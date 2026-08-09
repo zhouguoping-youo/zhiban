@@ -204,6 +204,25 @@ class AgentDataRepositoryTest {
     }
 
     @Test
+    fun duplicatePhonesInsideOneSystemImportBatchCollapseToOneContact() = runBlocking {
+        val summary = repository.importConfirmedSystemContacts(
+            listOf(
+                systemContact("android-a", "张老师", "138-0013-8000"),
+                systemContact("android-b", "张三", "+86 138 0013 8000"),
+            ),
+            ownerPhone = null,
+            ownerWechatId = null,
+            ownerName = null,
+            nowEpochMs = 2_000L,
+        )
+
+        assertEquals(1, summary.created)
+        assertEquals(1, summary.updated)
+        assertEquals(1, repository.observeRawContacts().first().size)
+        assertNotNull(database.contactKnowledgeDao().findContactByMethod("PHONE", "13800138000"))
+    }
+
+    @Test
     fun editingUserPhoneRemovesStaleNormalizedIdentity() = runBlocking {
         val contactId = repository.saveUserContact(
             null, "联系人", "138-0013-8000", "old-wechat", "旧公司", "旧职位", "旧标签", null, 1_000L,
@@ -708,6 +727,38 @@ class AgentDataRepositoryTest {
                 it.factType == "INTERACTION_SUMMARY"
             },
         )
+    }
+
+    @Test
+    fun confirmedPlatformHandlesMatchWechatFeishuDingtalkAndQqCandidates() = runBlocking {
+        val now = System.currentTimeMillis()
+        val contactId = repository.saveUserContact(
+            null, "跨平台联系人", null, null, null, null, null, null, nowEpochMs = now,
+        )
+        val platforms = listOf("WECHAT", "FEISHU", "DINGTALK", "QQ")
+        platforms.forEach { platform ->
+            repository.addContactPlatformIdentity(contactId, platform, " @Account-88 ", nowEpochMs = now)
+            val candidateId = "platform-${platform.lowercase()}"
+            repository.stageNotificationCandidate(
+                NotificationCandidateEntity(
+                    candidateId = candidateId,
+                    sourceKey = "source-$candidateId",
+                    packageName = "test.$platform",
+                    appLabel = platform,
+                    title = "Account-88",
+                    body = "收到",
+                    postedAtEpochMs = now,
+                    platform = platform,
+                    conversationTitle = "Account-88",
+                    senderName = " account-88 ",
+                ),
+            )
+
+            val matched = requireNotNull(database.notificationCandidateDao().find(candidateId))
+            assertEquals(contactId, matched.suggestedContactId)
+            assertEquals(1.0, matched.suggestedContactConfidence, 0.0)
+            assertEquals(contactId, matched.linkedContactId)
+        }
     }
 
     @Test

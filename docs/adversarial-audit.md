@@ -81,21 +81,21 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 ## 维度 4 · 联系人链路
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
 |---|---|---|---|---|---|---|
-| 4.1 | 合并联系人撤销图谱恢复 | ⬜ | | | | |
-| 4.2 | 软删联系人后 Fact/关系/活动清理 | ⬜ | | | | |
-| 4.3 | 通讯录导入重复联系人重复条目 | ⬜ | | | | |
+| 4.1 | 合并联系人撤销图谱恢复 | ⚪ | — | 未复现：合并时不改写原边，图查询动态投影 canonical；撤销后 source 重新可见，边端点和触达关系恢复 | — | `ContactDaoTest.mergedSourceIsHiddenFromSearchAndGraphUntilUndo`、`ContactMergeChainTest.undoConfirmedMergeRestoresSourceVisibilityAndClearsLink` |
+| 4.2 | 软删联系人后 Fact/关系/活动清理 | ⚪ | — | 未复现：删除对整个活动身份簇同事务软删，关系边/关系事件置 INACTIVE、Fact 置 REVOKED，查询层也过滤遗留软删数据；合并撤销不能复活 | — | `AgentDataRepositoryTest.deletingMergedContactClusterHidesDerivedFactsRelationshipsAndEvents`、`ContactDaoTest.legacySoftDeletedContactCannotLeakThroughFactsOrGraph` |
+| 4.3 | 通讯录导入重复联系人重复条目 | ⚪ | — | 未复现：单批先按 sourceId 去重，再按规范手机号/微信方法逐条匹配；前一条写入的方法在同一事务内对后一条立即可见，格式不同也只保留一个联系人 | — | `AgentDataRepositoryTest.duplicatePhonesInsideOneSystemImportBatchCollapseToOneContact`、`systemImportMatchesExistingFormattedPhoneThroughCanonicalContactMethod` |
 | 4.4 | 智能完善建议过期后能否确认 | ✅ | 数据完整性 | 确认入口曾直接使用 UI 传回的候选对象，不回读状态/有效期；候选被清理后旧页面仍能写联系人，调用方还能替换 proposedValue。现事务内回读持久候选，只接受未过期 PENDING，并检查资料写与状态转换结果 | 本提交 `fix(4.4)` | `ContactEnrichmentConfirmTest.staleUiCannotApplyExpiredOrPurgedEnrichment`、`confirmUsesPersistedCandidateInsteadOfCallerModifiedPayload` + 既有确认回归 |
-| 4.5 | 合并后搜索仍显示已合并联系人 | ⬜ | | | | |
-| 4.6 | 编辑后 normalizedValue 更新 | ⬜ | | | | |
+| 4.5 | 合并后搜索仍显示已合并联系人 | ⚪ | — | 未复现：搜索命中 source 的 FTS/别名/方法时只投影 canonical，活动合并源不会形成第二条；撤销后 source 恢复 | — | `ContactDaoTest.mergedSourceIsHiddenFromSearchAndGraphUntilUndo` |
+| 4.6 | 编辑后 normalizedValue 更新 | ⚪ | — | 未复现：用户编辑会先删除 USER 来源旧 PHONE/WECHAT 方法，再用共享规范函数重建；旧号码/账号不再可检索，新值立即命中 | — | `AgentDataRepositoryTest.editingUserPhoneRemovesStaleNormalizedIdentity` |
 | 4.7 | 删除后 CRM primaryContactId SET_NULL | ✅ | 数据完整性 | CRM 外键的 SET_NULL/CASCADE 只在物理删除触发，联系人产品删除实际是软删，导致商机等继续持有不可打开的隐藏 contactId。现软删事务显式模拟外键语义：可空 CRM 联系人引用统一置空、stakeholder 关联删除，业务快照和历史记录保留 | 本提交 `fix(4.7)` | `ContactSoftDeleteCrmTest.softDeleteDetachesEveryCrmContactReferenceAndPreservesBusinessHistory` |
 | 4.8 | 智能完善模型返回非法 JSON 崩溃 | ✅ | 稳定性（roadmap 路径） | 保留的 LLM 智能完善 Provider 对无数组、坏 JSON、字段类型错误会直接抛异常；虽尚未接 UI，启用后会把模型格式偏差升级成链路失败。现所有外部结构先安全校验，非法项/非法整体返回空候选且不写数据 | 本提交 `fix(4.8)` | `LlmContactEnrichmentProviderTest.malformed model output is ignored instead of crashing enrichment` + 有效输出/代码围栏回归 |
 | 4.9 | 合并后通话记录仍关联已合并联系人 | ✅ | 体验/数据可见性 | 联系人时间线查询已做 canonical 匹配，但首页挂断备注使用原始 linkedContactId；合并源被联系人列表隐藏后卡片姓名为空。pending call Flow 现与活动合并映射组合投影，撤销即恢复 source，原始通话外键不被破坏 | 本提交 `fix(4.9)` | `CallLogImporterTest.pendingCallAndContactTimelineProjectActiveMergeAndUndoRestoresSource` |
 | 4.10 | 合并后通知候选仍关联已合并联系人 | ✅ | 功能不可用 | 联系人列表隐藏合并源，但通知候选 Flow 原样返回 source 的 suggested/linkedContactId，候选卡无法找到联系人名称和正确入口。现将候选与活动合并映射组合投影为 canonical；不改原外键，撤销后即时恢复 source | 本提交 `fix(4.10)` | `AgentDataRepositoryTest.notificationCandidateProjectsMergedContactAndUndoRestoresSource` |
 | 4.11 | 合并后 CRM 商机仍关联已合并联系人 | ✅ | 功能不可用 | 通话和关系查询已按 contact_merge_links 投影主联系人，但 CRM 六条按联系人查询仍原始等值匹配；合并源的线索、商机、活动和动作会从主联系人详情消失。现统一 canonical 映射，撤销合并自动恢复原作用域且不改写外键 | 本提交 `fix(4.11)` | `CrmContactLinkTest.mergedContactSeesSourceCrmRecordsAndUndoRestoresOriginalScope` + 原联系人过滤回归 |
-| 4.12 | 智能完善确认覆盖用户已有数据 | ⬜ | | | | |
+| 4.12 | 智能完善确认覆盖用户已有数据 | ⚪ | — | 未复现：确认写入是 additive-only，逐字段只填空值；已有公司等用户数据保持不变，候选仍被正常处理 | — | `ContactEnrichmentConfirmTest.confirmNeverOverwritesExistingNonBlankValue` |
 | 4.13 | 智能完善拒绝后能否再生成 | ✅ | 数据完整性 | 候选主键由 runId+providerCallId 稳定生成，但 REPLACE 会在同一调用重放时把用户已拒绝的 DISMISSED 覆盖回 PENDING。现改为 INSERT IGNORE：同一证据不可复活，新 providerCallId/新证据仍可生成独立候选 | 本提交 `fix(4.13)` | `ContactEnrichmentConfirmTest.replayCannotResurrectDismissedCandidateButNewEvidenceCanBeStaged` |
-| 4.14 | 多平台账号(微信/飞书/钉钉/QQ)匹配 | ⬜ | | | | |
-| 4.15 | 电话格式不一致匹配失败 | ⬜ | | | | |
+| 4.14 | 多平台账号(微信/飞书/钉钉/QQ)匹配 | ⚪ | — | 未复现：平台与 handle 分别规范化，已确认身份按 platform+normalizedHandle 精确匹配；四个平台候选均以 1.0 置信关联同一联系人 | — | `AgentDataRepositoryTest.confirmedPlatformHandlesMatchWechatFeishuDingtalkAndQqCandidates` |
+| 4.15 | 电话格式不一致匹配失败 | ⚪ | — | 未复现：共享号码规范支持分隔符、空格、+86 与本地 11 位号码等价；导入、方法检索和合并建议均使用规范值 | — | `RelationPhoneMatchingTest.formattedAndCanonicalPhoneNumbersMatch`、`AgentDataRepositoryTest.systemImportMatchesExistingFormattedPhoneThroughCanonicalContactMethod` |
 
 ## 维度 5 · 日历链路
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
