@@ -187,22 +187,22 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 ## 维度 11 · 权限与隐私
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
 |---|---|---|---|---|---|---|
-| 11.1 | 通知监听撤销后仍采集 | ⬜ | | | | |
-| 11.2 | 无障碍撤销后崩溃 | ⬜ | | | | |
-| 11.3 | 通话记录撤销后崩溃 | ⬜ | | | | |
-| 11.4 | 录音撤销后崩溃 | ⬜ | | | | |
-| 11.5 | 通讯录撤销后崩溃 | ⬜ | | | | |
-| 11.6 | 日历撤销后崩溃 | ⬜ | | | | |
-| 11.7 | 敏感数据脱敏后发送 | ⬜ | | | | |
-| 11.8 | 敏感数据写入日志 | ⬜ | | | | |
-| 11.9 | 敏感数据写未加密存储 | ⬜ | | | | |
-| 11.10 | 无障碍截图 Bitmap 释放 | ⬜ | | | | |
-| 11.11 | 通知含验证码过滤 | ⬜ | | | | |
+| 11.1 | 通知监听撤销后仍采集 | 🖐 | 隐私（需系统设置实测） | Android 撤销通知使用权后系统应解绑 Listener，进程内没有旁路读取通知；断连只记录时间并请求系统 rebind。需在系统设置撤销后发送唯一测试通知，确认候选计数不增，再恢复权限 | — | SM-W7023 人工权限步骤 |
+| 11.2 | 无障碍撤销后崩溃 | 🖐 | 功能不可用（需系统设置实测） | 服务所有入口受系统绑定与用户总开关约束，销毁时清 Handler、Recognizer 和 scope；需录入草稿后在系统设置关闭知伴无障碍，确认无崩溃且不再生成发出候选 | — | SM-W7023 人工权限步骤 |
+| 11.3 | 通话记录撤销后崩溃 | 🖐 | 功能不可用（需权限切换实测） | Source 查询前检查 `READ_CALL_LOG`，同步协调器对检查后竞态产生的 `SecurityException` 降级为空；需在一次增量同步前撤销权限并确认同步安静结束、游标不错误前移 | — | `CallLogAccessProbeTest` + SM-W7023 人工权限步骤 |
+| 11.4 | 录音撤销后崩溃 | 🖐 | 隐私/功能不可用（需录音中实测） | 采集循环把 AudioRecord 负错误码转成明确失败并停止，finally 清零帧缓冲，停止路径释放 recorder/effects；仍需录音中途撤销麦克风权限验证三星驱动实际返回值与 UI 终态 | — | `StepFunRealtimeProtocolTest.audio read failures are terminal` + SM-W7023 人工权限步骤 |
+| 11.5 | 通讯录撤销后崩溃 | 🖐 | 功能不可用（需权限切换实测） | Reader 查询前检查 `READ_CONTACTS`，查询竞态走 `runSuspendCatching` 返回固定错误而非崩溃；需导入页打开期间撤销权限验证页面提示与零落库 | — | `SystemContactReader` 代码审查 + SM-W7023 人工权限步骤 |
+| 11.6 | 日历撤销后崩溃 | 🖐 | 功能不可用（需权限切换实测） | Reader 查询前检查 `READ_CALENDAR`，Provider 异常降级为空结果；需系统日历二级页打开期间撤销权限，确认无崩溃、无半写入 | — | `SystemCalendarReader` 代码审查 + SM-W7023 人工权限步骤 |
+| 11.7 | 敏感数据脱敏后发送 | ⚪ | — | 所有模型请求经 `PolicyEnforcingProviderAdapter`；自动检索 PERSONAL 的手机号/邮箱/身份证脱敏，SENSITIVE 整块省略，工具观察结构化私有字段清除，自动敏感附件 fail-closed | 审计提交 | `OutboundDataPolicyTest.automaticallyRetrievedPersonalIdentifiersAreRedactedWithoutTruncatingContext` + `toolObservationRemovesStructuredPrivateFieldsButKeepsUsefulProfileFields` + `userAuthoredIdentifiersRemainIntactButAutomaticSensitiveContentIsOmitted` |
+| 11.8 | 敏感数据写入日志 | ⚪ | — | 生产 Kotlin 无 `Log/println/printStackTrace/Timber` 调用；出站审计仅保存通道、敏感度、数量、结果和时间，不记录正文/音频/工具参数，Provider 错误仅保留固定码和安全 requestId | 审计提交 | `ProviderModuleTest.redactorRemovesCanaryBearerAndRejectsUnsafeRequestId` + 全生产源码静态扫描 |
+| 11.9 | 敏感数据写未加密存储 | ⚪ | — | Room 主库由 Keystore 包裹随机密钥的 SQLCipher 打开，旧明文库原子迁移；API Key/用户档案使用加密偏好或加密文件，Manifest 禁止备份数据库与设备迁移 | 审计提交 | `AgentDatabaseEncryptionTest.plaintextDatabaseIsAtomicallyEncryptedAndReopensWithStableKeystoreKey` + `newRoomDatabaseIsEncryptedAndReopensWithoutDataLoss` |
+| 11.10 | 无障碍截图 Bitmap 释放 | ⚪ | — | 截图 hardwareBuffer 在复制后立即 close；Bitmap 在 OCR 启动失败回调和完成回调两条路径 recycle，服务销毁关闭 recognizer；截图不落盘且只在知伴发起的待验证 handoff 期间触发 | 审计提交 | `ScreenshotOcrResourceTest` + `OutgoingMessageAccessibilityService.recognizeExpectedHandoffScreenshot` 资源路径审查 |
+| 11.11 | 通知含验证码过滤 | ⚪ | — | 中英文 OTP/验证码/动态口令/交易密码及邻近 4–8 位码在 Parser 入库前丢弃，发出消息候选复用同一过滤器；SMS 默认未启用且服务号另有阻断 | 审计提交 | `SocialMessagePerceptionTest.verificationCodesAndUnsupportedAppsAreNeverStaged` + `OutgoingMessageCandidateTest` |
 | 11.12 | 通知含银行卡号过滤 | ✅ | 隐私泄露 | 原过滤器只覆盖验证码、密码和密钥，普通社交消息里的银行卡号可进入候选；现按银行卡关键词邻近数字/掩码过滤，并对无关键词的 13–19 位号码用 Luhn 校验，避免把普通长编号一律误杀 | 本提交 `fix(11.12)` | `SocialMessagePerceptionTest.verificationCodesAndUnsupportedAppsAreNeverStaged` |
-| 11.13 | 通话含敏感号码(10086)过滤 | ⬜ | | | | |
-| 11.14 | 语音上传前明确授权 | ⬜ | | | | |
-| 11.15 | 联系人上传前明确授权 | ⬜ | | | | |
-| 11.16 | 消息内容上传前明确授权 | ⬜ | | | | |
+| 11.13 | 通话含敏感号码(10086)过滤 | ⚪ | — | 100xx、95/96、106 等服务短号在社交通知解析和自动关系证据阶段均 fail-closed；通话日志只把号码可识别且能匹配真实联系人的记录关联关系，不会为服务号自动建联系人 | 审计提交 | `SocialMessagePerceptionTest.genericOrBroadcastSmsIsNotAddedToRelationshipInbox` + `AgentDataRepositoryTest.purgeNonPersonalSmsCandidates` + `CallLogSyncCoordinator` 代码审查 |
+| 11.14 | 语音上传前明确授权 | ⚪ | — | ASR_BATCH/REALTIME 默认关闭；每次发送音频前由 `OutboundExportGate` 检查独立“允许语音识别上云”同意，拒绝时不读取凭据、不调用 transport，并记录不含正文的阻断审计 | 审计提交 | `ProviderCloudAsrGatewayTest.cloud speech is blocked before credential and transport without consent` + `StepFunRealtimeVoiceControllerTest.startWithoutCloudSpeechConsentFailsWithActionableMessage` |
+| 11.15 | 联系人上传前明确授权 | ⚪ | — | App 不批量上传通讯录；仅在用户发起模型请求时注入相关联系人摘要。自动手机号/邮箱等始终脱敏、关系边等 SENSITIVE 省略，设置页可关闭全部自动个人资料发送；主动联系人完善也经过同一出站策略 | 审计提交 | `OutboundDataPolicyTest.userCanDisableAllAutomaticallyRetrievedPersonalContext` + `LlmContactEnrichmentProviderTest` |
+| 11.16 | 消息内容上传前明确授权 | ⚪ | — | 用户在问问点发送的原文属于当次主动授权；通知/记忆自动检索内容标为 AUTO_RETRIEVED，经策略脱敏或省略后才进入模型，原始通知候选不会直接裸发。远程 MCP/语音另有默认关闭的独立同意门 | 审计提交 | `OutboundDataPolicyTest.userAuthoredIdentifiersRemainIntactButAutomaticSensitiveContentIsOmitted` + `ProviderRetrievalRerankerTest` |
 
 ## 维度 12 · 性能与内存
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
