@@ -114,5 +114,9 @@ class AgentProjectionUiMapperTest {
 
         val invalidTool = mapped("INVALID_TOOL_CALL")
         assertTrue(invalidTool.safeMessage!!.contains("可安全执行"))
+
+        val tls = mapped("TLS_VERIFICATION_FAILED")
+        assertTrue(tls.safeMessage!!.contains("安全连接验证失败"))
+        assertFalse(tls.safeMessage!!.contains("certificate", ignoreCase = true))
     }
 }

@@ -178,7 +178,7 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | 10.5 | 网络断开离线提示 | ⬜ | | | | |
 | 10.6 | 网络恢复自动重试 | ⬜ | | | | |
 | 10.7 | API Key 过期明确提示 | ⬜ | | | | |
-| 10.8 | 证书锁定失败明确提示 | ⬜ | | | | |
+| 10.8 | 证书锁定失败明确提示 | ✅ | 功能不可用/安全 | TLS 主机或 SPKI 校验失败原先作为普通 IOException 重试，最终只显示网络不可用；Provider 传输边界现映射为不可重试的 `TLS_VERIFICATION_FAILED`，运行记录保留固定码，UI 明确提示安全连接验证失败且不泄露证书细节 | 本提交 `fix(10.8)` | `ProviderModuleTest.tlsVerificationFailureIsSafeAndNeverRetryableForProbeOrStream` + `AgentProjectionUiMapperTest.failure taxonomy maps to actionable safe Chinese messages` |
 | 10.9 | 流式中断显示已接收部分 | ⬜ | | | | |
 | 10.10 | 流式重复去重 | ⬜ | | | | |
 | 10.11 | 响应>100KB OOM | ⬜ | | | | |

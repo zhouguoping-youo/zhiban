@@ -33,6 +33,7 @@ object AgentProjectionUiMapper {
                 cancelling -> "正在取消，请稍候…"
                 projection.safeFailureCode == "PROVIDER_NOT_CONFIGURED" -> "尚未配置大模型服务，请先完成连接设置。"
                 projection.safeFailureCode == "AUTHENTICATION_FAILED" -> "大模型连接验证失败，请检查设置后重试。"
+                projection.safeFailureCode == "TLS_VERIFICATION_FAILED" -> "安全连接验证失败，请检查网络环境或更新知伴后重试。"
                 projection.safeFailureCode == "RATE_LIMITED" -> "请求较多，请稍后重试。"
                 projection.safeFailureCode == "INSUFFICIENT_QUOTA" -> "阶跃星辰账户余额或套餐额度不足，请检查服务商账户。"
                 projection.safeFailureCode == "INPUT_SENSITIVE" -> "输入内容未通过阶跃星辰安全检查，请调整后重新发送。"

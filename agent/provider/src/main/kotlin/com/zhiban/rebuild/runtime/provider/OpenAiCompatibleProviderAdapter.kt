@@ -2,6 +2,7 @@ package com.zhiban.rebuild.runtime.provider
 
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
+import javax.net.ssl.SSLPeerUnverifiedException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -65,6 +66,8 @@ class OpenAiCompatibleProviderAdapter(
                     bytes.fill(0)
                 }
             }
+        } catch (_: SSLPeerUnverifiedException) {
+            throw ProviderFailure("TLS_VERIFICATION_FAILED", retryable = false)
         } finally {
             active.remove(requestId, call)
         }
@@ -217,6 +220,8 @@ class OpenAiCompatibleProviderAdapter(
                     }
                 }
             }
+        } catch (_: SSLPeerUnverifiedException) {
+            throw ProviderFailure("TLS_VERIFICATION_FAILED", retryable = false)
         } finally {
             active.remove(request.requestId, call)
         }

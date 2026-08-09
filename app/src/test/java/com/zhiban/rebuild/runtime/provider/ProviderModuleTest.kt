@@ -2,6 +2,7 @@ package com.zhiban.rebuild.runtime.provider
 
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.SSLPeerUnverifiedException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.toList
@@ -209,6 +210,29 @@ class ProviderModuleTest {
         val httpFailure = runCatching { http.probe(profile) }.exceptionOrNull() as ProviderFailure
         assertEquals("AUTHENTICATION_FAILED", httpFailure.code)
         assertEquals("req_safe", httpFailure.safeRequestId)
+    }
+
+    @Test fun tlsVerificationFailureIsSafeAndNeverRetryableForProbeOrStream() = runBlocking {
+        val adapter = OpenAiCompatibleProviderAdapter(ThrowingCallFactory(), resolver, registry, clock = { 10 })
+
+        val probeFailure = runCatching { adapter.probe(profile) }.exceptionOrNull() as ProviderFailure
+        assertEquals("TLS_VERIFICATION_FAILED", probeFailure.code)
+        assertFalse(probeFailure.retryable)
+
+        val streamFailure = runCatching {
+            adapter.stream(
+                ModelRequest(
+                    "tls-stream",
+                    OutboundChannel.LLM_INFERENCE,
+                    profile,
+                    listOf(userMessage("hello")),
+                    capability(100),
+                    20,
+                ),
+            ).toList()
+        }.exceptionOrNull() as ProviderFailure
+        assertEquals("TLS_VERIFICATION_FAILED", streamFailure.code)
+        assertFalse(streamFailure.retryable)
     }
 
     @Test fun standardCompatibleProviderErrorsAreMappedWithoutExposingMessages() = runBlocking {
@@ -650,6 +674,18 @@ class ProviderModuleTest {
         override fun isCanceled() = cancelled
         override fun timeout() = Timeout.NONE
         override fun clone(): Call = FixedCall(req, response)
+    }
+    private class ThrowingCallFactory : Call.Factory {
+        override fun newCall(request: Request): Call = object : Call {
+            override fun request() = request
+            override fun execute(): Response = throw SSLPeerUnverifiedException("test certificate detail")
+            override fun enqueue(responseCallback: Callback) = error("unused")
+            override fun cancel() = Unit
+            override fun isExecuted() = true
+            override fun isCanceled() = false
+            override fun timeout() = Timeout.NONE
+            override fun clone(): Call = newCall(request)
+        }
     }
     private class BlockingCallFactory : Call.Factory {
         val started = CountDownLatch(1)
