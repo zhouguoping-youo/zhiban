@@ -110,7 +110,7 @@ class AgentDataExportService @Inject internal constructor(
     private fun JsonWriter.writeConversation(turn: RuntimeConversationTurnEntity) {
         beginObject()
         name("role").value(turn.role)
-        name("text").value(redactor.redact(turn.content))
+        name("text").value(redactor.redactWithoutTruncation(turn.content))
         name("createdAtEpochMs").value(turn.createdAtEpochMs)
         endObject()
     }
@@ -118,48 +118,48 @@ class AgentDataExportService @Inject internal constructor(
     private fun JsonWriter.writeMemory(memory: MemoryEntity) {
         beginObject()
         name("kind").value(memory.kind)
-        name("content").value(redactor.redact(memory.content))
+        name("content").value(redactor.redactWithoutTruncation(memory.content))
         name("createdAtEpochMs").value(memory.createdAtEpochMs)
         endObject()
     }
 
     private fun JsonWriter.writeContact(contact: ContactEntity) {
         beginObject()
-        name("displayName").value(redactor.redact(contact.displayName))
-        name("phone").value(redactor.redact(contact.phone))
-        name("email").value(redactor.redact(contact.email))
-        name("wechatId").value(redactor.redact(contact.wechatId))
-        name("company").value(redactor.redact(contact.company))
-        name("title").value(redactor.redact(contact.title))
-        name("note").value(redactor.redact(contact.note))
+        name("displayName").value(redactor.redactWithoutTruncation(contact.displayName))
+        name("phone").value(redactor.redactWithoutTruncation(contact.phone))
+        name("email").value(redactor.redactWithoutTruncation(contact.email))
+        name("wechatId").value(contact.wechatId?.takeIf(String::isNotBlank)?.let { REDACTED_CONTACT_ID }.orEmpty())
+        name("company").value(redactor.redactWithoutTruncation(contact.company))
+        name("title").value(redactor.redactWithoutTruncation(contact.title))
+        name("note").value(redactor.redactWithoutTruncation(contact.note))
         name("source").value(contact.source)
         endObject()
     }
 
     private fun JsonWriter.writeSchedule(schedule: ScheduleEntity) {
         beginObject()
-        name("title").value(redactor.redact(schedule.title))
+        name("title").value(redactor.redactWithoutTruncation(schedule.title))
         name("startAtEpochMs").value(schedule.startAtEpochMs)
         name("durationMinutes").value(schedule.durationMinutes.toLong())
-        schedule.note?.let { name("note").value(redactor.redact(it)) }
+        schedule.note?.let { name("note").value(redactor.redactWithoutTruncation(it)) }
         schedule.reminderMinutesBefore?.let { name("reminderMinutesBefore").value(it.toLong()) }
         endObject()
     }
 
     private fun JsonWriter.writeLead(lead: CrmLeadEntity) {
         beginObject()
-        name("displayName").value(redactor.redact(lead.displayNameSnapshot))
-        lead.companyNameSnapshot?.let { name("company").value(redactor.redact(it)) }
+        name("displayName").value(redactor.redactWithoutTruncation(lead.displayNameSnapshot))
+        lead.companyNameSnapshot?.let { name("company").value(redactor.redactWithoutTruncation(it)) }
         name("status").value(lead.status)
         name("sourceType").value(lead.sourceType)
-        lead.fitSummary?.let { name("fitSummary").value(redactor.redact(it)) }
+        lead.fitSummary?.let { name("fitSummary").value(redactor.redactWithoutTruncation(it)) }
         endObject()
     }
 
     private fun JsonWriter.writeOpportunity(opportunity: CrmOpportunityEntity) {
         beginObject()
-        name("title").value(redactor.redact(opportunity.title))
-        name("account").value(redactor.redact(opportunity.accountNameSnapshot))
+        name("title").value(redactor.redactWithoutTruncation(opportunity.title))
+        name("account").value(redactor.redactWithoutTruncation(opportunity.accountNameSnapshot))
         name("stage").value(opportunity.stage)
         name("status").value(opportunity.status)
         opportunity.valueMinor?.let { name("valueMinor").value(it) }
@@ -170,8 +170,8 @@ class AgentDataExportService @Inject internal constructor(
     private fun JsonWriter.writeActivity(activity: CrmActivityEntity) {
         beginObject()
         name("activityType").value(activity.activityType)
-        name("title").value(redactor.redact(activity.title))
-        name("summary").value(redactor.redact(activity.summary))
+        name("title").value(redactor.redactWithoutTruncation(activity.title))
+        name("summary").value(redactor.redactWithoutTruncation(activity.summary))
         name("occurredAtEpochMs").value(activity.occurredAtEpochMs)
         endObject()
     }
@@ -179,7 +179,7 @@ class AgentDataExportService @Inject internal constructor(
     private fun JsonWriter.writeNextAction(action: CrmNextActionEntity) {
         beginObject()
         name("actionType").value(action.actionType)
-        name("title").value(redactor.redact(action.title))
+        name("title").value(redactor.redactWithoutTruncation(action.title))
         action.dueAtEpochMs?.let { name("dueAtEpochMs").value(it) }
         name("status").value(action.status)
         endObject()
@@ -190,5 +190,6 @@ class AgentDataExportService @Inject internal constructor(
         const val DIRECTORY = "data-export"
         const val DEFAULT_PAGE_SIZE = 200
         const val RETENTION_MS = 24L * 60 * 60 * 1_000
+        const val REDACTED_CONTACT_ID = "[REDACTED_CONTACT_ID]"
     }
 }

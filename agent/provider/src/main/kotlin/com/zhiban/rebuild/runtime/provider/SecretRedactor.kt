@@ -17,6 +17,12 @@ class SecretRedactor {
     private val mainlandId = Regex("(?<![0-9A-Za-z])\\d{17}[0-9Xx](?![0-9A-Za-z])")
 
     fun redact(value: String?, knownSecrets: Collection<String> = emptyList()): String {
+        val safe = redactWithoutTruncation(value, knownSecrets)
+        return safe.take(DIAGNOSTIC_MAX_LENGTH)
+    }
+
+    /** Redacts direct identifiers without applying the diagnostic-log length cap. */
+    fun redactWithoutTruncation(value: String?, knownSecrets: Collection<String> = emptyList()): String {
         if (value.isNullOrEmpty()) return ""
         var safe: String = value
         knownSecrets.filter { it.isNotEmpty() }.forEach { safe = safe.replace(it, "[REDACTED]") }
@@ -29,7 +35,7 @@ class SecretRedactor {
         safe = mainlandPhone.replace(safe, "[REDACTED_PHONE]")
         safe = email.replace(safe, "[REDACTED_EMAIL]")
         safe = mainlandId.replace(safe, "[REDACTED_ID]")
-        return if (looksLikeUnredactedSecret(safe)) "[REDACTED]" else safe.take(512)
+        return if (looksLikeUnredactedSecret(safe)) "[REDACTED]" else safe
     }
 
     fun safeRequestId(value: String?): String? = value
@@ -92,4 +98,8 @@ class SecretRedactor {
     )
 
     private fun looksLikeUnredactedSecret(value: String): Boolean = value.contains("sk-") && Regex("sk-[A-Za-z0-9_-]{8,}").containsMatchIn(value)
+
+    private companion object {
+        const val DIAGNOSTIC_MAX_LENGTH = 512
+    }
 }

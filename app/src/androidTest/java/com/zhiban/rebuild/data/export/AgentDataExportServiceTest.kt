@@ -49,7 +49,14 @@ class AgentDataExportServiceTest {
     }
 
     @Test fun exportRedactsPhoneEmailAndNeverContainsSecrets() = runBlocking {
-        database.contactDao().insert(contact("contact-1", phone = "13812345678", email = "person@example.com"))
+        database.contactDao().insert(
+            contact(
+                "contact-1",
+                phone = "13812345678",
+                email = "person@example.com",
+                wechatId = "wx_private_123",
+            ),
+        )
         database.scheduleDao().insert(schedule("sched-1", title = "和张三 13998765432 谈合作"))
         database.runtimeSessionDao().insert(RuntimeSessionEntity("session-1", updatedAtEpochMs = 10))
         database.runtimeRunDao().insert(run("run-1", "session-1"))
@@ -58,8 +65,23 @@ class AgentDataExportServiceTest {
         val exported = AgentDataExportService(context, database, SecretRedactor()).create(100).readText()
 
         assertTrue(exported.contains("REDACTED_NO_CREDENTIALS"))
-        listOf("13812345678", "13998765432", "person@example.com", "sk-CANARY")
+        listOf("13812345678", "13998765432", "person@example.com", "wx_private_123", "sk-CANARY")
             .forEach { forbidden -> assertFalse("leaked $forbidden", exported.contains(forbidden)) }
+        assertTrue(exported.contains("[REDACTED_CONTACT_ID]"))
+    }
+
+    @Test fun exportPreservesLongConversationAfterRedactingDirectIdentifiers() = runBlocking {
+        val tail = "TAIL_MUST_SURVIVE"
+        val content = "电话 13812345678 " + "长对话正文".repeat(180) + tail
+        database.runtimeSessionDao().insert(RuntimeSessionEntity("session-long", updatedAtEpochMs = 10))
+        database.runtimeRunDao().insert(run("run-long", "session-long"))
+        database.runtimeConversationTurnDao().insert(turn("turn-long", "session-long", "run-long", content))
+
+        val exported = AgentDataExportService(context, database, SecretRedactor()).create(102).readText()
+
+        assertFalse(exported.contains("13812345678"))
+        assertTrue(exported.contains("[REDACTED_PHONE]"))
+        assertTrue(exported.contains(tail))
     }
 
     @Test fun exportIncludesConversationAndCrmContent() = runBlocking {
@@ -112,13 +134,19 @@ class AgentDataExportServiceTest {
         createdAtEpochMs = 10,
     )
 
-    private fun contact(id: String, phone: String? = null, email: String? = null, name: String = "张三") = ContactEntity(
+    private fun contact(
+        id: String,
+        phone: String? = null,
+        email: String? = null,
+        wechatId: String? = null,
+        name: String = "张三",
+    ) = ContactEntity(
         contactId = id,
         displayName = name,
         normalizedName = name,
         phone = phone,
         email = email,
-        wechatId = null,
+        wechatId = wechatId,
         company = "知伴科技",
         title = "工程师",
         aliasesJson = "[]",
