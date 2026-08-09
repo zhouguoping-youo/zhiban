@@ -192,7 +192,7 @@ internal fun CrmConvertLeadDialog(lead: CrmLeadEntity, onDismiss: () -> Unit, on
     var account by remember(lead.leadId) { mutableStateOf(lead.companyNameSnapshot ?: lead.displayNameSnapshot) }
     var amountText by remember(lead.leadId) { mutableStateOf("") }
     var closeDateText by remember(lead.leadId) { mutableStateOf("") }
-    val amountValid = amountText.isBlank() || amountText.toDoubleOrNull()?.let { it >= 0 } == true
+    val amountValid = amountText.isBlank() || parseCrmMoneyMinor(amountText) != null
     val closeDateValid = closeDateText.isBlank() || runCatching { LocalDate.parse(closeDateText) }.isSuccess
     val canConfirm = title.isNotBlank() && account.isNotBlank() && amountValid && closeDateValid
 
@@ -255,7 +255,7 @@ internal fun crmLeadSourceLabel(sourceType: String): String = when (sourceType) 
 }
 
 private fun buildConversionInput(title: String, account: String, amountText: String, closeDateText: String): CrmLeadConversionInput {
-    val valueMinor = amountText.toDoubleOrNull()?.let { (it * 100).toLong() }
+    val valueMinor = parseCrmMoneyMinor(amountText)
     val closeAt = closeDateText.takeIf { it.isNotBlank() }?.let {
         runCatching { LocalDate.parse(it).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() }.getOrNull()
     }

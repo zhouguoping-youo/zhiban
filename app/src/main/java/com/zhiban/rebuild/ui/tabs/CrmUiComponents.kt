@@ -42,6 +42,7 @@ import com.zhiban.rebuild.ui.theme.ZhiBanSize
 import com.zhiban.rebuild.ui.theme.ZhiBanSpacing
 import com.zhiban.rebuild.ui.theme.ZhiBanTerracotta
 import com.zhiban.rebuild.ui.theme.ZhiBanTerracottaSoft
+import java.math.RoundingMode
 import java.text.NumberFormat
 import java.time.Instant
 import java.time.ZoneId
@@ -78,9 +79,20 @@ internal fun crmStakeholderRoleLabel(role: String): String = when (role) {
 
 internal fun formatCrmMoney(valueMinor: Long?, currencyCode: String): String {
     if (valueMinor == null) return "金额待确认"
-    val amount = valueMinor / 100.0
+    val amount = valueMinor.toBigDecimal().movePointLeft(2)
     val prefix = if (currencyCode == "CNY") "¥" else "$currencyCode "
-    return prefix + NumberFormat.getNumberInstance(Locale.CHINA).apply { maximumFractionDigits = 0 }.format(amount)
+    return prefix + NumberFormat.getNumberInstance(Locale.CHINA).apply { maximumFractionDigits = 2 }.format(amount)
+}
+
+/** Parses a user-entered major-unit amount into exact minor units without floating-point rounding or overflow. */
+internal fun parseCrmMoneyMinor(text: String): Long? {
+    val raw = text.trim()
+    if (raw.isEmpty()) return null
+    return runCatching {
+        val amount = raw.toBigDecimal()
+        require(amount.signum() >= 0)
+        amount.movePointRight(2).setScale(0, RoundingMode.UNNECESSARY).longValueExact()
+    }.getOrNull()
 }
 
 private val crmDateTimeFormatter = DateTimeFormatter.ofPattern("M月d日 E HH:mm", Locale.CHINA)
