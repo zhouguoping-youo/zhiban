@@ -3,6 +3,7 @@ package com.zhiban.rebuild
 import android.content.Intent
 import android.net.Uri
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.zhiban.rebuild.data.calendar.ScheduleReminderWorker
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -10,6 +11,21 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class SharedIntentExtractionTest {
+    @Test fun scheduleReminderFocusAcceptsOnlyPositiveEpochAndIgnoresMissingInput() {
+        assertNull(safeScheduleReminderEpoch(null))
+        assertNull(safeScheduleReminderEpoch(Intent()))
+        assertNull(
+            safeScheduleReminderEpoch(
+                Intent().putExtra(ScheduleReminderWorker.EXTRA_OPEN_SCHEDULE_AT, 0L),
+            ),
+        )
+        assertEquals(
+            1_800_000L,
+            safeScheduleReminderEpoch(
+                Intent().putExtra(ScheduleReminderWorker.EXTRA_OPEN_SCHEDULE_AT, 1_800_000L),
+            ),
+        )
+    }
     @Test
     fun malformedExtraTypesAreRejectedWithoutEscapingAnException() {
         val malformed = Intent(Intent.ACTION_SEND).apply {

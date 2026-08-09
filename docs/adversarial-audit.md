@@ -142,7 +142,7 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | 8.3 | 页面嵌套过深返回键混乱 | ⬜ | | | | |
 | 8.4 | 路由参数缺失崩溃 | ⬜ | | | | |
 | 8.5 | 旋转后导航状态丢失 | ⬜ | | | | |
-| 8.6 | 通知点击进入正确页面 | ⬜ | | | | |
+| 8.6 | 通知点击进入正确页面 | ✅ | 功能不可用 | 日程提醒原先没有 contentIntent，App 已在后台其他页面时点击毫无动作；通知现携带目标日程时间，MainActivity 只消费一次并把 NavHost 导航到对应日期。通话备注仍进入关系页待备注项 | 本提交 `fix(8.6)` | `ScheduleReminderPrivacyTest.lockScreenVersionDoesNotContainScheduleDetails`（含 contentIntent）+ `SharedIntentExtractionTest.scheduleReminderFocusAcceptsOnlyPositiveEpochAndIgnoresMissingInput` |
 | 8.7 | 分享 Intent 进入正确页面 | ⬜ | | | | |
 | 8.8 | CRM 建议点击进入正确页面 | ⬜ | | | | |
 

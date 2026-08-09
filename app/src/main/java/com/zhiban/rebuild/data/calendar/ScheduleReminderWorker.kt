@@ -4,7 +4,9 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
@@ -12,6 +14,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.zhiban.rebuild.MainActivity
 import com.zhiban.rebuild.R
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.ScheduleEntity
@@ -75,7 +78,7 @@ class ScheduleReminderWorker(appContext: Context, params: WorkerParameters) : Co
         )
         val time = Instant.ofEpochMilli(startAt).atZone(ZoneId.systemDefault())
             .format(DateFormats.Time)
-        val notification = buildScheduleReminderNotification(applicationContext, schedule.title, time)
+        val notification = buildScheduleReminderNotification(applicationContext, schedule.title, time, startAt)
         postNotification(scheduleId.hashCode() and Int.MAX_VALUE, notification)
         return Result.success()
     }
@@ -90,13 +93,24 @@ class ScheduleReminderWorker(appContext: Context, params: WorkerParameters) : Co
         const val KEY_SCHEDULE_ID = "scheduleId"
         const val KEY_START_AT = "startAtEpochMs"
         const val KEY_REMINDER_MINUTES = "reminderMinutesBefore"
+        const val EXTRA_OPEN_SCHEDULE_AT = "openScheduleAtEpochMs"
         private const val INVALID_REMINDER_MINUTES = Int.MIN_VALUE
         private const val CHANNEL_ID = "schedule-reminders"
     }
 }
 
 /** The private notification may show details after unlock; its public version never reveals schedule content. */
-internal fun buildScheduleReminderNotification(context: Context, title: String, formattedTime: String): android.app.Notification {
+internal fun buildScheduleReminderNotification(context: Context, title: String, formattedTime: String, startAtEpochMs: Long): android.app.Notification {
+    val openScheduleIntent = Intent(context, MainActivity::class.java).apply {
+        flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        putExtra(ScheduleReminderWorker.EXTRA_OPEN_SCHEDULE_AT, startAtEpochMs)
+    }
+    val contentIntent = PendingIntent.getActivity(
+        context,
+        startAtEpochMs.hashCode(),
+        openScheduleIntent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
     val publicVersion = NotificationCompat.Builder(context, "schedule-reminders")
         .setSmallIcon(R.drawable.ic_agent_conversations)
         .setContentTitle("知伴日程提醒")
@@ -110,6 +124,7 @@ internal fun buildScheduleReminderNotification(context: Context, title: String, 
         .setPriority(NotificationCompat.PRIORITY_HIGH)
         .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
         .setPublicVersion(publicVersion)
+        .setContentIntent(contentIntent)
         .setAutoCancel(true)
         .build()
 }

@@ -18,6 +18,7 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
 import com.zhiban.rebuild.data.agent.AgentDataRepository
+import com.zhiban.rebuild.data.calendar.ScheduleReminderWorker
 import com.zhiban.rebuild.data.calllog.CallHangupReconcileWorker
 import com.zhiban.rebuild.data.calllog.CallLogSyncCoordinator
 import com.zhiban.rebuild.data.notification.sharedTextCandidate
@@ -43,6 +44,7 @@ class MainActivity : ComponentActivity() {
 
     private val relationInboxRequest = mutableLongStateOf(0L)
     private val callNoteRequest = mutableLongStateOf(0L)
+    private val calendarFocusRequest = mutableLongStateOf(0L)
     private var textRecognizer: TextRecognizer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,11 +56,13 @@ class MainActivity : ComponentActivity() {
                 ZhiBanNavHost(
                     relationInboxRequest = relationInboxRequest.longValue,
                     callNoteRequest = callNoteRequest.longValue,
+                    calendarFocusRequest = calendarFocusRequest.longValue,
                 )
             }
         }
         acceptSharedContent(intent)
         acceptCallNoteRequest(intent)
+        acceptScheduleReminderRequest(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -66,6 +70,7 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         acceptSharedContent(intent)
         acceptCallNoteRequest(intent)
+        acceptScheduleReminderRequest(intent)
     }
 
     private fun acceptCallNoteRequest(intent: Intent?) {
@@ -73,6 +78,12 @@ class MainActivity : ComponentActivity() {
             callNoteRequest.longValue = System.currentTimeMillis()
             intent.removeExtra(CallHangupReconcileWorker.EXTRA_OPEN_CALL_NOTE)
         }
+    }
+
+    private fun acceptScheduleReminderRequest(intent: Intent?) {
+        val startAtEpochMs = safeScheduleReminderEpoch(intent) ?: return
+        calendarFocusRequest.longValue = startAtEpochMs
+        intent?.removeExtra(ScheduleReminderWorker.EXTRA_OPEN_SCHEDULE_AT)
     }
 
     override fun onResume() {
@@ -206,3 +217,7 @@ internal fun safeSharedText(intent: Intent): String? = runCatching {
 internal fun safeSharedImageUri(intent: Intent): Uri? = runCatching {
     IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
 }.getOrNull()
+
+internal fun safeScheduleReminderEpoch(intent: Intent?): Long? = intent
+    ?.getLongExtra(ScheduleReminderWorker.EXTRA_OPEN_SCHEDULE_AT, 0L)
+    ?.takeIf { it > 0L }

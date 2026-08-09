@@ -51,7 +51,7 @@ import com.zhiban.rebuild.ui.tabs.RelationTab
 import com.zhiban.rebuild.ui.tabs.SkillTab
 
 @Composable
-fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L, callNoteRequest: Long = 0L) {
+fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L, callNoteRequest: Long = 0L, calendarFocusRequest: Long = 0L) {
     val navController = rememberNavController()
     var internalRelationInboxRequest by remember { mutableLongStateOf(0L) }
     var lastHandledRelationInboxRequest by rememberSaveable { mutableLongStateOf(0L) }
@@ -70,6 +70,14 @@ fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L
         if (callNoteRequest > 0L) {
             navController.navigate(Relation) {
                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                launchSingleTop = true
+            }
+        }
+    }
+    LaunchedEffect(calendarFocusRequest) {
+        if (calendarFocusRequest > 0L) {
+            navController.navigate(Calendar(calendarFocusRequest)) {
+                popUpTo(navController.graph.findStartDestination().id) { saveState = false }
                 launchSingleTop = true
             }
         }
