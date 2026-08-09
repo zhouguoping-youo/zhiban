@@ -240,19 +240,19 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 ## 维度 14 · 状态与生命周期
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
 |---|---|---|---|---|---|---|
-| 14.1 | 杀后重启会话状态恢复 | ⬜ | | | | |
+| 14.1 | 杀后重启会话状态恢复 | ⚪ | — | 会话、run、attempt、事件与 UI projection 均落 SQLCipher Room；数据库关闭重开后可 claim 恢复句柄并继续状态机 | 审计提交 | `RoomRuntimeStoreTest.fileReopenRecoveryHandleCarriesSnapshotAndCanContinueWithClaimedLease` |
 | 14.2 | 杀后重启草稿保留 | ✅ | 数据丢失 | 问问输入正文原先只用 `remember`，Activity 重建/系统保存状态恢复后清空；现用 `rememberSaveable` 保存未发送正文 | 本提交 `fix(14.2)` | `AgentConversationScreenE2ETest.unsentDraftSurvivesSavedInstanceStateRestoration` |
 | 14.3 | 杀后重启未发消息保留 | ✅ | 数据丢失 | 未发送文本与草稿是同一状态，现可随 saved instance state 恢复；未发送附件仍只存在私有暂存并受到期清理，不把 Uri/文件句柄塞进 Bundle | 本提交 `fix(14.2)` | `AgentConversationScreenE2ETest.unsentDraftSurvivesSavedInstanceStateRestoration` |
-| 14.4 | 杀后重启未完成确认保留 | ⬜ | | | | |
-| 14.5 | 杀后重启自动写回执保留 | ⬜ | | | | |
+| 14.4 | 杀后重启未完成确认保留 | ⚪ | — | pending approval 由持久化 run 状态与 approval 事件重建；冷启动时 `GatewayRuntimeUiClient` 解析持久化 payload，确认/拒绝仍引用原 proposal | 审计提交 | `AgentSessionReducerTest`（approval proposalId/payloadRef 回放）+ `AgentRuntimeProjectionControllerTest`（确认/拒绝命令） |
+| 14.5 | 杀后重启自动写回执保留 | ⚪ | — | `change_log` 与 `auto_write_receipts` 同事务写入 Room，重建 Repository 后仍可观察；迁移测试覆盖旧库回执保留 | 审计提交 | `AutoWriteAtomicityTest` + `AutoWriteMigrationTest` + `AgentDataRepositoryTest.inferredReplyInteractionIsPersistedAsReversibleAutoWrite` |
 | 14.6 | 覆盖安装 API Key 丢失 | ⏭ | | 上一轮 #22 已修+真机验证 | `c685d9b` | 真机 |
-| 14.7 | 覆盖安装用户数据保留 | ⬜ | | | | |
-| 14.8 | 覆盖安装设置保留 | ⬜ | | | | |
-| 14.9 | 清除数据后真清空 | ⬜ | | | | |
-| 14.10 | 清除后残留文件 | ⬜ | | | | |
-| 14.11 | 清除后残留数据库 | ⬜ | | | | |
-| 14.12 | 清除后残留缓存 | ⬜ | | | | |
-| 14.13 | 卸载重装数据清空 | ⬜ | | | | |
+| 14.7 | 覆盖安装用户数据保留 | 🖐 | 数据丢失 | 当前设备承载用户数据，不执行破坏性升级矩阵；需一次性测试档案按“旧 APK 建数据→`adb install -r` 新 APK→逐表核对”验收 | | 手工升级矩阵 |
+| 14.8 | 覆盖安装设置保留 | 🖐 | 数据丢失 | 与 14.7 同批验证 DataStore、加密偏好和 Keystore；现有 API Key 覆盖安装修复不能替代全设置矩阵 | | 手工升级矩阵 |
+| 14.9 | 清除数据后真清空 | 🖐 | 隐私 | `pm clear` 会删除用户数据，禁止在当前用户档案执行；需专用测试档案清除后验证首次启动状态 | | 专用测试档案 |
+| 14.10 | 清除后残留文件 | 🖐 | 隐私 | 需专用测试档案在 `pm clear` 前后核对 app files/cache/no-backup 目录；当前真机不做破坏性操作 | | 专用测试档案 |
+| 14.11 | 清除后残留数据库 | 🖐 | 隐私 | 需专用测试档案清除后确认 SQLCipher DB/WAL/SHM 均不存在 | | 专用测试档案 |
+| 14.12 | 清除后残留缓存 | 🖐 | 隐私 | 需专用测试档案清除后核对附件暂存、OCR 与图片缓存；当前真机不做破坏性操作 | | 专用测试档案 |
+| 14.13 | 卸载重装数据清空 | 🖐 | 隐私 | 卸载会删除当前用户数据与凭据，禁止直接执行；需专用测试档案卸载/重装后核对 DB、设置与 Keystore 新建 | | 专用测试档案 |
 
 ## 维度 15 · 特殊场景（多需人工/环境）
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
