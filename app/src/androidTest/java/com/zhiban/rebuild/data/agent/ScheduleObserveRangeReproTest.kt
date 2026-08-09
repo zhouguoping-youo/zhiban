@@ -76,4 +76,27 @@ class ScheduleObserveRangeReproTest {
         val after = database.scheduleDao().observeRange(from, to).first()
         assertEquals(listOf("schedule-today-16"), after.map { it.id })
     }
+
+    @Test fun crossMidnightScheduleIsVisibleOnEveryOverlappedDay() = runBlocking {
+        val zone = ZoneId.systemDefault()
+        val firstDay = LocalDate.of(2026, 8, 8)
+        val firstStart = firstDay.atStartOfDay(zone).toInstant().toEpochMilli()
+        val secondStart = firstDay.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        val thirdStart = firstDay.plusDays(2).atStartOfDay(zone).toInstant().toEpochMilli()
+        val startsAt = firstDay.atTime(23, 30).atZone(zone).toInstant().toEpochMilli()
+        database.scheduleDao().insert(schedule("cross-midnight", "跨天值守", startsAt).copy(durationMinutes = 120))
+
+        assertEquals(
+            listOf("cross-midnight"),
+            database.scheduleDao().observeRange(firstStart, secondStart - 1).first().map { it.id },
+        )
+        assertEquals(
+            listOf("cross-midnight"),
+            database.scheduleDao().observeRange(secondStart, thirdStart - 1).first().map { it.id },
+        )
+        assertEquals(
+            listOf("cross-midnight"),
+            database.scheduleDao().searchRange("值守", secondStart, thirdStart - 1, 20).map { it.id },
+        )
+    }
 }

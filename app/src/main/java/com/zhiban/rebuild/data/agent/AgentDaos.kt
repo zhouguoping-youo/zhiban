@@ -19,18 +19,25 @@ interface ScheduleDao {
     suspend fun findByRunId(runId: String): List<ScheduleEntity>
 
     @Query(
-        "SELECT id, title, startAtEpochMs, durationMinutes, note, reminderMinutesBefore FROM schedules WHERE startAtEpochMs BETWEEN :fromEpochMs AND :toEpochMs ORDER BY startAtEpochMs",
+        """SELECT id, title, startAtEpochMs, durationMinutes, note, reminderMinutesBefore FROM schedules
+           WHERE startAtEpochMs <= :toEpochMs
+             AND (startAtEpochMs + durationMinutes * 60000) > :fromEpochMs
+           ORDER BY startAtEpochMs""",
     )
     fun observeRange(fromEpochMs: Long, toEpochMs: Long): Flow<List<ScheduleProjection>>
 
     @Query(
-        "SELECT id, title, startAtEpochMs, durationMinutes, note, reminderMinutesBefore FROM schedules WHERE startAtEpochMs BETWEEN :fromEpochMs AND :toEpochMs ORDER BY startAtEpochMs LIMIT :limit",
+        """SELECT id, title, startAtEpochMs, durationMinutes, note, reminderMinutesBefore FROM schedules
+           WHERE startAtEpochMs <= :toEpochMs
+             AND (startAtEpochMs + durationMinutes * 60000) > :fromEpochMs
+           ORDER BY startAtEpochMs LIMIT :limit""",
     )
     suspend fun listRange(fromEpochMs: Long, toEpochMs: Long, limit: Int): List<ScheduleProjection>
 
     @Query(
         """SELECT id, title, startAtEpochMs, durationMinutes, note, reminderMinutesBefore FROM schedules
-           WHERE startAtEpochMs >= :fromEpochMs AND startAtEpochMs < :toEpochMs
+           WHERE startAtEpochMs <= :toEpochMs
+             AND (startAtEpochMs + durationMinutes * 60000) > :fromEpochMs
              AND (:query = '' OR title LIKE '%' || :query || '%' OR note LIKE '%' || :query || '%')
            ORDER BY startAtEpochMs LIMIT :limit""",
     )
