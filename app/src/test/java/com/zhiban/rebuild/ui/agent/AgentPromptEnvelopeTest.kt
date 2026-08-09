@@ -20,4 +20,18 @@ class AgentPromptEnvelopeTest {
     fun leavesOrdinaryUserInputUntouched() {
         assertEquals("明天下午提醒我开会", AgentPromptEnvelope.displayText("明天下午提醒我开会"))
     }
+
+    @Test
+    fun legacyCrmCreateInstructionIsPresentedAsNaturalLanguage() {
+        val legacy = "请使用个人 CRM 工具创建机会。主要联系人可选：我明确提到联系人时先调用 contact.search 确认"
+
+        assertEquals("帮我新建一个个人 CRM 机会", AgentPromptEnvelope.displayText(legacy))
+    }
+
+    @Test
+    fun legacyCrmSuggestionKeepsOnlyItsUserFacingTitle() {
+        val legacy = "请先调用 crm.opportunity.get 查询机会，再分析建议“联系采购负责人”的依据和下一步。"
+
+        assertEquals("帮我分析：联系采购负责人", AgentPromptEnvelope.displayText(legacy))
+    }
 }
