@@ -144,21 +144,24 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 ## 维度 9 · 数据与持久化
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
 |---|---|---|---|---|---|---|
-| 9.1 | 数据库迁移失败崩溃 | ⬜ | | | | |
-| 9.2 | SQLCipher 密钥丢失打不开 | ⬜ | | | | |
-| 9.3 | 数据库文件损坏崩溃 | ⬜ | | | | |
-| 9.4 | 并发写入死锁 | ⬜ | | | | |
-| 9.5 | Room 查询超时 ANR | ⬜ | | | | |
+| 9.1 | 数据库迁移失败崩溃 | 🧪 | 数据丢失风险 | 1→34 每条迁移均有 MigrationTestHelper 覆盖且最新全链迁移通过；真正失败时 Room 会拒绝打开以避免破坏数据。恢复界面需先定义“保留损坏库/导出/重置”产品策略，不能用 destructive fallback 冒充修复 | — | `FactIndexMigrationTest` 全链 + 各版本专项迁移测试；需专用损坏数据库安装包验收恢复 UX |
+| 9.2 | SQLCipher 密钥丢失打不开 | 🧪 | 数据丢失风险 | Keystore 包裹密钥丢失时当前明确 fail-closed，数据库不会被静默重建；密钥不可恢复，需产品裁断灾难恢复/导出策略后才能做 UI 闭环，禁止在用户真机删除密钥试验 | — | `AgentDatabaseEncryptionTest` 覆盖稳定密钥与重开；密钥丢失需隔离测试包 |
+| 9.3 | 数据库文件损坏崩溃 | 🧪 | 数据丢失风险 | SQLCipher 打开损坏文件会拒绝读取，当前无安全的隔离/恢复界面；不能自动删库。需构造损坏库的隔离安装包，并在产品确定保留原文件、诊断导出和重置路径后验收 | — | 明文转密文前执行 `integrity_check`/`cipher_integrity_check`；运行期损坏恢复待专用环境 |
+| 9.4 | 并发写入死锁 | ⚪ | — | 生产多表写统一走 Room `withTransaction`，Room 事务执行器串行化；SM-W7023 全量设备测试与自动写原子性/Runtime 并发回归未出现死锁或半写 | 审计提交 | `AutoWriteAtomicityTest` + `RoomRuntimeStoreTest` + `RuntimeGatewayTest` |
+| 9.5 | Room 查询超时 ANR | ⚪ | — | 生产数据库未启用 `allowMainThreadQueries`，DAO 均由 suspend/Flow 或 IO 工作线程消费；真机全量回归未出现主线程数据库访问或 ANR。测试内的 `allowMainThreadQueries` 仅用于隔离数据库 | 审计提交 | SM-W7023 319 项设备回归 + 代码审查 |
 | 9.6 | 导出文件过大 OOM | ✅ | 功能不可用 | 原实现一次加载各表全部实体，再构建完整 JSON 树和编码字符串，峰值内存随全量数据多重增长；改为每页 200 条读取并直接流式写入临时文件，完成后原子提交 | 本提交 `fix(9.6)` | `AgentDataExportServiceTest.exportStreamsEveryPageWithoutDroppingRows` + 既有完整性/脱敏测试 |
 | 9.7 | 导出含敏感信息脱敏 | ✅ | 数据完整性 / 隐私 | 导出误用诊断日志的 512 字符脱敏上限，长对话和备注尾部被静默截断；结构化微信号也不匹配通用正则而原样导出。导出改用不截断的脱敏路径，联系通道 ID 按字段整体隐藏，诊断日志仍保留原上限 | 本提交 `fix(9.7)` | `AgentDataExportServiceTest.exportRedactsPhoneEmailAndNeverContainsSecrets` + `exportPreservesLongConversationAfterRedactingDirectIdentifiers` |
-| 9.8 | 清除后是否真删除(非软删) | ⬜ | | | | |
+| 9.8 | 清除后是否真删除(非软删) | 🖐 | 数据丢失（测试风险） | “清除全部数据”明确跳系统应用信息页，由 Android 执行应用沙箱级清除；在用户当前真机执行会删除真实联系人、密钥和设置，不得自动测试。应在一次性测试安装中清除后用 `run-as` 检查 databases/files/shared_prefs 均不存在 | — | SM-W7023 人工步骤（仅一次性测试数据） |
 | 9.9 | 迁移后旧数据保留 | ✅ | 数据完整性 | 24→25 迁移把旧手机号原文直接写进 normalizedValue，导致 `+86`、空格或横线格式的旧联系人在升级后无法按当前规范号码匹配；新增 33→34 迁移复用生产归一化函数，并在唯一键冲突时按主号码/用户确认/验证时间保留最佳记录 | 本提交 `fix(9.9)` | `ContactMethodNormalizationMigrationTest.formattedLegacyPhonesAreCanonicalizedAndDuplicatesAreCollapsed` + `FactIndexMigrationTest` 全迁移链 |
-| 9.10 | 迁移后索引正确 | ⬜ | | | | |
-| 9.11 | 迁移后外键约束正确 | ⬜ | | | | |
-| 9.12 | SQLCipher 加密查询性能下降 | ⬜ | | | | |
-| 9.13 | 备份恢复后数据完整 | ⬜ | | | | |
-| 9.14 | 清除后 WAL 文件清理 | ⬜ | | | | |
+| 9.10 | 迁移后索引正确 | ⚪ | — | MigrationTestHelper 对每次迁移后的 34 版导出 schema 做严格比较，callback 管理的部分索引另有显式断言；未发现缺失/重复索引 | 审计提交 | `PlanDagMigrationTest` + `CrmDomainMigrationTest` + `FactIndexMigrationTest` |
+| 9.11 | 迁移后外键约束正确 | ⚪ | — | 迁移严格校验通过；CRM、Runtime、关系事件和通话表的 FK 行为有开启 `PRAGMA foreign_keys=ON` 的删除/SET_NULL/CASCADE 设备测试，未发现悬空引用 | 审计提交 | `CrmReferenceIntegrityMigrationTest` + `RuntimeStoreMigrationTest` + `RelationshipEventMigrationTest` + `CallLogMigrationTest` |
+| 9.12 | SQLCipher 加密查询性能下降 | 🧪 | 体验 | 正确性回归已在真实加密库通过，但仓库没有可复现的大数据基准；需基准构建预置 1000 联系人/500 日程/100 商机，对比冷开、FTS P95 和事务 P95，普通功能测试不能给性能结论 | — | 待 Macrobenchmark/固定数据集 |
+| 9.13 | 备份恢复后数据完整 | ⚪ | — | 产品明确禁用 Android 备份：Manifest `allowBackup=false`，cloud backup 与 device transfer 均排除 database；加密库和设备 Keystore 不跨设备恢复，因此该场景不受支持，也不会产生“恢复了库却没有密钥”的半恢复 | 审计提交 | Manifest + `backup_rules.xml` + `data_extraction_rules.xml` 代码审查 |
+| 9.14 | 清除后 WAL 文件清理 | 🖐 | 数据丢失（测试风险） | 系统“清除数据”应移除整个应用数据目录，包含 db/wal/shm、SharedPreferences、缓存和 Keystore 归属；当前真机含用户数据，不执行破坏性验证。一次性安装清除后检查沙箱目录与重新启动建库 | — | SM-W7023 人工步骤（仅一次性测试数据） |
 | 9.15 | 真机测试清空生产用户资料 | ✅ | 数据丢失 | 两个设备测试直接复用 `user_profile_secure` 并调用 `clear()`；为 UserProfileStore 增加测试命名空间，测试结束只删除隔离数据 | 本提交 `fix(9.15)` | `UserProfileStoreTest` + `UserProfilePageTest` |
+| 9.16 | 覆盖安装后数据库版本/密钥兼容 | 🖐 | 数据丢失（测试风险） | 普通设备回归只证明全新测试安装；覆盖升级必须先在一次性构建写入唯一联系人/日程并记录 DB 版本，再 `adb install -r` 新 APK，确认数据、wrapped key 与 34 版迁移均保留。不得用当前用户资料做破坏性升级演练 | — | SM-W7023 人工升级矩阵 |
+| 9.17 | 清除数据重装后是否重建 | 🖐 | 数据丢失（测试风险） | Android 清除数据/卸载会删除应用沙箱；需一次性测试安装执行清除→启动→确认创建全新加密 34 版库、旧唯一数据不存在。当前用户设备不自动执行 | — | SM-W7023 人工步骤（一次性数据） |
+| 9.18 | 数据库文件权限被改后是否崩溃 | 🧪 | 功能不可用 | 非 root 生产设备不能修改应用私有数据库权限；需 root 模拟器把 DB 设为不可读并验证 fail-closed/恢复界面。SM-W7023 非 root，无法安全复现 | — | root 模拟器专用场景 |
 
 ## 维度 10 · 网络与 Provider
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
