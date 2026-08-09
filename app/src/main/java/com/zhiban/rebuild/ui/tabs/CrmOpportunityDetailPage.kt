@@ -25,7 +25,6 @@ import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -53,6 +52,7 @@ import com.zhiban.rebuild.data.crm.CrmActionStatus
 import com.zhiban.rebuild.data.crm.CrmActivityEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityStage
 import com.zhiban.rebuild.data.crm.CrmStageHistoryEntity
+import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
@@ -552,7 +552,7 @@ private fun CrmHistoryRow(history: CrmStageHistoryEntity, modifier: Modifier = M
 @Composable
 private fun CrmStageDialog(currentStage: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     var pendingStage by remember(currentStage) { mutableStateOf(currentStage) }
-    AlertDialog(
+    ZhiBanAlertDialog(
         onDismissRequest = onDismiss,
         shape = androidx.compose.foundation.shape.RoundedCornerShape(ZhiBanRadius.Dialog),
         title = { Text("调整推进阶段") },

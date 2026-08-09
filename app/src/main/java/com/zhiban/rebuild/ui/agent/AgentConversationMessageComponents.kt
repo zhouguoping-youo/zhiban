@@ -70,6 +70,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanHeaderIconAction
 import com.zhiban.rebuild.ui.theme.*
 import kotlin.math.abs
@@ -80,15 +81,12 @@ private val AgentAccent = ZhiBanTerracotta
 
 @Composable
 internal fun PermissionSettingsDialog(permissionName: String, onDismiss: () -> Unit, onOpenSettings: () -> Unit) {
-    AlertDialog(
+    ZhiBanAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("允许知伴使用你的$permissionName？") },
         text = { Text("需要在 Android 系统设置中为知伴开启${permissionName}权限。开启后请返回知伴继续使用。") },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
         confirmButton = { TextButton(onClick = onOpenSettings) { Text("打开系统设置") } },
-        shape = RoundedCornerShape(24.dp),
-        containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 0.dp,
     )
 }
 

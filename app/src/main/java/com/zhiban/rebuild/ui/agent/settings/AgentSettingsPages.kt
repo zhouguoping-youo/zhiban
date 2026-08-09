@@ -56,6 +56,7 @@ import com.zhiban.rebuild.runtime.personalization.UserProfileStore
 import com.zhiban.rebuild.runtime.provider.ProviderEnvironmentManager
 import com.zhiban.rebuild.runtime.runSuspendCatching
 import com.zhiban.rebuild.runtime.tool.RuntimeToolCatalog
+import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanGlassCard
 import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
 import com.zhiban.rebuild.ui.components.ZhiBanPage
@@ -386,7 +387,7 @@ data class MemoryUiState(
         }, busy = state.busy)
     }
     pendingRemoval?.let { server ->
-        AlertDialog(
+        ZhiBanAlertDialog(
             onDismissRequest = { pendingRemoval = null },
             shape = RoundedCornerShape(ZhiBanRadius.Dialog),
             containerColor = MaterialTheme.colorScheme.surface,
@@ -413,7 +414,7 @@ data class MemoryUiState(
     var name by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
     var endpoint by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
     var token by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
-    AlertDialog(
+    ZhiBanAlertDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(
             ZhiBanRadius.Dialog,

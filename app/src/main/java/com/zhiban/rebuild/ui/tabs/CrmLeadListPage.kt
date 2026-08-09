@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -29,6 +28,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zhiban.rebuild.data.agent.CrmLeadConversionInput
 import com.zhiban.rebuild.data.crm.CrmLeadEntity
 import com.zhiban.rebuild.data.crm.CrmLeadStatus
+import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
@@ -108,7 +108,7 @@ fun CrmLeadListPage(onBack: () -> Unit, onOpenOpportunity: (String) -> Unit, vie
     }
 
     candidateToPromote?.let { lead ->
-        AlertDialog(
+        ZhiBanAlertDialog(
             onDismissRequest = { candidateToPromote = null },
             title = { Text("转为正式线索？") },
             text = { Text("${lead.displayNameSnapshot} 将进入正式线索列表，之后可参与推进判断。") },
@@ -196,7 +196,7 @@ internal fun CrmConvertLeadDialog(lead: CrmLeadEntity, onDismiss: () -> Unit, on
     val closeDateValid = closeDateText.isBlank() || runCatching { LocalDate.parse(closeDateText) }.isSuccess
     val canConfirm = title.isNotBlank() && account.isNotBlank() && amountValid && closeDateValid
 
-    AlertDialog(
+    ZhiBanAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("转化为商机") },
         text = {

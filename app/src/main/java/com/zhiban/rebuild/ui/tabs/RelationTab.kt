@@ -53,7 +53,6 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Sms
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -119,6 +118,7 @@ import com.zhiban.rebuild.data.notification.ScheduleInsight
 import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.personalization.UserProfile
+import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanHeaderIconAction
 import com.zhiban.rebuild.ui.components.ZhiBanPrimaryTabHeader
 import com.zhiban.rebuild.ui.components.ZhiBanSearchField
@@ -754,7 +754,7 @@ fun RelationTab(
         )
     }
     if (showContactPermissionIntro) {
-        AlertDialog(
+        ZhiBanAlertDialog(
             onDismissRequest = { showContactPermissionIntro = false },
             title = { Text("导入手机联系人") },
             text = { Text("知伴只会读取你接下来主动选择的人，不会上传、修改或默认全选通讯录。下一步 Android 会询问通讯录权限。") },
@@ -771,7 +771,7 @@ fun RelationTab(
         )
     }
     if (showPermissionExplanation) {
-        AlertDialog(
+        ZhiBanAlertDialog(
             onDismissRequest = { showPermissionExplanation = false },
             title = { Text("需要通讯录权限") },
             text = { Text("知伴只读取你主动选择导入的联系人，不会自动上传或修改手机通讯录。你可以在系统设置中随时关闭权限。") },
@@ -842,7 +842,7 @@ fun RelationTab(
         )
     }
     deleting?.let { contact ->
-        AlertDialog(
+        ZhiBanAlertDialog(
             onDismissRequest = { deleting = null },
             title = { Text("删除联系人？") },
             text = { Text("“${contact.displayName}”及其个人资料将从关系中移除。") },
@@ -861,7 +861,7 @@ fun RelationTab(
         )
     }
     correctingAutoWrite?.let { receipt ->
-        AlertDialog(
+        ZhiBanAlertDialog(
             onDismissRequest = { correctingAutoWrite = null },
             title = { Text("这条内容属于谁？") },
             text = {
@@ -883,7 +883,7 @@ fun RelationTab(
         )
     }
     markingAsOwner?.let { contact ->
-        AlertDialog(
+        ZhiBanAlertDialog(
             onDismissRequest = { markingAsOwner = null },
             title = { Text("这是你本人吗？") },
             text = { Text("确认后，“${contact.displayName}”会归入“我”的资料，不再作为另一位联系人出现在列表和关系图中。原始通讯录资料会保留，并可撤销。") },
@@ -922,7 +922,7 @@ fun RelationTab(
     deletingEdge?.let { edge ->
         val names = contacts.associate { it.contactId to it.displayName } +
             (RelationshipPersonIds.SELF to ownerProfile.relationshipLabel())
-        AlertDialog(
+        ZhiBanAlertDialog(
             onDismissRequest = { deletingEdge = null },
             title = { Text("删除这条关系？") },
             text = {

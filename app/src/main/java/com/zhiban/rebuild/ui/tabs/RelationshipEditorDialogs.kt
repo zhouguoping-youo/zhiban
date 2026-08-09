@@ -54,7 +54,6 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Sms
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -209,7 +208,7 @@ internal fun RelationshipEditorDialog(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(max = 640.dp)
-                    .clip(RoundedCornerShape(28.dp))
+                    .clip(RoundedCornerShape(ZhiBanRadius.Dialog))
                     .background(RelationSurface)
                     .padding(20.dp),
             ) {
@@ -356,9 +355,9 @@ internal fun RelationshipEditorDialog(
                             onSave(fromId, toId, type) { error = it }
                         }
                     },
-                    Modifier.fillMaxWidth().height(50.dp),
+                    Modifier.fillMaxWidth().height(ZhiBanSize.Control),
                     colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
-                    shape = RoundedCornerShape(25.dp),
+                    shape = RoundedCornerShape(ZhiBanRadius.Card),
                     enabled = canSubmit,
                 ) {
                     Text(
@@ -559,7 +558,7 @@ internal fun RelationshipEventEditorDialog(
     }
     Dialog(onDismissRequest = onDismiss) {
         LazyColumn(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(RelationSurface),
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Dialog)).background(RelationSurface),
             contentPadding = PaddingValues(20.dp),
         ) {
             item {
@@ -731,9 +730,9 @@ internal fun RelationshipEventEditorDialog(
                             onSave(type, title.ifBlank(::suggestedTitle), note, roles) { error = it }
                         }
                     },
-                    Modifier.fillMaxWidth().height(50.dp),
+                    Modifier.fillMaxWidth().height(ZhiBanSize.Control),
                     colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
-                    shape = RoundedCornerShape(25.dp),
+                    shape = RoundedCornerShape(ZhiBanRadius.Card),
                 ) { Text("确认保存") }
             }
         }
@@ -743,7 +742,7 @@ internal fun RelationshipEventEditorDialog(
 @Composable
 internal fun RelationshipEventDetailDialog(value: RelationshipEventWithParticipants, onDismiss: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(RelationSurface).padding(20.dp)) {
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Dialog)).background(RelationSurface).padding(20.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) { Icon(Icons.Rounded.Close, "关闭") }
                 Text(
@@ -793,9 +792,9 @@ internal fun RelationshipEventDetailDialog(value: RelationshipEventWithParticipa
             Spacer(Modifier.height(12.dp))
             Button(
                 onClick = onEdit,
-                Modifier.fillMaxWidth().height(50.dp),
+                Modifier.fillMaxWidth().height(ZhiBanSize.Control),
                 colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
-                shape = RoundedCornerShape(25.dp),
+                shape = RoundedCornerShape(ZhiBanRadius.Card),
             ) { Text("编辑这段经历") }
             TextButton(onClick = onDelete, modifier = Modifier.fillMaxWidth().height(48.dp)) {
                 Text("删除这段经历", color = RelationDanger)
@@ -819,7 +818,7 @@ internal fun RelationshipEvidenceDialog(
     val relationTypes =
         listOf("FAMILY", "FRIEND", "COLLEAGUE", "CUSTOMER", "SUPPLIER", "TEACHER", "CLASSMATE", "PROJECT_PARTNER", "OTHER")
     Dialog(onDismissRequest = onDismiss) {
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(RelationSurface).padding(20.dp)) {
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Dialog)).background(RelationSurface).padding(20.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) { Icon(Icons.Rounded.Close, "关闭") }
                 Text(
@@ -872,9 +871,9 @@ internal fun RelationshipEvidenceDialog(
             if (edge.userConfirmed) {
                 Button(
                     onClick = { onUpdate(type) { error = it } },
-                    Modifier.fillMaxWidth().height(50.dp),
+                    Modifier.fillMaxWidth().height(ZhiBanSize.Control),
                     colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
-                    shape = RoundedCornerShape(25.dp),
+                    shape = RoundedCornerShape(ZhiBanRadius.Card),
                 ) { Text("保存修改") }
                 TextButton(onClick = onDelete, modifier = Modifier.fillMaxWidth().height(48.dp)) {
                     Text("删除这条关系", color = RelationDanger)

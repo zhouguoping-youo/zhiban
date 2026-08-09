@@ -54,7 +54,6 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Sms
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -117,6 +116,7 @@ import com.zhiban.rebuild.data.notification.ScheduleInsight
 import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.personalization.UserProfile
+import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanPrimaryTabHeader
 import com.zhiban.rebuild.ui.components.ZhiBanSearchField
 import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
@@ -291,7 +291,7 @@ internal fun CallNoteDialog(
 
     Dialog(onDismissRequest = { if (recorder == null && !transcribing) dismissAndDeleteTemporaryAudio() }) {
         Column(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(RelationSurface).padding(20.dp),
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Dialog)).background(RelationSurface).padding(20.dp),
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = ::dismissAndDeleteTemporaryAudio, enabled = recorder == null && !transcribing) {
@@ -348,10 +348,10 @@ internal fun CallNoteDialog(
                         }
                     }
                 },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
+                modifier = Modifier.fillMaxWidth().height(ZhiBanSize.Control),
                 enabled = recorder == null && !transcribing,
                 colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
-                shape = RoundedCornerShape(25.dp),
+                shape = RoundedCornerShape(ZhiBanRadius.Card),
             ) { Text("保存备注") }
             TextButton(onClick = {
                 retryFile?.delete()
@@ -363,7 +363,7 @@ internal fun CallNoteDialog(
     }
 
     if (showCloudConsent) {
-        AlertDialog(
+        ZhiBanAlertDialog(
             onDismissRequest = { showCloudConsent = false },
             title = { Text("允许语音识别上云？") },
             text = { Text("只有你点击录音后生成的这段语音会发送给当前模型服务做转写。知伴不会录制电话通话，也不会在后台持续录音。你可以随时在“我的－隐私与权限”关闭。") },
@@ -402,7 +402,7 @@ internal fun NotificationCandidateDialog(
     var error by remember { mutableStateOf<String?>(null) }
     Dialog(onDismissRequest = onDismiss) {
         Column(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(RelationSurface).padding(20.dp),
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Dialog)).background(RelationSurface).padding(20.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDismiss, modifier = Modifier.size(ZhiBanIconContainer.TouchTarget)) {
@@ -690,9 +690,9 @@ internal fun NotificationCandidateDialog(
                 Spacer(Modifier.height(14.dp))
                 Button(
                     onClick = onEnable,
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    modifier = Modifier.fillMaxWidth().height(ZhiBanSize.Control),
                     colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
-                    shape = RoundedCornerShape(25.dp),
+                    shape = RoundedCornerShape(ZhiBanRadius.Card),
                 ) { Text("我知道了，去开启") }
             } else if (candidates.isEmpty()) {
                 Text(

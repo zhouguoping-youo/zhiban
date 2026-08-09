@@ -23,7 +23,6 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Lightbulb
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -48,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zhiban.rebuild.data.crm.CrmLeadEntity
 import com.zhiban.rebuild.data.crm.CrmLeadStatus
 import com.zhiban.rebuild.data.crm.CrmSuggestionType
+import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
@@ -307,7 +307,7 @@ fun CrmCapabilityPage(
     }
 
     candidateToPromote?.let { lead ->
-        AlertDialog(
+        ZhiBanAlertDialog(
             onDismissRequest = { candidateToPromote = null },
             title = { Text("转为正式线索？") },
             text = { Text("${lead.displayNameSnapshot} 将进入正式线索列表，之后可参与个人 CRM 的推进判断。") },

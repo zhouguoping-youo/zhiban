@@ -56,6 +56,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -66,6 +67,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.theme.*
 import kotlin.math.abs
 import kotlin.math.sin
@@ -81,76 +83,68 @@ internal fun ConversationHistoryDialog(
     onDismiss: () -> Unit,
 ) {
     var pendingDeleteId by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
-    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            color = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(ZhiBanRadius.Dialog),
-            shadowElevation = 10.dp,
-        ) {
-            Column(Modifier.fillMaxWidth().padding(20.dp)) {
-                Text(
-                    "对话历史",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = ZhiBanTextPrimary,
-                )
-                Spacer(Modifier.height(16.dp))
-                if (items.isEmpty()) {
-                    Text("还没有历史对话", color = ZhiBanTextSecondary)
-                } else {
-                    LazyColumn(
-                        Modifier.fillMaxWidth().heightIn(max = 420.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+    com.zhiban.rebuild.ui.components.ZhiBanTaskDialog(
+        onDismissRequest = onDismiss,
+        maxWidth = 480.dp,
+        maxHeight = 560.dp,
+    ) {
+        com.zhiban.rebuild.ui.components.ZhiBanDialogHeader("对话历史", onDismiss)
+        Spacer(Modifier.height(ZhiBanSpacing.Md))
+        if (items.isEmpty()) {
+            Text("还没有历史对话", color = ZhiBanTextSecondary)
+        } else {
+            LazyColumn(
+                Modifier.fillMaxWidth().heightIn(max = 420.dp),
+                verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm),
+            ) {
+                items(items, key = { it.sessionId }) { item ->
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().clickable { onOpen(item.sessionId) },
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .42f),
+                        shape = RoundedCornerShape(ZhiBanRadius.Card),
                     ) {
-                        items(items, key = { it.sessionId }) { item ->
-                            Surface(
-                                modifier = Modifier.fillMaxWidth().clickable { onOpen(item.sessionId) },
-                                color = ZhiBanWarmBackground,
-                                shape = RoundedCornerShape(16.dp),
+                        Row(
+                            Modifier.fillMaxWidth().padding(
+                                start = ZhiBanSpacing.Lg,
+                                top = ZhiBanSpacing.Md,
+                                bottom = ZhiBanSpacing.Md,
+                                end = ZhiBanSpacing.Xs,
+                            ),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    item.preview,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = ZhiBanTextPrimary,
+                                    maxLines = 2,
+                                )
+                                Spacer(Modifier.height(ZhiBanSpacing.Xs))
+                                Text(
+                                    "历史对话",
+                                    color = ZhiBanTextSecondary,
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            }
+                            IconButton(
+                                onClick = { pendingDeleteId = item.sessionId },
+                                modifier = Modifier.size(ZhiBanIconContainer.TouchTarget),
                             ) {
-                                Row(
-                                    Modifier.fillMaxWidth().padding(
-                                        start = 16.dp,
-                                        top = 12.dp,
-                                        bottom = 12.dp,
-                                        end = 6.dp,
-                                    ),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Column(Modifier.weight(1f)) {
-                                        Text(
-                                            item.preview,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = ZhiBanTextPrimary,
-                                            maxLines = 2,
-                                        )
-                                        Spacer(Modifier.height(4.dp))
-                                        Text(
-                                            "历史对话",
-                                            color = ZhiBanTextSecondary,
-                                            style = MaterialTheme.typography.labelSmall,
-                                        )
-                                    }
-                                    IconButton(onClick = { pendingDeleteId = item.sessionId }) {
-                                        Icon(
-                                            Icons.Outlined.Delete,
-                                            "删除对话",
-                                            tint = ZhiBanTextSecondary,
-                                            modifier = Modifier.size(ZhiBanIconSize.Action),
-                                        )
-                                    }
-                                }
+                                Icon(
+                                    Icons.Outlined.Delete,
+                                    "删除对话",
+                                    tint = ZhiBanTextSecondary,
+                                    modifier = Modifier.size(ZhiBanIconSize.Inline),
+                                )
                             }
                         }
                     }
                 }
-                Spacer(Modifier.height(16.dp))
-                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text("关闭") }
             }
         }
     }
     pendingDeleteId?.let { sessionId ->
-        AlertDialog(
+        ZhiBanAlertDialog(
             onDismissRequest = { pendingDeleteId = null },
             title = { Text("删除这段对话？") },
             text = { Text("删除后无法恢复。") },
@@ -168,119 +162,64 @@ internal fun ConversationHistoryDialog(
                     Text("删除")
                 }
             },
-            shape = RoundedCornerShape(24.dp),
-            containerColor = MaterialTheme.colorScheme.surface,
-            tonalElevation = 0.dp,
         )
     }
 }
 
-@Composable fun MoreDrawer(
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MoreDrawer(
     onDismiss: () -> Unit,
     onOpenHistory: () -> Unit,
     onNewConversation: () -> Unit = {
     },
     onNavigateToSettings: () -> Unit,
 ) {
-    // Per architect 759 派单 H: ⋯ 抽屉 = 对话历史 + 设置入口.
-    // ModalBottomSheet with ZhiBan surface (米色, 16dp 圆角).
-    androidx.compose.ui.window.Dialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(
-            usePlatformDefaultWidth = false,
-        ),
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(topStart = ZhiBanRadius.Dialog, topEnd = ZhiBanRadius.Dialog),
+        tonalElevation = 0.dp,
+        dragHandle = { BottomSheetDefaults.DragHandle() },
     ) {
-        Box(
+        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.4f))
-                .clickable { onDismiss() },
-            contentAlignment = Alignment.Center,
+                .fillMaxWidth()
+                .padding(horizontal = ZhiBanSpacing.PageHorizontal)
+                .padding(bottom = ZhiBanSpacing.Xxl),
         ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 560.dp)
-                    .padding(horizontal = 20.dp)
-                    .clickable { /* swallow click */ },
-                color = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(20.dp),
-                shadowElevation = 8.dp,
-            ) {
-                Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                    Text(
-                        "更多",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = ZhiBanTextPrimary,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                    )
-                    androidx.compose.material3.HorizontalDivider(
-                        color = ZhiBanTextSecondary.copy(alpha = 0.2f),
-                    )
-                    Surface(
-                        modifier = Modifier.fillMaxWidth().clickable(onClick = onNewConversation),
-                        color = Color.Transparent,
-                    ) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                Icons.Outlined.Edit,
-                                contentDescription = null,
-                                tint = ZhiBanTextSecondary,
-                                modifier = Modifier.size(ZhiBanIconSize.Leading),
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Text("新建对话", color = ZhiBanTextPrimary, style = MaterialTheme.typography.bodyLarge)
-                        }
-                    }
-                    androidx.compose.material3.HorizontalDivider(color = ZhiBanTextSecondary.copy(alpha = 0.1f))
-                    Surface(
-                        modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenHistory),
-                        color = Color.Transparent,
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                Icons.Outlined.History,
-                                contentDescription = null,
-                                tint = ZhiBanTextSecondary,
-                                modifier = Modifier.size(ZhiBanIconSize.Leading),
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Text("对话历史", color = ZhiBanTextPrimary, style = MaterialTheme.typography.bodyLarge)
-                        }
-                    }
-                    androidx.compose.material3.HorizontalDivider(
-                        color = ZhiBanTextSecondary.copy(alpha = 0.1f),
-                    )
-                    Surface(
-                        modifier = Modifier.fillMaxWidth().clickable {
-                            onDismiss()
-                            onNavigateToSettings()
-                        },
-                        color = Color.Transparent,
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                Icons.Outlined.Settings,
-                                contentDescription = null,
-                                tint = ZhiBanTextSecondary,
-                                modifier = Modifier.size(ZhiBanIconSize.Leading),
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Text("设置", color = ZhiBanTextPrimary, style = MaterialTheme.typography.bodyLarge)
-                        }
-                    }
-                }
+            Text(
+                "更多",
+                style = MaterialTheme.typography.titleLarge,
+                color = ZhiBanTextPrimary,
+                modifier = Modifier.padding(bottom = ZhiBanSpacing.Sm),
+            )
+            DrawerAction(Icons.Outlined.Edit, "新建对话", onNewConversation)
+            DrawerAction(Icons.Outlined.History, "对话历史", onOpenHistory)
+            DrawerAction(Icons.Outlined.Settings, "设置") {
+                onDismiss()
+                onNavigateToSettings()
             }
         }
+    }
+}
+
+@Composable
+private fun DrawerAction(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = ZhiBanSize.ListRow)
+            .clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(ZhiBanIconSize.Leading),
+        )
+        Spacer(Modifier.width(ZhiBanSpacing.Md))
+        Text(label, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
     }
 }

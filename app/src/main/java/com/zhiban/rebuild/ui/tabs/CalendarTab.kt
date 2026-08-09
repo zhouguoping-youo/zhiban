@@ -39,7 +39,6 @@ import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -81,6 +80,7 @@ import com.zhiban.rebuild.data.calendar.SystemCalendarWriteIntent
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.NotificationInsightAnalyzer
 import com.zhiban.rebuild.data.notification.ScheduleInsight
+import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanHeaderIconAction
 import com.zhiban.rebuild.ui.components.ZhiBanPrimaryTabHeader
 import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
@@ -93,6 +93,8 @@ import com.zhiban.rebuild.ui.theme.ZhiBanCard
 import com.zhiban.rebuild.ui.theme.ZhiBanDivider
 import com.zhiban.rebuild.ui.theme.ZhiBanIconContainer
 import com.zhiban.rebuild.ui.theme.ZhiBanIconSize
+import com.zhiban.rebuild.ui.theme.ZhiBanRadius
+import com.zhiban.rebuild.ui.theme.ZhiBanSize
 import com.zhiban.rebuild.ui.theme.ZhiBanTerracotta
 import com.zhiban.rebuild.ui.theme.ZhiBanTextPrimary
 import com.zhiban.rebuild.ui.theme.ZhiBanTextSecondary
@@ -346,7 +348,7 @@ fun CalendarTab(
         )
     }
     deleting?.let { schedule ->
-        AlertDialog(
+        ZhiBanAlertDialog(
             onDismissRequest = { deleting = null },
             title = { Text("删除日程？") },
             text = { Text("“${schedule.title}”将从日历中移除。") },
@@ -373,7 +375,7 @@ fun CalendarTab(
         )
     }
     if (showPermissionExplanation) {
-        AlertDialog(
+        ZhiBanAlertDialog(
             onDismissRequest = { showPermissionExplanation = false },
             title = { Text("需要日历权限") },
             text = { Text("知伴只读取你确认导入的日程，不会修改手机系统日历。你可以在系统设置中随时关闭权限。") },
@@ -394,7 +396,7 @@ fun CalendarTab(
         )
     }
     if (reminderPermissionMessage) {
-        AlertDialog(
+        ZhiBanAlertDialog(
             onDismissRequest = { reminderPermissionMessage = false },
             title = { Text("提醒已保存") },
             text = { Text("还需要开启通知权限，知伴才能在日程开始前提醒你。") },
@@ -526,155 +528,142 @@ private fun SystemCalendarImportDialog(state: CalendarAgentViewModel.ImportState
     }
     val maxDialogHeight = (LocalConfiguration.current.screenHeightDp.dp - 64.dp)
         .coerceIn(320.dp, 640.dp)
-    Dialog(onDismissRequest = onDismiss) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .widthIn(max = 480.dp)
-                .heightIn(max = maxDialogHeight)
-                .clip(RoundedCornerShape(28.dp))
-                .background(CalendarSurface)
-                .padding(horizontal = 20.dp, vertical = 18.dp),
-        ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "导入手机日历",
-                        color = CalendarInk,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text("最近 30 天至未来 90 天", color = CalendarMuted, style = MaterialTheme.typography.bodySmall)
+    com.zhiban.rebuild.ui.components.ZhiBanTaskDialog(
+        onDismissRequest = onDismiss,
+        maxWidth = 480.dp,
+        maxHeight = maxDialogHeight,
+    ) {
+        com.zhiban.rebuild.ui.components.ZhiBanDialogHeader(
+            title = "导入手机日历",
+            subtitle = "最近 30 天至未来 90 天",
+            onDismiss = onDismiss,
+        )
+        when {
+            state.isLoading -> {
+                Box(Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(Modifier.size(28.dp), color = CalendarInk, strokeWidth = 2.dp)
                 }
-                IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) { Icon(Icons.Rounded.Close, "关闭") }
             }
-            when {
-                state.isLoading -> {
-                    Box(Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(Modifier.size(28.dp), color = CalendarInk, strokeWidth = 2.dp)
-                    }
-                }
 
-                state.resultMessage != null -> {
-                    Text(
-                        state.resultMessage,
-                        Modifier.fillMaxWidth().padding(top = 44.dp, bottom = 8.dp),
-                        color = CalendarInk,
-                        style = MaterialTheme.typography.titleMedium,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    )
-                    Text(
-                        "已复制到知伴；以后手机日历中的修改不会自动同步。",
-                        Modifier.fillMaxWidth().padding(bottom = 36.dp),
-                        color = CalendarMuted,
-                        style = MaterialTheme.typography.bodySmall,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    )
-                    Button(
-                        onClick = onDismiss,
-                        Modifier.fillMaxWidth().height(50.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = CalendarInk),
-                        shape = RoundedCornerShape(25.dp),
-                    ) { Text("完成") }
-                }
+            state.resultMessage != null -> {
+                Text(
+                    state.resultMessage,
+                    Modifier.fillMaxWidth().padding(top = 44.dp, bottom = 8.dp),
+                    color = CalendarInk,
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+                Text(
+                    "已复制到知伴；以后手机日历中的修改不会自动同步。",
+                    Modifier.fillMaxWidth().padding(bottom = 36.dp),
+                    color = CalendarMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+                Button(
+                    onClick = onDismiss,
+                    Modifier.fillMaxWidth().height(ZhiBanSize.Control),
+                    colors = ButtonDefaults.buttonColors(containerColor = CalendarInk),
+                    shape = RoundedCornerShape(ZhiBanRadius.Card),
+                ) { Text("完成") }
+            }
 
-                state.events.isEmpty() -> {
-                    Text(
-                        state.error ?: "这个时间范围内没有可导入的系统日程",
-                        Modifier.fillMaxWidth().padding(vertical = 54.dp),
-                        color = if (state.error == null) CalendarMuted else CalendarDanger,
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    )
-                    TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                        Text("完成", color = CalendarInk)
-                    }
+            state.events.isEmpty() -> {
+                Text(
+                    state.error ?: "这个时间范围内没有可导入的系统日程",
+                    Modifier.fillMaxWidth().padding(vertical = 54.dp),
+                    color = if (state.error == null) CalendarMuted else CalendarDanger,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+                TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+                    Text("完成", color = CalendarInk)
                 }
+            }
 
-                else -> {
-                    Text(
-                        "选择要导入的日历",
-                        Modifier.padding(top = 18.dp),
-                        color = CalendarInk,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        "日程会一次性复制到知伴，不会修改手机日历，也不会自动同步后续变化。",
-                        Modifier.padding(top = 4.dp, bottom = 10.dp),
-                        color = CalendarMuted,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    if (sources.size > 1) {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            TextButton(
-                                onClick = {
-                                    selectedSources = if (selectedSources.size == sources.size) {
-                                        linkedSetOf()
-                                    } else {
-                                        sources.mapTo(linkedSetOf(), SystemCalendarSource::key)
-                                    }
-                                },
-                                contentPadding = PaddingValues(horizontal = 0.dp),
-                            ) {
-                                Text(
-                                    if (selectedSources.size == sources.size) "取消全选" else "选择全部",
-                                    color = CalendarInk,
-                                )
-                            }
-                            Spacer(Modifier.weight(1f))
+            else -> {
+                Text(
+                    "选择要导入的日历",
+                    Modifier.padding(top = 18.dp),
+                    color = CalendarInk,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "日程会一次性复制到知伴，不会修改手机日历，也不会自动同步后续变化。",
+                    Modifier.padding(top = 4.dp, bottom = 10.dp),
+                    color = CalendarMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                if (sources.size > 1) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(
+                            onClick = {
+                                selectedSources = if (selectedSources.size == sources.size) {
+                                    linkedSetOf()
+                                } else {
+                                    sources.mapTo(linkedSetOf(), SystemCalendarSource::key)
+                                }
+                            },
+                            contentPadding = PaddingValues(horizontal = 0.dp),
+                        ) {
                             Text(
-                                "已选 ${selectedEvents.size} 条",
-                                color = CalendarMuted,
-                                style = MaterialTheme.typography.bodySmall,
+                                if (selectedSources.size == sources.size) "取消全选" else "选择全部",
+                                color = CalendarInk,
                             )
                         }
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            "已选 ${selectedEvents.size} 条",
+                            color = CalendarMuted,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                     }
-                    LazyColumn(
-                        Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 300.dp),
-                    ) {
-                        items(sources.size, key = { sources[it].key }) { index ->
-                            val source = sources[index]
-                            Row(
-                                Modifier.fillMaxWidth().clickable {
-                                    selectedSources = selectedSources.toMutableSet().apply {
-                                        if (!add(source.key)) remove(source.key)
-                                    }
-                                }.padding(vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Checkbox(checked = source.key in selectedSources, onCheckedChange = null)
-                                Column(Modifier.weight(1f)) {
-                                    Text(
-                                        source.name,
-                                        color = CalendarInk,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        maxLines = 1,
-                                    )
-                                    Text(
-                                        "${source.events.size} 条日程",
-                                        color = CalendarMuted,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        maxLines = 1,
-                                    )
+                }
+                LazyColumn(
+                    Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 300.dp),
+                ) {
+                    items(sources.size, key = { sources[it].key }) { index ->
+                        val source = sources[index]
+                        Row(
+                            Modifier.fillMaxWidth().clickable {
+                                selectedSources = selectedSources.toMutableSet().apply {
+                                    if (!add(source.key)) remove(source.key)
                                 }
+                            }.padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(checked = source.key in selectedSources, onCheckedChange = null)
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    source.name,
+                                    color = CalendarInk,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1,
+                                )
+                                Text(
+                                    "${source.events.size} 条日程",
+                                    color = CalendarMuted,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 1,
+                                )
                             }
                         }
                     }
-                    state.error?.let { Text(it, color = CalendarDanger, style = MaterialTheme.typography.bodySmall) }
-                    Spacer(Modifier.height(14.dp))
-                    Button(
-                        onClick = { onImport(selectedEvents.mapTo(linkedSetOf(), SystemCalendarEvent::sourceId)) },
-                        Modifier.fillMaxWidth().height(50.dp),
-                        enabled = selectedEvents.isNotEmpty() && !state.isImporting,
-                        colors = ButtonDefaults.buttonColors(containerColor = CalendarInk),
-                        shape = RoundedCornerShape(25.dp),
-                    ) {
-                        if (state.isImporting) {
-                            CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
-                        } else {
-                            Text("导入 ${selectedEvents.size} 条日程")
-                        }
+                }
+                state.error?.let { Text(it, color = CalendarDanger, style = MaterialTheme.typography.bodySmall) }
+                Spacer(Modifier.height(14.dp))
+                Button(
+                    onClick = { onImport(selectedEvents.mapTo(linkedSetOf(), SystemCalendarEvent::sourceId)) },
+                    Modifier.fillMaxWidth().height(ZhiBanSize.Control),
+                    enabled = selectedEvents.isNotEmpty() && !state.isImporting,
+                    colors = ButtonDefaults.buttonColors(containerColor = CalendarInk),
+                    shape = RoundedCornerShape(ZhiBanRadius.Card),
+                ) {
+                    if (state.isImporting) {
+                        CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                    } else {
+                        Text("导入 ${selectedEvents.size} 条日程")
                     }
                 }
             }

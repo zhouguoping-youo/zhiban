@@ -54,7 +54,6 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Sms
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -189,7 +188,7 @@ internal fun ContactDetailDialog(
 ) {
     Dialog(onDismissRequest = onDismiss) {
         LazyColumn(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(RelationSurface),
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Dialog)).background(RelationSurface),
             contentPadding = PaddingValues(20.dp),
         ) {
             item {
@@ -570,7 +569,7 @@ internal fun ContactMergeReviewDialog(suggestion: ContactMergeSuggestion, onDism
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     Dialog(onDismissRequest = onDismiss) {
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(RelationSurface).padding(20.dp)) {
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Dialog)).background(RelationSurface).padding(20.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
                     Icon(Icons.Rounded.Close, "关闭")
@@ -667,10 +666,10 @@ internal fun ContactMergeReviewDialog(suggestion: ContactMergeSuggestion, onDism
                         error = it
                     }
                 },
-                Modifier.fillMaxWidth().height(50.dp),
+                Modifier.fillMaxWidth().height(ZhiBanSize.Control),
                 enabled = !saving,
                 colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
-                shape = RoundedCornerShape(25.dp),
+                shape = RoundedCornerShape(ZhiBanRadius.Card),
             ) {
                 if (saving) {
                     CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
@@ -719,7 +718,7 @@ internal fun ContactIdentityEditorDialog(
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     Dialog(onDismissRequest = onDismiss) {
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(RelationSurface).padding(20.dp)) {
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Dialog)).background(RelationSurface).padding(20.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
                     Icon(Icons.Rounded.Close, "关闭")
@@ -845,10 +844,10 @@ internal fun ContactIdentityEditorDialog(
                         }
                     }
                 },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
+                modifier = Modifier.fillMaxWidth().height(ZhiBanSize.Control),
                 enabled = !saving,
                 colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
-                shape = RoundedCornerShape(25.dp),
+                shape = RoundedCornerShape(ZhiBanRadius.Card),
             ) {
                 if (saving) {
                     CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
@@ -891,7 +890,7 @@ internal fun ContactFactEditorDialog(contact: ContactEntity, onDismiss: () -> Un
     var type by remember { mutableStateOf("CONTACT_MEMORY") }
     var error by remember { mutableStateOf<String?>(null) }
     Dialog(onDismissRequest = onDismiss) {
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(RelationSurface).padding(20.dp)) {
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Dialog)).background(RelationSurface).padding(20.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) { Icon(Icons.Rounded.Close, "关闭") }
                 Text(
@@ -948,9 +947,9 @@ internal fun ContactFactEditorDialog(contact: ContactEntity, onDismiss: () -> Un
                         onSave(text, type) { error = it }
                     }
                 },
-                Modifier.fillMaxWidth().height(50.dp),
+                Modifier.fillMaxWidth().height(ZhiBanSize.Control),
                 colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
-                shape = RoundedCornerShape(25.dp),
+                shape = RoundedCornerShape(ZhiBanRadius.Card),
             ) { Text("确认保存") }
         }
     }

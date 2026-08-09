@@ -400,7 +400,7 @@ private fun AttachmentPickerSheet(
                     .fillMaxWidth()
                     .clickable { },
                 color = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(22.dp),
+                shape = RoundedCornerShape(ZhiBanRadius.Dialog),
                 shadowElevation = 10.dp,
             ) {
                 Column(Modifier.padding(vertical = 8.dp)) {
@@ -466,7 +466,7 @@ internal fun ModelPickerSheet(
                     .fillMaxWidth()
                     .clickable { },
                 color = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(22.dp),
+                shape = RoundedCornerShape(ZhiBanRadius.Dialog),
                 shadowElevation = 10.dp,
             ) {
                 Column(

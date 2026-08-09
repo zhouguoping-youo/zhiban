@@ -33,6 +33,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.zhiban.rebuild.runtime.personalization.UserProfile
 import com.zhiban.rebuild.runtime.personalization.UserProfileStore
+import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.components.ZhiBanSaveButton
 import com.zhiban.rebuild.ui.components.ZhiBanSaveState
@@ -485,7 +486,7 @@ private fun AddAccountRow(onClick: () -> Unit) {
 
 @Composable
 private fun PlatformPickerDialog(onSelect: (String) -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
+    ZhiBanAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("选择平台") },
         text = {

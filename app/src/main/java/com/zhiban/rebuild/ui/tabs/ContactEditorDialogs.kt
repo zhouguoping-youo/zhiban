@@ -57,7 +57,6 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Sms
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -162,7 +161,7 @@ internal fun ContactImportDialog(state: ContactImportUiState, onDismiss: () -> U
             Modifier
                 .fillMaxWidth()
                 .heightIn(max = 680.dp)
-                .clip(RoundedCornerShape(28.dp))
+                .clip(RoundedCornerShape(ZhiBanRadius.Dialog))
                 .background(RelationSurface)
                 .padding(20.dp),
         ) {
@@ -209,9 +208,9 @@ internal fun ContactImportDialog(state: ContactImportUiState, onDismiss: () -> U
                     }
                     Button(
                         onClick = onDismiss,
-                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        modifier = Modifier.fillMaxWidth().height(ZhiBanSize.Control),
                         colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
-                        shape = RoundedCornerShape(25.dp),
+                        shape = RoundedCornerShape(ZhiBanRadius.Card),
                     ) { Text("完成") }
                 }
 
@@ -296,9 +295,9 @@ internal fun ContactImportDialog(state: ContactImportUiState, onDismiss: () -> U
                         Button(
                             onClick = { onImport(selected) },
                             enabled = selected.isNotEmpty() && !state.isImporting,
-                            modifier = Modifier.fillMaxWidth().height(50.dp),
+                            modifier = Modifier.fillMaxWidth().height(ZhiBanSize.Control),
                             colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
-                            shape = RoundedCornerShape(25.dp),
+                            shape = RoundedCornerShape(ZhiBanRadius.Card),
                         ) {
                             if (state.isImporting) {
                                 CircularProgressIndicator(
@@ -345,7 +344,7 @@ internal fun ContactEditorDialog(
                     .fillMaxWidth()
                     .widthIn(max = 560.dp)
                     .heightIn(max = 720.dp)
-                    .clip(RoundedCornerShape(28.dp))
+                    .clip(RoundedCornerShape(ZhiBanRadius.Dialog))
                     .background(RelationSurface),
                 contentPadding = PaddingValues(20.dp),
             ) {
@@ -441,9 +440,9 @@ internal fun ContactEditorDialog(
                                 onSave(contact?.contactId, name, phone, wechat, company, title, tag, note) { error = it }
                             }
                         },
-                        Modifier.fillMaxWidth().height(50.dp),
+                        Modifier.fillMaxWidth().height(ZhiBanSize.Control),
                         colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
-                        shape = RoundedCornerShape(25.dp),
+                        shape = RoundedCornerShape(ZhiBanRadius.Card),
                     ) { Text("保存") }
                 }
             }

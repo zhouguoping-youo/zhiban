@@ -51,6 +51,7 @@ import com.zhiban.rebuild.runtime.personalization.UserProfileStore
 import com.zhiban.rebuild.runtime.provider.ProviderEnvironmentManager
 import com.zhiban.rebuild.runtime.runSuspendCatching
 import com.zhiban.rebuild.runtime.tool.RuntimeToolCatalog
+import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanGlassCard
 import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
 import com.zhiban.rebuild.ui.components.ZhiBanPage
@@ -302,7 +303,7 @@ fun AgentMemoryPage(onBack: () -> Unit, viewModel: AgentMemoryViewModel = hiltVi
         })
     }
     if (clearing) {
-        AlertDialog(
+        ZhiBanAlertDialog(
             onDismissRequest = {
                 clearing = false
             },
@@ -363,7 +364,7 @@ fun AgentMemoryPage(onBack: () -> Unit, viewModel: AgentMemoryViewModel = hiltVi
         "PROJECT_RULE" to "长期规则",
         "EXPERIENCE" to "知伴经验",
     )
-    AlertDialog(
+    ZhiBanAlertDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(
             ZhiBanRadius.Dialog,
@@ -436,7 +437,7 @@ private fun EditMemoryDialog(memory: AgentMemoryItem, busy: Boolean, onDismiss: 
         "PROJECT_RULE" to "长期规则",
         "EXPERIENCE" to "知伴经验",
     )
-    AlertDialog(
+    ZhiBanAlertDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(
             ZhiBanRadius.Dialog,

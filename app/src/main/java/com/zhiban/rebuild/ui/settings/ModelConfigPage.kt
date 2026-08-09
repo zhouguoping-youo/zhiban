@@ -22,7 +22,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudQueue
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -48,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zhiban.rebuild.ui.chat.PreferencesManager
+import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanGlassCard
 import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.components.ZhiBanSaveButton
@@ -248,7 +248,7 @@ fun ModelConfigPage(onBack: () -> Unit = {}, viewModel: ModelConfigViewModel = h
         }
     }
     if (confirmClear) {
-        AlertDialog(
+        ZhiBanAlertDialog(
             onDismissRequest = { confirmClear = false },
             title = { Text("清除 API Key？") },
             text = { Text("清除后，文字、图片和实时语音将停止使用，直到重新连接。") },

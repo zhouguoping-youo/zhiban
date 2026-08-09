@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -37,6 +36,7 @@ import com.zhiban.rebuild.data.agent.AgentDataRepository
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.runtime.governance.AutoWriteReceiptRow
 import com.zhiban.rebuild.runtime.governance.AutoWriteRepository
+import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
@@ -164,7 +164,7 @@ internal fun AutoWriteContent(
 
     correcting?.let { receipt ->
         if (receipt.correctionRoute == "CONTACT_PICKER") {
-            AlertDialog(
+            ZhiBanAlertDialog(
                 onDismissRequest = { correcting = null },
                 title = { Text("这条互动属于谁？") },
                 text = {

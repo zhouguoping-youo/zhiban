@@ -42,7 +42,6 @@ import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.Sync
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -84,6 +83,7 @@ import com.zhiban.rebuild.data.export.AgentDataExportService
 import com.zhiban.rebuild.data.notification.NotificationCategory
 import com.zhiban.rebuild.data.notification.NotificationCategoryPreferences
 import com.zhiban.rebuild.data.notification.OutgoingMessageAccessibilityService
+import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
 import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
@@ -402,7 +402,7 @@ fun PrivacySecurityPage(
         }
     }
     pendingOutboundConsent?.let { consent ->
-        AlertDialog(
+        ZhiBanAlertDialog(
             onDismissRequest = { pendingOutboundConsent = null },
             title = { Text(consent.title) },
             text = { Text(consent.description) },
@@ -584,7 +584,7 @@ fun StorageSettingsPage(onBack: () -> Unit) {
         }
     }
     if (confirmClear) {
-        AlertDialog(
+        ZhiBanAlertDialog(
             onDismissRequest = { confirmClear = false },
             shape = RoundedCornerShape(ZhiBanRadius.Dialog),
             containerColor = ZhiBanCard,
@@ -720,7 +720,7 @@ fun DataSettingsPage(onBack: () -> Unit, onMemory: () -> Unit, onRunHistory: () 
         }
     }
     if (confirmReset) {
-        AlertDialog(
+        ZhiBanAlertDialog(
             onDismissRequest = { confirmReset = false },
             shape = RoundedCornerShape(ZhiBanRadius.Dialog),
             containerColor = ZhiBanCard,
@@ -849,7 +849,7 @@ fun AboutZhiBanPage(onBack: () -> Unit) {
         }
     }
     openEntry?.let { entry ->
-        AlertDialog(
+        ZhiBanAlertDialog(
             onDismissRequest = { openEntry = null },
             shape = RoundedCornerShape(ZhiBanRadius.Dialog),
             containerColor = ZhiBanCard,
