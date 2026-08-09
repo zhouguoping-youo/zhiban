@@ -219,7 +219,7 @@ internal fun shouldAutoScrollToLatest(totalItems: Int, lastVisibleIndex: Int): B
                 .weight(1f)
                 .semantics { contentDescription = "消息输入框" }
                 .clickable(enabled = enabled) { inputFocused = true }
-                .height(42.dp),
+                .height(ZhiBanSize.TouchTarget),
             contentAlignment = Alignment.CenterStart,
         ) {
             Text(
@@ -235,6 +235,7 @@ internal fun shouldAutoScrollToLatest(totalItems: Int, lastVisibleIndex: Int): B
             visibleModelLabel,
             modifier = Modifier
                 .semantics { contentDescription = "选择模型与思考强度" }
+                .defaultMinSize(minHeight = ZhiBanSize.TouchTarget)
                 .clickable(enabled = enabled) { onModelLabelClick() }
                 .padding(horizontal = ZhiBanSpacing.Xs, vertical = ZhiBanSpacing.Md),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -300,6 +301,7 @@ internal fun shouldAutoScrollToLatest(totalItems: Int, lastVisibleIndex: Int): B
                             visibleModelLabel,
                             modifier = Modifier
                                 .semantics { contentDescription = "选择模型与思考强度" }
+                                .defaultMinSize(minHeight = ZhiBanSize.TouchTarget)
                                 .clickable(enabled = enabled) { onModelLabelClick() }
                                 .padding(horizontal = ZhiBanSpacing.Sm, vertical = ZhiBanSpacing.Md),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -772,6 +774,8 @@ private fun LiveVoiceWaveform(level: Float, modifier: Modifier = Modifier) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text("需要${label}权限才能继续", Modifier.weight(1f), color = ZhiBanTextPrimary)
-        Text("授权", Modifier.clickable(onClick = onGrant), color = ZhiBanTerracotta, fontWeight = FontWeight.Bold)
+        TextButton(onClick = onGrant, modifier = Modifier.defaultMinSize(minHeight = ZhiBanSize.TouchTarget)) {
+            Text("授权", color = ZhiBanTerracotta, style = MaterialTheme.typography.labelLarge)
+        }
     }
 }

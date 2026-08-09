@@ -127,15 +127,12 @@ internal fun PermissionSettingsDialog(permissionName: String, onDismiss: () -> U
         ) {
             Text(it, Modifier.weight(1f), color = ZhiBanTextPrimary, style = MaterialTheme.typography.bodySmall)
             if (micDenied || camDenied) {
-                Text(
-                    "前往设置",
-                    Modifier
-                        .clickable(onClick = onOpenAppSettings)
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    color = ZhiBanTerracotta,
-                    fontWeight = FontWeight.SemiBold,
-                    style = MaterialTheme.typography.bodySmall,
-                )
+                TextButton(
+                    onClick = onOpenAppSettings,
+                    modifier = Modifier.defaultMinSize(minHeight = ZhiBanSize.TouchTarget),
+                ) {
+                    Text("前往设置", color = ZhiBanTerracotta, style = MaterialTheme.typography.labelLarge)
+                }
             }
         }
     }
@@ -176,7 +173,9 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text("记忆 · $text", Modifier.weight(1f), color = ZhiBanTextSecondary, style = MaterialTheme.typography.bodySmall)
-        Text("不使用", Modifier.clickable(onClick = onDismiss), color = ZhiBanTerracotta, fontWeight = FontWeight.SemiBold)
+        TextButton(onClick = onDismiss, modifier = Modifier.defaultMinSize(minHeight = ZhiBanSize.TouchTarget)) {
+            Text("不使用", color = ZhiBanTerracotta, style = MaterialTheme.typography.labelLarge)
+        }
     }
 }
 

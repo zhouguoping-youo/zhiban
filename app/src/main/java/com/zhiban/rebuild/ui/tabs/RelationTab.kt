@@ -396,7 +396,8 @@ fun RelationTab(
                             }
                         }
                         Row(
-                            Modifier.fillMaxWidth().clickable(onClick = onOpenAutoWrites).padding(top = 4.dp),
+                            Modifier.fillMaxWidth().defaultMinSize(minHeight = ZhiBanSize.TouchTarget)
+                                .clickable(onClick = onOpenAutoWrites).padding(top = 4.dp),
                             horizontalArrangement = Arrangement.End,
                         ) {
                             Text(

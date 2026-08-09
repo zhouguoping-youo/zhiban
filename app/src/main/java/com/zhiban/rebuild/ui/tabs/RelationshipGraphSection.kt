@@ -82,6 +82,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -531,6 +533,8 @@ internal fun GraphPersonNode(person: RelationshipPersonUi, labelAbove: Boolean =
         verticalArrangement = Arrangement.Center,
         modifier = Modifier
             .width(76.dp)
+            .defaultMinSize(minHeight = ZhiBanSize.TouchTarget)
+            .semantics { contentDescription = "查看${person.displayName}" }
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(vertical = 2.dp),
     ) {
