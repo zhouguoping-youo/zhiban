@@ -271,9 +271,15 @@ internal fun ContactDetailDialog(
                             onDelete = { onDeleteAlias(alias.aliasId) },
                         )
                     }
-                    contact.wechatId?.takeIf(String::isNotBlank)?.let {
-                        IdentityValueRow("微信", it, null)
-                    }
+                    contact.wechatId?.takeIf(String::isNotBlank)
+                        ?.takeUnless { wechat ->
+                            platformIdentities.any {
+                                it.platform == "WECHAT" &&
+                                    it.normalizedHandle == wechat.trim().trimStart('@').lowercase()
+                            }
+                        }?.let {
+                            IdentityValueRow("微信", it, null)
+                        }
                     platformIdentities.forEach { identity ->
                         IdentityValueRow(
                             platformLabel(identity.platform),
@@ -421,8 +427,8 @@ internal fun ContactDetailDialog(
                                 modifier = Modifier.weight(1f),
                             )
                             Text(
-                                if (edge.isInferredCompanyRelationship()) {
-                                    "${relationLabel(edge.relationType)} · 同公司推测"
+                                if (edge.isInferredEvidenceRelationship()) {
+                                    "${relationLabel(edge.relationType)} · ${edge.inferredEvidenceLabel()}"
                                 } else {
                                     relationLabel(edge.relationType)
                                 },
@@ -773,6 +779,9 @@ internal fun ContactIdentityEditorDialog(
                 ) {
                     listOf(
                         "WECHAT" to "微信",
+                        "WE_COM" to "企业微信",
+                        "FEISHU" to "飞书",
+                        "DINGTALK" to "钉钉",
                         "DOUYIN" to "抖音",
                         "XIAOHONGSHU" to "小红书",
                         "QQ" to "QQ",
@@ -861,6 +870,12 @@ internal fun ContactIdentityEditorDialog(
 
 internal fun platformLabel(platform: String): String = when (platform) {
     "WECHAT" -> "微信"
+    "WE_COM" -> "企业微信"
+    "FEISHU" -> "飞书"
+    "DINGTALK" -> "钉钉"
+    "SKYPE" -> "Skype"
+    "GOOGLE_CHAT" -> "Google Chat"
+    "JABBER" -> "Jabber"
     "DOUYIN" -> "抖音"
     "XIAOHONGSHU" -> "小红书"
     "QQ" -> "QQ"

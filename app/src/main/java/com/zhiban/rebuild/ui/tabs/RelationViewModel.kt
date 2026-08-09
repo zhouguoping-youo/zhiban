@@ -79,6 +79,9 @@ class RelationViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val ownerContactLinks: StateFlow<List<OwnerContactLinkEntity>> = repository.observeOwnerContactLinks()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val pendingEnrichment: StateFlow<List<ContactEnrichmentCandidateEntity>> =
+        repository.observeAllPendingContactEnrichment()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val mergeSuggestions: StateFlow<List<ContactMergeSuggestion>> = combine(
         repository.observeRawContacts(),
         repository.observeContactAliases(),
@@ -111,6 +114,7 @@ class RelationViewModel @Inject constructor(
 
     init {
         viewModelScope.launch { repository.purgeNonPersonalSmsCandidates() }
+        viewModelScope.launch { repository.refreshLocalContactIntelligence() }
         refreshCloudAsrAvailability()
     }
 

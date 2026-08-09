@@ -26,6 +26,13 @@ interface ContactDao {
     @Query("SELECT * FROM contacts WHERE deletedAtEpochMs IS NULL ORDER BY normalizedName, updatedAtEpochMs DESC")
     fun observeAllActive(): Flow<List<ContactEntity>>
 
+    @Query(
+        """SELECT * FROM contacts WHERE deletedAtEpochMs IS NULL
+        AND contactId NOT IN (SELECT sourceContactId FROM contact_merge_links WHERE undoneAtEpochMs IS NULL)
+        ORDER BY normalizedName, updatedAtEpochMs DESC""",
+    )
+    suspend fun listActiveForIntelligence(): List<ContactEntity>
+
     @Query("SELECT * FROM contacts WHERE deletedAtEpochMs IS NULL ORDER BY contactId LIMIT :limit OFFSET :offset")
     suspend fun listActivePageForExport(limit: Int, offset: Int): List<ContactEntity>
 
@@ -186,6 +193,9 @@ interface ContactIdentityDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertPlatformIdentity(value: ContactPlatformIdentityEntity)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertPlatformIdentityIfAbsent(value: ContactPlatformIdentityEntity): Long
 
     @Query(
         """SELECT a.aliasId, COALESCE(m.canonicalContactId, a.contactId) AS contactId,

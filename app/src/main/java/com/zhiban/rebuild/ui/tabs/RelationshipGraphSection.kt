@@ -194,7 +194,7 @@ internal fun RelationshipGraphState(
         edges.filter { it.fromContactId in peopleById && it.toContactId in peopleById }
     }
     val inferredEdgesCount = remember(allValidEdges) {
-        allValidEdges.count(RelationshipEdgeEntity::isInferredCompanyRelationship)
+        allValidEdges.count(RelationshipEdgeEntity::isInferredEvidenceRelationship)
     }
     val visibleEdges = remember(allValidEdges, rootId) {
         allValidEdges.filter { it.fromContactId == rootId || it.toContactId == rootId }
@@ -348,7 +348,7 @@ internal fun RelationshipGraphState(
         Spacer(Modifier.height(14.dp))
         Text(
             if (inferredEdgesCount > 0) {
-                "实线为已确认关系；虚线为同公司资料自动推测"
+                "实线为已确认关系；虚线为资料证据推测"
             } else {
                 "只展示已保存、已确认且能追溯来源的关系"
             },
@@ -413,13 +413,13 @@ internal fun RelationshipGraphCard(
     onDelete: (RelationshipEdgeEntity) -> Unit,
     onSelectContact: (String) -> Unit,
 ) {
-    val inferredFromCompany = edge.isInferredCompanyRelationship()
+    val inferredFromEvidence = edge.isInferredEvidenceRelationship()
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(RelationSoft)
-            .clickable(enabled = !inferredFromCompany) { onInspect(edge) }
+            .clickable(enabled = !inferredFromEvidence) { onInspect(edge) }
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -435,8 +435,8 @@ internal fun RelationshipGraphCard(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (inferredFromCompany) {
-                Text("同公司推测", color = RelationMuted, style = MaterialTheme.typography.labelSmall)
+            if (inferredFromEvidence) {
+                Text(edge.inferredEvidenceLabel().orEmpty(), color = RelationMuted, style = MaterialTheme.typography.labelSmall)
             } else if (!edge.userConfirmed) {
                 Text("待确认", color = RelationMuted, style = MaterialTheme.typography.labelSmall)
             }
@@ -455,7 +455,7 @@ internal fun RelationshipGraphCard(
             )
             Text(
                 when {
-                    inferredFromCompany -> "由联系人公司资料自动关联"
+                    inferredFromEvidence -> "由联系人资料证据自动关联"
                     edge.userConfirmed -> "可点击查看"
                     else -> "待你确认"
                 },
@@ -463,7 +463,7 @@ internal fun RelationshipGraphCard(
                 style = MaterialTheme.typography.labelSmall,
             )
         }
-        if (!inferredFromCompany) {
+        if (!inferredFromEvidence) {
             IconButton(
                 onClick = { onDelete(edge) },
                 modifier = Modifier.size(ZhiBanSize.TouchTarget),

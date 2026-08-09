@@ -109,6 +109,13 @@ interface ContactKnowledgeDao {
     )
     fun observePendingEnrichment(contactId: String): Flow<List<ContactEnrichmentCandidateEntity>>
 
+    @Query(
+        """SELECT * FROM contact_enrichment_candidates
+        WHERE status = 'PENDING' AND (expiresAtEpochMs IS NULL OR expiresAtEpochMs > :nowEpochMs)
+        ORDER BY confidence DESC, updatedAtEpochMs DESC""",
+    )
+    fun observeAllPendingEnrichment(nowEpochMs: Long): Flow<List<ContactEnrichmentCandidateEntity>>
+
     @Query("SELECT * FROM contact_enrichment_candidates WHERE candidateId = :candidateId")
     suspend fun findEnrichmentCandidate(candidateId: String): ContactEnrichmentCandidateEntity?
 

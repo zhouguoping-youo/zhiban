@@ -21,6 +21,7 @@ import com.zhiban.rebuild.data.contact.RelationshipEventParticipantEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventWithParticipants
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.data.contact.SystemContactCandidate
+import com.zhiban.rebuild.data.contact.buildLocalOrganizationSuggestions
 import com.zhiban.rebuild.data.contact.normalizeContactPhone
 import com.zhiban.rebuild.data.crm.CrmActionStatus
 import com.zhiban.rebuild.data.crm.CrmActivityEntity
@@ -60,6 +61,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -430,6 +432,7 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
         contacts.distinctBy(SystemContactCandidate::sourceId).forEach { candidate ->
             processSystemContactCandidate(ctx, candidate)
         }
+        stageLocalOrganizationSuggestions(nowEpochMs)
         ContactImportSummary(
             created = ctx.created,
             updated = ctx.updated,
@@ -472,7 +475,11 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
     private suspend fun processSystemContactCandidate(ctx: SystemContactImportContext, candidate: SystemContactCandidate) {
         val name = candidate.displayName.trim().take(100)
         val phones = candidate.phones.mapNotNull(::normalizeContactPhone).distinct()
-        val wechats = candidate.wechatIds.map(::normalizeContactMethodHandle).distinct()
+        val platformIdentities = candidate.platformIdentities
+            .plus(candidate.wechatIds.map { com.zhiban.rebuild.data.contact.SystemContactPlatformIdentity("WECHAT", it) })
+            .map { it.copy(handle = normalizeContactMethodHandle(it.handle)) }
+            .distinctBy { it.platform to it.handle }
+        val wechats = platformIdentities.filter { it.platform == "WECHAT" }.map { it.handle }
         if (name.isBlank()) {
             ctx.skippedInvalid++
             return
@@ -500,6 +507,8 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
                 ?: ctx.dao.findByPhone(normalized)
         } ?: wechats.firstOrNull()?.let { normalized ->
             database.contactKnowledgeDao().findContactByMethod("WECHAT", normalized)
+        } ?: platformIdentities.firstNotNullOfOrNull { identity ->
+            database.contactIdentityDao().findContactByPlatformHandle(identity.platform, identity.handle)
         }
         val value = buildSystemContactEntity(
             SystemContactEntityInput(
@@ -524,6 +533,7 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
         val knowledge = database.contactKnowledgeDao()
         val sourceRef = "android-contact:${candidate.sourceId.take(180)}"
         upsertSystemContactMethods(knowledge, candidate, value, sourceRef, ctx.nowEpochMs)
+        upsertSystemContactPlatformIdentities(candidate, value, sourceRef, ctx.nowEpochMs)
         upsertSystemContactOrganization(knowledge, candidate, value, sourceRef, ctx.nowEpochMs)
         upsertSystemContactAddressesDatesAndFacet(knowledge, candidate, value, sourceRef, ctx.nowEpochMs)
     }
@@ -599,26 +609,30 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
                     ),
                 )
             }
-            candidate.wechatIds.map(::normalizeContactMethodHandle).distinct().forEachIndexed { index, normalized ->
-                add(
-                    ContactMethodEntity(
-                        methodId = stableContactKnowledgeId(value.contactId, "WECHAT", normalized),
-                        contactId = value.contactId,
-                        kind = "WECHAT",
-                        value = normalized,
-                        normalizedValue = normalized,
-                        label = null,
-                        isPrimary = index == 0,
-                        source = "SYSTEM_CONTACT",
-                        evidenceRef = sourceRef,
-                        confidence = 0.85,
-                        userConfirmed = true,
-                        verifiedAtEpochMs = null,
-                        createdAtEpochMs = nowEpochMs,
-                        updatedAtEpochMs = nowEpochMs,
-                    ),
-                )
-            }
+            candidate.platformIdentities
+                .plus(candidate.wechatIds.map { com.zhiban.rebuild.data.contact.SystemContactPlatformIdentity("WECHAT", it) })
+                .distinctBy { it.platform to normalizeContactMethodHandle(it.handle) }
+                .forEachIndexed { index, identity ->
+                    val normalized = normalizeContactMethodHandle(identity.handle)
+                    add(
+                        ContactMethodEntity(
+                            methodId = stableContactKnowledgeId(value.contactId, identity.platform, normalized),
+                            contactId = value.contactId,
+                            kind = identity.platform,
+                            value = normalized,
+                            normalizedValue = normalized,
+                            label = null,
+                            isPrimary = index == 0,
+                            source = "SYSTEM_CONTACT",
+                            evidenceRef = sourceRef,
+                            confidence = 0.85,
+                            userConfirmed = true,
+                            verifiedAtEpochMs = null,
+                            createdAtEpochMs = nowEpochMs,
+                            updatedAtEpochMs = nowEpochMs,
+                        ),
+                    )
+                }
             candidate.emails.map { it.trim().lowercase() }.filter { it.contains('@') }.distinct()
                 .forEachIndexed { index, normalized ->
                     add(
@@ -642,6 +656,76 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
                 }
         }
         if (methods.isNotEmpty()) knowledge.upsertMethods(methods)
+    }
+
+    private suspend fun upsertSystemContactPlatformIdentities(candidate: SystemContactCandidate, value: ContactEntity, sourceRef: String, nowEpochMs: Long) {
+        val identities = candidate.platformIdentities
+            .plus(candidate.wechatIds.map { com.zhiban.rebuild.data.contact.SystemContactPlatformIdentity("WECHAT", it) })
+            .distinctBy { it.platform to normalizeContactMethodHandle(it.handle) }
+        identities.forEach { identity ->
+            val normalized = normalizeContactMethodHandle(identity.handle)
+            database.contactIdentityDao().upsertPlatformIdentity(
+                ContactPlatformIdentityEntity(
+                    identityId = stableContactKnowledgeId(value.contactId, identity.platform, normalized),
+                    contactId = value.contactId,
+                    platform = identity.platform,
+                    handle = identity.handle.trim(),
+                    normalizedHandle = normalized,
+                    platformUserId = null,
+                    source = "SYSTEM_CONTACT:$sourceRef",
+                    userConfirmed = true,
+                    createdAtEpochMs = nowEpochMs,
+                    updatedAtEpochMs = nowEpochMs,
+                ),
+            )
+        }
+    }
+
+    private suspend fun stageLocalOrganizationSuggestions(nowEpochMs: Long) {
+        val contacts = database.contactDao().listActiveForIntelligence()
+        buildLocalOrganizationSuggestions(contacts).forEach { suggestion ->
+            val candidateId = "local-org-${sha256("${suggestion.contactId}|${suggestion.company}").take(24)}"
+            database.contactKnowledgeDao().insertEnrichmentCandidateIfAbsent(
+                ContactEnrichmentCandidateEntity(
+                    candidateId = candidateId,
+                    contactId = suggestion.contactId,
+                    providerId = "local-contact-intelligence",
+                    fieldKind = "ORGANIZATION",
+                    proposedValueJson = buildJsonObject { put("company", JsonPrimitive(suggestion.company)) }.toString(),
+                    sourceRef = "通讯录中另一位联系人的已存公司资料",
+                    confidence = suggestion.confidence,
+                    status = "PENDING",
+                    observedAtEpochMs = nowEpochMs,
+                    expiresAtEpochMs = nowEpochMs + LOCAL_ENRICHMENT_TTL_MS,
+                    createdAtEpochMs = nowEpochMs,
+                    updatedAtEpochMs = nowEpochMs,
+                ),
+            )
+        }
+    }
+
+    suspend fun refreshLocalContactIntelligence(nowEpochMs: Long = System.currentTimeMillis()) = database.withTransaction {
+        val contacts = database.contactDao().listActiveForIntelligence()
+        contacts.forEach { contact ->
+            contact.wechatId?.cleanContactField()?.let { handle ->
+                val normalized = normalizeContactMethodHandle(handle)
+                database.contactIdentityDao().insertPlatformIdentityIfAbsent(
+                    ContactPlatformIdentityEntity(
+                        identityId = stableContactKnowledgeId(contact.contactId, "WECHAT", normalized),
+                        contactId = contact.contactId,
+                        platform = "WECHAT",
+                        handle = handle,
+                        normalizedHandle = normalized,
+                        platformUserId = null,
+                        source = "CONTACT_PROFILE",
+                        userConfirmed = true,
+                        createdAtEpochMs = contact.createdAtEpochMs,
+                        updatedAtEpochMs = nowEpochMs,
+                    ),
+                )
+            }
+        }
+        stageLocalOrganizationSuggestions(nowEpochMs)
     }
 
     private suspend fun upsertSystemContactOrganization(
@@ -775,6 +859,8 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
     fun observeContactImportantDates(contactId: String) = database.contactKnowledgeDao().observeImportantDates(contactId)
     fun observeContactFacets(contactId: String) = database.contactKnowledgeDao().observeFacets(contactId)
     fun observePendingContactEnrichment(contactId: String) = database.contactKnowledgeDao().observePendingEnrichment(contactId)
+    fun observeAllPendingContactEnrichment(nowEpochMs: Long = System.currentTimeMillis()) =
+        database.contactKnowledgeDao().observeAllPendingEnrichment(nowEpochMs)
 
     suspend fun stageContactEnrichmentCandidate(candidate: ContactEnrichmentCandidateEntity) =
         database.contactKnowledgeDao().insertEnrichmentCandidateIfAbsent(candidate.copy(status = "PENDING")) != -1L
@@ -872,4 +958,8 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
         .lowercase()
         .filterNot(Char::isWhitespace)
     private fun normalizeIdentityValue(value: String): String = value.lowercase().filterNot(Char::isWhitespace).trimStart('@')
+
+    private companion object {
+        const val LOCAL_ENRICHMENT_TTL_MS = 30L * 24 * 60 * 60 * 1_000
+    }
 }

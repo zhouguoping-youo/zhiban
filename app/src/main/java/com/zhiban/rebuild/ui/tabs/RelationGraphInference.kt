@@ -3,8 +3,10 @@ package com.zhiban.rebuild.ui.tabs
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
+import com.zhiban.rebuild.data.contact.corporateEmailDomain
 
 internal const val INFERRED_COMPANY_RELATIONSHIP_STATUS = "INFERRED_COMPANY"
+internal const val INFERRED_EMAIL_DOMAIN_RELATIONSHIP_STATUS = "INFERRED_EMAIL_DOMAIN"
 
 /**
  * Adds reversible, display-only colleague links when two people have the same explicit company.
@@ -17,54 +19,92 @@ internal fun withInferredCompanyRelationships(
     ownerContactSources: List<ContactEntity>,
     savedEdges: List<RelationshipEdgeEntity>,
 ): List<RelationshipEdgeEntity> {
-    val companiesByPerson = buildMap<String, Set<NormalizedCompany>> {
-        contacts.forEach { contact ->
-            contact.company?.toNormalizedCompany()?.let { company ->
-                put(contact.contactId, setOf(company))
-            }
-        }
-        ownerContactSources.mapNotNull { it.company?.toNormalizedCompany() }
-            .toSet()
-            .takeIf { it.isNotEmpty() }
-            ?.let { put(RelationshipPersonIds.SELF, it) }
-    }
-    if (companiesByPerson.size < 2) return savedEdges
+    val companiesByPerson = companyEvidenceByPerson(contacts, ownerContactSources)
+    val emailDomainsByPerson = emailDomainEvidenceByPerson(contacts, ownerContactSources)
+    if (companiesByPerson.size < 2 && emailDomainsByPerson.size < 2) return savedEdges
 
     val savedColleaguePairs = savedEdges.asSequence()
         .filter { it.relationType == "COLLEAGUE" }
         .map { relationshipPairKey(it.fromContactId, it.toContactId) }
-        .toSet()
-    val inferred = buildList {
-        val people = companiesByPerson.keys.sorted()
-        people.forEachIndexed { index, firstId ->
-            people.drop(index + 1).forEach { secondId ->
-                val secondCompanies = companiesByPerson.getValue(secondId)
-                val sharedCompany = companiesByPerson.getValue(firstId)
-                    .firstOrNull { first -> secondCompanies.any { second -> first.key == second.key } }
-                    ?: return@forEach
-                val pairKey = relationshipPairKey(firstId, secondId)
-                if (pairKey in savedColleaguePairs) return@forEach
-                add(
-                    RelationshipEdgeEntity(
-                        edgeId = "inferred-company:$pairKey",
-                        fromContactId = firstId,
-                        toContactId = secondId,
-                        relationType = "COLLEAGUE",
-                        evidenceDigest = "联系人资料中的公司名称一致：${sharedCompany.displayName.take(100)}",
-                        evidenceRefsJson = "[\"contact.company\"]",
-                        confidence = 0.88,
-                        userConfirmed = false,
-                        skillId = null,
-                        status = INFERRED_COMPANY_RELATIONSHIP_STATUS,
-                        createdAtEpochMs = 0L,
-                        updatedAtEpochMs = 0L,
-                    ),
-                )
-            }
+        .toMutableSet()
+    val companyEdges = inferEvidencePairs(
+        evidenceByPerson = companiesByPerson.mapValues { (_, values) -> values.associate { it.key to it.displayName } },
+        status = INFERRED_COMPANY_RELATIONSHIP_STATUS,
+        evidencePrefix = "联系人资料中的公司名称一致",
+        evidenceRef = "contact.company",
+        confidence = 0.88,
+        blockedPairs = savedColleaguePairs,
+    )
+    savedColleaguePairs += companyEdges.map { relationshipPairKey(it.fromContactId, it.toContactId) }
+    val emailEdges = inferEvidencePairs(
+        evidenceByPerson = emailDomainsByPerson.mapValues { (_, values) -> values.associateWith { it } },
+        status = INFERRED_EMAIL_DOMAIN_RELATIONSHIP_STATUS,
+        evidencePrefix = "企业邮箱域一致",
+        evidenceRef = "contact.email.domain",
+        confidence = 0.8,
+        blockedPairs = savedColleaguePairs,
+    )
+    return savedEdges + companyEdges + emailEdges
+}
+
+private fun companyEvidenceByPerson(contacts: List<ContactEntity>, ownerContactSources: List<ContactEntity>): Map<String, Set<NormalizedCompany>> = buildMap {
+    contacts.forEach { contact -> contact.company?.toNormalizedCompany()?.let { put(contact.contactId, setOf(it)) } }
+    ownerContactSources.mapNotNull { it.company?.toNormalizedCompany() }.toSet()
+        .takeIf { it.isNotEmpty() }
+        ?.let { put(RelationshipPersonIds.SELF, it) }
+}
+
+private fun emailDomainEvidenceByPerson(contacts: List<ContactEntity>, ownerContactSources: List<ContactEntity>): Map<String, Set<String>> = buildMap {
+    contacts.forEach { contact -> corporateEmailDomain(contact.email)?.let { put(contact.contactId, setOf(it)) } }
+    ownerContactSources.mapNotNull { corporateEmailDomain(it.email) }.toSet()
+        .takeIf { it.isNotEmpty() }
+        ?.let { put(RelationshipPersonIds.SELF, it) }
+}
+
+private fun inferEvidencePairs(
+    evidenceByPerson: Map<String, Map<String, String>>,
+    status: String,
+    evidencePrefix: String,
+    evidenceRef: String,
+    confidence: Double,
+    blockedPairs: Set<String>,
+): List<RelationshipEdgeEntity> = buildList {
+    val people = evidenceByPerson.keys.sorted()
+    people.forEachIndexed { index, firstId ->
+        people.drop(index + 1).forEach { secondId ->
+            val sharedKey = evidenceByPerson.getValue(firstId).keys
+                .firstOrNull(evidenceByPerson.getValue(secondId)::containsKey)
+                ?: return@forEach
+            val pairKey = relationshipPairKey(firstId, secondId)
+            if (pairKey in blockedPairs) return@forEach
+            val displayValue = evidenceByPerson.getValue(firstId).getValue(sharedKey)
+            add(inferredColleagueEdge(firstId, secondId, pairKey, status, "$evidencePrefix：$displayValue", evidenceRef, confidence))
         }
     }
-    return savedEdges + inferred
 }
+
+private fun inferredColleagueEdge(
+    firstId: String,
+    secondId: String,
+    pairKey: String,
+    status: String,
+    evidence: String,
+    evidenceRef: String,
+    confidence: Double,
+) = RelationshipEdgeEntity(
+    edgeId = "inferred:$status:$pairKey",
+    fromContactId = firstId,
+    toContactId = secondId,
+    relationType = "COLLEAGUE",
+    evidenceDigest = evidence.take(180),
+    evidenceRefsJson = "[\"$evidenceRef\"]",
+    confidence = confidence,
+    userConfirmed = false,
+    skillId = null,
+    status = status,
+    createdAtEpochMs = 0L,
+    updatedAtEpochMs = 0L,
+)
 
 internal fun contactMatchesRelationCategory(contact: ContactEntity, category: String, relationships: List<RelationshipEdgeEntity>): Boolean {
     if (category == "全部") return true
@@ -84,6 +124,15 @@ internal fun contactMatchesRelationCategory(contact: ContactEntity, category: St
 }
 
 internal fun RelationshipEdgeEntity.isInferredCompanyRelationship(): Boolean = status == INFERRED_COMPANY_RELATIONSHIP_STATUS
+
+internal fun RelationshipEdgeEntity.isInferredEvidenceRelationship(): Boolean =
+    status == INFERRED_COMPANY_RELATIONSHIP_STATUS || status == INFERRED_EMAIL_DOMAIN_RELATIONSHIP_STATUS
+
+internal fun RelationshipEdgeEntity.inferredEvidenceLabel(): String? = when (status) {
+    INFERRED_COMPANY_RELATIONSHIP_STATUS -> "同公司推测"
+    INFERRED_EMAIL_DOMAIN_RELATIONSHIP_STATUS -> "企业邮箱推测"
+    else -> null
+}
 
 private data class NormalizedCompany(val key: String, val displayName: String)
 

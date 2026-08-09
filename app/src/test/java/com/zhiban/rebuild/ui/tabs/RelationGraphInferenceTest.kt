@@ -83,6 +83,24 @@ class RelationGraphInferenceTest {
     }
 
     @Test
+    fun `same corporate email domain creates explainable inferred relationship`() {
+        val result = withInferredCompanyRelationships(
+            contacts = listOf(
+                contact("a", "A", null, "a@zhiban.com"),
+                contact("b", "B", null, "b@zhiban.com"),
+                contact("c", "C", null, "c@qq.com"),
+            ),
+            ownerContactSources = emptyList(),
+            savedEdges = emptyList(),
+        )
+
+        assertEquals(1, result.size)
+        assertEquals(INFERRED_EMAIL_DOMAIN_RELATIONSHIP_STATUS, result.single().status)
+        assertEquals("企业邮箱推测", result.single().inferredEvidenceLabel())
+        assertTrue(result.single().evidenceDigest.contains("zhiban.com"))
+    }
+
+    @Test
     fun `work category uses inferred colleague edges while other categories stay distinct`() {
         val li = contact("li", "李应啸", "西安知伴科技有限公司")
         val inferred = withInferredCompanyRelationships(
@@ -97,12 +115,12 @@ class RelationGraphInferenceTest {
         assertFalse(contactMatchesRelationCategory(li, "客户", inferred))
     }
 
-    private fun contact(id: String, name: String, company: String?) = ContactEntity(
+    private fun contact(id: String, name: String, company: String?, email: String? = null) = ContactEntity(
         contactId = id,
         displayName = name,
         normalizedName = name.lowercase(),
         phone = null,
-        email = null,
+        email = email,
         wechatId = null,
         company = company,
         title = null,

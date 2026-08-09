@@ -12,6 +12,7 @@ import com.zhiban.rebuild.data.contact.RelationshipEventEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventParticipantEntity
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.data.contact.SystemContactCandidate
+import com.zhiban.rebuild.data.contact.SystemContactPlatformIdentity
 import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityStage
 import com.zhiban.rebuild.data.crm.CrmRecordStatus
@@ -295,6 +296,90 @@ class AgentDataRepositoryTest {
         assertEquals(1, second.updated)
         assertEquals(1, database.contactDao().countActive())
         assertEquals("未来科技", database.contactDao().findBySource("SYSTEM_CONTACT:lookup-1")?.company)
+    }
+
+    @Test
+    fun systemImportPersistsDistinctPlatformIdentities() = runBlocking {
+        repository.importConfirmedSystemContacts(
+            contacts = listOf(
+                systemContact(
+                    sourceId = "platforms",
+                    name = "李应啸",
+                    platformIdentities = listOf(
+                        SystemContactPlatformIdentity("WECHAT", "li-wechat"),
+                        SystemContactPlatformIdentity("FEISHU", "li-feishu"),
+                        SystemContactPlatformIdentity("WE_COM", "li-wecom"),
+                    ),
+                ),
+            ),
+            ownerPhone = null,
+            ownerWechatId = null,
+            ownerName = null,
+            nowEpochMs = 1_000L,
+        )
+
+        val contact = database.contactDao().findBySource("SYSTEM_CONTACT:platforms")!!
+        assertEquals("li-wechat", contact.wechatId)
+        assertEquals(
+            setOf("WECHAT", "FEISHU", "WE_COM"),
+            database.contactIdentityDao().platformIdentities(contact.contactId).map { it.platform }.toSet(),
+        )
+    }
+
+    @Test
+    fun sameConfirmedPlatformAccountLinksReimportedCardToExistingPerson() = runBlocking {
+        val identity = SystemContactPlatformIdentity("FEISHU", "ou_verified_123")
+        val summary = repository.importConfirmedSystemContacts(
+            contacts = listOf(
+                systemContact("feishu-a", "李应啸", platformIdentities = listOf(identity)),
+                systemContact("feishu-b", "李老师", platformIdentities = listOf(identity)),
+            ),
+            ownerPhone = null,
+            ownerWechatId = null,
+            ownerName = null,
+            nowEpochMs = 1_000L,
+        )
+
+        assertEquals(1, summary.created)
+        assertEquals(1, summary.updated)
+        assertEquals(1, database.contactDao().countActive())
+        assertNotNull(database.contactIdentityDao().findContactByPlatformHandle("FEISHU", "ou_verified_123"))
+    }
+
+    @Test
+    fun importStagesUniqueLocalCompanyCompletionInsteadOfOverwritingProfile() = runBlocking {
+        repository.importConfirmedSystemContacts(
+            contacts = listOf(
+                systemContact("short-company", "周国平", company = "知伴"),
+                systemContact("full-company", "李应啸", company = "知伴科技（上海）有限公司"),
+            ),
+            ownerPhone = null,
+            ownerWechatId = null,
+            ownerName = null,
+            nowEpochMs = 1_000L,
+        )
+
+        val contact = database.contactDao().findBySource("SYSTEM_CONTACT:short-company")!!
+        assertEquals("知伴", contact.company)
+        val candidates = repository.observePendingContactEnrichment(contact.contactId).first()
+        assertEquals(1, candidates.size)
+        assertTrue(candidates.single().proposedValueJson.contains("知伴科技（上海）有限公司"))
+        assertEquals("local-contact-intelligence", candidates.single().providerId)
+    }
+
+    @Test
+    fun intelligenceRefreshBackfillsLegacyWechatProfileAsPlatformIdentityIdempotently() = runBlocking {
+        val contactId = repository.saveUserContact(
+            null, "丁波", null, "ding-wechat", null, null, null, null, nowEpochMs = 1_000L,
+        )
+
+        repository.refreshLocalContactIntelligence()
+        repository.refreshLocalContactIntelligence()
+
+        val identities = database.contactIdentityDao().platformIdentities(contactId)
+        assertEquals(1, identities.size)
+        assertEquals("WECHAT", identities.single().platform)
+        assertEquals("ding-wechat", identities.single().handle)
     }
 
     @Test
@@ -919,13 +1004,16 @@ class AgentDataRepositoryTest {
         phone: String? = null,
         company: String? = null,
         wechatIds: List<String> = emptyList(),
+        platformIdentities: List<SystemContactPlatformIdentity> = emptyList(),
+        emails: List<String> = emptyList(),
         phones: List<String> = phone?.let { listOf(it) } ?: emptyList(),
     ) = SystemContactCandidate(
         sourceId = sourceId,
         displayName = name,
         phones = phones,
-        emails = emptyList(),
+        emails = emails,
         wechatIds = wechatIds,
+        platformIdentities = platformIdentities,
         company = company,
         title = null,
         note = null,

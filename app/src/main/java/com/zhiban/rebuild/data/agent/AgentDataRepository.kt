@@ -654,6 +654,8 @@ class AgentDataRepository internal constructor(
     fun observeContactImportantDates(contactId: String) = contacts.observeContactImportantDates(contactId)
     fun observeContactFacets(contactId: String) = contacts.observeContactFacets(contactId)
     fun observePendingContactEnrichment(contactId: String) = contacts.observePendingContactEnrichment(contactId)
+    fun observeAllPendingContactEnrichment() = contacts.observeAllPendingContactEnrichment()
+    suspend fun refreshLocalContactIntelligence() = contacts.refreshLocalContactIntelligence()
     suspend fun stageContactEnrichmentCandidate(candidate: ContactEnrichmentCandidateEntity) = contacts.stageContactEnrichmentCandidate(candidate)
     suspend fun resolveContactEnrichmentCandidate(candidateId: String, accepted: Boolean): Boolean =
         contacts.resolveContactEnrichmentCandidate(candidateId, accepted)

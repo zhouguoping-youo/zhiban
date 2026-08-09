@@ -150,7 +150,9 @@ internal fun buildForceGraphModel(rootId: String, peopleById: Map<String, Relati
             relationType = edge.relationType,
             confidence = edge.confidence.toFloat().coerceIn(0f, 1f),
             isInferred = !edge.userConfirmed,
-            evidenceLabel = sharedCompany,
+            evidenceLabel = sharedCompany ?: edge.evidenceDigest
+                .takeIf { edge.isInferredEvidenceRelationship() }
+                ?.substringAfter('：', missingDelimiterValue = edge.evidenceDigest),
         )
     }
     return ForceGraphModel(personNodes, relationLinks)
@@ -659,7 +661,7 @@ private fun ForceGraphLegend(colors: RelationshipGraphColors) {
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md)) {
             ForceLegendItem("工作关系", colors.workNode, Modifier.weight(1f))
-            ForceLegendItem("同公司关系", colors.sharedCompany, Modifier.weight(1f), line = true)
+            ForceLegendItem("资料推测", colors.sharedCompany, Modifier.weight(1f), line = true)
         }
     }
 }
@@ -792,7 +794,7 @@ private fun ForceNodeDetailSheet(node: ForceGraphNode, model: ForceGraphModel, o
                             Text(
                                 buildString {
                                     append(forceRelationLabel(link.relationType))
-                                    link.evidenceLabel?.let { append(" · 同公司：").append(it) }
+                                    link.evidenceLabel?.let { append(" · 依据：").append(it) }
                                     if (link.isInferred) append(" · 智能推测")
                                 },
                                 style = MaterialTheme.typography.labelSmall,

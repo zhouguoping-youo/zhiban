@@ -186,6 +186,7 @@ fun RelationTab(
     val relationshipEvents by viewModel.relationshipEvents.collectAsStateWithLifecycle()
     val rawContacts by viewModel.rawContacts.collectAsStateWithLifecycle()
     val ownerContactLinks by viewModel.ownerContactLinks.collectAsStateWithLifecycle()
+    val pendingEnrichment by viewModel.pendingEnrichment.collectAsStateWithLifecycle()
     val mergeSuggestions by viewModel.mergeSuggestions.collectAsStateWithLifecycle()
     val notificationCandidates by viewModel.notificationCandidates.collectAsStateWithLifecycle()
     val pendingCallNotes by viewModel.pendingCallNotes.collectAsStateWithLifecycle()
@@ -279,6 +280,9 @@ fun RelationTab(
     }
     val graphRelationships = remember(contacts, ownerContactSources, relationships) {
         withInferredCompanyRelationships(contacts, ownerContactSources, relationships)
+    }
+    val inferredRelationshipCount = remember(graphRelationships) {
+        graphRelationships.count(RelationshipEdgeEntity::isInferredEvidenceRelationship)
     }
     val visible = remember(contacts, graphRelationships, query, tag) {
         contacts.filter { contact ->
@@ -512,6 +516,41 @@ fun RelationTab(
                             )
                         }
                         Text("查看", color = RelationInk, style = MaterialTheme.typography.labelLarge)
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+            }
+            if (pendingEnrichment.isNotEmpty()) {
+                item {
+                    Row(
+                        Modifier.fillMaxWidth().zhiBanCardSurface(RelationSurface)
+                            .clickable {
+                                pendingEnrichment.firstNotNullOfOrNull { candidate ->
+                                    candidate.contactId?.let { id -> contacts.firstOrNull { it.contactId == id } }
+                                }?.let { selected = it }
+                            }
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Outlined.AutoAwesome, contentDescription = null, tint = RelationAccent)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "资料待核实",
+                                color = RelationInk,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                            )
+                            Text(
+                                buildString {
+                                    append("${pendingEnrichment.size} 条补全建议")
+                                    if (inferredRelationshipCount > 0) append(" · $inferredRelationshipCount 条关系推测")
+                                },
+                                color = RelationMuted,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        Text("查看", color = RelationAccent, style = MaterialTheme.typography.labelLarge)
                     }
                     Spacer(Modifier.height(12.dp))
                 }

@@ -18,6 +18,7 @@ data class SystemContactCandidate(
     val phones: List<String>,
     val emails: List<String>,
     val wechatIds: List<String> = emptyList(),
+    val platformIdentities: List<SystemContactPlatformIdentity> = emptyList(),
     val company: String?,
     val title: String?,
     val department: String? = null,
@@ -27,6 +28,8 @@ data class SystemContactCandidate(
     val birthday: SystemContactBirthday? = null,
     val note: String? = null,
 )
+
+data class SystemContactPlatformIdentity(val platform: String, val handle: String)
 
 data class SystemContactAddress(val kind: String, val formattedAddress: String)
 
@@ -131,7 +134,16 @@ class SystemContactReader @Inject constructor(@ApplicationContext private val co
             }
 
             ContactsContract.CommonDataKinds.Im.CONTENT_ITEM_TYPE -> {
-                cursor.string(ContactsContract.CommonDataKinds.Im.DATA)?.let(::normalizeContactMethodHandle)?.let(target.wechatIds::add)
+                val handle = cursor.string(ContactsContract.CommonDataKinds.Im.DATA)
+                    ?.let(::normalizeContactMethodHandle)
+                val platform = systemImPlatform(
+                    protocol = cursor.string(ContactsContract.CommonDataKinds.Im.PROTOCOL)?.toIntOrNull(),
+                    customProtocol = cursor.string(ContactsContract.CommonDataKinds.Im.CUSTOM_PROTOCOL),
+                )
+                if (handle != null && platform != null) {
+                    target.platformIdentities += SystemContactPlatformIdentity(platform, handle)
+                    if (platform == "WECHAT") target.wechatIds += handle
+                }
             }
 
             ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE -> {
@@ -201,6 +213,7 @@ class SystemContactReader @Inject constructor(@ApplicationContext private val co
         val phones: LinkedHashSet<String> = linkedSetOf(),
         val emails: LinkedHashSet<String> = linkedSetOf(),
         val wechatIds: LinkedHashSet<String> = linkedSetOf(),
+        val platformIdentities: LinkedHashSet<SystemContactPlatformIdentity> = linkedSetOf(),
         var company: String? = null,
         var title: String? = null,
         var department: String? = null,
@@ -219,6 +232,7 @@ class SystemContactReader @Inject constructor(@ApplicationContext private val co
                 phones = phones.toList(),
                 emails = emails.toList(),
                 wechatIds = wechatIds.toList(),
+                platformIdentities = platformIdentities.toList(),
                 company = company,
                 title = title,
                 department = department,
@@ -233,6 +247,32 @@ class SystemContactReader @Inject constructor(@ApplicationContext private val co
 }
 
 private fun normalizeContactMethodHandle(raw: String): String = raw.trim().trimStart('@').lowercase()
+
+internal fun systemImPlatform(protocol: Int?, customProtocol: String?): String? = when (protocol) {
+    ContactsContract.CommonDataKinds.Im.PROTOCOL_QQ -> "QQ"
+
+    ContactsContract.CommonDataKinds.Im.PROTOCOL_SKYPE -> "SKYPE"
+
+    ContactsContract.CommonDataKinds.Im.PROTOCOL_GOOGLE_TALK -> "GOOGLE_CHAT"
+
+    ContactsContract.CommonDataKinds.Im.PROTOCOL_JABBER -> "JABBER"
+
+    ContactsContract.CommonDataKinds.Im.PROTOCOL_CUSTOM -> when {
+        customProtocol.matchesPlatform("微信", "wechat", "weixin") -> "WECHAT"
+        customProtocol.matchesPlatform("企业微信", "企微", "wecom", "wework") -> "WE_COM"
+        customProtocol.matchesPlatform("飞书", "feishu", "lark") -> "FEISHU"
+        customProtocol.matchesPlatform("钉钉", "dingtalk") -> "DINGTALK"
+        customProtocol.matchesPlatform("qq") -> "QQ"
+        else -> null
+    }
+
+    else -> null
+}
+
+private fun String?.matchesPlatform(vararg aliases: String): Boolean {
+    val normalized = orEmpty().trim().lowercase().replace(" ", "")
+    return aliases.any { normalized == it.lowercase().replace(" ", "") }
+}
 
 internal fun parseSystemContactBirthday(raw: String?): SystemContactBirthday? {
     val value = raw.orEmpty().trim()
