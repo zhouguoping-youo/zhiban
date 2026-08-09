@@ -23,12 +23,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
@@ -59,7 +61,7 @@ fun AgentConversationRoute(
     BackHandler(onBack = onBackToHome)
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    var input by remember { mutableStateOf("") }
+    var input by rememberConversationDraftState()
     var multimodal by remember { mutableStateOf(MultimodalUiState()) }
     var voiceInputLevel by remember { mutableFloatStateOf(0f) }
     var pendingCaptureUri by remember { mutableStateOf<Uri?>(null) }
@@ -730,6 +732,9 @@ fun AgentConversationRoute(
         },
     )
 }
+
+@Composable
+internal fun rememberConversationDraftState(): MutableState<String> = rememberSaveable { mutableStateOf("") }
 
 private fun cloudAsrFailureMessage(code: String): String = when (code) {
     "ASR_EMPTY_RESULT", "AUDIO_EMPTY" -> "没有听清，请删除录音后重新说一次"

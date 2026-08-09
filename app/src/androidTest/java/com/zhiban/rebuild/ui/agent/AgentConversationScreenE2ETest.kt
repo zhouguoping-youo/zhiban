@@ -7,7 +7,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -15,7 +17,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.longClick
 import com.zhiban.rebuild.ui.theme.ZhiBanTheme
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -96,6 +97,26 @@ class AgentConversationScreenE2ETest {
         compose.onNodeWithContentDescription("添加附件").performClick()
         compose.onNodeWithText("文件").performClick()
         assertEquals("file", picked.get())
+    }
+
+    @Test fun unsentDraftSurvivesSavedInstanceStateRestoration() {
+        val restoration = StateRestorationTester(compose)
+        restoration.setContent {
+            ZhiBanTheme {
+                var input by rememberConversationDraftState()
+                AgentConversationScreen(
+                    state = AgentConversationUiState(),
+                    inputText = input,
+                    onInputChange = { input = it },
+                )
+            }
+        }
+
+        compose.onNodeWithContentDescription("消息输入框").performClick()
+        compose.onNodeWithContentDescription("消息输入框").performTextInput("尚未发送的草稿")
+        restoration.emulateSavedInstanceStateRestore()
+
+        compose.onNodeWithText("尚未发送的草稿").assertIsDisplayed()
     }
 
     @Test fun approvalReplyActionsErrorRecoveryAndBackCallbacksAreOperable() {

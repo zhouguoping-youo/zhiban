@@ -241,8 +241,8 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
 |---|---|---|---|---|---|---|
 | 14.1 | 杀后重启会话状态恢复 | ⬜ | | | | |
-| 14.2 | 杀后重启草稿保留 | ⬜ | | | | |
-| 14.3 | 杀后重启未发消息保留 | ⬜ | | | | |
+| 14.2 | 杀后重启草稿保留 | ✅ | 数据丢失 | 问问输入正文原先只用 `remember`，Activity 重建/系统保存状态恢复后清空；现用 `rememberSaveable` 保存未发送正文 | 本提交 `fix(14.2)` | `AgentConversationScreenE2ETest.unsentDraftSurvivesSavedInstanceStateRestoration` |
+| 14.3 | 杀后重启未发消息保留 | ✅ | 数据丢失 | 未发送文本与草稿是同一状态，现可随 saved instance state 恢复；未发送附件仍只存在私有暂存并受到期清理，不把 Uri/文件句柄塞进 Bundle | 本提交 `fix(14.2)` | `AgentConversationScreenE2ETest.unsentDraftSurvivesSavedInstanceStateRestoration` |
 | 14.4 | 杀后重启未完成确认保留 | ⬜ | | | | |
 | 14.5 | 杀后重启自动写回执保留 | ⬜ | | | | |
 | 14.6 | 覆盖安装 API Key 丢失 | ⏭ | | 上一轮 #22 已修+真机验证 | `c685d9b` | 真机 |
