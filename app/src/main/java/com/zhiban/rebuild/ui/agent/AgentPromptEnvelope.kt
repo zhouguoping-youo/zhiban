@@ -7,10 +7,10 @@ package com.zhiban.rebuild.ui.agent
  * including when an older session is reopened from history.
  */
 object AgentPromptEnvelope {
-    private const val INTERNAL_CONTEXT_MARKER = "\n\n<!-- zhiban-internal-task-context -->\n"
+    private const val INTERNAL_CONTEXT_MARKER = "<!-- zhiban-internal-task-context -->"
     private val legacySuggestionTitle = Regex("建议[‘'“\\\"]([^’'”\\\"]+)[’'”\\\"]")
 
-    fun wrap(displayText: String, internalContext: String): String = displayText.trim() + INTERNAL_CONTEXT_MARKER + internalContext.trim()
+    fun wrap(displayText: String, internalContext: String): String = "${displayText.trim()}\n\n$INTERNAL_CONTEXT_MARKER\n${internalContext.trim()}"
 
     fun displayText(value: String): String {
         val trimmed = value.substringBefore(INTERNAL_CONTEXT_MARKER).trim()

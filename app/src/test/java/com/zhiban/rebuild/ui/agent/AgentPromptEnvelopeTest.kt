@@ -17,6 +17,16 @@ class AgentPromptEnvelopeTest {
     }
 
     @Test
+    fun hidesInternalContextAfterPersistenceFlattensWhitespace() {
+        val prompt = AgentPromptEnvelope.wrap(
+            displayText = "帮我创建机会",
+            internalContext = "调用 crm.opportunity.create 并等待确认",
+        ).replace('\n', ' ')
+
+        assertEquals("帮我创建机会", AgentPromptEnvelope.displayText(prompt))
+    }
+
+    @Test
     fun leavesOrdinaryUserInputUntouched() {
         assertEquals("明天下午提醒我开会", AgentPromptEnvelope.displayText("明天下午提醒我开会"))
     }
