@@ -301,16 +301,16 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 ## 维度 18 · 工具执行与确认
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
 |---|---|---|---|---|---|---|
-| 18.1 | 参数缺失拒绝不崩溃 | ⬜ | | | | |
-| 18.2 | 参数非法拒绝不崩溃 | ⬜ | | | | |
-| 18.3 | 执行超时显示错误 | ⬜ | | | | |
-| 18.4 | 执行失败显示错误不卡住 | ⬜ | | | | |
-| 18.5 | 确认后执行失败显示错误 | ⬜ | | | | |
-| 18.6 | 确认后执行成功显示权威结果 | ⬜ | | | | |
-| 18.7 | 拒绝后能否再提议 | ⬜ | | | | |
-| 18.8 | 执行后 safeResult 权威结果 | ⬜ | | | | |
-| 18.9 | 执行后 ChangeLog 记录 | ⬜ | | | | |
-| 18.10 | 执行后 ToolAudit 记录 | ⬜ | | | | |
+| 18.1 | 参数缺失拒绝不崩溃 | ⚪ | — | ToolArgumentParser 与各 binding 做必填字段/引用校验，缺失返回固定安全错误，不进入 DomainWriter | 审计提交 | `ToolArgumentParserTest` + `CrmMutationToolBindingTest` |
+| 18.2 | 参数非法拒绝不崩溃 | ⚪ | — | 畸形 JSON、未知字段、幻觉 contact/opportunity id 均在审批前 fail-closed；运行时落安全失败而非异常正文 | 审计提交 | `ToolArgumentParserTest.rejectsUnknownKeysAndMalformedJsonWithSameSafeFailure` + `RuntimeInputProcessorTest.invalidToolCallFailsClosedWithoutSuccess` |
+| 18.3 | 执行超时显示错误 | ⚪ | — | Provider/感知/重排均有有界 timeout；主执行超时落 `FAILED_RETRYABLE` 与安全失败码，UI reducer 显示可重试状态 | 审计提交 | `RuntimeInputProcessorTest.stalledProviderTimesOutWhileLeaseHeartbeatKeepsSafeFailureWritable` + `AgentProjectionUiMapperTest` |
+| 18.4 | 执行失败显示错误不卡住 | ⚪ | — | 认证失败、非法工具与网络失败均终结 attempt/run 并投影固定文案，不保留 EXECUTING 死状态 | 审计提交 | `RuntimeInputProcessorTest.providerAuthenticationFailureIsFinalAndPersistsOnlySafeCode` + `invalidToolCallFailsClosedWithoutSuccess` |
+| 18.5 | 确认后执行失败显示错误 | ⚪ | — | approval 与执行分离持久化，确认后的 DomainWriter 失败不写成功事件/领域数据，run 投影安全失败 | 审计提交 | `RoomScheduleToolExecutorTest.unconfirmedOrMismatchedApprovalWritesNothing` + 原子失败测试 |
+| 18.6 | 确认后执行成功显示权威结果 | ⚪ | — | 成功正文由已提交 ToolExecution 的 safeResult/领域记录生成，不允许模型仅凭意图宣称成功 | 审计提交 | `RuntimeInputProcessorTest.workToolCallRequiresApprovalThenCreatesScheduleExactlyOnce` |
+| 18.7 | 拒绝后能否再提议 | ⚪ | — | REJECT 终结当前 run 并清 pendingApproval；后续 START 使用新 run/idempotency key，可再次形成独立提议 | 审计提交 | `AgentRuntimeProjectionControllerTest`（reject 命令）+ `RuntimeGatewayTest.sixCommandsPersistWithCasAndDuplicateDoesNotAppendAgain` |
+| 18.8 | 执行后 safeResult 权威结果 | ⚪ | — | observation/final answer只消费持久化 `safeResultJson`，重复执行返回原结果，同键不同 digest 冲突 | 审计提交 | `RoomScheduleToolExecutorTest.confirmedWriteIsAtomicAndDuplicateReturnsOriginalResult` + `RuntimeInputProcessorTest.contactSearchAutoExecutesWithoutApprovalAndFeedsFinalAnswer` |
+| 18.9 | 执行后 ChangeLog 记录 | ⚪ | — | 可变更工具的领域写与 ChangeLog 在同一 Room transaction；八个 CRM 写工具逐一覆盖 | 审计提交 | `RoomCrmToolExecutorTest.allEightConfirmedToolsWriteAuditAndChangeRecords` + `RoomScheduleToolExecutorTest` |
+| 18.10 | 执行后 ToolAudit 记录 | ⚪ | — | 成功/失败工具执行均写 tool ledger/audit；未确认或载荷不匹配保持零审计和零领域写 | 审计提交 | `RoomScheduleToolExecutorTest` + `RoomCrmToolExecutorTest.allEightConfirmedToolsWriteAuditAndChangeRecords` |
 | 18.11 | 目标 App 启动失败后立即重试被误判已打开 | ✅ | 功能不可用 | 去重占位在解析/启动前写入且失败不释放；改为可释放 reservation，失败路径立即回收 | 本提交 `fix(18.11)` | `RecentHandoffLaunchGuardTest.failedLaunchReservationCanBeReleasedForImmediateRetry` |
 
 ## 维度 19 · 记忆与个性化
