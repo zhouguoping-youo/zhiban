@@ -100,19 +100,19 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 ## 维度 5 · 日历链路
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
 |---|---|---|---|---|---|---|
-| 5.1 | 时间解析错误("明天下午3点") | ⬜ | | | | |
-| 5.2 | 改期后旧提醒仍触发 | ⬜ | | | | |
-| 5.3 | 系统日历和本地日程冲突误报 | ⬜ | | | | |
-| 5.4 | 重复事件最后一天取消误报冲突 | ⬜ | | | | |
-| 5.5 | 标题特殊字符(emoji/换行)崩溃 | ⬜ | | | | |
-| 5.6 | 提醒到期 App 被杀提醒丢失 | ⬜ | | | | |
-| 5.7 | 删除日程后关联 CRM 下一步清理 | ⬜ | | | | |
-| 5.8 | 系统日历权限关闭本地日程正常 | ⬜ | | | | |
+| 5.1 | 时间解析错误("明天下午3点") | ⚪ | — | 未复现：本地实体提取按设备时区解析“明天+下午”为次日 15:00；即使模型返回 03:00，最终工具调用也被本地时间覆盖纠正 | — | `CalendarTimeResolutionTest.deterministicFallbackComputesLocalTomorrow3pm`、`normalizeOverridesWrongProviderEpochWithLocalTomorrow3pm` |
+| 5.2 | 改期后旧提醒仍触发 | ⚪ | — | 未复现：唯一 Work 采用 REPLACE，Worker 到点重新读取加密库并核对 start/reminder 快照；删除、改期或提醒设置改变都会静默退出 | — | `ScheduleReminderValidationTest.rescheduledOrChangedReminderInvalidatesOldWorkerSnapshot`、`deletedOrRescheduledWorkerSnapshotNeverDispatchesNotification` |
+| 5.3 | 系统日历和本地日程冲突误报 | ⚪ | — | 未复现：本地冲突使用严格重叠边界；已导入系统实例按 sourceId 从外部冲突结果排除，不会本地+系统重复计数 | — | `CalendarSearchToolBindingTest.conflict tool does not duplicate an imported system event`、`RoomScheduleToolExecutorTest.overlappingScheduleIsRejectedBeforeAnyAgentSideEffect` |
+| 5.4 | 重复事件最后一天取消误报冲突 | ⚪ | — | 未复现：Instances 查询同时要求 VISIBLE=1 且 STATUS!=STATUS_CANCELED，已取消的单个重复实例不会进入导入或冲突结果 | — | `SystemCalendarReaderSelectionTest` |
+| 5.5 | 标题特殊字符(emoji/换行)崩溃 | ⚪ | — | 未复现：标题/备注以 Kotlin String→Room TEXT 原样往返，emoji 和内部换行不参与 SQL 拼接；读取结果保持一致 | — | `CalendarPersistenceEdgeTest.localScheduleRoundTripsEmojiAndNewlinesWithoutSystemCalendarAccess` |
+| 5.6 | 提醒到期 App 被杀提醒丢失 | 🖐 | — | 代码使用持久化 OneTimeWorkRequest+唯一 work，理论上进程死亡后由 WorkManager 恢复；同进程自动测试不能证明 OEM 杀进程后的真实投递。人工步骤：建 10 分钟提醒→强停 App→等待触发→核对锁屏私密通知 | — | `ScheduleReminderValidationTest.workManagerSnapshotNeverContainsScheduleTitle`；待人工真机投递 |
+| 5.7 | 删除日程后关联 CRM 下一步清理 | ⚪ | — | 未复现：crm_next_actions.scheduleId 有 SET_NULL 外键；删除日程后动作业务记录保留、日程引用清空，不产生孤儿 | — | `CalendarPersistenceEdgeTest.deletingScheduleNullsCrmActionReferenceButPreservesAction`、`CrmReferenceIntegrityMigrationTest` |
+| 5.8 | 系统日历权限关闭本地日程正常 | ⚪ | — | 未复现：系统读取无权限仅返回空 events+提示；本地保存/查询只依赖加密 Room，不调用 ContentResolver，特殊标题本地写入回归通过 | — | `CalendarPersistenceEdgeTest.localScheduleRoundTripsEmojiAndNewlinesWithoutSystemCalendarAccess` |
 | 5.9 | 跨天日程显示正确 | ✅ | 功能不可用 | 日历页、列表和检索只用 startAt 是否落在查询日判断，23:30 开始并跨午夜的日程在次日完全消失。三条查询现统一为时间区间重叠语义，结束恰在日界线的事件不会误入次日 | 本提交 `fix(5.9)` | `ScheduleObserveRangeReproTest.crossMidnightScheduleIsVisibleOnEveryOverlappedDay` + 当日插入/Flow 更新回归 |
-| 5.10 | 提醒提前时间按设置触发 | ⬜ | | | | |
-| 5.11 | 创建冲突检测误报 | ⬜ | | | | |
+| 5.10 | 提醒提前时间按设置触发 | ⚪ | — | 未复现：触发时刻严格按 start-reminderMinutes 计算；已进入提醒窗口立即排队，开始时间已过则取消，不产生负延迟 | — | `ScheduleReminderValidationTest.movedEarlierScheduleWithinReminderWindowRunsImmediately` |
+| 5.11 | 创建冲突检测误报 | ⚪ | — | 未复现：本地冲突条件为 existing.start < new.end 且 existing.end > new.start，相邻不重叠；Agent 写入在任何副作用前检查冲突 | — | `RoomScheduleToolExecutorTest.overlappingScheduleIsRejectedBeforeAnyAgentSideEffect`、`CalendarSearchToolBindingTest.conflict tool includes device calendar events` |
 | 5.12 | 时间已过(昨天)是否警告 | ✅ | 数据正确性 | 消息候选会拒绝过期时间，但手动保存和 Agent 最终执行只校验 epoch>0，昨天的误解析可无警告落库。两个最终写入口现统一拒绝超过 5 分钟容差的过去时间；确认延迟不误伤，失败无任何副作用 | 本提交 `fix(5.12)` | `AgentDataRepositoryTest.manualScheduleFromYesterdayIsRejectedWithoutWrite`、`RoomScheduleToolExecutorTest.confirmedScheduleFromThePastIsRejectedBeforeAnySideEffect` |
-| 5.13 | 系统日历同步重复事件实例去重 | ⬜ | | | | |
+| 5.13 | 系统日历同步重复事件实例去重 | ⚪ | — | 未复现：读取端和导入端均按 eventId+instanceStart 的 sourceId 去重；同一实例单批只创建一次，重复导入更新同一稳定 ID | — | `CalendarPersistenceEdgeTest.duplicateSystemCalendarInstancesInOneImportAreStoredOnce`、`AgentDataRepositoryTest.confirmedSystemCalendarImportIsIdempotent` |
 
 ## 维度 7 · 设置链路
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |

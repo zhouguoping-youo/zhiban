@@ -1,0 +1,82 @@
+package com.zhiban.rebuild.data.agent
+
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.zhiban.rebuild.data.calendar.SystemCalendarEvent
+import com.zhiban.rebuild.data.crm.CrmActionStatus
+import com.zhiban.rebuild.data.crm.CrmNextActionEntity
+import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
+import com.zhiban.rebuild.data.crm.CrmOpportunityStage
+import com.zhiban.rebuild.data.crm.CrmRecordStatus
+import kotlinx.coroutines.runBlocking
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+
+@RunWith(AndroidJUnit4::class)
+class CalendarPersistenceEdgeTest {
+    private lateinit var db: AgentDatabase
+    private lateinit var calendar: CalendarAgentDataRepository
+
+    @Before fun setUp() {
+        db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AgentDatabase::class.java)
+            .allowMainThreadQueries().build()
+        calendar = CalendarAgentDataRepository(db)
+    }
+
+    @After fun tearDown() = db.close()
+
+    @Test fun localScheduleRoundTripsEmojiAndNewlinesWithoutSystemCalendarAccess() = runBlocking {
+        val title = "客户会 🤝\n第二阶段"
+        val id = calendar.saveUserSchedule(null, title, 1_000_000L, 30, "备注 ✅", null, nowEpochMs = 1L)
+
+        assertEquals(title, calendar.findSchedule(id)?.title)
+        assertEquals("备注 ✅", calendar.findSchedule(id)?.note)
+    }
+
+    @Test fun deletingScheduleNullsCrmActionReferenceButPreservesAction() = runBlocking {
+        val scheduleId = calendar.saveUserSchedule(null, "跟进提醒", 1_000_000L, 30, null, null, nowEpochMs = 1L)
+        db.crmDao().insertOpportunity(opportunity())
+        db.crmDao().insertAction(action(scheduleId))
+
+        assertTrue(calendar.deleteSchedule(scheduleId))
+
+        val preserved = db.crmDao().findAction(ACTION_ID)
+        assertEquals("继续跟进", preserved?.title)
+        assertNull(preserved?.scheduleId)
+    }
+
+    @Test fun duplicateSystemCalendarInstancesInOneImportAreStoredOnce() = runBlocking {
+        val event = SystemCalendarEvent("42:1000", "重复会议", null, null, 1_000_000L, 1_060_000L, "工作")
+
+        val summary = calendar.importConfirmedSystemCalendarEvents(
+            listOf(event, event.copy(title = "重复实例")),
+            nowEpochMs = 1L,
+        )
+
+        assertEquals(1, summary.created)
+        assertEquals(0, summary.updated)
+        assertEquals(1, db.scheduleDao().count())
+        assertEquals("重复会议", db.scheduleDao().findById("system-calendar-42:1000")?.title)
+    }
+
+    private fun opportunity() = CrmOpportunityEntity(
+        OPPORTUNITY_ID, "历史商机", "客户公司", null, null, CrmOpportunityStage.QUALIFIED,
+        CrmRecordStatus.OPEN, null, "CNY", 45, null, null, null, null, "USER_CONFIRMED", 1, 1,
+    )
+
+    private fun action(scheduleId: String) = CrmNextActionEntity(
+        ACTION_ID, OPPORTUNITY_ID, null, "FOLLOW_UP", "继续跟进", 1_000_000L,
+        CrmActionStatus.PENDING, 1, null, "USER_CONFIRMED", scheduleId, 1, 1,
+    )
+
+    private companion object {
+        const val OPPORTUNITY_ID = "opportunity-calendar"
+        const val ACTION_ID = "action-calendar"
+    }
+}
