@@ -224,18 +224,18 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 ## 维度 13 · 兼容性与边界
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
 |---|---|---|---|---|---|---|
-| 13.1 | 屏幕密度 420/560dpi UI 变形 | ⬜ | | | | |
-| 13.2 | 手机/平板 UI 变形 | ⬜ | | | | |
-| 13.3 | 深色模式颜色正确 | ⬜ | | | | |
-| 13.4 | 字体放大2倍 UI 溢出 | ⬜ | | | | |
-| 13.5 | 横屏 UI 变形 | ⬜ | | | | |
-| 13.6 | Android 26/30/33/35 功能一致 | ⬜ | | | | |
-| 13.7 | 2GB 低端设备卡顿 | ⬜ | | | | |
-| 13.8 | 中英文混合输入处理 | ⬜ | | | | |
-| 13.9 | 特殊字符输入崩溃 | ⬜ | | | | |
-| 13.10 | 超长文本(>1000字)卡顿 | ⬜ | | | | |
-| 13.11 | 快速连续点击重复触发 | ⬜ | | | | |
-| 13.12 | 快速滑动卡顿 | ⬜ | | | | |
+| 13.1 | 屏幕密度 420/560dpi UI 变形 | 🧪 | 体验（设备矩阵缺口） | Compose 使用 dp/sp 和系统 density，未发现 px 固定布局；当前仅 SM-W7023 密度真机覆盖，仍需 420/560dpi 模拟器截图与点击目标测试 | — | 420/560dpi 模拟器矩阵 |
+| 13.2 | 手机/平板 UI 变形 | ⚪ | — | 根 Scaffold 按 600dp 切换底栏/导航 Rail，内容最大宽 840dp并处理 safeDrawing；320/599/600/840dp 边界有单测，SM-W7023 平板设备套件通过 | 审计提交 | `ZhiBanAdaptiveLayoutTest` + SM-W7023 设备测试 |
+| 13.3 | 深色模式颜色正确 | 🖐 | 体验（视觉验收） | Material 亮/暗 ColorScheme、系统栏图标和关系图 token 均按主题切换，节点文字对比度有单测；全页面视觉一致性仍需真机逐页暗色截图验收 | — | `RelationshipGraphColorsTest.node labels retain accessible contrast in light and dark themes` + 人工截图矩阵 |
+| 13.4 | 字体放大2倍 UI 溢出 | ⚪ | — | 统一页头和关键按钮已移除会裁字的固定文字高度，设备测试以 fontScale=2 渲染主视觉和输入区域并验证可显示/可操作 | 审计提交 | `ZhiBanVisualFontScaleTest` |
+| 13.5 | 横屏 UI 变形 | 🖐 | 体验（方向矩阵缺口） | Scaffold 基于实时 maxWidth 自适应并处理系统 Insets，但关系/日历/CRM 二级页尚无横屏截图金丝雀；需 SM-W7023 强制横屏逐页检查无裁切和不可达操作 | — | SM-W7023 人工横屏矩阵 |
+| 13.6 | Android 26/30/33/35 功能一致 | 🧪 | 兼容性（系统矩阵缺口） | minSdk 26/target 35，版本分支覆盖通知、截图、Parcelable、TelephonyCallback 等 API；当前设备仅 Android 13(API 33)，必须补 API 26/30/35 模拟器套件，不能外推一致 | — | API 26/30/35 模拟器矩阵 |
+| 13.7 | 2GB 低端设备卡顿 | 🧪 | 性能（环境缺口） | 有附件、图谱节点、Provider 响应上限，但没有 2GB/低 CPU 设备或低内存模拟器的启动、滚动和多任务回收基准 | — | 2GB AVD Macrobenchmark |
+| 13.8 | 中英文混合输入处理 | ⚪ | — | 输入按 UTF-8 暂存、JSON 序列化和 Unicode token 估算，不做 ASCII 假设；中文、英文、emoji 路径均在 Provider/解析测试覆盖 | 审计提交 | `ProviderModuleTest.outputLimitAndTotalContextFailClosed` + `SocialMessagePerceptionTest` |
+| 13.9 | 特殊字符输入崩溃 | ⚪ | — | 用户文本不拼接 SQL/JSON，Room 参数绑定与 kotlinx.serialization 负责转义；换行、引号、反斜线及 emoji 受统一 UTF-8 字节上限约束 | 审计提交 | `ToolArgumentParserTest` + `AppPrivateAttachmentStagerTest` + Provider Unicode 测试 |
+| 13.10 | 超长文本(>1000字)卡顿 | ⚪ | — | 文本输入允许到 65,536 UTF-8 字节但在暂存和 Provider 上下文处有硬上限；超模型上下文在网络前 fail-closed，不会构造无限请求。1k 字本身远低于上限 | 审计提交 | `RuntimeInputProcessorTest` 输入上限 + `ProviderModuleTest.outputLimitAndTotalContextFailClosed` |
+| 13.11 | 快速连续点击重复触发 | ⚪ | — | Start 使用稳定 actionId/commandId 与数据库唯一约束，双击只暂存一次；工具写再由 canonical digest + providerCallId 幂等，重复确认/执行不会产生第二次领域写 | 审计提交 | `V2AgentConversationBackendTest.double start stages once and rejected receipt discards staged input` + `PlanEnvelopeFactoryTest` + 工具幂等设备测试 |
+| 13.12 | 快速滑动卡顿 | 🧪 | 性能（帧基准缺口） | 主要长列表使用 Lazy 容器和稳定 key，未发现嵌套无限测量；尚无快速 fling 的 jank/帧时长基准，需在 1k 联系人和 500 日程数据集测量 | — | Macrobenchmark fling 场景待建 |
 
 ## 维度 14 · 状态与生命周期
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
