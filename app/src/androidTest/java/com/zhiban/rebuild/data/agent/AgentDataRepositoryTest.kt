@@ -470,6 +470,24 @@ class AgentDataRepositoryTest {
     }
 
     @Test
+    fun manualScheduleFromYesterdayIsRejectedWithoutWrite() = runBlocking {
+        val failure = runCatching {
+            repository.saveUserSchedule(
+                scheduleId = null,
+                title = "误选昨天",
+                startAtEpochMs = 1_000L,
+                durationMinutes = 30,
+                note = null,
+                reminderMinutesBefore = null,
+                nowEpochMs = 24 * 60 * 60_000L,
+            )
+        }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+        assertEquals(0, database.scheduleDao().count())
+    }
+
+    @Test
     fun notificationCandidateStaysPendingUntilUserDismissesIt() = runBlocking {
         repository.stageNotificationCandidate(
             NotificationCandidateEntity(

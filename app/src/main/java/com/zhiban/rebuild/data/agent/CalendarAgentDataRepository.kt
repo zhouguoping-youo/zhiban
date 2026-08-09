@@ -81,6 +81,7 @@ internal class CalendarAgentDataRepository(private val database: AgentDatabase) 
     ): String {
         require(title.isNotBlank()) { "日程名称不能为空" }
         require(durationMinutes in 1..1_440) { "日程时长无效" }
+        require(startAtEpochMs >= nowEpochMs - PAST_SCHEDULE_GRACE_MS) { "这个时间已经过去" }
         require(reminderMinutesBefore == null || reminderMinutesBefore in setOf(10, 30, 60, 1_440)) {
             "提醒时间无效"
         }
@@ -153,4 +154,8 @@ internal class CalendarAgentDataRepository(private val database: AgentDatabase) 
             endEpochMs = startAtEpochMs + durationMinutes * 60_000L,
             excludeId = excludeScheduleId,
         )
+
+    private companion object {
+        const val PAST_SCHEDULE_GRACE_MS = 5 * 60_000L
+    }
 }

@@ -187,15 +187,36 @@ class RoomScheduleToolExecutorTest {
         assertEquals("EXECUTING", store.runById("run")?.status)
     }
 
-    private suspend fun fixture(): ConfirmedToolExecutionContext {
+    @Test fun confirmedScheduleFromThePastIsRejectedBeforeAnySideEffect() = runBlocking {
+        val unsigned = call().copy(
+            startAtEpochMs = 1_000L,
+            canonicalInputDigest = "0".repeat(64),
+            idempotencyKey = "pending",
+        )
+        val withDigest = unsigned.copy(canonicalInputDigest = canonicalScheduleDigest(unsigned))
+        val past = withDigest.copy(idempotencyKey = canonicalToolIdempotencyKey("run", "attempt", withDigest))
+        val fixture = fixture(nowEpochMs = 1_000_000L, leaseTtlMs = 2_000_000L, approvedCall = past)
+
+        val failure = runCatching { executor.execute(fixture, past, confirmationFor(past)) }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+        assertEquals(0, database.scheduleDao().count())
+        assertEquals(0, database.toolAuditDao().count())
+        assertEquals(null, store.toolResult(past.idempotencyKey))
+    }
+
+    private suspend fun fixture(
+        nowEpochMs: Long = 30,
+        leaseTtlMs: Long = 1_000,
+        approvedCall: ScheduleCreateToolCall = call(),
+    ): ConfirmedToolExecutionContext {
         store.acceptStart("start", "session", "run", "{}", 1)
-        val lease = store.claimSession("session", "owner", 2, 1_000)
+        val lease = store.claimSession("session", "owner", 2, leaseTtlMs)
         val kernel = PersistentRuntimeKernel(store)
         kernel.transition("run", RuntimeSignal.BeginContext, "owner", lease.leaseEpoch, 3)
         kernel.transition("run", RuntimeSignal.ContextReady, "owner", lease.leaseEpoch, 4)
         kernel.transition("run", RuntimeSignal.ModelReady, "owner", lease.leaseEpoch, 5)
         kernel.transition("run", RuntimeSignal.PlanValidated, "owner", lease.leaseEpoch, 6)
-        val approved = call()
         database.runtimeAttemptDao().insert(
             com.zhiban.rebuild.runtime.store.RuntimeAttemptEntity("attempt", "run", 1, "ACTIVE", 6, 6),
         )
@@ -203,13 +224,13 @@ class RoomScheduleToolExecutorTest {
             "UPDATE runtime_runs SET activeAttemptId = 'attempt' WHERE runId = 'run'",
         )
         store.appendEvent(
-            RuntimeEventDraft("approval", "ApprovalRequested", "session", "run", "attempt", "plan", "run", "{\"proposalId\":\"proposal\",\"payloadRef\":\"payload\",\"revision\":7,\"canonicalInputDigest\":\"${approved.canonicalInputDigest}\"}", 7),
+            RuntimeEventDraft("approval", "ApprovalRequested", "session", "run", "attempt", "plan", "run", "{\"proposalId\":\"proposal\",\"payloadRef\":\"payload\",\"revision\":7,\"canonicalInputDigest\":\"${approvedCall.canonicalInputDigest}\"}", 7),
             "owner",
             lease.leaseEpoch,
             7,
         )
         kernel.transition("run", RuntimeSignal.Approved, "owner", lease.leaseEpoch, 8)
-        return ConfirmedToolExecutionContext("run", "owner", lease.leaseEpoch, 30)
+        return ConfirmedToolExecutionContext("run", "owner", lease.leaseEpoch, nowEpochMs)
     }
 
     private suspend fun fixtureFor(runId: String, sessionId: String, attemptId: String): ConfirmedToolExecutionContext {

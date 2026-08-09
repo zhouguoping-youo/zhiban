@@ -30,7 +30,7 @@ internal class RoomScheduleToolExecutor(
         val result = database.withTransaction {
             val resolved = validateToolCall(context, call, confirmation)
             handleIdempotentReplay(context, call, resolved.attemptId)?.let { return@withTransaction it }
-            checkSchedulePreconditions(resolved.attemptStatus, resolved.runStatus, call)
+            checkSchedulePreconditions(resolved.attemptStatus, resolved.runStatus, call, context.nowEpochMs)
             val safeResult = persistScheduleAndSideEffects(context, call, resolved.attemptId)
             finalizeRun(context, call, resolved.sessionId, resolved.attemptId, safeResult)
         }
@@ -104,13 +104,18 @@ internal class RoomScheduleToolExecutor(
         return null
     }
 
-    private suspend fun checkSchedulePreconditions(attemptStatus: String, runStatus: String, call: ScheduleCreateToolCall) {
+    private suspend fun checkSchedulePreconditions(attemptStatus: String, runStatus: String, call: ScheduleCreateToolCall, nowEpochMs: Long) {
         check(attemptStatus == "ACTIVE") { "tool execution requires the run's active attempt" }
         check(runStatus == RuntimeRunStatus.EXECUTING.name) { "run is not executing" }
+        require(call.startAtEpochMs >= nowEpochMs - PAST_SCHEDULE_GRACE_MS) { "CALENDAR_SCHEDULE_IN_PAST" }
         val endAt = Math.addExact(call.startAtEpochMs, call.durationMinutes * 60_000L)
         if (database.scheduleDao().findConflicts(call.startAtEpochMs, endAt).isNotEmpty()) {
             throw CalendarScheduleConflictException("CALENDAR_SCHEDULE_CONFLICT")
         }
+    }
+
+    private companion object {
+        const val PAST_SCHEDULE_GRACE_MS = 5 * 60_000L
     }
 
     private suspend fun persistScheduleAndSideEffects(context: ConfirmedToolExecutionContext, call: ScheduleCreateToolCall, attemptId: String): String {

@@ -111,7 +111,7 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | 5.9 | 跨天日程显示正确 | ✅ | 功能不可用 | 日历页、列表和检索只用 startAt 是否落在查询日判断，23:30 开始并跨午夜的日程在次日完全消失。三条查询现统一为时间区间重叠语义，结束恰在日界线的事件不会误入次日 | 本提交 `fix(5.9)` | `ScheduleObserveRangeReproTest.crossMidnightScheduleIsVisibleOnEveryOverlappedDay` + 当日插入/Flow 更新回归 |
 | 5.10 | 提醒提前时间按设置触发 | ⬜ | | | | |
 | 5.11 | 创建冲突检测误报 | ⬜ | | | | |
-| 5.12 | 时间已过(昨天)是否警告 | ⬜ | | | | |
+| 5.12 | 时间已过(昨天)是否警告 | ✅ | 数据正确性 | 消息候选会拒绝过期时间，但手动保存和 Agent 最终执行只校验 epoch>0，昨天的误解析可无警告落库。两个最终写入口现统一拒绝超过 5 分钟容差的过去时间；确认延迟不误伤，失败无任何副作用 | 本提交 `fix(5.12)` | `AgentDataRepositoryTest.manualScheduleFromYesterdayIsRejectedWithoutWrite`、`RoomScheduleToolExecutorTest.confirmedScheduleFromThePastIsRejectedBeforeAnySideEffect` |
 | 5.13 | 系统日历同步重复事件实例去重 | ⬜ | | | | |
 
 ## 维度 7 · 设置链路
