@@ -316,15 +316,15 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 ## 维度 19 · 记忆与个性化
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
 |---|---|---|---|---|---|---|
-| 19.1 | 记忆保存后 Agent 能读取 | ⬜ | | | | |
-| 19.2 | 记忆删除后 Agent 还读取 | ⬜ | | | | |
-| 19.3 | 记忆过期后被清理 | ⬜ | | | | |
-| 19.4 | 记忆冲突时合并 | ⬜ | | | | |
-| 19.5 | 记忆含敏感信息脱敏 | ⬜ | | | | |
-| 19.6 | 个性化修改后立即生效 | ⬜ | | | | |
-| 19.7 | 个性化删除后恢复默认 | ⬜ | | | | |
+| 19.1 | 记忆保存后 Agent 能读取 | ⚪ | — | 用户确认后的候选原子提交 memory record/FTS/fact projection，下一次检索可召回并进入模型上下文 | 审计提交 | `RuntimeInputProcessorTest.memoryToolRequiresApprovalThenBecomesRetrievableContext` |
+| 19.2 | 记忆删除后 Agent 还读取 | ⚪ | — | 删除生成 generation tombstone；recall、FTS 与 canonical 查询均排除 tombstone，晚到 ack 与数据库重开也不能复活 | 审计提交 | `MemoryAtomicCommitStoreTest.tombstoneGenerationBlocksRecallAcrossLateAckAndRestart` |
+| 19.3 | 记忆过期后被清理 | ⚪ | — | 待确认候选 TTL 到期硬清正文；长期记忆 180 天无使用转 DORMANT 并退出召回但保留可审计记录 | 审计提交 | `RoomStagedMemoryCandidateStoreTest.directApprovalAfterExpiryFailsAndHardClearsContent` + `MemoryAtomicCommitStoreTest.memoryBecomesDormantAfter180DaysWithoutBeingDeleted` |
+| 19.4 | 记忆冲突时合并 | 🧪 | 产品缺口 | 当前只按 canonicalText 阻止完全重复，并未对同 subject/predicate 的语义矛盾自动合并；需先定义“覆盖旧值/并存/让用户裁决”的产品策略，不能让模型擅自覆盖 | | 需产品裁断后补冲突矩阵 |
+| 19.5 | 记忆含敏感信息脱敏 | ⚪ | — | SENSITIVE 记忆不进入远程 embedding；自动召回内容在 LLM/RERANK 出站口按 sensitivity/purpose 阻断或脱敏 | 审计提交 | `EmbeddingIndexIntegrationTest.sensitiveFactsAreNeverOfferedToEmbeddingGatewayOrCountedAsPending` + `OutboundDataPolicyTest` |
+| 19.6 | 个性化修改后立即生效 | ⚪ | — | Provider 每次组装请求都重新调用 personalization lambda 读取加密 store 与当前 profile StateFlow，不缓存旧提示词 | 审计提交 | `AgentPersonalizationPageTest.selectingPresetStylePersistsAfterSave` + `UserProfileTest` |
+| 19.7 | 个性化删除后恢复默认 | ⚪ | — | UserProfile `clear()` 原子清加密偏好并将 StateFlow 置默认；对话预设可保存 BALANCED 恢复默认 prompt | 审计提交 | `UserProfileStoreTest` + `ResponseStyleTest` |
 | 19.8 | 对话风格修改后风格变化 | ✅ | 功能不可用 | 从 CUSTOM 切到预设后，旧 `customInstructions` 仍随 user.md 注入，界面与实际回答风格不一致；最终上下文现仅在 CUSTOM 模式注入自定义指令 | 本提交 `fix(19.8)` | `UserProfileTest.presetStyleDoesNotInjectStaleCustomInstructions` |
-| 19.9 | 对话风格删除后恢复默认 | ⬜ | | | | |
+| 19.9 | 对话风格删除后恢复默认 | ⚪ | — | 保存 BALANCED 后最终上下文使用默认片段；旧 CUSTOM 指令保留供以后切回但已被 19.8 的最终注入边界隔离 | `f0138af` | `UserProfileTest.presetStyleDoesNotInjectStaleCustomInstructions` |
 
 ## 维度 20 · 错误处理与恢复（静态扫描）
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
