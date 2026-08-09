@@ -54,15 +54,15 @@ class AutoWritePageTest {
         }
     }
 
-    @Test fun subtitleIsOneConciseLine() {
+    @Test fun screenDoesNotRepeatAutoWritePolicy() {
         render(emptyList())
-        compose.onNodeWithText("知伴帮你自动整理的内容，可撤销或纠正。保留 90 天。").assertIsDisplayed()
+        compose.onNodeWithText("知伴帮你自动整理的内容，可撤销或纠正。保留 90 天。").assertDoesNotExist()
     }
 
-    @Test fun emptyStateShowsTitleAndGuidance() {
+    @Test fun emptyStateUsesOneConciseMessage() {
         render(emptyList())
-        compose.onNodeWithText("还没有自动整理记录").assertIsDisplayed()
-        compose.onNodeWithText("知伴会在你收到消息或打完电话后，自动帮你整理记录。").assertIsDisplayed()
+        compose.onNodeWithText("暂无自动整理").assertIsDisplayed()
+        compose.onNodeWithText("知伴会在你收到消息或打完电话后，自动帮你整理记录。").assertDoesNotExist()
     }
 
     @Test fun interactionSummaryCorrectOpensContactPicker() {

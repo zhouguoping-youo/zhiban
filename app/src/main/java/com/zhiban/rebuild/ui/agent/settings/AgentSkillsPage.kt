@@ -71,7 +71,7 @@ fun AgentSkillsPage(onBack: () -> Unit, viewModel: AgentSkillsViewModel = hiltVi
     val s by viewModel.state.collectAsStateWithLifecycle()
     ZhiBanPage {
         Column(Modifier.fillMaxSize()) {
-            AgentHeader("技能", "知伴在什么场景下用哪些工具", onBack)
+            AgentHeader("技能", onBack)
             LazyColumn(
                 Modifier.fillMaxSize().padding(horizontal = ZhiBanSpacing.PageHorizontal),
                 contentPadding = PaddingValues(bottom = ZhiBanSpacing.PageBottom),
@@ -105,11 +105,6 @@ private fun SkillCard(skill: SkillSpec, enabled: Boolean, onToggle: (Boolean) ->
                     skillTagline(skill.id),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
-                )
-                Text(
-                    "含 ${skill.requiredTools.size} 个工具",
-                    color = ZhiBanTextSecondary,
-                    style = MaterialTheme.typography.labelSmall,
                 )
             }
             Spacer(Modifier.width(ZhiBanSpacing.Sm))

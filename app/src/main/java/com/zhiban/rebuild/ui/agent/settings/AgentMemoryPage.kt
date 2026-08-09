@@ -135,22 +135,14 @@ fun AgentMemoryPage(onBack: () -> Unit, viewModel: AgentMemoryViewModel = hiltVi
     var clearing by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     ZhiBanPage {
         Column(Modifier.fillMaxSize()) {
-            AgentHeader("记忆", "管理知伴如何保存和使用记忆", onBack)
+            AgentHeader("记忆", onBack)
             LazyColumn(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                item {
-                    Text(
-                        "允许知伴根据你的聊天和已连接的应用，为你提供更符合个人情况的回答。",
-                        color = ZhiBanTextSecondary,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
-                    )
-                }
                 item {
                     ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
                         Column {
                             CompactMemoryToggle(
                                 "记住对话内容",
-                                "跨对话记住对你重要的事",
+                                "跨对话使用",
                                 s.policy.longTermMemoryEnabled,
                                 viewModel::longTerm,
                             )
@@ -160,7 +152,7 @@ fun AgentMemoryPage(onBack: () -> Unit, viewModel: AgentMemoryViewModel = hiltVi
                             )
                             CompactMemoryToggle(
                                 "自动发现新记忆",
-                                "从对话里自动提炼有用信息",
+                                "自动提炼",
                                 s.policy.learnFromConversations,
                                 viewModel::learn,
                             )
@@ -195,7 +187,7 @@ fun AgentMemoryPage(onBack: () -> Unit, viewModel: AgentMemoryViewModel = hiltVi
                                 )
                                 CompactMemoryToggle(
                                     "临时对话",
-                                    "这轮对话不读也不存记忆，聊完就忘",
+                                    "不读不存",
                                     s.policy.temporaryModeEnabled,
                                     viewModel::temporary,
                                 )
@@ -214,11 +206,13 @@ fun AgentMemoryPage(onBack: () -> Unit, viewModel: AgentMemoryViewModel = hiltVi
                                 fontWeight = FontWeight.SemiBold,
                                 style = MaterialTheme.typography.titleMedium,
                             )
-                            Text(
-                                if (s.items.isEmpty()) "还没有保存的记忆" else "共 ${s.items.size} 条，可查看、修改或删除",
-                                color = ZhiBanTextSecondary,
-                                style = MaterialTheme.typography.bodySmall,
-                            )
+                            if (s.items.isNotEmpty()) {
+                                Text(
+                                    "${s.items.size} 条",
+                                    color = ZhiBanTextSecondary,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
                         }
                         FilledTonalButton(
                             onClick = {
@@ -265,17 +259,13 @@ fun AgentMemoryPage(onBack: () -> Unit, viewModel: AgentMemoryViewModel = hiltVi
                                     modifier = Modifier.size(ZhiBanIconSize.Action),
                                 )
                                 Text("还没有记住任何事", fontWeight = FontWeight.SemiBold)
-                                Text(
-                                    "聊天时说“记住……”，或点上方添加",
-                                    color = ZhiBanTextSecondary,
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
+                                Text("可以手动添加", color = ZhiBanTextSecondary, style = MaterialTheme.typography.bodySmall)
                             }
                         }
                     }
 
                     else -> items(s.items, key = { it.id }) { m ->
-                        SettingRow(memoryIcon(m.type), m.text, "${m.categoryLabel} · 点击管理") {
+                        SettingRow(memoryIcon(m.type), m.text, m.categoryLabel) {
                             editing =
                                 m
                         }
@@ -353,7 +343,9 @@ fun AgentMemoryPage(onBack: () -> Unit, viewModel: AgentMemoryViewModel = hiltVi
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(title, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge)
-            Text(subtitle, color = ZhiBanTextSecondary, style = MaterialTheme.typography.bodySmall)
+            if (subtitle.isNotBlank()) {
+                Text(subtitle, color = ZhiBanTextSecondary, style = MaterialTheme.typography.bodySmall)
+            }
         }
         Spacer(Modifier.width(8.dp))
         Switch(checked, onChecked, modifier = Modifier.scale(.82f))
@@ -546,7 +538,7 @@ fun AgentPersonalizationPage(onBack: () -> Unit, viewModel: AgentPersonalization
     val s by viewModel.state.collectAsStateWithLifecycle()
     ZhiBanPage {
         Column(Modifier.fillMaxSize()) {
-            AgentHeader("对话风格", "选择知伴回答问题的方式", onBack)
+            AgentHeader("对话风格", onBack)
             LazyColumn(
                 Modifier.fillMaxSize().padding(horizontal = ZhiBanSpacing.PageHorizontal),
                 contentPadding = PaddingValues(bottom = ZhiBanSpacing.PageBottom),

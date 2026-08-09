@@ -107,10 +107,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 @Composable
-private fun SettingsPageFrame(title: String, subtitle: String, onBack: () -> Unit, content: @Composable () -> Unit) {
+private fun SettingsPageFrame(title: String, onBack: () -> Unit, content: @Composable () -> Unit) {
     ZhiBanPage {
         Column(Modifier.fillMaxSize()) {
-            ZhiBanTopBar(title = title, subtitle = subtitle, onBack = onBack)
+            ZhiBanTopBar(title = title, onBack = onBack)
             content()
         }
     }
@@ -118,7 +118,7 @@ private fun SettingsPageFrame(title: String, subtitle: String, onBack: () -> Uni
 
 @Composable
 fun LanguageSettingsPage(onBack: () -> Unit) {
-    SettingsPageFrame("语言", "当前版本的显示语言", onBack) {
+    SettingsPageFrame("语言", onBack) {
         Column(
             Modifier
                 .fillMaxSize()
@@ -131,12 +131,6 @@ fun LanguageSettingsPage(onBack: () -> Unit) {
                     Icon(Icons.Outlined.Check, contentDescription = null, tint = ZhiBanTerracotta)
                 })
             }
-            Text(
-                "当前版本仅提供简体中文。后续增加其他语言后，会在这里直接切换。",
-                style = MaterialTheme.typography.bodySmall,
-                color = ZhiBanTextSecondary,
-                modifier = Modifier.padding(ZhiBanSpacing.Lg),
-            )
         }
     }
 }
@@ -186,7 +180,7 @@ fun PrivacySecurityPage(
         }
     }
 
-    SettingsPageFrame("隐私与权限", "查看知伴可以使用的手机能力", onBack) {
+    SettingsPageFrame("隐私与权限", onBack) {
         LazyColumn(
             Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
             verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
@@ -255,7 +249,7 @@ fun PrivacySecurityPage(
                     SettingsPermissionRow(
                         Icons.Outlined.FolderOpen,
                         "照片与文件",
-                        "每次由你在系统选择器中选择",
+                        "每次选择",
                     ) { context.openAppDetails() }
                 }
             }
@@ -272,7 +266,7 @@ fun PrivacySecurityPage(
                     SettingsToggleRow(
                         title = "同步通话记录",
                         subtitle = callCollectionState.lastResult
-                            ?: "仅保存时间、方向和号码匹配；不录制通话内容",
+                            ?: "不录音",
                         checked = callCollectionState.enabled,
                         onCheckedChange = { enabled ->
                             if (!enabled) {
@@ -288,7 +282,7 @@ fun PrivacySecurityPage(
                         Divider()
                         SettingsToggleRow(
                             title = "挂断后提醒补充要点",
-                            subtitle = "只感知通话已结束，不录制通话内容",
+                            subtitle = "不录音",
                             checked = callCollectionState.hangupNoteEnabled,
                             onCheckedChange = { enabled ->
                                 if (!enabled) {
@@ -341,14 +335,6 @@ fun PrivacySecurityPage(
             }
             item {
                 Text(
-                    "知伴只处理你主动允许的消息通知。验证码、支付密码等敏感内容会被过滤；关闭权限后会立即停止新的采集。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = ZhiBanTextSecondary,
-                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.Lg),
-                )
-            }
-            item {
-                Text(
                     "模型数据发送",
                     style = MaterialTheme.typography.labelMedium,
                     color = ZhiBanTextSecondary,
@@ -359,14 +345,14 @@ fun PrivacySecurityPage(
                 SettingsCard {
                     SettingsToggleRow(
                         title = "使用脱敏后的个人资料",
-                        subtitle = "关闭后，联系人、日程和记忆等自动补充内容不会发送给模型",
+                        subtitle = "脱敏后发送",
                         checked = outboundState.allowRedactedAutomaticPersonalContext,
                         onCheckedChange = outboundViewModel::setAllowRedactedAutomaticPersonalContext,
                     )
                     Divider()
                     SettingsToggleRow(
                         title = "允许语音识别上云",
-                        subtitle = "关闭时不会上传录音，也不会自动调用系统语音识别服务",
+                        subtitle = "仅主动录音",
                         checked = outboundState.allowCloudSpeech,
                         onCheckedChange = { enabled ->
                             if (enabled) {
@@ -379,7 +365,7 @@ fun PrivacySecurityPage(
                     Divider()
                     SettingsToggleRow(
                         title = "允许远程外部工具",
-                        subtitle = "仅发送你逐次确认过的 MCP 工具参数",
+                        subtitle = "逐次确认",
                         checked = outboundState.allowRemoteMcp,
                         onCheckedChange = { enabled ->
                             if (enabled) {
@@ -392,7 +378,7 @@ fun PrivacySecurityPage(
                     Divider()
                     SettingsToggleRow(
                         title = "允许远程语义检索",
-                        subtitle = "当前仍是本机检索；敏感内容和直接身份信息始终阻断",
+                        subtitle = "当前未启用",
                         checked = outboundState.allowRemoteEmbedding,
                         onCheckedChange = { enabled ->
                             if (enabled) {
@@ -403,14 +389,6 @@ fun PrivacySecurityPage(
                         },
                     )
                     Divider()
-                    SettingsRow("电话、邮箱和身份证号", "自动检索时始终脱敏")
-                    Divider()
-                    SettingsRow("关系图谱等敏感内容", "默认不发送")
-                    Divider()
-                    SettingsRow("主动添加的图片和文件", "仅在你当次发送时上传给模型")
-                    Divider()
-                    SettingsRow("语义向量检索", "当前仅使用本机检索，未连接远程向量服务")
-                    Divider()
                     SettingsRow(
                         "发送与拦截记录",
                         "${outboundState.auditCount} 次 · 已拦截 ${outboundState.blockedCount} 次 · 已脱敏 ${outboundState.redactedCount} 条",
@@ -419,27 +397,6 @@ fun PrivacySecurityPage(
                         Divider()
                         SettingsActionRow("清除发送记录", outboundViewModel::clearAudit)
                     }
-                }
-            }
-            item {
-                Text(
-                    "数据与执行",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = ZhiBanTextSecondary,
-                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.Xs, vertical = ZhiBanSpacing.Sm),
-                )
-            }
-            item {
-                SettingsCard {
-                    SettingsInfoRow(Icons.Outlined.Lock, "API Key", "加密保存在本机安全区域")
-                    Divider()
-                    SettingsInfoRow(Icons.Outlined.Storage, "本机数据", "对话、记忆、日程和联系人保存在应用私有空间")
-                    Divider()
-                    SettingsInfoRow(Icons.Outlined.Security, "操作确认", "修改、删除或发送内容前会先请你确认")
-                    Divider()
-                    SettingsActionRow("管理知伴记住的事", onOpenMemory)
-                    Divider()
-                    SettingsActionRow("管理工具和外部服务", onOpenTools)
                 }
             }
         }
@@ -483,11 +440,11 @@ private enum class OutboundConsentType(val title: String, val description: Strin
 
 /** 隐私页"数据发送范围"总览：每类数据是否发送给模型 + 一句话说明。 */
 internal enum class DataSendScope(val dataType: String, val isSent: Boolean, val note: String) {
-    CONTACT_IDENTITY("联系人姓名、公司、职位", true, "脱敏后发送，用于识别和称呼"),
-    DIRECT_IDENTIFIER("手机号、邮箱", false, "始终脱敏，不会原样发送"),
-    MESSAGE_CONTENT("消息内容", false, "只提炼摘要，原文不发送"),
+    CONTACT_IDENTITY("联系人资料（脱敏）", true, "脱敏后发送，用于识别和称呼"),
+    DIRECT_IDENTIFIER("手机号与邮箱", false, "始终脱敏，不会原样发送"),
+    MESSAGE_CONTENT("消息原文", false, "只提炼摘要，原文不发送"),
     CALL_LOG("通话记录", false, "只保存时间与方向等元数据"),
-    VOICE("语音", true, "仅在你授权后发给语音识别"),
+    VOICE("语音（授权后）", true, "仅在你授权后发给语音识别"),
     ;
 
     val statusLabel: String get() = if (isSent) "发送" else "不发送"
@@ -496,19 +453,15 @@ internal enum class DataSendScope(val dataType: String, val isSent: Boolean, val
 @Composable
 private fun DataSendScopeRow(scope: DataSendScope) {
     Row(
-        Modifier.fillMaxWidth().defaultMinSize(
-            minHeight = ZhiBanSize.ListRowWithSubtitle,
-        ).padding(vertical = ZhiBanSpacing.Md),
+        Modifier.fillMaxWidth().defaultMinSize(minHeight = ZhiBanSize.ListRow).padding(vertical = ZhiBanSpacing.Md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(scope.dataType, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-            Text(
-                scope.note,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        Text(
+            scope.dataType,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
         Text(
             scope.statusLabel,
             style = MaterialTheme.typography.labelMedium,
@@ -551,7 +504,7 @@ fun NotificationSettingsPage(onBack: () -> Unit, categoryViewModel: Notification
     }
     val categoryStates by categoryViewModel.states.collectAsStateWithLifecycle()
 
-    SettingsPageFrame("通知", "管理日程提醒和知伴通知", onBack) {
+    SettingsPageFrame("通知", onBack) {
         Column(
             Modifier
                 .fillMaxSize()
@@ -602,12 +555,6 @@ fun NotificationSettingsPage(onBack: () -> Unit, categoryViewModel: Notification
                     )
                 }
             }
-            Text(
-                "关闭通知后，已保存的日程仍会保留，但你可能收不到到期提醒。",
-                style = MaterialTheme.typography.bodySmall,
-                color = ZhiBanTextSecondary,
-                modifier = Modifier.padding(horizontal = ZhiBanSpacing.Lg),
-            )
         }
     }
 }
@@ -618,7 +565,7 @@ fun StorageSettingsPage(onBack: () -> Unit) {
     var cacheBytes by remember { mutableLongStateOf(regenerableCacheSize(context.cacheDir)) }
     var confirmClear by remember { mutableStateOf(false) }
     val databaseBytes = remember { agentDatabaseSize(context) }
-    SettingsPageFrame("存储", "查看占用空间，清理可重新生成的临时文件", onBack) {
+    SettingsPageFrame("存储", onBack) {
         Column(
             Modifier
                 .fillMaxSize()
@@ -634,12 +581,6 @@ fun StorageSettingsPage(onBack: () -> Unit) {
                 Divider()
                 SettingsActionRow("清理临时文件", onClick = { confirmClear = true }, isDanger = cacheBytes > 0)
             }
-            Text(
-                "知伴数据是对话、记忆、联系人和日程等本机内容，只能在“数据管理”里清除；清理临时文件不会删除它们或 API Key。",
-                style = MaterialTheme.typography.bodySmall,
-                color = ZhiBanTextSecondary,
-                modifier = Modifier.padding(horizontal = ZhiBanSpacing.Lg),
-            )
         }
     }
     if (confirmClear) {
@@ -705,7 +646,7 @@ fun DataSettingsPage(onBack: () -> Unit, onMemory: () -> Unit, onRunHistory: () 
             exportViewModel.exportConsumed()
         }
     }
-    SettingsPageFrame("数据管理", "查看、导出或清除知伴保存的数据", onBack) {
+    SettingsPageFrame("数据管理", onBack) {
         LazyColumn(
             Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
             verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
@@ -720,15 +661,15 @@ fun DataSettingsPage(onBack: () -> Unit, onMemory: () -> Unit, onRunHistory: () 
             }
             item {
                 SettingsCard {
-                    SettingsRow("对话记录", "用于保持连续对话")
+                    SettingsRow("对话记录", "")
                     Divider()
                     SettingsActionRow("已保存的记忆", onClick = onMemory)
                     Divider()
-                    SettingsRow("联系人与关系", "来自联系人、消息判断和你的确认")
+                    SettingsRow("联系人与关系", "")
                     Divider()
-                    SettingsRow("日程", "已确认的日程与提醒")
+                    SettingsRow("日程", "")
                     Divider()
-                    SettingsRow("消息采集记录", "只保留经过过滤和确认所需的数据")
+                    SettingsRow("消息采集记录", "")
                 }
             }
             item {
@@ -746,7 +687,7 @@ fun DataSettingsPage(onBack: () -> Unit, onMemory: () -> Unit, onRunHistory: () 
                         onClick = exportViewModel::export,
                     )
                     Divider()
-                    SettingsActionRow("查看并导出去除敏感信息的诊断记录", onClick = onRunHistory)
+                    SettingsActionRow("导出诊断记录", onClick = onRunHistory)
                 }
             }
             if (exportState.exportFailed) {
@@ -758,14 +699,6 @@ fun DataSettingsPage(onBack: () -> Unit, onMemory: () -> Unit, onRunHistory: () 
                         modifier = Modifier.padding(horizontal = ZhiBanSpacing.Lg),
                     )
                 }
-            }
-            item {
-                Text(
-                    "导出的 JSON 包含对话、记忆、联系人、日程和 CRM 数据；手机号、邮箱等已脱敏，不包含 API Key。诊断记录在本机生成，分享前会移除对话正文、API Key 和联系人敏感信息。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = ZhiBanTextSecondary,
-                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.Lg),
-                )
             }
             item {
                 Text(
@@ -817,7 +750,7 @@ fun DataSettingsPage(onBack: () -> Unit, onMemory: () -> Unit, onRunHistory: () 
 @Composable
 fun ReportErrorSettingsPage(onBack: () -> Unit, onDiagnostics: () -> Unit) {
     val context = LocalContext.current
-    SettingsPageFrame("报告问题", "描述问题，或生成脱敏诊断记录", onBack) {
+    SettingsPageFrame("报告问题", onBack) {
         Column(
             Modifier
                 .fillMaxSize()
@@ -841,14 +774,8 @@ fun ReportErrorSettingsPage(onBack: () -> Unit, onDiagnostics: () -> Unit) {
                     )
                 })
                 Divider()
-                SettingsActionRow("查看并导出脱敏诊断", onClick = onDiagnostics)
+                SettingsActionRow("导出诊断记录", onClick = onDiagnostics)
             }
-            Text(
-                "问题描述不会自动附带聊天内容。诊断记录由你主动生成和分享。",
-                style = MaterialTheme.typography.bodySmall,
-                color = ZhiBanTextSecondary,
-                modifier = Modifier.padding(horizontal = ZhiBanSpacing.Lg),
-            )
         }
     }
 }
@@ -885,7 +812,7 @@ internal val ABOUT_LEGAL_ENTRIES: List<AboutLegalEntry> = listOf(
 @Composable
 fun AboutZhiBanPage(onBack: () -> Unit) {
     var openEntry by remember { mutableStateOf<AboutLegalEntry?>(null) }
-    SettingsPageFrame("关于知伴", "你的个人智能助理", onBack) {
+    SettingsPageFrame("关于知伴", onBack) {
         Column(
             Modifier
                 .fillMaxSize()
@@ -912,11 +839,6 @@ fun AboutZhiBanPage(onBack: () -> Unit) {
                 color = ZhiBanTextSecondary,
             )
             Spacer(Modifier.height(ZhiBanSpacing.Xxl))
-            Text(
-                "知伴帮助你管理日程、联系人关系、记忆与场景任务。所有操作遵循最小权限原则。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = ZhiBanTextSecondary,
-            )
             Spacer(Modifier.height(ZhiBanSpacing.Xxl))
             SettingsCard {
                 ABOUT_LEGAL_ENTRIES.forEachIndexed { index, entry ->
@@ -943,7 +865,7 @@ fun AboutZhiBanPage(onBack: () -> Unit) {
 @Composable
 fun AppearanceSettingsPage(onBack: () -> Unit, themePreferenceStore: ThemePreferenceStore = hiltViewModel<AppearanceThemeViewModel>().store) {
     val preference by themePreferenceStore.preference.collectAsStateWithLifecycle()
-    SettingsPageFrame("外观", "选择知伴的显示模式", onBack) {
+    SettingsPageFrame("外观", onBack) {
         Column(
             Modifier
                 .fillMaxSize()
@@ -954,21 +876,21 @@ fun AppearanceSettingsPage(onBack: () -> Unit, themePreferenceStore: ThemePrefer
             SettingsCard {
                 ThemeOptionRow(
                     title = "浅色",
-                    subtitle = "始终使用浅色显示",
+                    subtitle = "",
                     selected = preference == ThemePreference.LIGHT,
                     onClick = { themePreferenceStore.setPreference(ThemePreference.LIGHT) },
                 )
                 Divider()
                 ThemeOptionRow(
                     title = "深色",
-                    subtitle = "始终使用深色显示",
+                    subtitle = "",
                     selected = preference == ThemePreference.DARK,
                     onClick = { themePreferenceStore.setPreference(ThemePreference.DARK) },
                 )
                 Divider()
                 ThemeOptionRow(
                     title = "跟随系统",
-                    subtitle = "自动适配手机的浅色或深色模式",
+                    subtitle = "",
                     selected = preference == ThemePreference.SYSTEM,
                     onClick = { themePreferenceStore.setPreference(ThemePreference.SYSTEM) },
                 )
@@ -984,7 +906,7 @@ class AppearanceThemeViewModel @Inject constructor(val store: ThemePreferenceSto
 private fun ThemeOptionRow(title: String, subtitle: String, selected: Boolean, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().defaultMinSize(
-            minHeight = ZhiBanSize.ListRowWithSubtitle,
+            minHeight = if (subtitle.isBlank()) ZhiBanSize.ListRow else ZhiBanSize.ListRowWithSubtitle,
         ).clickable(onClick = onClick).padding(vertical = ZhiBanSpacing.Md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -994,11 +916,13 @@ private fun ThemeOptionRow(title: String, subtitle: String, selected: Boolean, o
                 style = MaterialTheme.typography.bodyLarge,
                 color = if (selected) ZhiBanTerracotta else MaterialTheme.colorScheme.onSurface,
             )
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (subtitle.isNotBlank()) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         if (selected) {
             Icon(Icons.Outlined.Check, contentDescription = null, tint = ZhiBanTerracotta)
@@ -1021,17 +945,19 @@ private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
 private fun SettingsRow(title: String, subtitle: String, trailing: (@Composable () -> Unit)? = null) {
     Row(
         Modifier.fillMaxWidth().defaultMinSize(
-            minHeight = ZhiBanSize.ListRowWithSubtitle,
+            minHeight = if (subtitle.isBlank()) ZhiBanSize.ListRow else ZhiBanSize.ListRowWithSubtitle,
         ).padding(vertical = ZhiBanSpacing.Md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (subtitle.isNotBlank()) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         trailing?.invoke()
     }

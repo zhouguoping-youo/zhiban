@@ -86,7 +86,7 @@ fun ModelConfigPage(onBack: () -> Unit = {}, viewModel: ModelConfigViewModel = h
 
     ZhiBanPage {
         Column(modifier = Modifier.fillMaxSize().background(ModelSettingsCanvas)) {
-            ZhiBanTopBar(title = "大模型连接", subtitle = "连接知伴使用的 AI 服务", onBack = onBack)
+            ZhiBanTopBar(title = "大模型连接", onBack = onBack)
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(horizontal = ZhiBanSpacing.PageHorizontal),
@@ -132,11 +132,6 @@ fun ModelConfigPage(onBack: () -> Unit = {}, viewModel: ModelConfigViewModel = h
                                     style = MaterialTheme.typography.titleMedium,
                                     color = ModelSettingsPrimary,
                                     fontWeight = FontWeight.SemiBold,
-                                )
-                                Text(
-                                    "自动适配文字、图片和实时语音",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = ModelSettingsSecondary,
                                 )
                             }
                             StatusBadge(configured = state.isApiKeyConfigured)

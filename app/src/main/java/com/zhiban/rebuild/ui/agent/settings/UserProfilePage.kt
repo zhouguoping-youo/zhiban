@@ -215,7 +215,7 @@ fun UserProfilePage(onBack: () -> Unit, viewModel: UserProfileViewModel = hiltVi
 
     ZhiBanPage {
         Column(Modifier.fillMaxSize()) {
-            AgentHeader("个人资料", "知伴只使用你主动填写的信息", onBack)
+            AgentHeader("个人资料", onBack)
             LazyColumn(
                 Modifier
                     .weight(1f)

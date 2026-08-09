@@ -116,14 +116,6 @@ internal fun AutoWriteContent(
                 verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
             ) {
                 item { ZhiBanTopBar(title = "自动整理", onBack = onBack) }
-                item {
-                    Text(
-                        "知伴帮你自动整理的内容，可撤销或纠正。保留 90 天。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
-                    )
-                }
                 if (state.receipts.isEmpty()) {
                     item {
                         Column(
@@ -134,16 +126,9 @@ internal fun AutoWriteContent(
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             Text(
-                                "还没有自动整理记录",
+                                "暂无自动整理",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold,
-                                textAlign = TextAlign.Center,
-                            )
-                            Spacer(Modifier.height(ZhiBanSpacing.Sm))
-                            Text(
-                                "知伴会在你收到消息或打完电话后，自动帮你整理记录。",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center,
                             )
                         }

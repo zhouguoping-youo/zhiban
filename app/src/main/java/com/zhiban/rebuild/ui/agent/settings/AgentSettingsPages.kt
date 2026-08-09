@@ -72,8 +72,8 @@ import kotlinx.coroutines.launch
 private val AgentSettingsSecondary = ZhiBanTextSecondary
 
 @Composable
-internal fun AgentHeader(title: String, subtitle: String, onBack: () -> Unit) {
-    ZhiBanTopBar(title = title, subtitle = subtitle, onBack = onBack)
+internal fun AgentHeader(title: String, onBack: () -> Unit) {
+    ZhiBanTopBar(title = title, onBack = onBack)
 }
 
 @Composable
@@ -93,7 +93,7 @@ fun AgentSettingsPage(
     LaunchedEffect(Unit) { viewModel.refresh() }
     ZhiBanPage {
         Column(Modifier.fillMaxSize()) {
-            AgentHeader("智能体设置", "连接、记忆、回答方式与工具", onBack)
+            AgentHeader("智能体设置", onBack)
             LazyColumn(
                 Modifier.fillMaxSize().padding(horizontal = ZhiBanSpacing.PageHorizontal),
                 contentPadding = PaddingValues(bottom = ZhiBanSpacing.PageBottom),
@@ -123,9 +123,9 @@ fun AgentSettingsPage(
                 item {
                     AgentSettingsGroup(
                         listOf(
-                            AgentSettingsEntry(Icons.Outlined.Security, "行为与安全", "自动执行、确认与隐私边界", onBehavior),
-                            AgentSettingsEntry(Icons.Outlined.RateReview, "反馈与改进", "管理回答反馈和改进偏好", onFeedback),
-                            AgentSettingsEntry(Icons.Outlined.History, "运行记录", "查看知伴的执行与诊断记录", onRunHistory),
+                            AgentSettingsEntry(Icons.Outlined.Security, "行为与安全", "", onBehavior),
+                            AgentSettingsEntry(Icons.Outlined.RateReview, "反馈与改进", "", onFeedback),
+                            AgentSettingsEntry(Icons.Outlined.History, "运行记录", "", onRunHistory),
                         ),
                     )
                 }
@@ -161,7 +161,7 @@ private fun AgentSettingsGroup(entries: List<AgentSettingsEntry>) {
 private fun SettingRowContent(icon: ImageVector, title: String, subtitle: String, onClick: (() -> Unit)?) {
     Row(
         Modifier.fillMaxWidth().clickable(enabled = onClick != null) { onClick?.invoke() }
-            .defaultMinSize(minHeight = ZhiBanSize.ListRowWithSubtitle)
+            .defaultMinSize(minHeight = if (subtitle.isBlank()) ZhiBanSize.ListRow else ZhiBanSize.ListRowWithSubtitle)
             .padding(horizontal = ZhiBanSpacing.Lg, vertical = ZhiBanSpacing.Md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -169,7 +169,9 @@ private fun SettingRowContent(icon: ImageVector, title: String, subtitle: String
         Spacer(Modifier.width(ZhiBanSpacing.Md))
         Column(Modifier.weight(1f)) {
             Text(title, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            if (subtitle.isNotBlank()) {
+                Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            }
         }
         if (onClick != null) {
             Icon(Icons.Outlined.ChevronRight, null, tint = AgentSettingsSecondary, modifier = Modifier.size(ZhiBanIconSize.Inline))
@@ -286,7 +288,7 @@ data class MemoryUiState(
     }
     ZhiBanPage {
         Column(Modifier.fillMaxSize()) {
-            AgentHeader("工具", "管理知伴可用的工具", onBack)
+            AgentHeader("工具", onBack)
             LazyColumn(
                 Modifier.fillMaxSize().padding(horizontal = ZhiBanSpacing.PageHorizontal),
                 contentPadding = PaddingValues(bottom = ZhiBanSpacing.PageBottom),
@@ -485,17 +487,19 @@ private fun toolDisplayName(name: String) = when (name) {
     ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
         Row(
             Modifier.fillMaxWidth().defaultMinSize(
-                minHeight = ZhiBanSize.ListRowWithSubtitle,
+                minHeight = if (subtitle.isBlank()) ZhiBanSize.ListRow else ZhiBanSize.ListRowWithSubtitle,
             ).padding(horizontal = ZhiBanSpacing.Lg, vertical = ZhiBanSpacing.Md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                Text(
-                    subtitle,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                )
+                if (subtitle.isNotBlank()) {
+                    Text(
+                        subtitle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             }
             Spacer(Modifier.width(ZhiBanSpacing.Sm))
             Switch(checked, onChecked)
@@ -525,7 +529,7 @@ internal fun executionHint(preference: ExecutionPreference): String = when (pref
     val s by vm.state.collectAsStateWithLifecycle()
     ZhiBanPage {
         Column(Modifier.fillMaxSize()) {
-            AgentHeader("行为与安全", "设置执行偏好，风险规则始终由 ActionPolicy 强制", onBack)
+            AgentHeader("行为与安全", onBack)
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("执行偏好", fontWeight = FontWeight.SemiBold)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -538,10 +542,10 @@ internal fun executionHint(preference: ExecutionPreference): String = when (pref
                     style = MaterialTheme.typography.bodySmall,
                     color = AgentSettingsSecondary,
                 )
-                SettingRow(Icons.Outlined.Visibility, "只读工具", "可自动执行·受白名单和调用预算限制")
-                SettingRow(Icons.Outlined.GppGood, "可逆自动整理", "仅限低风险内部写入·可见、可撤销、可纠正")
-                SettingRow(Icons.Outlined.Edit, "重要写入与对外操作", "每次执行前必须由你确认")
-                SettingRow(Icons.Outlined.GppGood, "高风险操作", "强确认·审计·绝不自动")
+                SettingRow(Icons.Outlined.Visibility, "只读操作", "自动执行")
+                SettingRow(Icons.Outlined.GppGood, "自动整理", "可撤销")
+                SettingRow(Icons.Outlined.Edit, "写入与发送", "执行前确认")
+                SettingRow(Icons.Outlined.GppGood, "高风险操作", "再次确认")
             }
         }
     }
@@ -585,10 +589,10 @@ class AgentFeedbackViewModel @Inject constructor(private val controls: AgentCont
     val s by vm.state.collectAsStateWithLifecycle()
     ZhiBanPage {
         Column(Modifier.fillMaxSize()) {
-            AgentHeader("反馈与改进", "反馈只生成待审核建议，不会自动改变 Agent", onBack)
+            AgentHeader("反馈与改进", onBack)
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                ToggleRow("使用点赞与点踩", "将人类反馈用于后续回答调整", s.policy.useHumanFeedback, vm::human)
-                ToggleRow("允许偏好改进", "生成可审查建议，不自动修改权限或设置", s.policy.allowPreferenceImprovement, vm::improve)
+                ToggleRow("使用回答反馈", "", s.policy.useHumanFeedback, vm::human)
+                ToggleRow("允许偏好建议", "需你确认", s.policy.allowPreferenceImprovement, vm::improve)
                 s.suggestion?.let { suggestion ->
                     ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -668,7 +672,7 @@ data class AgentRunHistoryState(
     }
     ZhiBanPage {
         Column(Modifier.fillMaxSize()) {
-            AgentHeader("运行记录", "感知、规划、工具、执行与反馈的脱敏闭环", onBack)
+            AgentHeader("运行记录", onBack)
             LazyColumn(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 item {
                     OutlinedButton(vm::export, Modifier.fillMaxWidth(), enabled = !s.exporting) {

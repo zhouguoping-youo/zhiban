@@ -34,11 +34,10 @@ class AgentSkillsPageTest {
         }
     }
 
-    @Test fun showsSkillCardsWithTaglinesAndToolCounts() {
-        // First card composed on screen shows name and tagline; tool-count rows are rendered.
+    @Test fun showsSkillCardsWithoutInternalToolCounts() {
         compose.onNodeWithText("日程协调").assertIsDisplayed()
         compose.onNodeWithText("协调日程：先核对时间，创建修改前与你确认").assertIsDisplayed()
-        compose.onNodeWithText("含 19 个工具").assertIsDisplayed()
+        compose.onNodeWithText("含 19 个工具").assertDoesNotExist()
     }
 
     @Test fun togglingSkillPersistsDisabled() {
