@@ -245,7 +245,7 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | 14.3 | 杀后重启未发消息保留 | ✅ | 数据丢失 | 未发送文本与草稿是同一状态，现可随 saved instance state 恢复；未发送附件仍只存在私有暂存并受到期清理，不把 Uri/文件句柄塞进 Bundle | 本提交 `fix(14.2)` | `AgentConversationScreenE2ETest.unsentDraftSurvivesSavedInstanceStateRestoration` |
 | 14.4 | 杀后重启未完成确认保留 | ⚪ | — | pending approval 由持久化 run 状态与 approval 事件重建；冷启动时 `GatewayRuntimeUiClient` 解析持久化 payload，确认/拒绝仍引用原 proposal | 审计提交 | `AgentSessionReducerTest`（approval proposalId/payloadRef 回放）+ `AgentRuntimeProjectionControllerTest`（确认/拒绝命令） |
 | 14.5 | 杀后重启自动写回执保留 | ⚪ | — | `change_log` 与 `auto_write_receipts` 同事务写入 Room，重建 Repository 后仍可观察；迁移测试覆盖旧库回执保留 | 审计提交 | `AutoWriteAtomicityTest` + `AutoWriteMigrationTest` + `AgentDataRepositoryTest.inferredReplyInteractionIsPersistedAsReversibleAutoWrite` |
-| 14.6 | 覆盖安装 API Key 丢失 | ⏭ | | 上一轮 #22 已修+真机验证 | `c685d9b` | 真机 |
+| 14.6 | 覆盖安装 API Key 丢失 | ⏭ | — | 上一轮 #22 已修+真机验证 | `c685d9b` | 真机 |
 | 14.7 | 覆盖安装用户数据保留 | 🖐 | 数据丢失 | 当前设备承载用户数据，不执行破坏性升级矩阵；需一次性测试档案按“旧 APK 建数据→`adb install -r` 新 APK→逐表核对”验收 | | 手工升级矩阵 |
 | 14.8 | 覆盖安装设置保留 | 🖐 | 数据丢失 | 与 14.7 同批验证 DataStore、加密偏好和 Keystore；现有 API Key 覆盖安装修复不能替代全设置矩阵 | | 手工升级矩阵 |
 | 14.9 | 清除数据后真清空 | 🖐 | 隐私 | `pm clear` 会删除用户数据，禁止在当前用户档案执行；需专用测试档案清除后验证首次启动状态 | | 专用测试档案 |
@@ -257,20 +257,20 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 ## 维度 15 · 特殊场景（多需人工/环境）
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
 |---|---|---|---|---|---|---|
-| 15.1 | 双卡通话识别 SIM 卡 | 🧪 | | 需双卡设备 | | |
-| 15.2 | 飞行模式降级不崩溃 | 🖐 | | | | |
-| 15.3 | 低电量后台任务受限 | 🖐 | | | | |
-| 15.4 | 充电/不充电行为一致 | 🖐 | | | | |
-| 15.5 | 耳机插拔语音中断 | 🧪 | | 需耳机 | | |
-| 15.6 | 蓝牙连接/断开语音中断 | 🧪 | | 需蓝牙设备 | | |
-| 15.7 | 锁屏后台采集继续 | 🖐 | | | | |
-| 15.8 | 解锁 UI 正常恢复 | 🖐 | | | | |
-| 15.9 | 分屏 UI 变形 | 🖐 | | | | |
-| 15.10 | 弹出窗口 UI 变形 | 🖐 | | | | |
-| 15.11 | 系统字体繁体 UI 变形 | 🖐 | | | | |
-| 15.12 | 系统语言英文 UI 变形 | 🖐 | | | | |
-| 15.13 | 系统时间未来日程异常 | 🖐 | | | | |
-| 15.14 | 系统时间过去日程异常 | 🖐 | | | | |
+| 15.1 | 双卡通话识别 SIM 卡 | 🧪 | 功能边界 | 当前 SM-W7023 只有单卡测试条件；需插入两张 SIM，分别呼入/呼出后核对 subscription/phoneAccount 映射 | | 双卡实呼矩阵 |
+| 15.2 | 飞行模式降级不崩溃 | 🖐 | 功能可用性 | 需人工在流式对话、语音与后台同步中途切飞行模式，核对安全失败、重试与恢复；自动化不能可靠切换 OEM 飞行模式 | | 人工网络切换 |
+| 15.3 | 低电量后台任务受限 | 🖐 | 功能可用性 | 需在三星电量保护与低电量模式下观察 WorkManager/通知监听/通话对账至少一个调度周期 | | 人工电量矩阵 |
+| 15.4 | 充电/不充电行为一致 | 🖐 | — | 当前 Worker 未声明充电约束；仍需人工插拔电源验证 OEM 不额外限制采集与维护任务 | | 人工电源矩阵 |
+| 15.5 | 耳机插拔语音中断 | 🧪 | 功能可用性 | 无有线耳机测试条件；需录音/播放期间插拔并确认资源释放、错误提示与可重新开始 | | 外设矩阵 |
+| 15.6 | 蓝牙连接/断开语音中断 | 🧪 | 功能可用性 | 无蓝牙音频设备测试条件；需 SCO/A2DP 连接切换矩阵，确认录音不会假停留在 Recording | | 外设矩阵 |
+| 15.7 | 锁屏后台采集继续 | 🖐 | 采集完整性 | 需锁屏后从白名单 App 收消息、拨打电话并等待提醒，核对通知监听与 CallLog 对账；涉及真实系统事件 | | 人工锁屏矩阵 |
+| 15.8 | 解锁 UI 正常恢复 | 🖐 | 体验 | 与 15.7 连续执行，解锁后核对当前 Tab、草稿、录音状态与新采集记录 | | 人工锁屏矩阵 |
+| 15.9 | 分屏 UI 变形 | 🖐 | 体验 | SM-W7023 需人工逐页进入分屏最小宽度，检查日历/关系图/CRM/问问无裁切与不可达按钮 | | 人工窗口矩阵 |
+| 15.10 | 弹出窗口 UI 变形 | 🖐 | 体验 | 三星弹出视图尺寸由系统手势控制，需逐页缩到最小窗口并核对滚动/弹窗/键盘避让 | | 人工窗口矩阵 |
+| 15.11 | 系统字体繁体 UI 变形 | 🖐 | 体验 | 需切换系统繁体与最大字体/显示缩放后逐页截图比对；自动测试仅覆盖当前简体环境 | | 人工字体矩阵 |
+| 15.12 | 系统语言英文 UI 变形 | 🖐 | 产品边界 | 当前产品主要为硬编码中文且未承诺完整 i18n；英文系统下仍需验证布局不崩溃，但不会验收英文翻译完整性 | | 人工语言矩阵 |
+| 15.13 | 系统时间未来日程异常 | 🖐 | 数据正确性 | 改系统时间会影响真实提醒与证书，需专用测试档案跳到未来，核对过期候选、提醒与时区处理 | | 专用时间矩阵 |
+| 15.14 | 系统时间过去日程异常 | 🖐 | 数据正确性 | 需专用测试档案回拨时间，核对幂等、租约、撤销窗口及提醒不会重复；当前用户档案不做时钟破坏 | | 专用时间矩阵 |
 
 ## 维度 16 · Agent 内核与状态机
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
@@ -331,7 +331,7 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 |---|---|---|---|---|---|---|
 | 20.1 | suspend 全用 runSuspendCatching | ✅ | 功能不可用 | 启动协程曾用 `runCatching` 包裹配置迁移、健康检查、维护和通话设置读取，会吞取消；统一走传播取消的 `runStartupAction` | 本提交 `fix(20.1)` | `ZhiBanAppCancellationTest.startupActionPropagatesCoroutineCancellation` + `auditCancellationSafety` |
 | 20.2 | 资源(Cursor/Stream/WS/Bitmap)finally/use 释放 | ✅ | 数据丢失 | Cursor/Stream/Bitmap/实时语音资源均有 use/finally；会话工件原子写入失败会遗留 `.part`，现失败路径删除临时文件 | 本提交 `fix(20.2)` | `SessionWorkspaceAtomicWriteTest.failedAtomicRenameDeletesPartialArtifact` |
-| 20.3 | 异常捕获并记录降级原因 | ⬜ | | | | |
+| 20.3 | 异常捕获并记录降级原因 | ✅ | — | 静态扫描确认核心 suspend/IO 韧性路径均使用固定 degradation code，取消传播；本轮已单独修复唯一发现的 embedding 维护静默吞错 | 审计提交 | `auditCancellationSafety` + `RetrievalAttemptTest` + `AgentMaintenanceDegradationTest` + `GatewayRuntimeUiClientTest` |
 | 20.3a | Embedding 维护失败被空 catch 静默吞掉 | ✅ | 可调试性 | 本地 FTS 仍可用时保留韧性，但返回固定 `embedding_backfill:failure`；不记录异常详情，取消仍上抛 | 本提交 `fix(20.3a)` | `AgentMaintenanceDegradationTest`（失败原因码 + 取消传播） |
 | 20.4 | 空 catch 块存在 | ✅ | — | 全量 Kotlin 正则扫描无字面空 catch；Embedding 维护原“仅注释 catch”已在 20.3a 改为可见降级原因 | 审计提交 | `detekt` + `rg -U 'catch...{\\s*}'` |
 | 20.5 | 硬编码密钥存在 | ✅ | — | 仓库扫描无硬编码 key/token/password，凭据走 Keystore vault；根 check 已包含秘密扫描 | 审计提交 | `verifyNoCommittedSecrets` |
