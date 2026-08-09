@@ -152,7 +152,7 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | 9.6 | 导出文件过大 OOM | ✅ | 功能不可用 | 原实现一次加载各表全部实体，再构建完整 JSON 树和编码字符串，峰值内存随全量数据多重增长；改为每页 200 条读取并直接流式写入临时文件，完成后原子提交 | 本提交 `fix(9.6)` | `AgentDataExportServiceTest.exportStreamsEveryPageWithoutDroppingRows` + 既有完整性/脱敏测试 |
 | 9.7 | 导出含敏感信息脱敏 | ✅ | 数据完整性 / 隐私 | 导出误用诊断日志的 512 字符脱敏上限，长对话和备注尾部被静默截断；结构化微信号也不匹配通用正则而原样导出。导出改用不截断的脱敏路径，联系通道 ID 按字段整体隐藏，诊断日志仍保留原上限 | 本提交 `fix(9.7)` | `AgentDataExportServiceTest.exportRedactsPhoneEmailAndNeverContainsSecrets` + `exportPreservesLongConversationAfterRedactingDirectIdentifiers` |
 | 9.8 | 清除后是否真删除(非软删) | ⬜ | | | | |
-| 9.9 | 迁移后旧数据保留 | ⬜ | | | | |
+| 9.9 | 迁移后旧数据保留 | ✅ | 数据完整性 | 24→25 迁移把旧手机号原文直接写进 normalizedValue，导致 `+86`、空格或横线格式的旧联系人在升级后无法按当前规范号码匹配；新增 33→34 迁移复用生产归一化函数，并在唯一键冲突时按主号码/用户确认/验证时间保留最佳记录 | 本提交 `fix(9.9)` | `ContactMethodNormalizationMigrationTest.formattedLegacyPhonesAreCanonicalizedAndDuplicatesAreCollapsed` + `FactIndexMigrationTest` 全迁移链 |
 | 9.10 | 迁移后索引正确 | ⬜ | | | | |
 | 9.11 | 迁移后外键约束正确 | ⬜ | | | | |
 | 9.12 | SQLCipher 加密查询性能下降 | ⬜ | | | | |

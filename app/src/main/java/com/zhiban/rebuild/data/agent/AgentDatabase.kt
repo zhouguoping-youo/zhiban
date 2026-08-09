@@ -30,6 +30,7 @@ import com.zhiban.rebuild.data.contact.RelationshipEventEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventParticipantEntity
 import com.zhiban.rebuild.data.contact.StagedContactCandidateDao
 import com.zhiban.rebuild.data.contact.StagedContactCandidateEntity
+import com.zhiban.rebuild.data.contact.normalizeContactPhone
 import com.zhiban.rebuild.data.crm.CrmActivityEntity
 import com.zhiban.rebuild.data.crm.CrmAgentSuggestionEntity
 import com.zhiban.rebuild.data.crm.CrmDao
@@ -102,7 +103,7 @@ const val AGENT_DATABASE_FILE_NAME = "zhiban-agent.db"
         CallRecordEntity::class,
         CallNoteEntity::class,
     ],
-    version = 33,
+    version = 34,
     exportSchema = true,
 )
 internal abstract class AgentDatabase : RoomDatabase() {
@@ -1361,6 +1362,47 @@ internal abstract class AgentDatabase : RoomDatabase() {
                 db.execSQL(
                     "CREATE INDEX IF NOT EXISTS `index_crm_agent_suggestions_createdAtEpochMs` ON `crm_agent_suggestions` (`createdAtEpochMs`)",
                 )
+            }
+        }
+
+        /** Repairs legacy phone methods whose normalized value was copied from formatted input. */
+        val MIGRATION_33_34 = object : Migration(33, 34) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                data class PhoneMethod(val methodId: String, val contactId: String, val normalizedValue: String)
+
+                val methods = buildList {
+                    db.query(
+                        "SELECT methodId, contactId, value FROM contact_methods WHERE kind = 'PHONE' " +
+                            "ORDER BY contactId, isPrimary DESC, userConfirmed DESC, " +
+                            "verifiedAtEpochMs DESC, updatedAtEpochMs DESC, methodId",
+                    ).use { cursor ->
+                        while (cursor.moveToNext()) {
+                            val rawValue = cursor.getString(2)
+                            add(
+                                PhoneMethod(
+                                    methodId = cursor.getString(0),
+                                    contactId = cursor.getString(1),
+                                    normalizedValue = normalizeContactPhone(rawValue) ?: rawValue,
+                                ),
+                            )
+                        }
+                    }
+                }
+                val winners = linkedMapOf<Pair<String, String>, PhoneMethod>()
+                val duplicates = mutableListOf<String>()
+                methods.forEach { method ->
+                    val key = method.contactId to method.normalizedValue
+                    if (winners.putIfAbsent(key, method) != null) duplicates += method.methodId
+                }
+                duplicates.forEach { methodId ->
+                    db.execSQL("DELETE FROM contact_methods WHERE methodId = ?", arrayOf(methodId))
+                }
+                winners.values.forEach { method ->
+                    db.execSQL(
+                        "UPDATE contact_methods SET normalizedValue = ? WHERE methodId = ?",
+                        arrayOf(method.normalizedValue, method.methodId),
+                    )
+                }
             }
         }
 
