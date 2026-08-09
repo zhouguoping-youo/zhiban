@@ -39,6 +39,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -328,106 +329,119 @@ internal fun ContactEditorDialog(
     var tag by remember(contact?.contactId) { mutableStateOf(contact?.firstKnownTag() ?: "朋友") }
     var note by remember(contact?.contactId) { mutableStateOf(contact?.note.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
-    Dialog(onDismissRequest = onDismiss) {
-        LazyColumn(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(RelationSurface),
-            contentPadding = PaddingValues(20.dp),
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        Box(
+            Modifier.fillMaxSize().systemBarsPadding().imePadding().padding(horizontal = 20.dp, vertical = 16.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            item {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(ZhiBanIconContainer.TouchTarget)) {
-                        Icon(Icons.Rounded.Close, "关闭")
-                    }
-                    Text(
-                        if (contact ==
-                            null
-                        ) {
-                            "添加联系人"
-                        } else {
-                            "编辑联系人"
-                        },
-                        Modifier.weight(1f),
-                        color = RelationInk,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-                Spacer(Modifier.height(12.dp))
-            }
-            item {
-                ContactField("姓名", name, {
-                    name = it
-                    error = null
-                })
-                Spacer(Modifier.height(9.dp))
-            }
-            item {
-                ContactField("手机号（可选）", phone, { phone = it })
-                Spacer(Modifier.height(9.dp))
-            }
-            item {
-                ContactField("微信号（可选）", wechat, { wechat = it })
-                Spacer(Modifier.height(9.dp))
-            }
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                    OutlinedTextField(company, {
-                        company = it
-                    }, Modifier.weight(1f), label = { Text("公司") }, singleLine = true)
-                    OutlinedTextField(title, {
-                        title = it
-                    }, Modifier.weight(1f), label = { Text("职位") }, singleLine = true)
-                }
-                Spacer(Modifier.height(12.dp))
-            }
-            item {
-                Text("关系", color = RelationMuted, style = MaterialTheme.typography.labelMedium)
-                Spacer(Modifier.height(7.dp))
-                Row(
-                    Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(7.dp),
-                ) {
-                    RelationTags.drop(1).forEach {
+            LazyColumn(
+                Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 560.dp)
+                    .heightIn(max = 720.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(RelationSurface),
+                contentPadding = PaddingValues(20.dp),
+            ) {
+                item {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = onDismiss, modifier = Modifier.size(ZhiBanIconContainer.TouchTarget)) {
+                            Icon(Icons.Rounded.Close, "关闭")
+                        }
                         Text(
-                            it,
-                            color = if (tag == it) Color.White else RelationMuted,
-                            modifier = Modifier.clip(RoundedCornerShape(16.dp)).background(
-                                if (tag ==
-                                    it
-                                ) {
-                                    RelationAccent
-                                } else {
-                                    RelationSoft
-                                },
-                            )
-                                .clickable { tag = it }.padding(horizontal = 13.dp, vertical = 7.dp),
-                            style = MaterialTheme.typography.labelMedium,
+                            if (contact ==
+                                null
+                            ) {
+                                "添加联系人"
+                            } else {
+                                "编辑联系人"
+                            },
+                            Modifier.weight(1f),
+                            color = RelationInk,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
                         )
                     }
+                    Spacer(Modifier.height(12.dp))
                 }
-                Spacer(Modifier.height(12.dp))
-            }
-            item {
-                OutlinedTextField(note, {
-                    note = it
-                }, Modifier.fillMaxWidth(), label = { Text("备注（可选）") }, minLines = 2, maxLines = 4)
-                error?.let {
+                item {
+                    ContactField("姓名", name, {
+                        name = it
+                        error = null
+                    })
+                    Spacer(Modifier.height(9.dp))
+                }
+                item {
+                    ContactField("手机号（可选）", phone, { phone = it })
+                    Spacer(Modifier.height(9.dp))
+                }
+                item {
+                    ContactField("微信号（可选）", wechat, { wechat = it })
+                    Spacer(Modifier.height(9.dp))
+                }
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                        OutlinedTextField(company, {
+                            company = it
+                        }, Modifier.weight(1f), label = { Text("公司") }, singleLine = true)
+                        OutlinedTextField(title, {
+                            title = it
+                        }, Modifier.weight(1f), label = { Text("职位") }, singleLine = true)
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+                item {
+                    Text("关系", color = RelationMuted, style = MaterialTheme.typography.labelMedium)
                     Spacer(Modifier.height(7.dp))
-                    Text(it, color = RelationDanger, style = MaterialTheme.typography.bodySmall)
-                }
-                Spacer(Modifier.height(18.dp))
-                Button(
-                    onClick = {
-                        if (name.isBlank()) {
-                            error = "请输入联系人姓名"
-                        } else {
-                            onSave(contact?.contactId, name, phone, wechat, company, title, tag, note) { error = it }
+                    Row(
+                        Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    ) {
+                        RelationTags.drop(1).forEach {
+                            Text(
+                                it,
+                                color = if (tag == it) Color.White else RelationMuted,
+                                modifier = Modifier.clip(RoundedCornerShape(16.dp)).background(
+                                    if (tag ==
+                                        it
+                                    ) {
+                                        RelationAccent
+                                    } else {
+                                        RelationSoft
+                                    },
+                                )
+                                    .clickable { tag = it }.padding(horizontal = 13.dp, vertical = 7.dp),
+                                style = MaterialTheme.typography.labelMedium,
+                            )
                         }
-                    },
-                    Modifier.fillMaxWidth().height(50.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
-                    shape = RoundedCornerShape(25.dp),
-                ) { Text("保存") }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+                item {
+                    OutlinedTextField(note, {
+                        note = it
+                    }, Modifier.fillMaxWidth(), label = { Text("备注（可选）") }, minLines = 2, maxLines = 4)
+                    error?.let {
+                        Spacer(Modifier.height(7.dp))
+                        Text(it, color = RelationDanger, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Spacer(Modifier.height(18.dp))
+                    Button(
+                        onClick = {
+                            if (name.isBlank()) {
+                                error = "请输入联系人姓名"
+                            } else {
+                                onSave(contact?.contactId, name, phone, wechat, company, title, tag, note) { error = it }
+                            }
+                        },
+                        Modifier.fillMaxWidth().height(50.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
+                        shape = RoundedCornerShape(25.dp),
+                    ) { Text("保存") }
+                }
             }
         }
     }
