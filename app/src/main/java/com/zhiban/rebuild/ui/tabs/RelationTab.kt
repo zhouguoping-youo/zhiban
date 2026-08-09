@@ -118,6 +118,7 @@ import com.zhiban.rebuild.data.notification.ScheduleInsight
 import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.personalization.UserProfile
+import com.zhiban.rebuild.ui.components.ZhiBanHeaderIconAction
 import com.zhiban.rebuild.ui.components.ZhiBanPrimaryTabHeader
 import com.zhiban.rebuild.ui.components.ZhiBanSearchField
 import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
@@ -293,18 +294,15 @@ fun RelationTab(
                     title = "关系",
                     subtitle = "${contacts.size} 位联系人",
                 ) {
-                    IconButton(
+                    ZhiBanHeaderIconAction(
+                        icon = Icons.Outlined.NotificationsNone,
+                        contentDescription = "待确认内容",
                         onClick = { showNotificationCandidates = true },
-                        modifier = Modifier.size(ZhiBanIconContainer.TouchTarget),
-                    ) {
-                        Icon(
-                            Icons.Outlined.NotificationsNone,
-                            "待确认内容",
-                            tint = if (notificationCandidates.isNotEmpty()) RelationAccent else RelationInk,
-                            modifier = Modifier.size(ZhiBanIconSize.Action),
-                        )
-                    }
-                    IconButton(
+                        tint = if (notificationCandidates.isNotEmpty()) RelationAccent else RelationInk,
+                    )
+                    ZhiBanHeaderIconAction(
+                        icon = Icons.Outlined.PhoneAndroid,
+                        contentDescription = "从手机通讯录导入",
                         onClick = {
                             if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) ==
                                 PackageManager.PERMISSION_GRANTED
@@ -315,26 +313,17 @@ fun RelationTab(
                                 contactPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
                             }
                         },
-                        modifier = Modifier.size(ZhiBanIconContainer.TouchTarget),
-                    ) {
-                        Icon(
-                            Icons.Outlined.PhoneAndroid,
-                            "从手机通讯录导入",
-                            tint = RelationInk,
-                            modifier = Modifier.size(ZhiBanIconSize.Action),
-                        )
-                    }
-                    IconButton(onClick = {
-                        editing = null
-                        showEditor = true
-                    }, modifier = Modifier.size(ZhiBanIconContainer.TouchTarget)) {
-                        Icon(
-                            Icons.Outlined.Add,
-                            "添加联系人",
-                            tint = RelationInk,
-                            modifier = Modifier.size(ZhiBanIconSize.Action),
-                        )
-                    }
+                        tint = RelationInk,
+                    )
+                    ZhiBanHeaderIconAction(
+                        icon = Icons.Outlined.Add,
+                        contentDescription = "添加联系人",
+                        onClick = {
+                            editing = null
+                            showEditor = true
+                        },
+                        tint = RelationInk,
+                    )
                 }
                 Spacer(Modifier.height(16.dp))
             }

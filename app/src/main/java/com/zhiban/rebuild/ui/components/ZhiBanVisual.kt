@@ -34,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -111,6 +112,44 @@ fun ZhiBanPrimaryTabHeader(title: String, subtitle: String, modifier: Modifier =
             )
         }
         trailing()
+    }
+}
+
+/** A single optical grid for every action shown in a primary-tab header. */
+@Composable
+fun ZhiBanHeaderIconAction(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tint: Color = MaterialTheme.colorScheme.onBackground,
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = modifier.size(ZhiBanIconContainer.TouchTarget),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = tint,
+            modifier = Modifier.size(ZhiBanIconSize.Action),
+        )
+    }
+}
+
+/** Text actions share the same 48 dp row and typography as adjacent icon actions. */
+@Composable
+fun ZhiBanHeaderTextAction(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, tint: Color = MaterialTheme.colorScheme.onBackground) {
+    TextButton(
+        onClick = onClick,
+        modifier = modifier.defaultMinSize(minHeight = ZhiBanIconContainer.TouchTarget),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = ZhiBanSpacing.Sm),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = tint,
+        )
     }
 }
 

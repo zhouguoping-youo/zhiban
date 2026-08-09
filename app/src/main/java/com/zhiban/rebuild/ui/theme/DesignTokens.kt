@@ -56,7 +56,7 @@ object ZhiBanIconSize {
     val Leading = 22.dp
 
     /** Toolbar, navigation and standard standalone action glyph. */
-    val Action = 24.dp
+    val Action = 22.dp
     val Navigation = Action
 
     /** Deliberately larger non-interactive illustration for empty states. */

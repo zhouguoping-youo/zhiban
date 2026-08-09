@@ -25,13 +25,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.Extension
-import androidx.compose.material.icons.outlined.Hub
-import androidx.compose.material.icons.outlined.PersonOutline
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -42,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination
@@ -52,6 +46,11 @@ import com.zhiban.rebuild.navigation.MainTabContract
 import com.zhiban.rebuild.navigation.Profile
 import com.zhiban.rebuild.navigation.Relation
 import com.zhiban.rebuild.navigation.Skill
+import com.zhiban.rebuild.ui.icons.AskIcon
+import com.zhiban.rebuild.ui.icons.CalendarIcon
+import com.zhiban.rebuild.ui.icons.ProfileIcon
+import com.zhiban.rebuild.ui.icons.RelationIcon
+import com.zhiban.rebuild.ui.icons.SkillGridIcon
 import com.zhiban.rebuild.ui.theme.ZhiBanIconContainer
 import com.zhiban.rebuild.ui.theme.ZhiBanIconSize
 import com.zhiban.rebuild.ui.theme.ZhiBanRadius
@@ -153,35 +152,35 @@ private fun ZhiBanNavigationRail(currentDestination: NavDestination?, onTabSelec
             currentDestination?.hasRoute(Calendar::class) == true,
             { onTabSelected(Calendar()) },
         ) { selected ->
-            NavigationIcon(Icons.Outlined.CalendarMonth, selected)
+            CalendarIcon(selected = selected, color = navigationIconColor(selected))
         }
         RailNavItem(
             tabs.getValue("relation").label,
             currentDestination?.hasRoute(Relation::class) == true,
             { onTabSelected(Relation) },
         ) { selected ->
-            NavigationIcon(Icons.Outlined.Hub, selected)
+            RelationIcon(selected = selected, color = navigationIconColor(selected))
         }
         RailNavItem(
             tabs.getValue("home").label,
             currentDestination?.hasRoute(Home::class) == true,
             { onTabSelected(Home) },
         ) { selected ->
-            NavigationIcon(Icons.Outlined.ChatBubbleOutline, selected)
+            AskIcon(selected = selected, color = navigationIconColor(selected))
         }
         RailNavItem(
             tabs.getValue("skill").label,
             currentDestination?.hasRoute(Skill::class) == true,
             { onTabSelected(Skill) },
         ) { selected ->
-            NavigationIcon(Icons.Outlined.Extension, selected)
+            SkillGridIcon(selected = selected, color = navigationIconColor(selected))
         }
         RailNavItem(
             tabs.getValue("profile").label,
             currentDestination?.hasRoute(Profile::class) == true,
             { onTabSelected(Profile) },
         ) { selected ->
-            NavigationIcon(Icons.Outlined.PersonOutline, selected)
+            ProfileIcon(selected = selected, color = navigationIconColor(selected))
         }
     }
 }
@@ -217,50 +216,45 @@ fun ZhiBanBottomBar(currentDestination: NavDestination?, onTabSelected: (Any) ->
             TabNavItem(tabs.getValue("calendar").label, currentDestination?.hasRoute(Calendar::class) == true, {
                 onTabSelected(Calendar())
             }, Modifier.weight(1f)) { selected ->
-                Icon(
-                    Icons.Outlined.CalendarMonth,
-                    contentDescription = null,
-                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                CalendarIcon(
+                    selected = selected,
+                    color = navigationIconColor(selected),
                     modifier = Modifier.size(BottomTabIconSize),
                 )
             }
             TabNavItem(tabs.getValue("relation").label, currentDestination?.hasRoute(Relation::class) == true, {
                 onTabSelected(Relation)
             }, Modifier.weight(1f)) { selected ->
-                Icon(
-                    Icons.Outlined.Hub,
-                    contentDescription = null,
-                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                RelationIcon(
+                    selected = selected,
+                    color = navigationIconColor(selected),
                     modifier = Modifier.size(BottomTabIconSize),
                 )
             }
             TabNavItem(tabs.getValue("home").label, currentDestination?.hasRoute(Home::class) == true, {
                 onTabSelected(Home)
             }, Modifier.weight(1f)) { selected ->
-                Icon(
-                    Icons.Outlined.ChatBubbleOutline,
-                    contentDescription = null,
-                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                AskIcon(
+                    selected = selected,
+                    color = navigationIconColor(selected),
                     modifier = Modifier.size(BottomTabIconSize),
                 )
             }
             TabNavItem(tabs.getValue("skill").label, currentDestination?.hasRoute(Skill::class) == true, {
                 onTabSelected(Skill)
             }, Modifier.weight(1f)) { selected ->
-                Icon(
-                    Icons.Outlined.Extension,
-                    contentDescription = null,
-                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                SkillGridIcon(
+                    selected = selected,
+                    color = navigationIconColor(selected),
                     modifier = Modifier.size(BottomTabIconSize),
                 )
             }
             TabNavItem(tabs.getValue("profile").label, currentDestination?.hasRoute(Profile::class) == true, {
                 onTabSelected(Profile)
             }, Modifier.weight(1f)) { selected ->
-                Icon(
-                    Icons.Outlined.PersonOutline,
-                    contentDescription = null,
-                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                ProfileIcon(
+                    selected = selected,
+                    color = navigationIconColor(selected),
                     modifier = Modifier.size(BottomTabIconSize),
                 )
             }
@@ -273,6 +267,7 @@ private fun TabNavItem(label: String, selected: Boolean, onClick: () -> Unit, mo
     Box(
         modifier = modifier.height(ZhiBanSize.TouchTarget).semantics {
             contentDescription = label
+            this.selected = selected
         }.clickable(role = Role.Tab, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -291,7 +286,10 @@ private fun RailNavItem(label: String, selected: Boolean, onClick: () -> Unit, i
     Box(
         modifier = Modifier
             .size(ZhiBanSize.TouchTarget)
-            .semantics { contentDescription = label }
+            .semantics {
+                contentDescription = label
+                this.selected = selected
+            }
             .clickable(role = Role.Tab, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -308,11 +306,4 @@ private fun RailNavItem(label: String, selected: Boolean, onClick: () -> Unit, i
 }
 
 @Composable
-private fun NavigationIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean) {
-    Icon(
-        icon,
-        contentDescription = null,
-        tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.size(BottomTabIconSize),
-    )
-}
+private fun navigationIconColor(selected: Boolean): Color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant

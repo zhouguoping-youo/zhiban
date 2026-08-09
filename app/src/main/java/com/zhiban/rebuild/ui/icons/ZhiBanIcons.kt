@@ -45,12 +45,54 @@ fun LightningBoltIcon(modifier: Modifier = Modifier.size(24.dp), color: Color = 
     }
 }
 
+// ═══════════════ AskIcon ═══════════════
+@Composable
+fun AskIcon(modifier: Modifier = Modifier.size(24.dp), color: Color = LocalContentColor.current, selected: Boolean = false) {
+    Canvas(modifier = modifier) {
+        val stroke = Stroke(
+            width = (if (selected) 2.2.dp else 1.8.dp).toPx(),
+            cap = StrokeCap.Round,
+            join = StrokeJoin.Round,
+        )
+        val bubble = Path().apply {
+            moveTo(size.width * 0.18f, size.height * 0.2f)
+            quadraticTo(size.width * 0.12f, size.height * 0.2f, size.width * 0.12f, size.height * 0.3f)
+            lineTo(size.width * 0.12f, size.height * 0.67f)
+            quadraticTo(size.width * 0.12f, size.height * 0.76f, size.width * 0.22f, size.height * 0.76f)
+            lineTo(size.width * 0.34f, size.height * 0.76f)
+            lineTo(size.width * 0.25f, size.height * 0.9f)
+            lineTo(size.width * 0.48f, size.height * 0.76f)
+            lineTo(size.width * 0.82f, size.height * 0.76f)
+            quadraticTo(size.width * 0.88f, size.height * 0.76f, size.width * 0.88f, size.height * 0.67f)
+            lineTo(size.width * 0.88f, size.height * 0.3f)
+            quadraticTo(size.width * 0.88f, size.height * 0.2f, size.width * 0.78f, size.height * 0.2f)
+            close()
+        }
+        drawPath(bubble, color = color, style = stroke)
+        drawLine(
+            color = color,
+            start = Offset(size.width * 0.3f, size.height * 0.42f),
+            end = Offset(size.width * 0.7f, size.height * 0.42f),
+            strokeWidth = stroke.width,
+            cap = StrokeCap.Round,
+        )
+        drawLine(
+            color = color,
+            start = Offset(size.width * 0.3f, size.height * 0.57f),
+            end = Offset(size.width * 0.57f, size.height * 0.57f),
+            strokeWidth = stroke.width,
+            cap = StrokeCap.Round,
+        )
+    }
+}
+
 // ═══════════════ CalendarIcon ═══════════════
 @Composable
 fun CalendarIcon(modifier: Modifier = Modifier.size(24.dp), color: Color = LocalContentColor.current, selected: Boolean = false) {
     val strokeColor = color
     Canvas(modifier = modifier) {
-        val stroke = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+        val strokeWidth = (if (selected) 2.2.dp else 1.8.dp).toPx()
+        val stroke = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
         drawRoundRect(
             color = strokeColor,
             size = size.copy(height = size.height * 0.85f),
@@ -61,21 +103,21 @@ fun CalendarIcon(modifier: Modifier = Modifier.size(24.dp), color: Color = Local
             color = strokeColor,
             start = Offset(size.width * 0.15f, size.height * 0.18f),
             end = Offset(size.width * 0.85f, size.height * 0.18f),
-            strokeWidth = 2.dp.toPx(),
+            strokeWidth = strokeWidth,
             cap = StrokeCap.Round,
         )
         drawLine(
             color = strokeColor,
             start = Offset(size.width * 0.35f, size.height * 0.08f),
             end = Offset(size.width * 0.35f, size.height * 0.22f),
-            strokeWidth = 2.dp.toPx(),
+            strokeWidth = strokeWidth,
             cap = StrokeCap.Round,
         )
         drawLine(
             color = strokeColor,
             start = Offset(size.width * 0.65f, size.height * 0.08f),
             end = Offset(size.width * 0.65f, size.height * 0.22f),
-            strokeWidth = 2.dp.toPx(),
+            strokeWidth = strokeWidth,
             cap = StrokeCap.Round,
         )
         val dotRadius = 1.5.dp.toPx()
@@ -102,7 +144,8 @@ fun CalendarIcon(modifier: Modifier = Modifier.size(24.dp), color: Color = Local
 fun RelationIcon(modifier: Modifier = Modifier.size(24.dp), color: Color = LocalContentColor.current, selected: Boolean = false) {
     val strokeColor = color
     Canvas(modifier = modifier) {
-        val stroke = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+        val strokeWidth = (if (selected) 2.2.dp else 1.8.dp).toPx()
+        val stroke = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
         val radius = 3.dp.toPx()
         drawCircle(
             color = strokeColor,
@@ -126,21 +169,21 @@ fun RelationIcon(modifier: Modifier = Modifier.size(24.dp), color: Color = Local
             color = strokeColor,
             start = Offset(size.width * 7.5f / 24f, size.height * 7f / 24f),
             end = Offset(size.width * 16.5f / 24f, size.height * 7f / 24f),
-            strokeWidth = 2.dp.toPx(),
+            strokeWidth = strokeWidth,
             cap = StrokeCap.Round,
         )
         drawLine(
             color = strokeColor,
             start = Offset(size.width * 6.5f / 24f, size.height * 7.5f / 24f),
             end = Offset(size.width * 10f / 24f, size.height * 16.5f / 24f),
-            strokeWidth = 2.dp.toPx(),
+            strokeWidth = strokeWidth,
             cap = StrokeCap.Round,
         )
         drawLine(
             color = strokeColor,
             start = Offset(size.width * 17.5f / 24f, size.height * 7.5f / 24f),
             end = Offset(size.width * 14f / 24f, size.height * 16.5f / 24f),
-            strokeWidth = 2.dp.toPx(),
+            strokeWidth = strokeWidth,
             cap = StrokeCap.Round,
         )
     }
@@ -151,7 +194,11 @@ fun RelationIcon(modifier: Modifier = Modifier.size(24.dp), color: Color = Local
 fun SkillGridIcon(modifier: Modifier = Modifier.size(24.dp), color: Color = LocalContentColor.current, selected: Boolean = false) {
     val strokeColor = color
     Canvas(modifier = modifier) {
-        val stroke = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+        val stroke = Stroke(
+            width = (if (selected) 2.2.dp else 1.8.dp).toPx(),
+            cap = StrokeCap.Round,
+            join = StrokeJoin.Round,
+        )
         val cornerRadius = CornerRadius(1.5.dp.toPx())
         drawRoundRect(
             color = strokeColor,
@@ -189,7 +236,11 @@ fun SkillGridIcon(modifier: Modifier = Modifier.size(24.dp), color: Color = Loca
 fun ProfileIcon(modifier: Modifier = Modifier.size(24.dp), color: Color = LocalContentColor.current, selected: Boolean = false) {
     val strokeColor = color
     Canvas(modifier = modifier) {
-        val stroke = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+        val stroke = Stroke(
+            width = (if (selected) 2.2.dp else 1.8.dp).toPx(),
+            cap = StrokeCap.Round,
+            join = StrokeJoin.Round,
+        )
         drawCircle(
             color = strokeColor,
             radius = size.width * 0.2f,

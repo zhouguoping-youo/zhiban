@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -59,14 +58,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
@@ -77,6 +74,8 @@ import com.zhiban.rebuild.data.calendar.SystemCalendarWriteIntent
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.NotificationInsightAnalyzer
 import com.zhiban.rebuild.data.notification.ScheduleInsight
+import com.zhiban.rebuild.ui.components.ZhiBanHeaderIconAction
+import com.zhiban.rebuild.ui.components.ZhiBanHeaderTextAction
 import com.zhiban.rebuild.ui.components.ZhiBanPrimaryTabHeader
 import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
 import com.zhiban.rebuild.ui.components.ZhiBanTabHorizontalPadding
@@ -112,7 +111,6 @@ internal val CalendarSoft: Color @Composable get() = MaterialTheme.colorScheme.s
 internal val CalendarLine: Color @Composable get() = MaterialTheme.colorScheme.outlineVariant
 internal val CalendarAccent: Color @Composable get() = MaterialTheme.colorScheme.primary
 internal val CalendarDanger: Color @Composable get() = MaterialTheme.colorScheme.error
-internal val CalendarImportIconOpticalOffset = 1.dp
 
 @Composable
 fun CalendarTab(
@@ -472,41 +470,24 @@ private fun CalendarHeader(date: LocalDate, monthExpanded: Boolean, onToday: () 
         title = "日历",
         subtitle = date.format(DateTimeFormatter.ofPattern("yyyy年 M月")),
     ) {
-        TextButton(onClick = onToday, contentPadding = PaddingValues(horizontal = 10.dp)) {
-            Text("今天", color = CalendarInk, fontWeight = FontWeight.Medium)
-        }
-        CalendarHeaderIconButton(
+        ZhiBanHeaderTextAction(label = "今天", onClick = onToday, tint = CalendarInk)
+        ZhiBanHeaderIconAction(
             icon = Icons.Outlined.EventAvailable,
             contentDescription = "从手机日历导入",
-            opticalOffsetY = CalendarImportIconOpticalOffset,
             onClick = onImport,
+            tint = CalendarInk,
         )
-        CalendarHeaderIconButton(
+        ZhiBanHeaderIconAction(
             icon = Icons.Outlined.CalendarMonth,
             contentDescription = if (monthExpanded) "收起全日历" else "查看全日历",
             onClick = onMonth,
+            tint = CalendarInk,
         )
-        CalendarHeaderIconButton(
+        ZhiBanHeaderIconAction(
             icon = Icons.Outlined.Add,
             contentDescription = "新建日程",
             onClick = onAdd,
-        )
-    }
-}
-
-@Composable
-private fun CalendarHeaderIconButton(icon: ImageVector, contentDescription: String, onClick: () -> Unit, opticalOffsetY: Dp = 0.dp) {
-    IconButton(
-        onClick = onClick,
-        modifier = Modifier.size(ZhiBanIconContainer.TouchTarget),
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
             tint = CalendarInk,
-            modifier = Modifier
-                .offset(y = opticalOffsetY)
-                .size(ZhiBanIconSize.Action),
         )
     }
 }

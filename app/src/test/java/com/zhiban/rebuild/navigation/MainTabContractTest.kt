@@ -7,7 +7,7 @@ import org.junit.Test
 class MainTabContractTest {
     @Test
     fun `tab labels and order stay frozen`() {
-        assertEquals(listOf("今日", "关系", "问问", "能力", "我的"), MainTabContract.tabs.map { it.label })
+        assertEquals(listOf("日历", "关系", "问问", "能力", "我的"), MainTabContract.tabs.map { it.label })
     }
 
     @Test
