@@ -801,7 +801,7 @@ fun DataSettingsPage(onBack: () -> Unit, onMemory: () -> Unit, onRunHistory: () 
 @Composable
 fun ReportErrorSettingsPage(onBack: () -> Unit, onDiagnostics: () -> Unit) {
     val context = LocalContext.current
-    SettingsPageFrame("报告错误", "描述问题，或生成脱敏诊断记录", onBack) {
+    SettingsPageFrame("报告问题", "描述问题，或生成脱敏诊断记录", onBack) {
         Column(
             Modifier.padding(ZhiBanSpacing.PageHorizontal),
             verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),

@@ -33,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,44 +48,53 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewModelScope
 import com.zhiban.rebuild.runtime.personalization.UserProfileStore
-import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
+import com.zhiban.rebuild.runtime.provider.ProviderEnvironmentManager
 import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.components.ZhiBanPrimaryTabHeader
 import com.zhiban.rebuild.ui.components.ZhiBanTabHorizontalPadding
 import com.zhiban.rebuild.ui.components.ZhiBanTabTopPadding
-import com.zhiban.rebuild.ui.theme.DangerRed
-import com.zhiban.rebuild.ui.theme.ZhiBanCard
-import com.zhiban.rebuild.ui.theme.ZhiBanDivider
 import com.zhiban.rebuild.ui.theme.ZhiBanRadius
 import com.zhiban.rebuild.ui.theme.ZhiBanSize
 import com.zhiban.rebuild.ui.theme.ZhiBanSpacing
 import com.zhiban.rebuild.ui.theme.ZhiBanTerracotta
-import com.zhiban.rebuild.ui.theme.ZhiBanTerracottaSoft
-import com.zhiban.rebuild.ui.theme.ZhiBanTextPrimary
-import com.zhiban.rebuild.ui.theme.ZhiBanTextSecondary
-import com.zhiban.rebuild.ui.theme.ZhiBanWarmBackground
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 private val SettingsCanvas: Color @Composable get() = MaterialTheme.colorScheme.background
 private val SettingsSurface: Color @Composable get() = MaterialTheme.colorScheme.surface
 private val SettingsPrimary: Color @Composable get() = MaterialTheme.colorScheme.onBackground
 private val SettingsSecondary: Color @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
-private val SettingsIconSurface: Color @Composable get() = MaterialTheme.colorScheme.primaryContainer
 private val SettingsDivider: Color @Composable get() = MaterialTheme.colorScheme.outlineVariant
 private val SettingsDanger: Color @Composable get() = MaterialTheme.colorScheme.error
 
 @HiltViewModel
-class ProfileTabViewModel @Inject constructor(store: UserProfileStore) : ViewModel() {
+class ProfileTabViewModel @Inject constructor(store: UserProfileStore, private val provider: ProviderEnvironmentManager) : ViewModel() {
     val profile = store.profile
+    private val mutableProviderConfigured = MutableStateFlow<Boolean?>(null)
+    val providerConfigured = mutableProviderConfigured.asStateFlow()
+
+    init {
+        refreshProviderState()
+    }
+
+    fun refreshProviderState() {
+        viewModelScope.launch {
+            mutableProviderConfigured.value = provider.isConfigured()
+        }
+    }
 }
 
 internal data class ProfileSettingItem(
     val icon: ImageVector,
     val title: String,
     val accessibilityDescription: String,
-    val supportingText: String? = null,
+    val statusText: String? = null,
+    val statusNeedsAttention: Boolean = false,
     val isDanger: Boolean = false,
     val onClick: () -> Unit,
 )
@@ -112,7 +122,9 @@ fun ProfileTab(
     }
 
     val profile by viewModel.profile.collectAsStateWithLifecycle()
+    val providerConfigured by viewModel.providerConfigured.collectAsStateWithLifecycle()
     val autoWriteState by autoWriteViewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { viewModel.refreshProviderState() }
     val pendingAutoWriteCount = autoWriteState.receipts.count { it.reviewState == "UNREVIEWED" }
     val preferredName = profile.preferredName.ifBlank { profile.name }
     val hasProfile = preferredName.isNotBlank() || profile.phone.isNotBlank()
@@ -128,13 +140,20 @@ fun ProfileTab(
             icon = Icons.Outlined.Psychology,
             title = "智能体设置",
             accessibilityDescription = "大模型、记忆、对话风格和工具",
+            statusText = when (providerConfigured) {
+                true -> "已连接"
+                false -> "未连接"
+                null -> null
+            },
+            statusNeedsAttention = providerConfigured == false,
             onClick = onNavigateToAgentSettings,
         ),
         ProfileSettingItem(
             icon = Icons.Outlined.AutoAwesome,
-            title = "知伴帮你记的",
+            title = "自动整理",
             accessibilityDescription = "查看、撤销或纠正知伴自动记录的内容",
-            supportingText = pendingAutoWriteCount.takeIf { it > 0 }?.let { "$it 条待查看" },
+            statusText = pendingAutoWriteCount.takeIf { it > 0 }?.let { "$it 条待查看" },
+            statusNeedsAttention = pendingAutoWriteCount > 0,
             onClick = onNavigateToAutoWrites,
         ),
     )
@@ -165,12 +184,12 @@ fun ProfileTab(
                 top = ZhiBanTabTopPadding,
                 bottom = ZhiBanSize.BottomBar + ZhiBanSpacing.Xxxl * 2,
             ),
-            verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Xl),
+            verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Lg),
         ) {
             item {
                 ZhiBanPrimaryTabHeader(
                     title = "我的",
-                    subtitle = "管理资料与设置",
+                    subtitle = "资料、权限与数据",
                 )
             }
 
@@ -184,12 +203,12 @@ fun ProfileTab(
                         .semantics {
                             contentDescription = "$identityTitle，$identitySubtitle，进入个人设置"
                         }
-                        .padding(ZhiBanSpacing.Lg),
+                        .padding(horizontal = ZhiBanSpacing.Lg, vertical = ZhiBanSpacing.Md),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(56.dp)
+                            .size(ZhiBanSize.Avatar)
                             .clip(CircleShape)
                             .background(ZhiBanTerracotta),
                         contentAlignment = Alignment.Center,
@@ -229,8 +248,8 @@ fun ProfileTab(
             }
 
             item { ProfileSettingsGroup("知伴", agentItems) }
-            item { ProfileSettingsGroup("APP 设置", appItems) }
-            item { ProfileSettingsGroup("帮助与关于", supportItems) }
+            item { ProfileSettingsGroup("设置", appItems) }
+            item { ProfileSettingsGroup("支持", supportItems) }
         }
     }
 }
@@ -256,38 +275,45 @@ internal fun ProfileSettingsGroup(title: String?, items: List<ProfileSettingItem
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .defaultMinSize(
-                            minHeight = if (item.supportingText == null) ZhiBanSize.ListRow else ZhiBanSize.ListRowWithSubtitle,
-                        )
+                        .defaultMinSize(minHeight = 56.dp)
                         .clickable(onClick = item.onClick)
                         .semantics {
-                            contentDescription = "${item.title}，${item.accessibilityDescription}"
+                            contentDescription = listOfNotNull(
+                                item.title,
+                                item.statusText,
+                                item.accessibilityDescription,
+                            ).joinToString("，")
                         }
-                        .padding(horizontal = ZhiBanSpacing.Lg, vertical = ZhiBanSpacing.Md),
+                        .padding(horizontal = ZhiBanSpacing.Lg, vertical = ZhiBanSpacing.Sm),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    ZhiBanLeadingIcon(
-                        item.icon,
-                        tint = if (item.isDanger) SettingsDanger else ZhiBanTerracotta,
-                        containerColor = SettingsIconSurface,
-                    )
-                    Spacer(Modifier.width(ZhiBanSpacing.Md))
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Text(
-                            item.title,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = if (item.isDanger) SettingsDanger else SettingsPrimary,
-                            fontWeight = FontWeight.Medium,
+                    Box(
+                        modifier = Modifier.size(32.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            item.icon,
+                            contentDescription = null,
+                            tint = if (item.isDanger) SettingsDanger else SettingsSecondary,
+                            modifier = Modifier.size(ZhiBanSize.Icon),
                         )
-                        item.supportingText?.let {
-                            Text(
-                                it,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = SettingsSecondary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
+                    }
+                    Spacer(Modifier.width(ZhiBanSpacing.Md))
+                    Text(
+                        item.title,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (item.isDanger) SettingsDanger else SettingsPrimary,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    item.statusText?.let {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (item.statusNeedsAttention) ZhiBanTerracotta else SettingsSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                     Spacer(Modifier.width(ZhiBanSpacing.Sm))
                     Icon(

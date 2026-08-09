@@ -18,7 +18,7 @@ enum class NotificationCategory(val title: String, val subtitle: String) {
     SCHEDULE("日程提醒", "日程到期提醒"),
     CRM("CRM 提醒", "跟进待办提醒"),
     COLLECTION("采集通知", "新消息 / 新通话采集提示"),
-    AUTO_WRITE("知伴帮你记的", "自动写入回执提示"),
+    AUTO_WRITE("自动整理", "自动写入回执提示"),
     ;
 
     val preferenceKey get() = booleanPreferencesKey(storageKey)

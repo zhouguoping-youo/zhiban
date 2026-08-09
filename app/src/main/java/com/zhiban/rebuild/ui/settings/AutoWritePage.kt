@@ -115,7 +115,7 @@ internal fun AutoWriteContent(
                 contentPadding = PaddingValues(bottom = ZhiBanSpacing.Xxxl),
                 verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
             ) {
-                item { ZhiBanTopBar(title = "知伴帮你记的", onBack = onBack) }
+                item { ZhiBanTopBar(title = "自动整理", onBack = onBack) }
                 item {
                     Text(
                         "知伴帮你自动整理的内容，可撤销或纠正。保留 90 天。",

@@ -36,7 +36,7 @@ class ProfileSettingsGroupTest {
                             Icons.Outlined.NotificationsNone,
                             "通知",
                             "提醒和消息权限",
-                            supportingText = "2 条待处理",
+                            statusText = "2 条待处理",
                             onClick = { notificationClicks++ },
                         ),
                     ),
@@ -47,7 +47,7 @@ class ProfileSettingsGroupTest {
         compose.onNodeWithText("跟随手机显示设置").assertDoesNotExist()
         compose.onNodeWithText("2 条待处理").assertIsDisplayed()
         compose.onNodeWithContentDescription("外观，跟随手机显示设置").performClick()
-        compose.onNodeWithContentDescription("通知，提醒和消息权限").performClick()
+        compose.onNodeWithContentDescription("通知，2 条待处理，提醒和消息权限").performClick()
 
         compose.runOnIdle {
             assertEquals(1, appearanceClicks)

@@ -78,6 +78,29 @@ class AgentSettingsNavigationE2ETest {
         compose.onNodeWithText("数据管理").assertExists()
     }
 
+    @Test fun everyProfileSettingsEntryOpensAndBackReturns() {
+        compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("我的").performClick()
+
+        listOf(
+            "智能体设置",
+            "自动整理",
+            "外观",
+            "通知",
+            "隐私与权限",
+            "存储",
+            "数据管理",
+            "报告问题",
+            "关于知伴",
+        ).forEach { title ->
+            compose.onNodeWithText(title).performScrollTo().performClick()
+            compose.onNodeWithText(title).assertIsDisplayed()
+            compose.onNodeWithContentDescription("返回").performClick()
+            compose.onNodeWithContentDescription("我的").assertExists()
+        }
+    }
+
     @Test fun appearancePageOffersThreeThemeChoices() {
         compose.activity.getSharedPreferences("theme_preference", android.content.Context.MODE_PRIVATE)
             .edit().clear().commit()
