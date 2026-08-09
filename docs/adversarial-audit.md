@@ -93,7 +93,7 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | 4.10 | 合并后通知候选仍关联已合并联系人 | ✅ | 功能不可用 | 联系人列表隐藏合并源，但通知候选 Flow 原样返回 source 的 suggested/linkedContactId，候选卡无法找到联系人名称和正确入口。现将候选与活动合并映射组合投影为 canonical；不改原外键，撤销后即时恢复 source | 本提交 `fix(4.10)` | `AgentDataRepositoryTest.notificationCandidateProjectsMergedContactAndUndoRestoresSource` |
 | 4.11 | 合并后 CRM 商机仍关联已合并联系人 | ✅ | 功能不可用 | 通话和关系查询已按 contact_merge_links 投影主联系人，但 CRM 六条按联系人查询仍原始等值匹配；合并源的线索、商机、活动和动作会从主联系人详情消失。现统一 canonical 映射，撤销合并自动恢复原作用域且不改写外键 | 本提交 `fix(4.11)` | `CrmContactLinkTest.mergedContactSeesSourceCrmRecordsAndUndoRestoresOriginalScope` + 原联系人过滤回归 |
 | 4.12 | 智能完善确认覆盖用户已有数据 | ⬜ | | | | |
-| 4.13 | 智能完善拒绝后能否再生成 | ⬜ | | | | |
+| 4.13 | 智能完善拒绝后能否再生成 | ✅ | 数据完整性 | 候选主键由 runId+providerCallId 稳定生成，但 REPLACE 会在同一调用重放时把用户已拒绝的 DISMISSED 覆盖回 PENDING。现改为 INSERT IGNORE：同一证据不可复活，新 providerCallId/新证据仍可生成独立候选 | 本提交 `fix(4.13)` | `ContactEnrichmentConfirmTest.replayCannotResurrectDismissedCandidateButNewEvidenceCanBeStaged` |
 | 4.14 | 多平台账号(微信/飞书/钉钉/QQ)匹配 | ⬜ | | | | |
 | 4.15 | 电话格式不一致匹配失败 | ⬜ | | | | |
 

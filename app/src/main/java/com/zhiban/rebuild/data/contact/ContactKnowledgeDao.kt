@@ -26,8 +26,8 @@ interface ContactKnowledgeDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertFacet(value: ContactFacetEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertEnrichmentCandidate(value: ContactEnrichmentCandidateEntity)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertEnrichmentCandidateIfAbsent(value: ContactEnrichmentCandidateEntity): Long
 
     @Query(
         """SELECT canonical.* FROM contact_methods method

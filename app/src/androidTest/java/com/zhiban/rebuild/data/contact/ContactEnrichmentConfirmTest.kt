@@ -78,6 +78,18 @@ class ContactEnrichmentConfirmTest {
         assertNull(db.contactDao().findRawById("c1")!!.company)
     }
 
+    @Test fun replayCannotResurrectDismissedCandidateButNewEvidenceCanBeStaged() = runBlocking {
+        db.contactDao().insert(contact(company = null, title = null))
+        val dismissed = candidate(id = "same-evidence", value = """{"company":"星河科技"}""")
+        assertTrue(repository.stageContactEnrichmentCandidate(dismissed))
+        assertTrue(repository.resolveContactEnrichmentCandidate(dismissed.candidateId, accepted = false))
+
+        assertFalse(repository.stageContactEnrichmentCandidate(dismissed.copy(updatedAtEpochMs = 2)))
+        assertEquals("DISMISSED", db.contactKnowledgeDao().findEnrichmentCandidate(dismissed.candidateId)!!.status)
+        assertTrue(repository.stageContactEnrichmentCandidate(candidate(id = "new-evidence")))
+        assertEquals(listOf("new-evidence"), db.contactKnowledgeDao().observePendingEnrichment("c1").first().map { it.candidateId })
+    }
+
     @Test fun purgeExpiredEnrichmentRemovesOnlyExpiredRows() = runBlocking {
         db.contactDao().insert(contact(company = null, title = null))
         val now = System.currentTimeMillis()

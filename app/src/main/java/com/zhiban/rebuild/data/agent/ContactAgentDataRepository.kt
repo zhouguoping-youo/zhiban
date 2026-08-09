@@ -769,7 +769,7 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
     fun observePendingContactEnrichment(contactId: String) = database.contactKnowledgeDao().observePendingEnrichment(contactId)
 
     suspend fun stageContactEnrichmentCandidate(candidate: ContactEnrichmentCandidateEntity) =
-        database.contactKnowledgeDao().upsertEnrichmentCandidate(candidate.copy(status = "PENDING"))
+        database.contactKnowledgeDao().insertEnrichmentCandidateIfAbsent(candidate.copy(status = "PENDING")) != -1L
 
     suspend fun resolveContactEnrichmentCandidate(candidateId: String, accepted: Boolean): Boolean = database.contactKnowledgeDao().resolveEnrichmentCandidate(
         candidateId = candidateId,

@@ -56,7 +56,7 @@ internal class ContactEnrichmentSuggestToolBinding(
             createdAtEpochMs = now,
             updatedAtEpochMs = now,
         )
-        knowledge.upsertEnrichmentCandidate(candidate)
+        knowledge.insertEnrichmentCandidateIfAbsent(candidate)
         return true
     }
 
