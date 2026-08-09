@@ -87,7 +87,7 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | 4.4 | 智能完善建议过期后能否确认 | ✅ | 数据完整性 | 确认入口曾直接使用 UI 传回的候选对象，不回读状态/有效期；候选被清理后旧页面仍能写联系人，调用方还能替换 proposedValue。现事务内回读持久候选，只接受未过期 PENDING，并检查资料写与状态转换结果 | 本提交 `fix(4.4)` | `ContactEnrichmentConfirmTest.staleUiCannotApplyExpiredOrPurgedEnrichment`、`confirmUsesPersistedCandidateInsteadOfCallerModifiedPayload` + 既有确认回归 |
 | 4.5 | 合并后搜索仍显示已合并联系人 | ⬜ | | | | |
 | 4.6 | 编辑后 normalizedValue 更新 | ⬜ | | | | |
-| 4.7 | 删除后 CRM primaryContactId SET_NULL | ⬜ | | | | |
+| 4.7 | 删除后 CRM primaryContactId SET_NULL | ✅ | 数据完整性 | CRM 外键的 SET_NULL/CASCADE 只在物理删除触发，联系人产品删除实际是软删，导致商机等继续持有不可打开的隐藏 contactId。现软删事务显式模拟外键语义：可空 CRM 联系人引用统一置空、stakeholder 关联删除，业务快照和历史记录保留 | 本提交 `fix(4.7)` | `ContactSoftDeleteCrmTest.softDeleteDetachesEveryCrmContactReferenceAndPreservesBusinessHistory` |
 | 4.8 | 智能完善模型返回非法 JSON 崩溃 | ⬜ | | | | |
 | 4.9 | 合并后通话记录仍关联已合并联系人 | ✅ | 体验/数据可见性 | 联系人时间线查询已做 canonical 匹配，但首页挂断备注使用原始 linkedContactId；合并源被联系人列表隐藏后卡片姓名为空。pending call Flow 现与活动合并映射组合投影，撤销即恢复 source，原始通话外键不被破坏 | 本提交 `fix(4.9)` | `CallLogImporterTest.pendingCallAndContactTimelineProjectActiveMergeAndUndoRestoresSource` |
 | 4.10 | 合并后通知候选仍关联已合并联系人 | ✅ | 功能不可用 | 联系人列表隐藏合并源，但通知候选 Flow 原样返回 source 的 suggested/linkedContactId，候选卡无法找到联系人名称和正确入口。现将候选与活动合并映射组合投影为 canonical；不改原外键，撤销后即时恢复 source | 本提交 `fix(4.10)` | `AgentDataRepositoryTest.notificationCandidateProjectsMergedContactAndUndoRestoresSource` |

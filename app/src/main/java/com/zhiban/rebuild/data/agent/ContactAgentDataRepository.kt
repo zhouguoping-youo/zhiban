@@ -758,6 +758,14 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
         database.relationshipEdgeDao().deactivateForContacts(identityCluster, now)
         database.relationshipEventDao().deactivateForContacts(identityCluster, now)
         FactIndex(database).revokeByContactIds(identityCluster, now)
+        database.crmDao().apply {
+            detachLeadContacts(identityCluster, now)
+            detachOpportunityContacts(identityCluster, now)
+            deleteStakeholdersForContacts(identityCluster)
+            detachActivityContacts(identityCluster)
+            detachActionContacts(identityCluster, now)
+            detachSuggestionContacts(identityCluster, now)
+        }
         database.contactDao().softDeleteAll(identityCluster, now) > 0
     }
 

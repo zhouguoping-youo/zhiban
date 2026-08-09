@@ -138,6 +138,24 @@ interface CrmDao {
     @Query("SELECT * FROM crm_activities WHERE activityId = :activityId")
     suspend fun findActivity(activityId: String): CrmActivityEntity?
 
+    @Query("UPDATE crm_leads SET contactId = NULL, updatedAtEpochMs = :nowEpochMs WHERE contactId IN (:contactIds)")
+    suspend fun detachLeadContacts(contactIds: List<String>, nowEpochMs: Long): Int
+
+    @Query("UPDATE crm_opportunities SET primaryContactId = NULL, updatedAtEpochMs = :nowEpochMs WHERE primaryContactId IN (:contactIds)")
+    suspend fun detachOpportunityContacts(contactIds: List<String>, nowEpochMs: Long): Int
+
+    @Query("DELETE FROM crm_opportunity_stakeholders WHERE contactId IN (:contactIds)")
+    suspend fun deleteStakeholdersForContacts(contactIds: List<String>): Int
+
+    @Query("UPDATE crm_activities SET contactId = NULL WHERE contactId IN (:contactIds)")
+    suspend fun detachActivityContacts(contactIds: List<String>): Int
+
+    @Query("UPDATE crm_next_actions SET contactId = NULL, updatedAtEpochMs = :nowEpochMs WHERE contactId IN (:contactIds)")
+    suspend fun detachActionContacts(contactIds: List<String>, nowEpochMs: Long): Int
+
+    @Query("UPDATE crm_agent_suggestions SET contactId = NULL, updatedAtEpochMs = :nowEpochMs WHERE contactId IN (:contactIds)")
+    suspend fun detachSuggestionContacts(contactIds: List<String>, nowEpochMs: Long): Int
+
     @Query("SELECT COUNT(*) FROM crm_opportunities")
     suspend fun countOpportunities(): Int
 
