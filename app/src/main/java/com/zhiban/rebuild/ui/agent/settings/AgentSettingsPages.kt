@@ -124,8 +124,8 @@ fun AgentSettingsPage(
                 item {
                     AgentSettingsGroup(
                         listOf(
-                            AgentSettingsEntry(Icons.Outlined.Security, "行为与安全", "", onBehavior),
-                            AgentSettingsEntry(Icons.Outlined.RateReview, "反馈与改进", "", onFeedback),
+                            AgentSettingsEntry(Icons.Outlined.Security, "回答方式", "快速、标准或深入", onBehavior),
+                            AgentSettingsEntry(Icons.Outlined.RateReview, "回答反馈", "点赞、点踩与改进建议", onFeedback),
                             AgentSettingsEntry(Icons.Outlined.History, "运行记录", "", onRunHistory),
                         ),
                     )
@@ -511,9 +511,9 @@ private fun toolDisplayName(name: String) = when (name) {
 data class BehaviorState(val execution: ExecutionPreference = ExecutionPreference.BALANCED)
 
 internal fun executionHint(preference: ExecutionPreference): String = when (preference) {
-    ExecutionPreference.FAST -> "更快响应 · 跳过智能重排"
-    ExecutionPreference.BALANCED -> "默认 · 速度与精度兼顾"
-    ExecutionPreference.DEEP -> "更准答案 · 更多上下文"
+    ExecutionPreference.FAST -> "简单问答 · 检索更少，响应更快"
+    ExecutionPreference.BALANCED -> "日常任务 · 自动平衡速度与信息量"
+    ExecutionPreference.DEEP -> "复杂问题 · 检索更多上下文，耗时更长"
 }
 
 @HiltViewModel class AgentBehaviorViewModel @Inject constructor(private val controls: AgentControlStore) : ViewModel() {
@@ -530,25 +530,50 @@ internal fun executionHint(preference: ExecutionPreference): String = when (pref
     val s by vm.state.collectAsStateWithLifecycle()
     ZhiBanPage {
         Column(Modifier.fillMaxSize()) {
-            AgentHeader("行为与安全", onBack)
+            AgentHeader("回答方式", onBack)
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("执行偏好", fontWeight = FontWeight.SemiBold)
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ExecutionPreference.entries.forEach { v ->
-                        FilterChip(s.execution == v, { vm.select(v) }, { Text(v.label) })
+                ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
+                    Column(Modifier.padding(horizontal = 16.dp)) {
+                        ExecutionPreference.entries.forEachIndexed { index, preference ->
+                            if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            ExecutionPreferenceRow(
+                                preference = preference,
+                                selected = s.execution == preference,
+                                onClick = { vm.select(preference) },
+                            )
+                        }
                     }
                 }
-                Text(
-                    executionHint(s.execution),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = AgentSettingsSecondary,
-                )
-                SettingRow(Icons.Outlined.Visibility, "只读操作", "自动执行")
-                SettingRow(Icons.Outlined.GppGood, "自动整理", "可撤销")
-                SettingRow(Icons.Outlined.Edit, "写入与发送", "执行前确认")
-                SettingRow(Icons.Outlined.GppGood, "高风险操作", "再次确认")
+                SettingRow(Icons.Outlined.GppGood, "重要操作会先确认", "写入、删除和发送不会静默执行")
             }
         }
+    }
+}
+
+@Composable
+private fun ExecutionPreferenceRow(preference: ExecutionPreference, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = ZhiBanSize.ListRowWithSubtitle)
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                preference.runtimeLevel,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (selected) ZhiBanTerracotta else MaterialTheme.colorScheme.onSurface,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            )
+            Text(
+                executionHint(preference),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        RadioButton(selected = selected, onClick = onClick)
     }
 }
 
@@ -590,10 +615,10 @@ class AgentFeedbackViewModel @Inject constructor(private val controls: AgentCont
     val s by vm.state.collectAsStateWithLifecycle()
     ZhiBanPage {
         Column(Modifier.fillMaxSize()) {
-            AgentHeader("反馈与改进", onBack)
+            AgentHeader("回答反馈", onBack)
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                ToggleRow("使用回答反馈", "", s.policy.useHumanFeedback, vm::human)
-                ToggleRow("允许偏好建议", "需你确认", s.policy.allowPreferenceImprovement, vm::improve)
+                ToggleRow("显示点赞和点踩", "出现在知伴回答下方", s.policy.useHumanFeedback, vm::human)
+                ToggleRow("根据反馈提出改进", "修改前仍会询问你", s.policy.allowPreferenceImprovement, vm::improve)
                 s.suggestion?.let { suggestion ->
                     ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {

@@ -34,13 +34,9 @@ import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Contacts
-import androidx.compose.material.icons.outlined.FolderOpen
-import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Phone
-import androidx.compose.material.icons.outlined.Security
-import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -138,15 +134,12 @@ fun LanguageSettingsPage(onBack: () -> Unit) {
 @Composable
 fun PrivacySecurityPage(
     onBack: () -> Unit,
-    onOpenMemory: () -> Unit,
-    onOpenTools: () -> Unit,
     outboundViewModel: OutboundPrivacyViewModel = hiltViewModel(),
     callCollectionViewModel: CallCollectionViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val outboundState by outboundViewModel.state.collectAsStateWithLifecycle()
     val callCollectionState by callCollectionViewModel.state.collectAsStateWithLifecycle()
-    var pendingOutboundConsent by remember { mutableStateOf<OutboundConsentType?>(null) }
     var callLogAccessStatus by remember { mutableStateOf(CallLogAccessStatus.NOT_GRANTED) }
     var refreshVersion by remember { mutableIntStateOf(0) }
     RefreshPermissionsOnResume { refreshVersion += 1 }
@@ -187,7 +180,7 @@ fun PrivacySecurityPage(
         ) {
             item {
                 Text(
-                    "数据发送范围",
+                    "让知伴更好用",
                     style = MaterialTheme.typography.labelMedium,
                     color = ZhiBanTextSecondary,
                     modifier = Modifier.padding(horizontal = ZhiBanSpacing.Xs),
@@ -195,62 +188,52 @@ fun PrivacySecurityPage(
             }
             item {
                 SettingsCard {
-                    DataSendScope.entries.forEachIndexed { index, scope ->
-                        if (index > 0) Divider()
-                        DataSendScopeRow(scope)
-                    }
-                }
-            }
-            item {
-                Text(
-                    "手机权限",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = ZhiBanTextSecondary,
-                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.Xs),
-                )
-            }
-            item {
-                SettingsCard {
-                    SettingsPermissionRow(
-                        Icons.Outlined.Mic,
-                        "麦克风",
-                        permissions.microphone.label,
-                    ) { requestOrOpen(Manifest.permission.RECORD_AUDIO, permissions.microphone.isGranted) }
-                    Divider()
-                    SettingsPermissionRow(
-                        Icons.Outlined.CameraAlt,
-                        "相机",
-                        permissions.camera.label,
-                    ) { requestOrOpen(Manifest.permission.CAMERA, permissions.camera.isGranted) }
-                    Divider()
                     SettingsPermissionRow(
                         Icons.Outlined.Contacts,
                         "联系人",
-                        permissions.contacts.label,
+                        permissions.contacts.withPurpose("识别人和关系"),
                     ) { requestOrOpen(Manifest.permission.READ_CONTACTS, permissions.contacts.isGranted) }
                     Divider()
                     SettingsPermissionRow(
                         Icons.Outlined.CalendarMonth,
                         "日历",
-                        permissions.calendar.label,
+                        permissions.calendar.withPurpose("安排日程和检查冲突"),
                     ) { requestOrOpen(Manifest.permission.READ_CALENDAR, permissions.calendar.isGranted) }
+                    Divider()
+                    SettingsPermissionRow(
+                        Icons.Outlined.Mic,
+                        "麦克风",
+                        permissions.microphone.withPurpose("语音输入和通话备注"),
+                    ) { requestOrOpen(Manifest.permission.RECORD_AUDIO, permissions.microphone.isGranted) }
+                    Divider()
+                    SettingsPermissionRow(
+                        Icons.Outlined.CameraAlt,
+                        "相机",
+                        permissions.camera.withPurpose("拍照识别信息"),
+                    ) { requestOrOpen(Manifest.permission.CAMERA, permissions.camera.isGranted) }
                     Divider()
                     SettingsPermissionRow(
                         Icons.Outlined.Phone,
                         "通话记录",
-                        when (callLogAccessStatus) {
+                        "${when (callLogAccessStatus) {
                             CallLogAccessStatus.AVAILABLE -> "已允许，可读取"
                             CallLogAccessStatus.RESTRICTED -> "系统或安装器未允许"
                             CallLogAccessStatus.UNAVAILABLE -> "暂时无法读取"
                             CallLogAccessStatus.NOT_GRANTED -> "未允许"
-                        },
+                        }} · 生成联系时间线",
                     ) { requestOrOpen(Manifest.permission.READ_CALL_LOG, permissions.callLog.isGranted) }
                     Divider()
                     SettingsPermissionRow(
-                        Icons.Outlined.FolderOpen,
-                        "照片与文件",
-                        "每次选择",
-                    ) { context.openAppDetails() }
+                        Icons.Outlined.NotificationsNone,
+                        "收到的消息",
+                        if (permissions.isNotificationListener) "已允许 · 从新消息通知中发现线索" else "未允许 · 从新消息通知中发现线索",
+                    ) { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+                    Divider()
+                    SettingsPermissionRow(
+                        Icons.Outlined.Sync,
+                        "发出的消息",
+                        if (permissions.outgoingAccessibility) "已允许 · 记录手机端发送结果" else "未允许 · 记录手机端发送结果",
+                    ) { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
                 }
             }
             item {
@@ -308,7 +291,7 @@ fun PrivacySecurityPage(
             }
             item {
                 Text(
-                    "消息感知",
+                    "AI 服务",
                     style = MaterialTheme.typography.labelMedium,
                     color = ZhiBanTextSecondary,
                     modifier = Modifier.padding(horizontal = ZhiBanSpacing.Xs, vertical = ZhiBanSpacing.Sm),
@@ -316,81 +299,12 @@ fun PrivacySecurityPage(
             }
             item {
                 SettingsCard {
-                    SettingsPermissionRow(
-                        Icons.Outlined.NotificationsNone,
-                        "收到的消息",
-                        if (permissions.isNotificationListener) "通知读取已开启" else "未开启通知读取",
-                    ) {
-                        context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                    }
+                    SettingsRow("文字、图片与联系人", "使用时按需处理 · 敏感信息自动保护")
                     Divider()
-                    SettingsPermissionRow(
-                        Icons.Outlined.Sync,
-                        "发出的消息",
-                        if (permissions.outgoingAccessibility) "辅助功能已开启" else "未开启辅助功能",
-                    ) {
-                        context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                    }
-                }
-            }
-            item {
-                Text(
-                    "模型数据发送",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = ZhiBanTextSecondary,
-                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.Xs, vertical = ZhiBanSpacing.Sm),
-                )
-            }
-            item {
-                SettingsCard {
-                    SettingsToggleRow(
-                        title = "使用脱敏后的个人资料",
-                        subtitle = "脱敏后发送",
-                        checked = outboundState.allowRedactedAutomaticPersonalContext,
-                        onCheckedChange = outboundViewModel::setAllowRedactedAutomaticPersonalContext,
-                    )
-                    Divider()
-                    SettingsToggleRow(
-                        title = "允许语音识别上云",
-                        subtitle = "仅主动录音",
-                        checked = outboundState.allowCloudSpeech,
-                        onCheckedChange = { enabled ->
-                            if (enabled) {
-                                pendingOutboundConsent = OutboundConsentType.CLOUD_SPEECH
-                            } else {
-                                outboundViewModel.setAllowCloudSpeech(false)
-                            }
-                        },
-                    )
-                    Divider()
-                    SettingsToggleRow(
-                        title = "允许远程外部工具",
-                        subtitle = "逐次确认",
-                        checked = outboundState.allowRemoteMcp,
-                        onCheckedChange = { enabled ->
-                            if (enabled) {
-                                pendingOutboundConsent = OutboundConsentType.REMOTE_MCP
-                            } else {
-                                outboundViewModel.setAllowRemoteMcp(false)
-                            }
-                        },
-                    )
-                    Divider()
-                    SettingsToggleRow(
-                        title = "允许远程语义检索",
-                        subtitle = "当前未启用",
-                        checked = outboundState.allowRemoteEmbedding,
-                        onCheckedChange = { enabled ->
-                            if (enabled) {
-                                pendingOutboundConsent = OutboundConsentType.REMOTE_EMBEDDING
-                            } else {
-                                outboundViewModel.setAllowRemoteEmbedding(false)
-                            }
-                        },
-                    )
+                    SettingsRow("语音输入", if (outboundState.allowCloudSpeech) "可用 · 仅主动使用时处理" else "首次使用时开启")
                     Divider()
                     SettingsRow(
-                        "发送与拦截记录",
+                        "隐私保护记录",
                         "${outboundState.auditCount} 次 · 已拦截 ${outboundState.blockedCount} 次 · 已脱敏 ${outboundState.redactedCount} 条",
                     )
                     if (outboundState.auditCount > 0) {
@@ -401,44 +315,9 @@ fun PrivacySecurityPage(
             }
         }
     }
-    pendingOutboundConsent?.let { consent ->
-        ZhiBanAlertDialog(
-            onDismissRequest = { pendingOutboundConsent = null },
-            title = { Text(consent.title) },
-            text = { Text(consent.description) },
-            confirmButton = {
-                TextButton(onClick = {
-                    when (consent) {
-                        OutboundConsentType.CLOUD_SPEECH -> outboundViewModel.setAllowCloudSpeech(true)
-                        OutboundConsentType.REMOTE_MCP -> outboundViewModel.setAllowRemoteMcp(true)
-                        OutboundConsentType.REMOTE_EMBEDDING -> outboundViewModel.setAllowRemoteEmbedding(true)
-                    }
-                    pendingOutboundConsent = null
-                }) { Text("同意开启") }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingOutboundConsent = null }) { Text("取消") }
-            },
-        )
-    }
 }
 
-private enum class OutboundConsentType(val title: String, val description: String) {
-    CLOUD_SPEECH(
-        "允许语音识别上云？",
-        "开启后，你主动录制的语音会发送给当前 AI 服务用于转写或实时对话。每次发送只记录时间、类别和大小，不保存语音原文。",
-    ),
-    REMOTE_MCP(
-        "允许远程外部工具？",
-        "开启后，只有经你当次确认的工具参数才会发送给已配置的 MCP 服务。连接服务不会获得整个联系人库或日历。",
-    ),
-    REMOTE_EMBEDDING(
-        "允许远程语义检索？",
-        "开启只为未来的远程向量服务预留授权。当前生产链路仍使用本机检索；电话、邮箱、证件号、凭据和 SENSITIVE 内容仍会强制阻断。",
-    ),
-}
-
-/** 隐私页"数据发送范围"总览：每类数据是否发送给模型 + 一句话说明。 */
+/** Stable outbound privacy contract used by policy regression tests; not rendered as a technical settings table. */
 internal enum class DataSendScope(val dataType: String, val isSent: Boolean, val note: String) {
     CONTACT_IDENTITY("联系人资料（脱敏）", true, "脱敏后发送，用于识别和称呼"),
     DIRECT_IDENTIFIER("手机号与邮箱", false, "始终脱敏，不会原样发送"),
@@ -448,26 +327,6 @@ internal enum class DataSendScope(val dataType: String, val isSent: Boolean, val
     ;
 
     val statusLabel: String get() = if (isSent) "发送" else "不发送"
-}
-
-@Composable
-private fun DataSendScopeRow(scope: DataSendScope) {
-    Row(
-        Modifier.fillMaxWidth().defaultMinSize(minHeight = ZhiBanSize.ListRow).padding(vertical = ZhiBanSpacing.Md),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            scope.dataType,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Text(
-            scope.statusLabel,
-            style = MaterialTheme.typography.labelMedium,
-            color = if (scope.isSent) ZhiBanTerracotta else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
 }
 
 @HiltViewModel
@@ -516,8 +375,8 @@ fun NotificationSettingsPage(onBack: () -> Unit, categoryViewModel: Notification
             SettingsCard {
                 SettingsPermissionRow(
                     Icons.Outlined.NotificationsNone,
-                    "允许知伴发送通知",
-                    if (notificationsGranted) "已允许" else "未允许",
+                    "系统通知",
+                    if (notificationsGranted) "已开启 · 点击管理" else "未开启 · 点击允许",
                 ) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !notificationsGranted) {
                         permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -529,14 +388,6 @@ fun NotificationSettingsPage(onBack: () -> Unit, categoryViewModel: Notification
                         )
                     }
                 }
-                Divider()
-                SettingsActionRow("打开系统通知设置", onClick = {
-                    context.startActivity(
-                        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                        },
-                    )
-                })
             }
             Text(
                 "通知分类",
@@ -565,6 +416,9 @@ fun StorageSettingsPage(onBack: () -> Unit) {
     var cacheBytes by remember { mutableLongStateOf(regenerableCacheSize(context.cacheDir)) }
     var confirmClear by remember { mutableStateOf(false) }
     val databaseBytes = remember { agentDatabaseSize(context) }
+    val fileBytes = remember { directorySize(context.filesDir) }
+    val totalBytes = databaseBytes + fileBytes + cacheBytes
+    val privateDirectory = remember { context.filesDir.parentFile?.absolutePath ?: context.filesDir.absolutePath }
     SettingsPageFrame("存储", onBack) {
         Column(
             Modifier
@@ -575,7 +429,22 @@ fun StorageSettingsPage(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
         ) {
             SettingsCard {
-                SettingsRow("知伴数据", formatBytes(databaseBytes))
+                SettingsRow("保存位置", "本机 · 知伴应用专属空间")
+                Divider()
+                SettingsRow("应用专属目录", privateDirectory)
+            }
+            Text(
+                "占用空间",
+                style = MaterialTheme.typography.labelMedium,
+                color = ZhiBanTextSecondary,
+                modifier = Modifier.padding(horizontal = ZhiBanSpacing.Xs),
+            )
+            SettingsCard {
+                SettingsRow("共计", formatBytes(totalBytes))
+                Divider()
+                SettingsRow("联系人、日程与对话", formatBytes(databaseBytes))
+                Divider()
+                SettingsRow("附件与导出文件", formatBytes(fileBytes))
                 Divider()
                 SettingsRow("临时文件", formatBytes(cacheBytes))
                 Divider()
@@ -1040,6 +909,8 @@ private fun Divider() {
 
 private data class PermissionStatus(val isGranted: Boolean) {
     val label: String get() = if (isGranted) "已允许" else "未允许"
+
+    fun withPurpose(purpose: String): String = "$label · $purpose"
 }
 
 private data class PermissionSnapshot(

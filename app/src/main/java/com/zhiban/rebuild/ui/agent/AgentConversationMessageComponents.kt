@@ -22,26 +22,21 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Undo
-import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.IosShare
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.ThumbDown
-import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -72,6 +67,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanHeaderIconAction
+import com.zhiban.rebuild.ui.icons.ReplyGlyph
+import com.zhiban.rebuild.ui.icons.ZhiBanReplyIcon
 import com.zhiban.rebuild.ui.theme.*
 import kotlin.math.abs
 import kotlin.math.sin
@@ -312,12 +309,12 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         if (state.canUndo) {
-                            ReplyAction(Icons.AutoMirrored.Outlined.Undo, "撤销刚才的更改", onClick = onUndo)
+                            ReplyVectorAction(Icons.AutoMirrored.Outlined.Undo, "撤销刚才的更改", onClick = onUndo)
                         }
-                        ReplyAction(Icons.Outlined.ContentCopy, "复制", onClick = onCopyAssistant)
+                        ReplyAction(ReplyGlyph.COPY, "复制", onClick = onCopyAssistant)
                         if (feedbackEnabled) {
                             ReplyAction(
-                                icon = Icons.Outlined.ThumbUp,
+                                glyph = ReplyGlyph.POSITIVE,
                                 label = "有帮助",
                                 selected = feedbackSelection == true,
                                 enabled = feedbackSelection == null,
@@ -328,7 +325,7 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
                                 }
                             }
                             ReplyAction(
-                                icon = Icons.Outlined.ThumbDown,
+                                glyph = ReplyGlyph.NEGATIVE,
                                 label = "需改进",
                                 selected = feedbackSelection == false,
                                 enabled = feedbackSelection == null,
@@ -339,8 +336,8 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
                                 }
                             }
                         }
-                        ReplyAction(Icons.AutoMirrored.Outlined.VolumeUp, "朗读", onClick = onReadAssistant)
-                        ReplyAction(Icons.Outlined.IosShare, "分享", onClick = onShareAssistant)
+                        ReplyAction(ReplyGlyph.SPEAK, "朗读", onClick = onReadAssistant)
+                        ReplyAction(ReplyGlyph.SHARE, "分享", onClick = onShareAssistant)
                     }
                 }
             }
@@ -414,27 +411,37 @@ private fun GeneratedArtifactsCard(artifacts: List<AgentArtifactUi>) {
 }
 
 @Composable
-private fun ReplyAction(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    selected: Boolean = false,
-    enabled: Boolean = true,
-    onClick: () -> Unit,
-) {
+private fun ReplyAction(glyph: ReplyGlyph, label: String, selected: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
     IconButton(
         onClick = onClick,
         enabled = enabled || selected,
         modifier = Modifier.size(ZhiBanIconContainer.TouchTarget),
     ) {
+        val tint = when {
+            selected -> AgentAccent
+            enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .68f)
+            else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .30f)
+        }
+        ZhiBanReplyIcon(
+            glyph = glyph,
+            label = label,
+            color = tint,
+            modifier = Modifier.size(17.dp),
+        )
+    }
+}
+
+@Composable
+private fun ReplyVectorAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier.size(ZhiBanIconContainer.TouchTarget),
+    ) {
         Icon(
-            icon,
-            label,
-            tint = when {
-                selected -> AgentAccent
-                enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .68f)
-                else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .30f)
-            },
-            modifier = Modifier.size(ZhiBanIconSize.Inline),
+            imageVector = icon,
+            contentDescription = label,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .68f),
+            modifier = Modifier.size(17.dp),
         )
     }
 }

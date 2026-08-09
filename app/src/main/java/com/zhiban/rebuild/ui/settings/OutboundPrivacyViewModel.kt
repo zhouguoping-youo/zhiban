@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 
 data class OutboundPrivacyState(
     val allowRedactedAutomaticPersonalContext: Boolean = true,
-    val allowCloudSpeech: Boolean = false,
+    val allowCloudSpeech: Boolean = true,
     val allowRemoteMcp: Boolean = false,
     val allowRemoteEmbedding: Boolean = false,
     val auditCount: Int = 0,

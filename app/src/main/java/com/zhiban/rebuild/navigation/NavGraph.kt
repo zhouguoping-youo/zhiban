@@ -199,8 +199,6 @@ fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L
             composable<PrivacySecurity> {
                 PrivacySecurityPage(
                     onBack = { navController.popBackStack() },
-                    onOpenMemory = { navController.navigate(MemoryConfig) },
-                    onOpenTools = { navController.navigate(AgentTools) },
                 )
             }
             composable<StorageSettings> { StorageSettingsPage(onBack = { navController.popBackStack() }) }

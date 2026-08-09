@@ -42,8 +42,8 @@ class AgentSettingsNavigationE2ETest {
             "对话风格" to "对话风格",
             "工具" to "工具",
             "技能" to "技能",
-            "行为与安全" to "行为与安全",
-            "反馈与改进" to "反馈与改进",
+            "回答方式" to "回答方式",
+            "回答反馈" to "回答反馈",
             "运行记录" to "运行记录",
         ).forEach { (entry, title) ->
             compose.onNodeWithText(entry).performScrollTo().performClick()
@@ -125,5 +125,46 @@ class AgentSettingsNavigationE2ETest {
         )
         compose.activity.getSharedPreferences("theme_preference", android.content.Context.MODE_PRIVATE)
             .edit().clear().commit()
+    }
+
+    @Test fun settingsPrioritizeUsefulPermissionsAndRemoveTechnicalDuplicates() {
+        compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("我的").performClick()
+
+        compose.onNodeWithText("通知").performScrollTo().performClick()
+        compose.onNodeWithText("系统通知").assertIsDisplayed()
+        compose.onNodeWithText("打开系统通知设置").assertDoesNotExist()
+        compose.onNodeWithContentDescription("返回").performClick()
+
+        compose.onNodeWithText("隐私与权限").performScrollTo().performClick()
+        compose.onNodeWithText("让知伴更好用").assertIsDisplayed()
+        compose.onNodeWithText("联系人").assertIsDisplayed()
+        compose.onNodeWithText("日历").assertIsDisplayed()
+        compose.onNodeWithText("数据发送范围").assertDoesNotExist()
+        compose.onNodeWithText("模型数据发送").assertDoesNotExist()
+        compose.onNodeWithText("允许远程语义检索").assertDoesNotExist()
+        compose.onNodeWithContentDescription("返回").performClick()
+
+        compose.onNodeWithText("存储").performScrollTo().performClick()
+        compose.onNodeWithText("保存位置").assertIsDisplayed()
+        compose.onNodeWithText("应用专属目录").assertIsDisplayed()
+        compose.onNodeWithText("共计").assertIsDisplayed()
+    }
+
+    @Test fun answerModesExplainTheirRealRuntimeTradeoffs() {
+        compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("我的").performClick()
+        compose.onNodeWithText("智能体设置").performClick()
+        compose.onNodeWithText("回答方式").performScrollTo().performClick()
+
+        compose.onNodeWithText("简单问答 · 检索更少，响应更快").assertIsDisplayed()
+        compose.onNodeWithText("日常任务 · 自动平衡速度与信息量").assertIsDisplayed()
+        compose.onNodeWithText("复杂问题 · 检索更多上下文，耗时更长").assertIsDisplayed().performClick()
+        assert(
+            compose.activity.getSharedPreferences("agent_controls", android.content.Context.MODE_PRIVATE)
+                .getString("execution_preference", null) == "DEEP",
+        )
     }
 }

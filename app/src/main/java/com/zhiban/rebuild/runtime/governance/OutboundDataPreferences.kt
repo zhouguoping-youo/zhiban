@@ -15,7 +15,9 @@ class OutboundDataPreferences @Inject constructor(@ApplicationContext context: C
             KEY_ALLOW_REDACTED_AUTOMATIC_PERSONAL_CONTEXT,
             true,
         ),
-        allowCloudSpeech = preferences.getBoolean(KEY_ALLOW_CLOUD_SPEECH, false),
+        // Cloud speech is only invoked after an explicit user action (voice input or call note).
+        // Keep it ready by default so the feature does not fail behind a technical setting.
+        allowCloudSpeech = preferences.getBoolean(KEY_ALLOW_CLOUD_SPEECH, true),
         allowRemoteMcp = preferences.getBoolean(KEY_ALLOW_REMOTE_MCP, false),
         allowRemoteEmbedding = preferences.getBoolean(KEY_ALLOW_REMOTE_EMBEDDING, false),
     )
