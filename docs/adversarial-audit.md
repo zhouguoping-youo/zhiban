@@ -84,7 +84,7 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | 4.1 | 合并联系人撤销图谱恢复 | ⬜ | | | | |
 | 4.2 | 软删联系人后 Fact/关系/活动清理 | ⬜ | | | | |
 | 4.3 | 通讯录导入重复联系人重复条目 | ⬜ | | | | |
-| 4.4 | 智能完善建议过期后能否确认 | ⬜ | | | | |
+| 4.4 | 智能完善建议过期后能否确认 | ✅ | 数据完整性 | 确认入口曾直接使用 UI 传回的候选对象，不回读状态/有效期；候选被清理后旧页面仍能写联系人，调用方还能替换 proposedValue。现事务内回读持久候选，只接受未过期 PENDING，并检查资料写与状态转换结果 | 本提交 `fix(4.4)` | `ContactEnrichmentConfirmTest.staleUiCannotApplyExpiredOrPurgedEnrichment`、`confirmUsesPersistedCandidateInsteadOfCallerModifiedPayload` + 既有确认回归 |
 | 4.5 | 合并后搜索仍显示已合并联系人 | ⬜ | | | | |
 | 4.6 | 编辑后 normalizedValue 更新 | ⬜ | | | | |
 | 4.7 | 删除后 CRM primaryContactId SET_NULL | ⬜ | | | | |

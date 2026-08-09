@@ -91,6 +91,33 @@ class ContactEnrichmentConfirmTest {
         assertEquals(listOf("fresh"), remaining.map { it.candidateId })
     }
 
+    @Test fun staleUiCannotApplyExpiredOrPurgedEnrichment() = runBlocking {
+        db.contactDao().insert(contact(company = null, title = null))
+        val expired = candidate(id = "expired-apply", value = """{"company":"不应写入"}""", expiresAt = 10)
+        repository.stageContactEnrichmentCandidate(expired)
+
+        assertFalse(repository.applyContactEnrichmentCandidate(expired, nowEpochMs = 11))
+        assertNull(db.contactDao().findRawById("c1")!!.company)
+
+        assertEquals(1, db.contactKnowledgeDao().purgeExpiredEnrichment(11))
+        assertFalse(repository.applyContactEnrichmentCandidate(expired, nowEpochMs = 12))
+        assertNull(db.contactDao().findRawById("c1")!!.company)
+    }
+
+    @Test fun confirmUsesPersistedCandidateInsteadOfCallerModifiedPayload() = runBlocking {
+        db.contactDao().insert(contact(company = null, title = null))
+        val persisted = candidate(value = """{"company":"可信候选"}""")
+        repository.stageContactEnrichmentCandidate(persisted)
+
+        assertTrue(
+            repository.applyContactEnrichmentCandidate(
+                persisted.copy(proposedValueJson = """{"company":"调用方篡改"}"""),
+                nowEpochMs = 10,
+            ),
+        )
+        assertEquals("可信候选", db.contactDao().findRawById("c1")!!.company)
+    }
+
     private fun contact(company: String?, title: String?) = ContactEntity(
         "c1", "张三", "张三", null, null, null, company, title, "[]", "[]", null, null, "USER", null, 1, 2,
     )

@@ -783,11 +783,18 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
      * applied; resolves the candidate regardless so it leaves the pending list. Returns true when a
      * field was written.
      */
-    suspend fun applyContactEnrichmentCandidate(candidate: ContactEnrichmentCandidateEntity): Boolean {
-        val contactId = candidate.contactId ?: return false
+    suspend fun applyContactEnrichmentCandidate(candidate: ContactEnrichmentCandidateEntity, nowEpochMs: Long = System.currentTimeMillis()): Boolean {
         return database.withTransaction {
+            val persisted = database.contactKnowledgeDao().findEnrichmentCandidate(candidate.candidateId)
+                ?: return@withTransaction false
+            if (persisted.status != "PENDING" ||
+                persisted.expiresAtEpochMs?.let { it <= nowEpochMs } == true
+            ) {
+                return@withTransaction false
+            }
+            val contactId = persisted.contactId ?: return@withTransaction false
             val contact = database.contactDao().findRawById(contactId) ?: return@withTransaction false
-            val patch = enrichmentProfilePatch(candidate.fieldKind, candidate.proposedValueJson) ?: emptyMap()
+            val patch = enrichmentProfilePatch(persisted.fieldKind, persisted.proposedValueJson) ?: emptyMap()
             var applied = false
             var updated = contact
             for ((field, value) in patch) {
@@ -812,12 +819,14 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
                 }
             }
             if (applied) {
-                database.contactDao().update(updated.copy(updatedAtEpochMs = System.currentTimeMillis()))
+                check(database.contactDao().update(updated.copy(updatedAtEpochMs = nowEpochMs)) == 1)
             }
-            database.contactKnowledgeDao().resolveEnrichmentCandidate(
-                candidateId = candidate.candidateId,
-                status = "APPROVED",
-                nowEpochMs = System.currentTimeMillis(),
+            check(
+                database.contactKnowledgeDao().resolveEnrichmentCandidate(
+                    candidateId = persisted.candidateId,
+                    status = "APPROVED",
+                    nowEpochMs = nowEpochMs,
+                ) == 1,
             )
             applied
         }
