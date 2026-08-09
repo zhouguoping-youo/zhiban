@@ -11,6 +11,7 @@ import com.zhiban.rebuild.runtime.provider.ProviderAdapter
 import com.zhiban.rebuild.runtime.provider.ProviderProfileStore
 import kotlinx.coroutines.flow.collect
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -110,17 +111,18 @@ class LlmContactEnrichmentProvider(private val provider: ProviderAdapter, privat
 
     /** Parses the model JSON array, keeping only approved fields with valid shape and confidence. */
     private fun parseSuggestions(raw: String, approved: Set<ContactEnrichmentField>, now: Long, expiresAt: Long): List<ContactEnrichmentSuggestion> {
-        val trimmed = raw.substringAfter('[').substringBeforeLast(']').let { "[$it]" }
-        val array = runCatching { json.parseToJsonElement(trimmed).jsonArray }.getOrElse {
-            error("ENRICHMENT_OUTPUT_INVALID_JSON")
-        }
+        val firstBracket = raw.indexOf('[')
+        val lastBracket = raw.lastIndexOf(']')
+        if (firstBracket < 0 || lastBracket < firstBracket) return emptyList()
+        val array = runCatching { json.parseToJsonElement(raw.substring(firstBracket, lastBracket + 1)).jsonArray }
+            .getOrNull() ?: return emptyList()
         return array.mapNotNull { element ->
             val obj = element as? JsonObject ?: return@mapNotNull null
-            val field = obj["field"]?.jsonPrimitive?.content?.toField() ?: return@mapNotNull null
+            val field = (obj["field"] as? JsonPrimitive)?.content?.toField() ?: return@mapNotNull null
             if (field !in approved) return@mapNotNull null
-            val value = obj["value"]?.jsonObject ?: return@mapNotNull null
+            val value = obj["value"] as? JsonObject ?: return@mapNotNull null
             if (value.isEmpty()) return@mapNotNull null
-            val confidence = obj["confidence"]?.jsonPrimitive?.doubleOrNull ?: return@mapNotNull null
+            val confidence = (obj["confidence"] as? JsonPrimitive)?.doubleOrNull ?: return@mapNotNull null
             if (confidence < MIN_CONFIDENCE || confidence > 1.0) return@mapNotNull null
             ContactEnrichmentSuggestion(
                 field = field,

@@ -100,6 +100,21 @@ class LlmContactEnrichmentProviderTest {
         assertEquals(ContactEnrichmentField.EMPLOYMENT, out[0].field)
     }
 
+    @Test
+    fun `malformed model output is ignored instead of crashing enrichment`() = runBlocking {
+        val malformedOutputs = listOf(
+            "not-json",
+            "{\"field\":\"ORGANIZATION\"}",
+            "[{\"field\":{},\"value\":[],\"confidence\":\"high\"}]",
+            "[broken]",
+        )
+
+        malformedOutputs.forEach { reply ->
+            val subject = LlmContactEnrichmentProvider(RecordingAdapter(reply), FixedProfileStore())
+            assertTrue(subject.suggest(request()).isEmpty())
+        }
+    }
+
     private fun request(
         approved: Set<ContactEnrichmentField> = setOf(ContactEnrichmentField.ORGANIZATION),
         companyHint: String? = null,
