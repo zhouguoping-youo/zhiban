@@ -171,18 +171,18 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 ## 维度 10 · 网络与 Provider
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
 |---|---|---|---|---|---|---|
-| 10.1 | StepFun 超时卡住 | ⬜ | | | | |
-| 10.2 | 返回错误码显示错误不崩溃 | ⬜ | | | | |
-| 10.3 | 返回非法 JSON 崩溃 | ⬜ | | | | |
-| 10.4 | 返回空响应显示空不崩溃 | ⬜ | | | | |
-| 10.5 | 网络断开离线提示 | ⬜ | | | | |
-| 10.6 | 网络恢复自动重试 | ⬜ | | | | |
-| 10.7 | API Key 过期明确提示 | ⬜ | | | | |
+| 10.1 | StepFun 超时卡住 | ⚪ | — | 主推理同时受总超时（默认 120 秒、弱网 15 秒）与逐事件空闲超时（默认 30 秒）约束；超时主动取消 Provider 请求并落 `TIMEOUT/FAILED_RETRYABLE`，不会永久卡住，租约心跳期间仍能安全写终态 | 审计提交 | `RuntimeInputProcessorTest.stalledProviderTimesOutWhileLeaseHeartbeatKeepsSafeFailureWritable` |
+| 10.2 | 返回错误码显示错误不崩溃 | ⚪ | — | HTTP 401/403、408、429、5xx 及阶跃业务错误均在 Provider 边界映射为固定安全码；响应 message 不进入 UI，映射器给出中文可操作提示 | 审计提交 | `ProviderModuleTest.probeStreamSchemaUsageAndErrorMapping` + `stepFunHttpErrorsMapSafeRequestId` + `standardCompatibleProviderErrorsAreMappedWithoutExposingMessages` + `AgentProjectionUiMapperTest.failure taxonomy maps to actionable safe Chinese messages` |
+| 10.3 | 返回非法 JSON 崩溃 | ⚪ | — | 非法 SSE JSON 块被忽略，工具参数 JSON 则 fail-closed 为 `INVALID_TOOL_ARGUMENTS`；流结束却无合法 Final 时转为 `PROVIDER_STREAM_INCOMPLETE`，不会把外部异常或原文抛到 UI | 审计提交 | `ProviderModuleTest.invalidOrOversizedToolArgumentsFailClosed` + Provider 解析边界代码审查 |
+| 10.4 | 返回空响应显示空不崩溃 | ⚪ | — | 无 Final 的空流转为 `PROVIDER_STREAM_INCOMPLETE`；有 Final 但正文为空转为 `EMPTY_RESPONSE`，投影层显示“AI 没有返回内容”，不会渲染空白成功态 | 审计提交 | `AgentProjectionUiMapperTest.failure taxonomy maps to actionable safe Chinese messages` + `ProviderExecutionEngine.consumeReActStream` 终态审查 |
+| 10.5 | 网络断开离线提示 | ⚪ | — | 网络预检在 Provider 调用前把离线映射为 `NETWORK_OFFLINE`；UI 明确说明仍可查看本地日程、联系人和记忆，并提供联网后重试语义 | 审计提交 | `RuntimeInputProcessorTest.weakNetworkSkipsVectorAndRerankWhileExtremeNetworkFailsBeforeProvider` + `AgentProjectionUiMapperTest.failure taxonomy maps to actionable safe Chinese messages` |
+| 10.6 | 网络恢复自动重试 | ⚪ | — | 瞬态失败只在尚未收到首个流事件时按 1s/2s 有界退避重试；一旦已有正文绝不自动重放，避免重复内容/工具调用。恢复超出该窗口后由 `FAILED_RETRYABLE` 的显式重试入口继续，不做无限后台重试 | 审计提交 | `ResilientProviderAdapterTest.probeRetriesTransientFailuresWithBoundedBackoff` + `streamRetriesOnlyBeforeFirstEvent` |
+| 10.7 | API Key 过期明确提示 | ⚪ | — | HTTP 401/403 与兼容服务鉴权错误统一映射 `AUTHENTICATION_FAILED`（不可重试），UI 明确引导检查大模型连接设置且开启凭据缺失入口 | 审计提交 | `ProviderModuleTest.stepFunHttpErrorsMapSafeRequestId` + `AgentProjectionUiMapperTest.failure taxonomy maps to actionable safe Chinese messages` |
 | 10.8 | 证书锁定失败明确提示 | ✅ | 功能不可用/安全 | TLS 主机或 SPKI 校验失败原先作为普通 IOException 重试，最终只显示网络不可用；Provider 传输边界现映射为不可重试的 `TLS_VERIFICATION_FAILED`，运行记录保留固定码，UI 明确提示安全连接验证失败且不泄露证书细节 | 本提交 `fix(10.8)` | `ProviderModuleTest.tlsVerificationFailureIsSafeAndNeverRetryableForProbeOrStream` + `AgentProjectionUiMapperTest.failure taxonomy maps to actionable safe Chinese messages` |
-| 10.9 | 流式中断显示已接收部分 | ⬜ | | | | |
-| 10.10 | 流式重复去重 | ⬜ | | | | |
-| 10.11 | 响应>100KB OOM | ⬜ | | | | |
-| 10.12 | 响应特殊字符崩溃 | ⬜ | | | | |
+| 10.9 | 流式中断显示已接收部分 | ⚪ | — | 每个 Delta 到达即独立写事件日志，失败终态不会删除既有 Delta；投影仍以 `assistantText` 展示已收正文，并保留失败提示。重连还能从 journal 回填正文 | 审计提交 | `GatewayRuntimeUiClientTest.reconnect backfills assistant body from journal when snapshot skipped the deltas` + `AgentSessionReducerTest.assistant deltas merge once by attempt and ordinal then finalize` |
+| 10.10 | 流式重复去重 | ⚪ | — | Provider 为事件分配单调 ordinal，Usage/Final 各最多发一次；投影以 `attemptId:ordinal` 去重，同一序号重放不会重复拼正文，不同重试 attempt 仍隔离 | 审计提交 | `ProviderModuleTest.usageAndFinalAreEmittedAtMostOnce` + `AgentSessionReducerTest.assistant deltas merge once by attempt and ordinal then finalize` |
+| 10.11 | 响应>100KB OOM | ⚪ | — | 模型列表上限 256KiB、单 SSE 帧 64KiB、整条流 4MiB；读取前/逐行累计检查，越界先取消 Call 再返回固定失败码。100KiB 多帧合法回复不会一次性聚合进内存，超限也不会无界增长 | 审计提交 | `ProviderModuleTest.oversizedModelsBodyAndSseFrameCancelBeforeUnboundedRead` + Provider 总流量上限代码审查 |
+| 10.12 | 响应特殊字符崩溃 | ⚪ | — | 请求/响应均由 kotlinx.serialization JSON 处理 UTF-8；中文和 emoji 的 token 上限按 Unicode 安全路径 fail-closed，SSE 文本由 `JsonPrimitive.content` 解码，不手拼/二次解析可见正文 | 审计提交 | `ProviderModuleTest.outputLimitAndTotalContextFailClosed` + `probeStreamSchemaUsageAndErrorMapping` |
 
 ## 维度 11 · 权限与隐私
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
