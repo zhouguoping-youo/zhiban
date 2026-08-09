@@ -134,7 +134,7 @@ class CrmAgentSuggestionChainTest {
         db.contactDao().insert(contact("c1", "高置信联系人"))
         insertCandidate("cand-1", "c1", 0.9)
 
-        val created = repo.suggestNewLeadFromNotification("c1", "cand-1", confidence = 0.9, nowEpochMs = 1_000L)
+        val created = repo.suggestNewLeadFromNotification("c1", "cand-1", nowEpochMs = 1_000L)
 
         assertTrue(created)
         val suggestion = db.crmDao().observePendingSuggestions(0.0).first().single()
@@ -150,8 +150,8 @@ class CrmAgentSuggestionChainTest {
         db.contactDao().insert(contact("c2", "联系人二"))
         insertCandidate("cand-mismatch", "c2", 0.9)
 
-        assertTrue(!repo.suggestNewLeadFromNotification("c1", "missing", confidence = 0.9, nowEpochMs = 1_000L))
-        assertTrue(!repo.suggestNewLeadFromNotification("c1", "cand-mismatch", confidence = 0.9, nowEpochMs = 1_000L))
+        assertTrue(!repo.suggestNewLeadFromNotification("c1", "missing", nowEpochMs = 1_000L))
+        assertTrue(!repo.suggestNewLeadFromNotification("c1", "cand-mismatch", nowEpochMs = 1_000L))
         assertEquals(0, db.crmDao().observePendingSuggestions(0.0).first().size)
     }
 
@@ -160,7 +160,7 @@ class CrmAgentSuggestionChainTest {
         val candidateId = "cand-\"quoted"
         insertCandidate(candidateId, "c1", 0.9)
 
-        assertTrue(repo.suggestNewLeadFromNotification("c1", candidateId, confidence = 0.9, nowEpochMs = 1_000L))
+        assertTrue(repo.suggestNewLeadFromNotification("c1", candidateId, nowEpochMs = 1_000L))
 
         val evidence = db.crmDao().observePendingSuggestions(0.0).first().single().evidenceRefsJson
         assertEquals(candidateId, Json.parseToJsonElement(evidence).jsonArray.single().jsonPrimitive.content)
@@ -170,9 +170,17 @@ class CrmAgentSuggestionChainTest {
         db.contactDao().insert(contact("c1", "联系人"))
         insertCandidate("cand-1", "c1", 0.5)
 
-        val created = repo.suggestNewLeadFromNotification("c1", "cand-1", confidence = 0.5, nowEpochMs = 1_000L)
+        val created = repo.suggestNewLeadFromNotification("c1", "cand-1", nowEpochMs = 1_000L)
 
         assertTrue(!created)
+        assertEquals(0, db.crmDao().observePendingSuggestions(0.0).first().size)
+    }
+
+    @Test fun newLeadSuggestionRejectsOutOfRangeConfidence() = runBlocking {
+        db.contactDao().insert(contact("c1", "联系人"))
+        insertCandidate("cand-overflow", "c1", 1.1)
+
+        assertTrue(!repo.suggestNewLeadFromNotification("c1", "cand-overflow", nowEpochMs = 1_000L))
         assertEquals(0, db.crmDao().observePendingSuggestions(0.0).first().size)
     }
 
@@ -181,7 +189,7 @@ class CrmAgentSuggestionChainTest {
         db.crmDao().insertLead(existingLead("lead-1", "c1"))
         insertCandidate("cand-1", "c1", 0.9)
 
-        val created = repo.suggestNewLeadFromNotification("c1", "cand-1", confidence = 0.9, nowEpochMs = 1_000L)
+        val created = repo.suggestNewLeadFromNotification("c1", "cand-1", nowEpochMs = 1_000L)
 
         assertTrue(!created)
     }
@@ -240,7 +248,7 @@ class CrmAgentSuggestionChainTest {
     @Test fun acceptNewLeadWritesUndoableLead() = runBlocking {
         db.contactDao().insert(contact("c1", "新线索联系人"))
         insertCandidate("cand-1", "c1", 0.9)
-        repo.suggestNewLeadFromNotification("c1", "cand-1", confidence = 0.9, nowEpochMs = 1_000L)
+        repo.suggestNewLeadFromNotification("c1", "cand-1", nowEpochMs = 1_000L)
         val suggestion = db.crmDao().observePendingSuggestions(0.0).first().single()
 
         val accepted = repo.acceptNewLeadSuggestion(suggestion.suggestionId, nowEpochMs = 2_000L)
@@ -260,7 +268,7 @@ class CrmAgentSuggestionChainTest {
     @Test fun undoAcceptedNewLeadRestoresPendingAndDeletesLead() = runBlocking {
         db.contactDao().insert(contact("c1", "新线索联系人"))
         insertCandidate("cand-1", "c1", 0.9)
-        repo.suggestNewLeadFromNotification("c1", "cand-1", confidence = 0.9, nowEpochMs = 1_000L)
+        repo.suggestNewLeadFromNotification("c1", "cand-1", nowEpochMs = 1_000L)
         val suggestion = db.crmDao().observePendingSuggestions(0.0).first().single()
         repo.acceptNewLeadSuggestion(suggestion.suggestionId, nowEpochMs = 2_000L)
         val change = db.changeLogDao().findByIdempotencyKey("crm-suggestion-accept:${suggestion.suggestionId}")!!

@@ -115,7 +115,7 @@ class AgentDataRepository internal constructor(
         daos.notificationCandidateDao.upsert(enriched)
         // High-confidence contact match: offer a CRM new-lead suggestion (user confirms; nothing auto-written).
         enriched.suggestedContactId?.let { matchedContactId ->
-            crm.suggestNewLeadFromNotification(matchedContactId, enriched.candidateId, enriched.suggestedContactConfidence, nowEpochMs)
+            crm.suggestNewLeadFromNotification(matchedContactId, enriched.candidateId, nowEpochMs)
         }
         daos.notificationCandidateDao.clearExpiredOrDismissed(
             nowEpochMs - 30L * 24 * 60 * 60 * 1_000,
@@ -567,12 +567,8 @@ class AgentDataRepository internal constructor(
     ): Boolean = crm.suggestCallFollowUpActivity(contactId, callRecordId, durationSeconds, nowEpochMs)
     suspend fun acceptCallFollowUpSuggestion(suggestionId: String, nowEpochMs: Long = System.currentTimeMillis()): Boolean =
         crm.acceptCallFollowUpSuggestion(suggestionId, nowEpochMs)
-    suspend fun suggestNewLeadFromNotification(
-        contactId: String,
-        candidateId: String,
-        confidence: Double,
-        nowEpochMs: Long = System.currentTimeMillis(),
-    ): Boolean = crm.suggestNewLeadFromNotification(contactId, candidateId, confidence, nowEpochMs)
+    suspend fun suggestNewLeadFromNotification(contactId: String, candidateId: String, nowEpochMs: Long = System.currentTimeMillis()): Boolean =
+        crm.suggestNewLeadFromNotification(contactId, candidateId, nowEpochMs)
     suspend fun acceptNewLeadSuggestion(suggestionId: String, nowEpochMs: Long = System.currentTimeMillis()): Boolean =
         crm.acceptNewLeadSuggestion(suggestionId, nowEpochMs)
     suspend fun createLeadForContactIfAbsent(contactId: String, sourceRef: String?, nowEpochMs: Long = System.currentTimeMillis()): String? =

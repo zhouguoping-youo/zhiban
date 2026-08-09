@@ -59,7 +59,7 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | 2.14 | 商机金额分/元混淆 | ✅ | 数据完整性 | 存储和表单换算虽约定最小单位“分”，显示层却把小数位强制为 0，金额会被四舍五入；表单用 Double 还会把 Infinity/溢出值钳成 Long 极值。改为 BigDecimal 精确换算、最多两位小数和 exact Long 边界校验 | 本提交 `fix(2.14)` | `CrmMoneyLogicTest`（分/元显示、精确输入、超精度、Infinity、溢出） |
 | 2.15 | 阶段历史记录完整 | ⬜ | | | | |
 | 2.16 | 建议 evidenceRefs 引用真实数据 | ✅ | 数据完整性 | 通知线索建议曾在通知候选落库前创建，且直接手拼 `candidateId` JSON；内部调用或特殊字符可留下不存在/不可解析的证据引用。现在先在同一事务保存候选，建议创建再校验候选存在且匹配联系人，并用 kotlinx.serialization 生成 evidenceRefs | 本提交 `fix(2.16)` | `CrmAgentSuggestionChainTest.newLeadSuggestionRejectsMissingOrMismatchedEvidence`、`newLeadSuggestionSerializesEvidenceIdAsJson` + 高置信建议回归 |
-| 2.17 | 建议 confidence 保持 0–1 | ⬜ | | | | |
+| 2.17 | 建议 confidence 保持 0–1 | ✅ | 数据完整性 | 通知建议入口只检查下限，允许 `>1`/非有限值落库；同时调用参数可与证据候选自身置信度不一致。现在删除重复参数，以已持久化候选为单源，并在最终写入前强制 `0.7..1.0` 有限范围 | 本提交 `fix(2.17)` | `CrmAgentSuggestionChainTest.newLeadSuggestionRejectsOutOfRangeConfidence` + 高/低置信回归 |
 | 2.18 | 建议过期后是否清理 | ⬜ | | | | |
 | 2.19 | 线索转化后能否再次转化 | ✅ | 数据完整性 | 页面转化会把线索置为 CONVERTED，但 Agent 的 `crm.opportunity.create` 只校验 sourceLeadId 存在，不修改线索状态，也不查已有来源商机；不同工具调用可从同一线索生成多个商机。最终事务现原子校验并标记 CONVERTED，重复转化失败 | 本提交 `fix(2.19)` | `RoomCrmToolExecutorTest.opportunityCreateConvertsSourceLeadAndRejectsASecondConversion` + 8 工具幂等回归 |
 | 2.20 | 商机删除后关联数据级联 | ⬜ | | | | |

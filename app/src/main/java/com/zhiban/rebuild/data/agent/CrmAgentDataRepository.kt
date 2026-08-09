@@ -199,41 +199,38 @@ internal class CrmAgentDataRepository(private val database: AgentDatabase) {
      * true when a suggestion was created; false when the match is too weak, the contact already has
      * a lead, or a NEW_LEAD suggestion is already pending for the contact.
      */
-    suspend fun suggestNewLeadFromNotification(
-        contactId: String,
-        candidateId: String,
-        confidence: Double,
-        nowEpochMs: Long = System.currentTimeMillis(),
-    ): Boolean = database.withTransaction {
-        if (confidence < SUGGESTION_MIN_CONFIDENCE) return@withTransaction false
-        val candidate = database.notificationCandidateDao().find(candidateId) ?: return@withTransaction false
-        if (candidate.suggestedContactId != contactId) return@withTransaction false
-        val contact = database.contactDao().findById(contactId) ?: return@withTransaction false
-        if (database.crmDao().findLeadByContact(contactId) != null) return@withTransaction false
-        if (database.crmDao().hasPendingSuggestionOfTypeForContact(contactId, CrmSuggestionType.NEW_LEAD)) {
-            return@withTransaction false
-        }
-        database.crmDao().upsertSuggestions(
-            listOf(
-                CrmAgentSuggestionEntity(
-                    suggestionId = "sug-${UUID.randomUUID()}",
-                    opportunityId = null,
-                    contactId = contactId,
-                    suggestionType = CrmSuggestionType.NEW_LEAD,
-                    title = "新建线索",
-                    summary = "识别到「${contact.displayName}」的新消息，要不要把 TA 加为线索？".take(200),
-                    rationale = "高置信通知匹配到联系人「${contact.displayName}」（置信度 ${"%.2f".format(confidence)}），TA 还没有线索。".take(500),
-                    evidenceRefsJson = buildJsonArray { add(JsonPrimitive(candidate.candidateId)) }.toString(),
-                    confidence = confidence,
-                    proposedActionJson = null,
-                    status = CrmSuggestionStatus.PENDING,
-                    createdAtEpochMs = nowEpochMs,
-                    updatedAtEpochMs = nowEpochMs,
+    suspend fun suggestNewLeadFromNotification(contactId: String, candidateId: String, nowEpochMs: Long = System.currentTimeMillis()): Boolean =
+        database.withTransaction {
+            val candidate = database.notificationCandidateDao().find(candidateId) ?: return@withTransaction false
+            if (candidate.suggestedContactId != contactId) return@withTransaction false
+            val confidence = candidate.suggestedContactConfidence
+            if (confidence !in SUGGESTION_MIN_CONFIDENCE..1.0) return@withTransaction false
+            val contact = database.contactDao().findById(contactId) ?: return@withTransaction false
+            if (database.crmDao().findLeadByContact(contactId) != null) return@withTransaction false
+            if (database.crmDao().hasPendingSuggestionOfTypeForContact(contactId, CrmSuggestionType.NEW_LEAD)) {
+                return@withTransaction false
+            }
+            database.crmDao().upsertSuggestions(
+                listOf(
+                    CrmAgentSuggestionEntity(
+                        suggestionId = "sug-${UUID.randomUUID()}",
+                        opportunityId = null,
+                        contactId = contactId,
+                        suggestionType = CrmSuggestionType.NEW_LEAD,
+                        title = "新建线索",
+                        summary = "识别到「${contact.displayName}」的新消息，要不要把 TA 加为线索？".take(200),
+                        rationale = "高置信通知匹配到联系人「${contact.displayName}」（置信度 ${"%.2f".format(confidence)}），TA 还没有线索。".take(500),
+                        evidenceRefsJson = buildJsonArray { add(JsonPrimitive(candidate.candidateId)) }.toString(),
+                        confidence = confidence,
+                        proposedActionJson = null,
+                        status = CrmSuggestionStatus.PENDING,
+                        createdAtEpochMs = nowEpochMs,
+                        updatedAtEpochMs = nowEpochMs,
+                    ),
                 ),
-            ),
-        )
-        true
-    }
+            )
+            true
+        }
 
     /** Marks stale PENDING suggestions EXPIRED. Returns the number of rows transitioned. */
     suspend fun expireStaleSuggestions(nowEpochMs: Long = System.currentTimeMillis()): Int =
