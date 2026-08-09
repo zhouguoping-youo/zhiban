@@ -117,22 +117,22 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 ## 维度 7 · 设置链路
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
 |---|---|---|---|---|---|---|
-| 7.1 | 个人资料保存返回数据丢失 | ⬜ | | | | |
-| 7.2 | 智能体档位改后行为真变化 | ⬜ | | | | |
-| 7.3 | 隐私权限关闭后数据仍发送 | ⬜ | | | | |
-| 7.4 | 外观切换主题立即生效 | ⬜ | | | | |
-| 7.5 | 记忆开关关后 Agent 仍读取 | ⬜ | | | | |
-| 7.6 | 对话风格切换回答风格变化 | ⬜ | | | | |
-| 7.7 | 工具开关关后仍调用该工具 | ⬜ | | | | |
-| 7.8 | 技能开关关后仍触发该技能 | ⬜ | | | | |
-| 7.9 | 自动写开关关后仍自动写入 | ⬜ | | | | |
-| 7.10 | 通知分类开关关后仍发送 | ⬜ | | | | |
-| 7.11 | 头像选择后立即显示 | ⬜ | | | | |
-| 7.12 | 多平台账号添加后保存 | ⬜ | | | | |
-| 7.13 | 职业多选后保存 | ⬜ | | | | |
-| 7.14 | 给知伴指令注入 prompt | ⬜ | | | | |
-| 7.15 | API Key 修改后立即生效 | ⬜ | | | | |
-| 7.16 | API Key 删除后显示未配置 | ⬜ | | | | |
+| 7.1 | 个人资料保存返回数据丢失 | ⚪ | — | 未复现：表单校验后一次性写入加密资料库并同步 StateFlow；姓名、联系方式、附加账号、职业和指令均从同一规范化对象回读 | — | `UserProfileStoreTest.mergeMissingIdentityOnlyFillsBlankFields` + `UserProfileTest` |
+| 7.2 | 智能体档位改后行为真变化 | ⚪ | — | 未复现：执行偏好持久化后由 ProviderEngineConfig 每次运行读取；FAST 关闭重排并强制 FTS，DEEP 提升上下文上限 | — | `ExecutionPreferenceConfigTest`、`PlanningStrategyTest.workMapsAllExecutionPreferences` |
+| 7.3 | 隐私权限关闭后数据仍发送 | ⚪ | — | 未复现：ASR、远程 MCP、远程 embedding 和自动检索个人上下文均在最终出站门读取当前设置；关闭时拒绝或省略，且不依赖 UI 状态 | — | `OutboundDataPolicyTest`、`ProviderCloudAsrGatewayTest.cloud speech is blocked without consent`、`McpRemoteEnvironmentTest`、`VolcEmbeddingEnvironmentTest` |
+| 7.4 | 外观切换主题立即生效 | ⚪ | — | 未复现：主题页直接更新应用级 ThemePreference 状态并持久化，根 Compose 观察该状态重组；真机页面切换和回读均通过 | — | `AgentSettingsNavigationE2ETest.appearancePageOffersThreeThemeChoices` + `ThemePreferenceTest` |
+| 7.5 | 记忆开关关后 Agent 仍读取 | ⚪ | — | 未复现：每轮运行动态读取 MemoryPolicy；长期记忆关闭或临时模式时不检索长期记忆，会话记忆关闭时不组装对话上下文，自动记忆工具也被禁用 | — | `RuntimeInputProcessorTest` 关闭会话/长期记忆回归 + `AgentControlStoreTest` |
+| 7.6 | 对话风格切换回答风格变化 | ⚪ | — | 未复现：保存的 ResponseStyle 在每轮组装 personalization 时转为对应 promptFragment；CUSTOM 改用用户资料中的自定义指令 | — | `AgentPersonalizationPageTest.selectingPresetStylePersistsAfterSave` + `ResponseStyleTest` |
+| 7.7 | 工具开关关后仍调用该工具 | ⚪ | — | 未复现：禁用集合持久化；ProviderEngineConfig.toolEnabled 直连 AgentControlStore，工具暴露与执行路由均受同一策略过滤 | — | `AgentControlStoreTest.disabledToolPersistsAndCanBeReenabled` + `AgentSettingsNavigationE2ETest.everyAgentSettingsEntryOpensAndBackReturnsThenToolTogglePersists` |
+| 7.8 | 技能开关关后仍触发该技能 | ⚪ | — | 未复现：每轮只组装 `activeSpecs` 且再经 `isSkillEnabled` 过滤；技能允许的工具集合在最终工具调用前二次校验 | — | `AgentSkillsPageTest.togglingSkillPersistsDisabled` + 最终 `toolAllowlist` 代码审查 |
+| 7.9 | 自动写开关关后仍自动写入 | ⚪ | — | 检查前提不成立：当前产品没有全局自动写开关；只允许五类固定白名单的可逆低风险自动整理，并强制 ChangeLog、可见回执与撤销。不能把不存在的开关当作失效设置 | — | `AutoWriteAtomicityTest`、`ContactTagAutoWriteTest`、`RoomCrmToolExecutorTest` |
+| 7.10 | 通知分类开关关后仍发送 | ⚪ | — | 未复现：实际发送系统通知的日程与通话采集 Worker 均在 notify 前读取持久化分类开关；CRM/AUTO_WRITE 当前没有独立系统通知发送器，不存在绕过发送 | — | `ScheduleReminderPrivacyTest` + 两个 Worker 最终发送点代码审查 + `NotificationCategoryTest` |
+| 7.11 | 头像选择后立即显示 | ⚪ | — | 未复现：选择器返回后后台加密复制并回读字节，成功后同一次 state update 同步 avatarUri/avatarBytes；明文旧头像也会首次读取迁移 | — | `UserProfileStoreTest.avatarIsEncryptedAtRestAndCanBeReadBack`、`legacyPlaintextAvatarMigratesOnFirstRead` |
+| 7.12 | 多平台账号添加后保存 | ⚪ | — | 未复现：飞书/企微/钉钉/QQ 及同平台多账号统一编码进加密资料库，重建表单时去重回读 | — | `UserProfilePageTest.addAccountShowsPlatformPicker` + `UserProfileTest` |
+| 7.13 | 职业多选后保存 | ⚪ | — | 未复现：职业使用 Set 多选、序列化持久化并由同一 profile StateFlow 回读，不会单选覆盖 | — | `UserProfilePageTest.showsProfileSectionsAndOccupationChips` + `UserProfileTest` |
+| 7.14 | 给知伴指令注入 prompt | ⚪ | — | 未复现：用户资料转义并限制长度后写入 user.md，ProviderContextAssembler 作为 PERSONAL/AUTO_RETRIEVED 上下文注入，最终仍经过出站策略 | — | `UserProfileTest.markdownSanitizesCustomInstructionsLineBreaks` + ProviderContextAssembler 代码审查 |
+| 7.15 | API Key 修改后立即生效 | ⚪ | — | 未复现：新凭据先 provision、健康探测成功后原子切换 profile；失败轮换保留旧 profile，不把未验证 key 发布给运行时 | — | `ProviderConfigurationBridgeTest.fiveProviderSwitchPublishesOnlyVerifiedKeyAndFailedRotationKeepsPrevious` |
+| 7.16 | API Key 删除后显示未配置 | ⚪ | — | 未复现：clear 同时删除活动 profile 与凭据，设置页刷新通过 `isConfigured()` 得到 false；运行时也不再可解析旧 credentialRef | — | `ProviderConfigurationManagerTest.clear removes profile and bound credential` |
 
 ## 维度 8 · 导航与路由
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
