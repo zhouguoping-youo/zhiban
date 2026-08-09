@@ -43,26 +43,26 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 ## 维度 2 · CRM 链路
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
 |---|---|---|---|---|---|---|
-| 2.1 | 线索转商机网络断开留半成品 | ⬜ | | | | |
-| 2.2 | 看板拖动改阶段 App 被杀回滚 | ⬜ | | | | |
+| 2.1 | 线索转商机网络断开留半成品 | ⚪ | — | 未复现：转化不依赖网络，线索状态、商机、首条阶段历史和转化活动都在同一个 Room `withTransaction` 中；任一写失败会整体回滚 | — | `CrmLeadPoolTest.convertLeadCreatesOpportunityHistoryAndActivity`；Room 事务回归随全套设备测试 |
+| 2.2 | 看板拖动改阶段 App 被杀回滚 | ⚪ | — | 未复现：当前看板不是拖拽写入，而是明确的“推进阶段”操作；阶段、状态、概率及历史在一个 Room 事务提交，进程只能看到提交前或提交后状态，不存在半条历史 | — | `RoomCrmToolExecutorTest.allEightConfirmedToolsWriteAuditAndChangeRecords`、`CrmLeadPoolTest.convertLeadCreatesOpportunityHistoryAndActivity` |
 | 2.3 | 建议过期重新触发重复生成 | ✅ | 功能不可用 | 建议去重本身按 evidence 生效，但状态更新没有 `PENDING` 守卫，旧界面能把已过期建议重新改成 ACCEPTED/DISMISSED；详情页“让知伴准备”还会在未执行任何动作时提前消费建议。状态转换增加原子守卫，准备问问不再修改建议 | 本提交 `fix(2.3)` | `CrmAgentSuggestionChainTest.expiredSuggestionCannotBeResurrectedByAStaleUiDecision` + 既有建议接受/过期回归 |
-| 2.4 | 商机删除后联系人详情仍显示 | ⬜ | | | | |
-| 2.5 | 仪表盘数据与实际不符 | ⬜ | | | | |
-| 2.6 | 线索候选转正后候选区仍显示 | ⬜ | | | | |
-| 2.7 | 活动追加时联系人不存在崩溃 | ⬜ | | | | |
-| 2.8 | 下一步动作创建时商机不存在崩溃 | ⬜ | | | | |
-| 2.9 | 阶段 WON→LEAD 终态守卫拦截 | ⬜ | | | | |
-| 2.10 | 阶段概率错误(CONTACTED 25 非 20) | ⬜ | | | | |
-| 2.11 | 建议接受后状态更新 ACCEPTED | ⬜ | | | | |
-| 2.12 | 建议撤销后写入的活动/线索删除 | ⬜ | | | | |
-| 2.13 | 建议拒绝后状态更新 DISMISSED | ⬜ | | | | |
+| 2.4 | 商机删除后联系人详情仍显示 | ⚪ | — | 未复现/当前不适用：产品没有用户可达的商机删除 API 或按钮；仅演示数据迁移可删除 DEMO 商机，联系人详情查询直接观察存活商机表，不维护独立缓存 | — | `CrmContactLinkTest.observeOpportunitiesByContactReturnsOnlyThatContact` |
+| 2.5 | 仪表盘数据与实际不符 | ⚪ | — | 未复现：统计查询只计时间窗内正式线索与活动，排除候选线索，并由 Room Flow 在新增后重发 | — | `CrmDashboardCountsTest.countsOnlyFormalLeadsAndActivitiesInsideWindow`、`emitsZeroAndReEmitsOnInsert` |
+| 2.6 | 线索候选转正后候选区仍显示 | ⚪ | — | 未复现：候选查询限定 `status='CANDIDATE'`，转正原子改为 QUALIFIED 后立即离开候选 Flow，并进入正式统计 | — | `RoomCrmToolExecutorTest.candidatePromotionEntersFormalListAndIgnoreRemovesCandidate`、`CrmCandidatePoolUiTest.promotedLeadIsVisibleAsFormalAndIncludedInLeadOverview` |
+| 2.7 | 活动追加时联系人不存在崩溃 | ⚪ | — | 未复现：审批前校验商机与联系人，最终执行仍二次校验；失效引用以受控领域错误拒绝，外键也阻止脏引用 | — | `CrmMutationToolBindingTest.activity append with unknown contact is rejected before approval` + 写入矩阵 |
+| 2.8 | 下一步动作创建时商机不存在崩溃 | ⚪ | — | 未复现：审批前和最终执行均要求商机存在；不存在时拒绝工具写入而非形成孤儿动作，数据库外键是最后防线 | — | `CrmMutationToolBindingTest.next action create with unknown opportunity is rejected before approval` + 写入矩阵 |
+| 2.9 | 阶段 WON→LEAD 终态守卫拦截 | ⚪ | — | 未复现：用户页面与 Agent 工具最终写入点都调用 `CrmOpportunityStage.requireTransitionAllowed`，WON/LOST 不可重新打开 | — | `AgentDataRepositoryTest.userStageChangeCannotReopenTerminalOpportunity`、`RoomCrmToolExecutorTest.ordinaryStageToolCannotReopenTerminalOpportunity` |
+| 2.10 | 阶段概率错误(CONTACTED 25 非 20) | ⚪ | — | 未复现：概率单源为 `CrmOpportunityStage.probabilityPercent`，CONTACTED 固定 25，页面与工具共用 | — | `CrmOpportunityStageTest.allWritersShareOneStageProbabilityPolicy` |
+| 2.11 | 建议接受后状态更新 ACCEPTED | ⚪ | — | 未复现：接受产生的活动/线索与 PENDING→ACCEPTED 条件更新在同一事务；状态竞争失败则整体回滚 | — | `CrmAgentSuggestionChainTest.acceptCallFollowUpWritesUndoableActivity`、`acceptNewLeadWritesUndoableLead` |
+| 2.12 | 建议撤销后写入的活动/线索删除 | ⚪ | — | 未复现：接受时写 ChangeLog 逆向载荷；撤销同事务删除所建活动/线索并把建议恢复 PENDING | — | `CrmAgentSuggestionChainTest.undoAcceptedCallFollowUpRestoresPendingAndDeletesActivity`、`undoAcceptedNewLeadRestoresPendingAndDeletesLead` |
+| 2.13 | 建议拒绝后状态更新 DISMISSED | ⚪ | — | 未复现：拒绝使用受状态守卫的 PENDING→DISMISSED CAS；处理过的 evidence 不会再次生成同类建议 | — | `CrmAgentSuggestionChainTest.processedCallEvidenceIsNeverSuggestedAgainButANewCallCanBeSuggested` |
 | 2.14 | 商机金额分/元混淆 | ✅ | 数据完整性 | 存储和表单换算虽约定最小单位“分”，显示层却把小数位强制为 0，金额会被四舍五入；表单用 Double 还会把 Infinity/溢出值钳成 Long 极值。改为 BigDecimal 精确换算、最多两位小数和 exact Long 边界校验 | 本提交 `fix(2.14)` | `CrmMoneyLogicTest`（分/元显示、精确输入、超精度、Infinity、溢出） |
-| 2.15 | 阶段历史记录完整 | ⬜ | | | | |
+| 2.15 | 阶段历史记录完整 | ⚪ | — | 未复现：商机创建写首条 `fromStage=null` 历史，后续阶段变化写 from/to/reason/source/确认标记，均与主体变更同事务 | — | `CrmLeadPoolTest.convertLeadCreatesOpportunityHistoryAndActivity`、`RoomCrmToolExecutorTest.allEightConfirmedToolsWriteAuditAndChangeRecords` |
 | 2.16 | 建议 evidenceRefs 引用真实数据 | ✅ | 数据完整性 | 通知线索建议曾在通知候选落库前创建，且直接手拼 `candidateId` JSON；内部调用或特殊字符可留下不存在/不可解析的证据引用。现在先在同一事务保存候选，建议创建再校验候选存在且匹配联系人，并用 kotlinx.serialization 生成 evidenceRefs | 本提交 `fix(2.16)` | `CrmAgentSuggestionChainTest.newLeadSuggestionRejectsMissingOrMismatchedEvidence`、`newLeadSuggestionSerializesEvidenceIdAsJson` + 高置信建议回归 |
 | 2.17 | 建议 confidence 保持 0–1 | ✅ | 数据完整性 | 通知建议入口只检查下限，允许 `>1`/非有限值落库；同时调用参数可与证据候选自身置信度不一致。现在删除重复参数，以已持久化候选为单源，并在最终写入前强制 `0.7..1.0` 有限范围 | 本提交 `fix(2.17)` | `CrmAgentSuggestionChainTest.newLeadSuggestionRejectsOutOfRangeConfidence` + 高/低置信回归 |
-| 2.18 | 建议过期后是否清理 | ⬜ | | | | |
+| 2.18 | 建议过期后是否清理 | ⚪ | — | 未复现：7 天后的 PENDING 建议原子转 EXPIRED 并从待处理查询消失；不物理删除是有意保留审计和去重证据，过期记录不能被旧 UI 复活 | — | `CrmAgentSuggestionChainTest.stalePendingSuggestionsExpireAfterSevenDays`、`expiredSuggestionCannotBeResurrectedByAStaleUiDecision` |
 | 2.19 | 线索转化后能否再次转化 | ✅ | 数据完整性 | 页面转化会把线索置为 CONVERTED，但 Agent 的 `crm.opportunity.create` 只校验 sourceLeadId 存在，不修改线索状态，也不查已有来源商机；不同工具调用可从同一线索生成多个商机。最终事务现原子校验并标记 CONVERTED，重复转化失败 | 本提交 `fix(2.19)` | `RoomCrmToolExecutorTest.opportunityCreateConvertsSourceLeadAndRejectsASecondConversion` + 8 工具幂等回归 |
-| 2.20 | 商机删除后关联数据级联 | ⬜ | | | | |
+| 2.20 | 商机删除后关联数据级联 | ⚪ | — | 未复现：活动、下一步动作、建议、阶段历史、利益相关人均以 opportunityId 外键 CASCADE；联系人/日程等可选引用用 SET_NULL。设备测试实际删除商机并逐表断言无孤儿行 | — | `RoomCrmToolExecutorTest.deletingOpportunityCascadesEveryOwnedCrmRecord`、`CrmReferenceIntegrityMigrationTest.migration28To29RepairsAndMaintainsOptionalReferences` |
 
 ## 维度 3 · 自动写链路
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |

@@ -107,6 +107,38 @@ class RoomCrmToolExecutorTest {
     }
 
     @Test
+    fun deletingOpportunityCascadesEveryOwnedCrmRecord() = runBlocking {
+        val db = database.openHelper.writableDatabase
+        db.execSQL(
+            "INSERT INTO crm_opportunity_stakeholders VALUES ('opp-1','contact-1','DECISION_MAKER','HIGH',1,1)",
+        )
+        db.execSQL(
+            "INSERT INTO crm_activities VALUES ('cascade-activity','opp-1','contact-1','NOTE','记录','摘要',1,'TEST',NULL,NULL,1,1)",
+        )
+        db.execSQL(
+            "INSERT INTO crm_agent_suggestions VALUES ('cascade-suggestion','opp-1','contact-1','FOLLOW_UP','建议','摘要','依据','[]',0.9,NULL,'PENDING',1,1)",
+        )
+        db.execSQL(
+            "INSERT INTO crm_stage_history VALUES ('cascade-history','opp-1','LEAD','CONTACTED','推进','TEST',1,1)",
+        )
+
+        db.execSQL("DELETE FROM crm_opportunities WHERE opportunityId = 'opp-1'")
+
+        listOf(
+            "crm_opportunity_stakeholders",
+            "crm_activities",
+            "crm_next_actions",
+            "crm_agent_suggestions",
+            "crm_stage_history",
+        ).forEach { table ->
+            db.query("SELECT COUNT(*) FROM $table WHERE opportunityId = 'opp-1'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("orphan row in $table", 0, cursor.getInt(0))
+            }
+        }
+    }
+
+    @Test
     fun allEightConfirmedToolsWriteAuditAndChangeRecords() = runBlocking {
         samples().forEachIndexed { index, sample ->
             val plan = plan(index, sample)

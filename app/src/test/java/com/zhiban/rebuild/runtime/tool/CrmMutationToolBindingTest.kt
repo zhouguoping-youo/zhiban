@@ -182,6 +182,40 @@ class CrmMutationToolBindingTest {
         assertTrue(failure is ProviderFailure)
     }
 
+    @Test
+    fun `activity append with unknown contact is rejected before approval`() = runTest {
+        coEvery { contacts.findById("missing-contact") } returns null
+        val failure = runCatching {
+            binding(CrmMutationToolBinding.ACTIVITY_APPEND).requestApproval(
+                RuntimeToolCallRequest(
+                    "call-missing-contact",
+                    CrmMutationToolBinding.ACTIVITY_APPEND,
+                    """{"opportunityId":"opp-1","contactId":"missing-contact","activityType":"NOTE","title":"记录","summary":"摘要","occurredAtEpochMs":1,"evidenceSummary":"测试"}""",
+                ),
+                context(),
+            )
+        }.exceptionOrNull()
+
+        assertTrue(failure is ProviderFailure)
+    }
+
+    @Test
+    fun `next action create with unknown opportunity is rejected before approval`() = runTest {
+        coEvery { crm.findOpportunity("missing-opportunity") } returns null
+        val failure = runCatching {
+            binding(CrmMutationToolBinding.ACTION_CREATE).requestApproval(
+                RuntimeToolCallRequest(
+                    "call-missing-opportunity",
+                    CrmMutationToolBinding.ACTION_CREATE,
+                    """{"opportunityId":"missing-opportunity","actionType":"CALL","title":"跟进","priority":50,"evidenceSummary":"测试"}""",
+                ),
+                context(),
+            )
+        }.exceptionOrNull()
+
+        assertTrue(failure is ProviderFailure)
+    }
+
     private fun binding(name: String) = CrmMutationToolBinding(
         RuntimeToolCatalog.production().requireRegistered(name),
         store,
