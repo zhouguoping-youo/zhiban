@@ -89,7 +89,18 @@ class AgentDataRepository internal constructor(
     private val contacts: ContactAgentDataRepository,
     private val relationships: RelationshipAgentDataRepository,
 ) {
-    fun observeNotificationCandidates(): Flow<List<NotificationCandidateEntity>> = daos.notificationCandidateDao.observePending()
+    fun observeNotificationCandidates(): Flow<List<NotificationCandidateEntity>> = combine(
+        daos.notificationCandidateDao.observePending(),
+        daos.contactIdentityDao.observeActiveMergeLinks(),
+    ) { candidates, mergeLinks ->
+        val canonicalBySource = mergeLinks.associate { it.sourceContactId to it.canonicalContactId }
+        candidates.map { candidate ->
+            candidate.copy(
+                suggestedContactId = candidate.suggestedContactId?.let { canonicalBySource[it] ?: it },
+                linkedContactId = candidate.linkedContactId?.let { canonicalBySource[it] ?: it },
+            )
+        }
+    }
 
     suspend fun stageNotificationCandidate(candidate: NotificationCandidateEntity) = transactions.runInTransaction {
         val existing = daos.notificationCandidateDao.findBySourceKey(candidate.sourceKey)

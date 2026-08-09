@@ -795,6 +795,36 @@ class AgentDataRepositoryTest {
         assertEquals(0, repository.observeContactMergeLinks().first().size)
     }
 
+    @Test
+    fun notificationCandidateProjectsMergedContactAndUndoRestoresSource() = runBlocking {
+        val canonical = repository.saveUserContact(null, "主联系人", null, null, null, null, null, null, 1_000L)
+        val source = repository.saveUserContact(null, "待合并联系人", null, null, null, null, null, null, 2_000L)
+        database.notificationCandidateDao().upsert(
+            NotificationCandidateEntity(
+                candidateId = "merge-notification",
+                sourceKey = "merge-notification-source",
+                packageName = "com.tencent.mm",
+                appLabel = "微信",
+                title = "待合并联系人",
+                body = "收到",
+                postedAtEpochMs = 2_000L,
+                suggestedContactId = source,
+                suggestedContactConfidence = 0.9,
+                linkedContactId = source,
+            ),
+        )
+
+        repository.confirmContactMerge(canonical, source, "用户确认同一人", 3_000L)
+        val merged = repository.observeNotificationCandidates().first().single()
+        assertEquals(canonical, merged.suggestedContactId)
+        assertEquals(canonical, merged.linkedContactId)
+
+        assertTrue(repository.undoContactMerge(source, 4_000L))
+        val restored = repository.observeNotificationCandidates().first().single()
+        assertEquals(source, restored.suggestedContactId)
+        assertEquals(source, restored.linkedContactId)
+    }
+
     private fun run(id: String) = AgentRunEntity(
         id = id,
         userInput = "test",
