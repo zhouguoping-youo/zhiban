@@ -5,7 +5,9 @@ internal object SensitiveMessageFilter {
         val normalized = value.lowercase()
         return sensitiveWords.any(normalized::contains) ||
             otpNearCode.containsMatchIn(normalized) ||
-            secretKeyNearValue.containsMatchIn(normalized)
+            secretKeyNearValue.containsMatchIn(normalized) ||
+            bankCardNearValue.containsMatchIn(normalized) ||
+            cardNumberCandidate.findAll(normalized).any { it.value.isLuhnValidCardNumber() }
     }
 
     private val sensitiveWords = listOf(
@@ -31,4 +33,22 @@ internal object SensitiveMessageFilter {
         """(?:密钥|secret\s+key|api\s+key).{0,20}(?:\b\d{4,8}\b|[A-Za-z0-9_-]{12,})|(?:\b\d{4,8}\b|[A-Za-z0-9_-]{12,}).{0,20}(?:密钥|secret\s+key|api\s+key)""",
         RegexOption.IGNORE_CASE,
     )
+    private const val BANK_CARD_KEYWORD =
+        "(?:银行卡|银行账号|储蓄卡|信用卡|借记卡|bank\\s+card|card\\s+number|account\\s+number)"
+    private const val BANK_CARD_VALUE = "(?:[0-9*][ -]?){3,23}[0-9*]"
+    private val bankCardNearValue = Regex(
+        "(?:$BANK_CARD_KEYWORD.{0,20}$BANK_CARD_VALUE|$BANK_CARD_VALUE.{0,20}$BANK_CARD_KEYWORD)",
+        RegexOption.IGNORE_CASE,
+    )
+    private val cardNumberCandidate = Regex("""(?<!\d)(?:\d[ -]?){12,18}\d(?!\d)""")
+
+    private fun String.isLuhnValidCardNumber(): Boolean {
+        val digits = filter(Char::isDigit)
+        if (digits.length !in 13..19) return false
+        val sum = digits.reversed().foldIndexed(0) { index, total, character ->
+            val value = character.digitToInt()
+            total + if (index % 2 == 0) value else (value * 2).let { if (it > 9) it - 9 else it }
+        }
+        return sum % 10 == 0
+    }
 }

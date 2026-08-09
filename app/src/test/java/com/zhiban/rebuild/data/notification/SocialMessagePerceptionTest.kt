@@ -273,6 +273,26 @@ class SocialMessagePerceptionTest {
                 ),
             ),
         )
+        listOf(
+            "这是我的银行卡号 6222 0212 3456 7890 123",
+            "信用卡尾号 **** 4829，请核对",
+            "please use card number 4111-1111-1111-1111",
+        ).forEach { sensitiveText ->
+            assertNull(
+                SocialNotificationParser.parse(
+                    snapshot(packageName = "com.tencent.mm", title = "张三", text = sensitiveText),
+                ),
+            )
+        }
+        assertNotNull(
+            SocialNotificationParser.parse(
+                snapshot(
+                    packageName = "com.tencent.mm",
+                    title = "张三",
+                    text = "会议编号 1234 5678 9012 3456，请查收",
+                ),
+            ),
+        )
         assertNull(
             SocialNotificationParser.parse(
                 snapshot(
