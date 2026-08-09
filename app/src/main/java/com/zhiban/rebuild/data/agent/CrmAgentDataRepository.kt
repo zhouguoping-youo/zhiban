@@ -425,7 +425,7 @@ internal class CrmAgentDataRepository(private val database: AgentDatabase) {
     suspend fun convertLeadToOpportunity(leadId: String, input: CrmLeadConversionInput, nowEpochMs: Long = System.currentTimeMillis()): String? =
         database.withTransaction {
             val lead = database.crmDao().findLead(leadId) ?: return@withTransaction null
-            if (lead.status !in CONVERTIBLE_LEAD_STATUSES) return@withTransaction null
+            if (lead.status !in CrmLeadStatus.convertibleStatuses) return@withTransaction null
             require(input.title.isNotBlank()) { "机会标题不能为空" }
             require(input.accountName.isNotBlank()) { "客户名不能为空" }
 
@@ -538,8 +538,6 @@ internal class CrmAgentDataRepository(private val database: AgentDatabase) {
         }
 
     companion object {
-        private val CONVERTIBLE_LEAD_STATUSES = setOf(CrmLeadStatus.NEW, CrmLeadStatus.CONTACTED, CrmLeadStatus.QUALIFIED)
-
         /** A resolved (exact-match) call match is treated as fully confident for follow-up suggestions. */
         private const val CALL_FOLLOW_UP_CONFIDENCE = 0.7
 

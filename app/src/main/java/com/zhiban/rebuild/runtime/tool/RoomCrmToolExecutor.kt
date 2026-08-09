@@ -441,13 +441,18 @@ internal class RoomCrmToolExecutor(private val database: AgentDatabase, private 
     private suspend fun applyOpportunityCreate(ctx: MutationBranchContext): AppliedCrmMutation = with(ctx) {
         // Optional contact: validate only when present; the nullable FK column accepts NULL.
         val contact = plan.optionalText("primaryContactId")?.let { realContact(it) }
-        plan.optionalText("sourceLeadId")?.let { leadId ->
+        val sourceLead = plan.optionalText("sourceLeadId")?.let { leadId ->
             requireNotNull(crm.findLead(leadId)) {
                 "CRM_LEAD_NOT_FOUND"
-            }.also { require(it.sourceType != "DEMO") }
+            }.also {
+                require(it.sourceType != "DEMO")
+                require(it.status in CrmLeadStatus.convertibleStatuses) { "CRM_LEAD_ALREADY_CONVERTED" }
+                require(crm.findOpportunityBySourceLead(leadId) == null) { "CRM_LEAD_ALREADY_CONVERTED" }
+            }
         }
         val stage = plan.requiredText("stage")
         val targetId = id("opportunity")
+        sourceLead?.let { check(crm.markLeadConverted(it.leadId, now) == 1) }
         crm.insertOpportunity(
             CrmOpportunityEntity(
                 opportunityId = targetId,

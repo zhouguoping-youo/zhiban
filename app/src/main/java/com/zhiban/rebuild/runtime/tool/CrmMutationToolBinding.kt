@@ -3,6 +3,7 @@ package com.zhiban.rebuild.runtime.tool
 import com.zhiban.rebuild.data.contact.ContactDao
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.crm.CrmDao
+import com.zhiban.rebuild.data.crm.CrmLeadStatus
 import com.zhiban.rebuild.runtime.governance.ReversibleWriteReadiness
 import com.zhiban.rebuild.runtime.provider.ProviderFailure
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
@@ -140,6 +141,9 @@ internal class CrmMutationToolBinding(
                 data.optionalText("sourceLeadId")?.let { leadId ->
                     val lead = crm.findLead(leadId)
                     if (lead == null || lead.sourceType == "DEMO") throw ProviderFailure("CRM_LEAD_NOT_FOUND", false)
+                    if (lead.status !in CrmLeadStatus.convertibleStatuses || crm.findOpportunityBySourceLead(leadId) != null) {
+                        throw ProviderFailure("CRM_LEAD_ALREADY_CONVERTED", false)
+                    }
                 }
                 contact?.displayName ?: data.requiredText("accountName")
             }

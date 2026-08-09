@@ -41,6 +41,7 @@ class CrmMutationToolBindingTest {
     init {
         coEvery { contacts.findById(any()) } returns contact
         coEvery { crm.findOpportunity(any()) } returns opportunity
+        coEvery { crm.findOpportunityBySourceLead(any()) } returns null
         coEvery { crm.findLead(any()) } returns CrmLeadEntity(
             "lead-1", "contact-1", "王建国", "甲公司", "NEW", "USER_CONFIRMED",
             null, null, 1.0, true, 1, 1,

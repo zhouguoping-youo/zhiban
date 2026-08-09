@@ -71,6 +71,42 @@ class RoomCrmToolExecutorTest {
     }
 
     @Test
+    fun opportunityCreateConvertsSourceLeadAndRejectsASecondConversion() = runBlocking {
+        database.crmDao().insertLead(
+            CrmLeadEntity(
+                "lead-create", "contact-1", "王建国", "甲公司", "NEW", "USER_CONFIRMED",
+                null, null, 1.0, true, 1, 1,
+            ),
+        )
+        val firstPlan = plan(
+            92,
+            Sample(
+                CrmMutationToolBinding.OPPORTUNITY_CREATE,
+                """{"title":"首次转化","accountName":"甲公司","sourceLeadId":"lead-create","stage":"LEAD","currencyCode":"CNY"}""",
+            ),
+        )
+        val first = executor.execute(firstPlan, fixture(92, firstPlan, approved = true))
+
+        assertEquals(CrmLeadStatus.CONVERTED, database.crmDao().findLead("lead-create")?.status)
+        val createdOpportunityId = requireNotNull(
+            database.crmDao().findOpportunityBySourceLead("lead-create"),
+        ).opportunityId
+        assertTrue(first.safeResultJson.contains(createdOpportunityId))
+
+        val secondPlan = plan(
+            93,
+            Sample(
+                CrmMutationToolBinding.OPPORTUNITY_CREATE,
+                """{"title":"重复转化","accountName":"甲公司","sourceLeadId":"lead-create","stage":"LEAD","currencyCode":"CNY"}""",
+            ),
+        )
+        val failure = runCatching { executor.execute(secondPlan, fixture(93, secondPlan, approved = true)) }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+        assertEquals(createdOpportunityId, database.crmDao().findOpportunityBySourceLead("lead-create")?.opportunityId)
+    }
+
+    @Test
     fun allEightConfirmedToolsWriteAuditAndChangeRecords() = runBlocking {
         samples().forEachIndexed { index, sample ->
             val plan = plan(index, sample)
@@ -373,7 +409,7 @@ class RoomCrmToolExecutorTest {
         ),
         Sample(
             CrmMutationToolBinding.OPPORTUNITY_CREATE,
-            """{"title":"新机会","accountName":"甲公司","primaryContactId":"contact-1","sourceLeadId":"lead-1","stage":"LEAD","valueMinor":10000,"currencyCode":"CNY","expectedCloseAtEpochMs":300000,"evidenceSummary":"客户确认"}""",
+            """{"title":"新机会","accountName":"甲公司","primaryContactId":"contact-1","stage":"LEAD","valueMinor":10000,"currencyCode":"CNY","expectedCloseAtEpochMs":300000,"evidenceSummary":"客户确认"}""",
         ),
         Sample(
             CrmMutationToolBinding.OPPORTUNITY_UPDATE,

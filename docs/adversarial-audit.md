@@ -58,6 +58,11 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | 2.13 | 建议拒绝后状态更新 DISMISSED | ⬜ | | | | |
 | 2.14 | 商机金额分/元混淆 | ✅ | 数据完整性 | 存储和表单换算虽约定最小单位“分”，显示层却把小数位强制为 0，金额会被四舍五入；表单用 Double 还会把 Infinity/溢出值钳成 Long 极值。改为 BigDecimal 精确换算、最多两位小数和 exact Long 边界校验 | 本提交 `fix(2.14)` | `CrmMoneyLogicTest`（分/元显示、精确输入、超精度、Infinity、溢出） |
 | 2.15 | 阶段历史记录完整 | ⬜ | | | | |
+| 2.16 | 建议 evidenceRefs 引用真实数据 | ⬜ | | | | |
+| 2.17 | 建议 confidence 保持 0–1 | ⬜ | | | | |
+| 2.18 | 建议过期后是否清理 | ⬜ | | | | |
+| 2.19 | 线索转化后能否再次转化 | ✅ | 数据完整性 | 页面转化会把线索置为 CONVERTED，但 Agent 的 `crm.opportunity.create` 只校验 sourceLeadId 存在，不修改线索状态，也不查已有来源商机；不同工具调用可从同一线索生成多个商机。最终事务现原子校验并标记 CONVERTED，重复转化失败 | 本提交 `fix(2.19)` | `RoomCrmToolExecutorTest.opportunityCreateConvertsSourceLeadAndRejectsASecondConversion` + 8 工具幂等回归 |
+| 2.20 | 商机删除后关联数据级联 | ⬜ | | | | |
 
 ## 维度 3 · 自动写链路
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |

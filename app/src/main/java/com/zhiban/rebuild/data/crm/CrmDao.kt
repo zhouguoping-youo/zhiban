@@ -39,6 +39,9 @@ interface CrmDao {
     @Query("SELECT * FROM crm_leads WHERE leadId = :leadId")
     suspend fun findLead(leadId: String): CrmLeadEntity?
 
+    @Query("SELECT * FROM crm_opportunities WHERE sourceLeadId = :leadId ORDER BY createdAtEpochMs LIMIT 1")
+    suspend fun findOpportunityBySourceLead(leadId: String): CrmOpportunityEntity?
+
     @Query("SELECT * FROM crm_leads WHERE contactId = :contactId ORDER BY updatedAtEpochMs DESC")
     fun observeLeadsByContact(contactId: String): Flow<List<CrmLeadEntity>>
 

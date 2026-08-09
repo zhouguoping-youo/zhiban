@@ -15,6 +15,8 @@ object CrmLeadStatus {
     const val QUALIFIED = "QUALIFIED"
     const val DISQUALIFIED = "DISQUALIFIED"
     const val CONVERTED = "CONVERTED"
+
+    val convertibleStatuses = setOf(NEW, CONTACTED, QUALIFIED)
 }
 
 object CrmOpportunityStage {
