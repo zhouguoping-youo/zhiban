@@ -2,11 +2,13 @@ package com.zhiban.rebuild.ui.agent.settings
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.test.core.app.ApplicationProvider
@@ -68,5 +70,18 @@ class UserProfilePageTest {
         compose.onNodeWithText("选择平台").assertIsDisplayed()
         compose.onAllNodesWithText("飞书").onFirst().assertIsDisplayed()
         compose.onNodeWithText("钉钉").assertIsDisplayed()
+    }
+
+    @Test fun validProfileShowsSavedResultAndPersists() {
+        render()
+        val fields = compose.onAllNodes(hasSetTextAction())
+        fields[2].performTextInput("13800138000")
+        fields[3].performTextInput("zhiban_test")
+        compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("保存"))
+        compose.onNodeWithText("保存").performClick()
+
+        compose.onNodeWithText("已保存").assertIsDisplayed()
+        assert(store.profile.value.phone == "13800138000")
+        assert(store.profile.value.wechatId == "zhiban_test")
     }
 }

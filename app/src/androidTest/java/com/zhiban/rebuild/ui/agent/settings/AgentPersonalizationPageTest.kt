@@ -54,6 +54,7 @@ class AgentPersonalizationPageTest {
 
         compose.onNodeWithText("保存").performClick()
         compose.waitForIdle()
+        compose.onNodeWithText("已保存").assertIsDisplayed()
         assertEquals(ResponseStyle.CUSTOM, store.load().style)
     }
 
@@ -61,6 +62,7 @@ class AgentPersonalizationPageTest {
         compose.onNodeWithText("专业").performClick()
         compose.onNodeWithText("保存").performClick()
         compose.waitForIdle()
+        compose.onNodeWithText("已保存").assertIsDisplayed()
         assertEquals(ResponseStyle.PROFESSIONAL, store.load().style)
     }
 }
