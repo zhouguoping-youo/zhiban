@@ -15,6 +15,7 @@ import com.zhiban.rebuild.navigation.Relation
 import com.zhiban.rebuild.navigation.Skill
 import com.zhiban.rebuild.ui.theme.ZhiBanTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -55,5 +56,21 @@ class ZhiBanBottomBarTest {
         compose.onNodeWithContentDescription("能力").performTouchInput { longClick() }
 
         compose.onNodeWithText("能力").assertIsDisplayed()
+    }
+
+    @Test
+    fun destinationsAreDistributedAtEqualIntervals() {
+        compose.setContent {
+            ZhiBanTheme {
+                ZhiBanBottomBar(currentDestination = null, onTabSelected = {})
+            }
+        }
+
+        val centers = listOf("日历", "关系", "问问", "能力", "我的").map { label ->
+            compose.onNodeWithContentDescription(label).fetchSemanticsNode().boundsInRoot.center.x
+        }
+        val gaps = centers.zipWithNext { first, second -> second - first }
+
+        assertTrue("TAB 间距应保持一致，实际为 $gaps", gaps.max() - gaps.min() <= 1.5f)
     }
 }

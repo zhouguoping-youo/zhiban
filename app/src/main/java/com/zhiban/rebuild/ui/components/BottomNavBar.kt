@@ -314,25 +314,27 @@ private fun TabNavItem(
             tooltipState.show()
         }
     }
-    TooltipBox(
-        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-        tooltip = { PlainTooltip { Text(label) } },
-        state = tooltipState,
-        focusable = false,
-    ) {
-        Box(
-            modifier = modifier.height(ZhiBanSize.TouchTarget).semantics {
-                contentDescription = label
-                this.selected = selected
-            }.clickable(role = Role.Tab, onClick = onClick),
-            contentAlignment = Alignment.Center,
+    Box(modifier = modifier.height(ZhiBanSize.TouchTarget)) {
+        TooltipBox(
+            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+            tooltip = { PlainTooltip { Text(label) } },
+            state = tooltipState,
+            focusable = false,
         ) {
             Box(
-                modifier = Modifier.size(ZhiBanIconContainer.Compact).clip(CircleShape)
-                    .background(if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent),
+                modifier = Modifier.fillMaxSize().semantics {
+                    contentDescription = label
+                    this.selected = selected
+                }.clickable(role = Role.Tab, onClick = onClick),
                 contentAlignment = Alignment.Center,
             ) {
-                iconContent(selected)
+                Box(
+                    modifier = Modifier.size(ZhiBanIconContainer.Compact).clip(CircleShape)
+                        .background(if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    iconContent(selected)
+                }
             }
         }
     }
