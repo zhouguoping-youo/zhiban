@@ -34,4 +34,17 @@ class RelationEmptyStateTest {
         assertEquals(1, imports.get())
         assertEquals(1, additions.get())
     }
+
+    @Test
+    fun primaryImportActionRemainsAvailableInDarkTheme() {
+        val imports = AtomicInteger()
+        compose.setContent {
+            ZhiBanTheme(darkTheme = true) {
+                RelationEmpty(searching = false, onImport = { imports.incrementAndGet() }, onAdd = {})
+            }
+        }
+
+        compose.onNodeWithText("导入联系人").assertIsDisplayed().performClick()
+        assertEquals(1, imports.get())
+    }
 }

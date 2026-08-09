@@ -158,7 +158,7 @@ internal fun RelationEmpty(searching: Boolean, onImport: () -> Unit, onAdd: () -
             Spacer(Modifier.height(16.dp))
             Button(
                 onClick = onImport,
-                colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
+                colors = ButtonDefaults.buttonColors(containerColor = RelationAccent),
                 shape = RoundedCornerShape(50),
             ) {
                 Icon(Icons.Outlined.PhoneAndroid, null, modifier = Modifier.size(ZhiBanIconSize.Inline))

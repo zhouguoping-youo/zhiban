@@ -35,6 +35,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
@@ -78,7 +79,6 @@ import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.NotificationInsightAnalyzer
 import com.zhiban.rebuild.data.notification.ScheduleInsight
 import com.zhiban.rebuild.ui.components.ZhiBanHeaderIconAction
-import com.zhiban.rebuild.ui.components.ZhiBanHeaderTextAction
 import com.zhiban.rebuild.ui.components.ZhiBanPrimaryTabHeader
 import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
 import com.zhiban.rebuild.ui.components.ZhiBanTabHorizontalPadding
@@ -467,12 +467,17 @@ private fun MessageScheduleSuggestions(
 private fun normalizeScheduleSuggestionTitle(rawTitle: String): String = NotificationInsightAnalyzer.sanitizeScheduleTitle(rawTitle, null).ifBlank { rawTitle }
 
 @Composable
-private fun CalendarHeader(date: LocalDate, monthExpanded: Boolean, onToday: () -> Unit, onMonth: () -> Unit, onImport: () -> Unit, onAdd: () -> Unit) {
+internal fun CalendarHeader(date: LocalDate, monthExpanded: Boolean, onToday: () -> Unit, onMonth: () -> Unit, onImport: () -> Unit, onAdd: () -> Unit) {
     ZhiBanPrimaryTabHeader(
         title = "日历",
         subtitle = date.format(DateTimeFormatter.ofPattern("yyyy年 M月")),
     ) {
-        ZhiBanHeaderTextAction(label = "今天", onClick = onToday, tint = CalendarInk)
+        ZhiBanHeaderIconAction(
+            icon = Icons.Outlined.Today,
+            contentDescription = "回到今天",
+            onClick = onToday,
+            tint = CalendarInk,
+        )
         ZhiBanHeaderIconAction(
             icon = Icons.Outlined.EventAvailable,
             contentDescription = "从手机日历导入",
