@@ -7,12 +7,21 @@ import com.zhiban.rebuild.runtime.context.FactIndex
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 @Singleton
 class CallLogRepository @Inject internal constructor(private val database: AgentDatabase) {
-    fun observePendingNotes(): Flow<List<CallRecordEntity>> = database.callLogDao().observePendingNotes()
+    fun observePendingNotes(): Flow<List<CallRecordEntity>> = combine(
+        database.callLogDao().observePendingNotes(),
+        database.contactIdentityDao().observeActiveMergeLinks(),
+    ) { calls, mergeLinks ->
+        val canonicalBySource = mergeLinks.associate { it.sourceContactId to it.canonicalContactId }
+        calls.map { call ->
+            call.copy(linkedContactId = call.linkedContactId?.let { canonicalBySource[it] ?: it })
+        }
+    }
     fun observeForContact(contactId: String): Flow<List<CallRecordEntity>> = database.callLogDao().observeForContact(contactId)
 
     suspend fun markLatestCallPending(nowEpochMs: Long = System.currentTimeMillis()): String? = database.withTransaction {

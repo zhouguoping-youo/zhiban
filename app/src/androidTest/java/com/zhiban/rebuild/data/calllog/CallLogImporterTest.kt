@@ -8,6 +8,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.CrmAgentDataRepository
 import com.zhiban.rebuild.data.contact.ContactEntity
+import com.zhiban.rebuild.data.contact.ContactMergeLinkEntity
 import com.zhiban.rebuild.data.contact.ContactMethodEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityStage
@@ -118,6 +119,26 @@ class CallLogImporterTest {
         assertEquals(true, repository.deleteNoteFact("call-note:$callId", nowEpochMs = 5_000))
         assertEquals(null, database.factDao().find("call-note:$callId"))
         assertEquals("DISMISSED", database.callLogDao().findById(callId)!!.notePromptState)
+    }
+
+    @Test
+    fun pendingCallAndContactTimelineProjectActiveMergeAndUndoRestoresSource() = runTest {
+        database.contactDao().insert(contact("canonical"))
+        database.contactDao().insert(contact("source"))
+        database.contactKnowledgeDao().upsertMethods(listOf(method("source", "13800138000")))
+        CallLogImporter(database).import(listOf(row(8, "13800138000", CallLog.Calls.PRESENTATION_ALLOWED)), 3_000)
+        val repository = CallLogRepository(database)
+        val callId = repository.markLatestCallPending(nowEpochMs = 2_500)!!
+        database.contactIdentityDao().upsertMergeLink(
+            ContactMergeLinkEntity("source", "canonical", "同一人", true, 4_000, null),
+        )
+
+        assertEquals("canonical", repository.observePendingNotes().first().single().linkedContactId)
+        assertEquals(callId, repository.observeForContact("canonical").first().single().callRecordId)
+
+        assertEquals(1, database.contactIdentityDao().undoConfirmedMerge("source", 5_000))
+        assertEquals("source", repository.observePendingNotes().first().single().linkedContactId)
+        assertEquals(callId, repository.observeForContact("source").first().single().callRecordId)
     }
 
     @Test
