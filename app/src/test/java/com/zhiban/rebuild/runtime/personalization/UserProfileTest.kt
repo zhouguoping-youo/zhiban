@@ -59,4 +59,17 @@ class UserProfileTest {
         assertTrue(markdown.contains("- 职业：未填写"))
         assertTrue(markdown.contains("- 给知伴的指令：未填写"))
     }
+
+    @Test
+    fun presetStyleDoesNotInjectStaleCustomInstructions() {
+        val profile = UserProfile(customInstructions = "每句话都用旧的自定义格式")
+
+        val preset = buildPersonalizationPrompt(Personalization(style = ResponseStyle.CONCISE), profile)
+        val custom = buildPersonalizationPrompt(Personalization(style = ResponseStyle.CUSTOM), profile)
+
+        assertFalse(preset.contains("每句话都用旧的自定义格式"))
+        assertTrue(preset.contains(ResponseStyle.CONCISE.promptFragment))
+        assertTrue(custom.contains("每句话都用旧的自定义格式"))
+        assertFalse(custom.contains(ResponseStyle.CONCISE.promptFragment))
+    }
 }

@@ -323,7 +323,7 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | 19.5 | 记忆含敏感信息脱敏 | ⬜ | | | | |
 | 19.6 | 个性化修改后立即生效 | ⬜ | | | | |
 | 19.7 | 个性化删除后恢复默认 | ⬜ | | | | |
-| 19.8 | 对话风格修改后风格变化 | ⬜ | | | | |
+| 19.8 | 对话风格修改后风格变化 | ✅ | 功能不可用 | 从 CUSTOM 切到预设后，旧 `customInstructions` 仍随 user.md 注入，界面与实际回答风格不一致；最终上下文现仅在 CUSTOM 模式注入自定义指令 | 本提交 `fix(19.8)` | `UserProfileTest.presetStyleDoesNotInjectStaleCustomInstructions` |
 | 19.9 | 对话风格删除后恢复默认 | ⬜ | | | | |
 
 ## 维度 20 · 错误处理与恢复（静态扫描）
