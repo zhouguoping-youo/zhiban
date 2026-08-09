@@ -72,7 +72,7 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | 3.3 | 回执过期后能否撤销 | ⬜ | | | | |
 | 3.4 | 互动摘要纠正联系人后原记录残留 | ⬜ | | | | |
 | 3.5 | ChangeLog inverse payload 可逆 | ⬜ | | | | |
-| 3.6 | auto_write_receipts reviewState 更新 | ⬜ | | | | |
+| 3.6 | auto_write_receipts reviewState 更新 | ✅ | 体验/状态一致性 | 成功撤销或“忽略候选”只把 ChangeLog 改为 UNDONE，回执仍为 UNREVIEWED，导致未读徽标继续计算已处理记录。撤销现于同一事务把 receipt 标为 CORRECTED，失败则整体回滚 | 本提交 `fix(3.6)` | `AgentDataRepositoryTest.structuredMessageSuggestsExactContactButWaitsForUserConfirmation`（撤销后回执与未读数）+ `RoomCrmToolExecutorTest.candidatePromotionEntersFormalListAndIgnoreRemovesCandidate` |
 | 3.7 | 同 source/idempotency 重放重复写入 | ⬜ | | | | |
 | 3.8 | undoState UNDONE 后能否再撤销 | ⬜ | | | | |
 | 3.9 | 目标被用户修改后撤销检测阻止覆盖 | ⬜ | | | | |

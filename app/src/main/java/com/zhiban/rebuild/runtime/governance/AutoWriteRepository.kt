@@ -39,7 +39,7 @@ class AutoWriteRepository @Inject internal constructor(private val database: Age
     }
 
     suspend fun undo(changeId: String, nowEpochMs: Long = System.currentTimeMillis()): Boolean = database.withTransaction {
-        ChangeUndoCoordinator(database).undoVisibleInTransaction(changeId, nowEpochMs) != null
+        undoAndMarkCorrected(changeId, nowEpochMs)
     }
 
     suspend fun promoteCandidateLead(leadId: String, nowEpochMs: Long = System.currentTimeMillis()): Boolean = database.withTransaction {
@@ -54,7 +54,13 @@ class AutoWriteRepository @Inject internal constructor(private val database: Age
     suspend fun ignoreCandidateLead(leadId: String, nowEpochMs: Long = System.currentTimeMillis()): Boolean = database.withTransaction {
         val change = database.changeLogDao().findAvailableAutoChangeForTarget("CRM_LEAD", leadId)
             ?: return@withTransaction false
-        ChangeUndoCoordinator(database).undoVisibleInTransaction(change.changeId, nowEpochMs) != null
+        undoAndMarkCorrected(change.changeId, nowEpochMs)
+    }
+
+    private suspend fun undoAndMarkCorrected(changeId: String, nowEpochMs: Long): Boolean {
+        if (ChangeUndoCoordinator(database).undoVisibleInTransaction(changeId, nowEpochMs) == null) return false
+        check(database.changeLogDao().markAutoWriteCorrected(changeId) == 1)
+        return true
     }
 
     suspend fun correctInteractionContact(changeId: String, newContactId: String, nowEpochMs: Long = System.currentTimeMillis()): Boolean =

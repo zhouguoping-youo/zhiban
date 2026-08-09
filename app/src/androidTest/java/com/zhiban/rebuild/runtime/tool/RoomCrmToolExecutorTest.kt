@@ -268,6 +268,11 @@ class RoomCrmToolExecutorTest {
         assertTrue(repository.ignoreCandidateLead(ignored.targetId, 60))
         assertEquals(null, database.crmDao().findLead(ignored.targetId))
         assertTrue(database.crmDao().observeCandidateLeads().first().none { it.leadId == ignored.targetId })
+        val ignoredChange = database.changeLogDao().findAvailableAutoChangeForTarget("CRM_LEAD", ignored.targetId)
+        assertEquals(null, ignoredChange)
+        val ignoredReceipt = database.changeLogDao().observeAutoWriteReceipts().first()
+            .single { it.targetId == ignored.targetId }
+        assertEquals("CORRECTED", ignoredReceipt.reviewState)
     }
 
     @Test

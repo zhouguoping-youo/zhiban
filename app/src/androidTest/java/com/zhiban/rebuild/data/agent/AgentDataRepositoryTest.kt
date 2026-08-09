@@ -700,6 +700,8 @@ class AgentDataRepositoryTest {
         assertEquals("INTERACTION_SUMMARY", receipt.presentationType)
         assertEquals("AVAILABLE", receipt.undoState)
         assertEquals(true, AutoWriteRepository(database, context).undo(receipt.changeId, now + 3_000L))
+        assertEquals("CORRECTED", database.changeLogDao().findAutoWriteReceipt(receipt.changeId)?.reviewState)
+        assertEquals(0, AutoWriteRepository(database, context).observeUnreviewedCount().first())
         assertEquals(
             0,
             repository.observeContactFacts(contactId).first().count {
