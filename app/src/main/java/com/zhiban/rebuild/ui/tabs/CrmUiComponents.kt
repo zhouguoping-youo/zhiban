@@ -435,7 +435,7 @@ internal fun CrmStageProgress(currentStage: String, modifier: Modifier = Modifie
 }
 
 @Composable
-internal fun CrmOpportunityRow(opportunity: CrmOpportunityUi, onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun CrmOpportunityRow(opportunity: CrmOpportunityUi, onClick: () -> Unit, modifier: Modifier = Modifier, statusLine: String? = null) {
     Row(
         modifier.fillMaxWidth().defaultMinSize(minHeight = 88.dp).zhiBanCardSurface().clickable(onClick = onClick)
             .padding(horizontal = ZhiBanSpacing.Lg, vertical = ZhiBanSpacing.Md),
@@ -478,12 +478,18 @@ internal fun CrmOpportunityRow(opportunity: CrmOpportunityUi, onClick: () -> Uni
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                "${formatCrmMoney(
+                statusLine ?: "${formatCrmMoney(
                     opportunity.entity.valueMinor,
                     opportunity.entity.currencyCode,
                 )} · 预计 ${formatCrmDate(opportunity.entity.expectedCloseAtEpochMs)}",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (statusLine?.startsWith("已逾期") == true) {
+                    CrmOverdueColor
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
         Spacer(Modifier.width(ZhiBanSpacing.Sm))

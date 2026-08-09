@@ -36,18 +36,24 @@ import com.zhiban.rebuild.ui.theme.ZhiBanTerracottaSoft
 @Composable
 fun CrmOpportunityBoardPage(onBack: () -> Unit, onOpenOpportunity: (String) -> Unit, viewModel: CrmCapabilityViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val columns = remember(state.opportunities) { buildCrmBoardColumns(state.opportunities) }
+    val columns = remember(state.opportunities) {
+        buildCrmBoardColumns(state.opportunities).filter { it.count > 0 }
+    }
 
     ZhiBanPage {
         Column(Modifier.fillMaxSize()) {
-            ZhiBanTopBar(title = "商机看板", subtitle = "${state.opportunities.size} 条商机", onBack = onBack)
-            CrmOpportunityBoardContent(
-                columns = columns,
-                onOpenOpportunity = onOpenOpportunity,
-                onAdvance = { stage, opportunityId ->
-                    nextCrmBoardStage(stage)?.let { viewModel.changeStage(opportunityId, it) }
-                },
-            )
+            ZhiBanTopBar(title = "机会看板", subtitle = "${state.opportunities.size} 条机会", onBack = onBack)
+            if (columns.isEmpty()) {
+                CrmDetailPageState(title = "还没有机会", message = "先创建一条机会，再按阶段推进。")
+            } else {
+                CrmOpportunityBoardContent(
+                    columns = columns,
+                    onOpenOpportunity = onOpenOpportunity,
+                    onAdvance = { stage, opportunityId ->
+                        nextCrmBoardStage(stage)?.let { viewModel.changeStage(opportunityId, it) }
+                    },
+                )
+            }
         }
     }
 }

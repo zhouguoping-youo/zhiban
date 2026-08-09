@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.Groups
@@ -130,28 +129,28 @@ fun CrmOpportunityDetailPage(
                 }
 
                 else -> {
-                    item {
-                        Column(
-                            Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
-                            verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Lg),
-                        ) {
-                            CrmSectionHeader(
-                                title = "推进阶段",
-                                action = if (opportunity.entity.stage in CrmOpportunityStage.terminalStages) null else "调整",
-                                onAction = if (opportunity.entity.stage in
-                                    CrmOpportunityStage.terminalStages
-                                ) {
-                                    null
-                                } else {
-                                    ({ showStageDialog = true })
+                    val guidance = buildCrmOpportunityGuidance(state, System.currentTimeMillis())
+                    guidance?.let { recommendation ->
+                        item {
+                            CrmOpportunityGuidanceCard(
+                                guidance = recommendation,
+                                onPrepare = {
+                                    onAskAgent(
+                                        crmOpportunityCoachPrompt(
+                                            opportunityId = opportunity.entity.opportunityId,
+                                            opportunityTitle = opportunity.entity.title,
+                                            guidanceTitle = recommendation.title,
+                                            evidence = recommendation.evidence,
+                                            isDemo = opportunity.entity.sourceType == "DEMO",
+                                        ),
+                                    )
                                 },
+                                onCalendar = recommendation.dueAtEpochMs?.let {
+                                    { onOpenCalendar(recommendation.dueAtEpochMs) }
+                                },
+                                modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
                             )
-                            CrmStageProgress(opportunity.entity.stage)
                         }
-                    }
-
-                    item {
-                        CrmDealFacts(opportunity, Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal))
                     }
 
                     item {
@@ -181,34 +180,26 @@ fun CrmOpportunityDetailPage(
                         }
                     }
 
-                    if (state.suggestions.any { it.entity.status == "PENDING" }) {
-                        item {
-                            CrmSectionHeader(
-                                title = "知伴建议",
-                                modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
-                            )
-                        }
-                        items(
-                            state.suggestions.filter {
-                                it.entity.status == "PENDING"
+                    item {
+                        CrmSectionHeader(
+                            title = "推进阶段",
+                            modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                        )
+                    }
+                    item {
+                        CrmCompactStageStatus(
+                            stage = opportunity.entity.stage,
+                            onAdjust = if (opportunity.entity.stage in CrmOpportunityStage.terminalStages) {
+                                null
+                            } else {
+                                { showStageDialog = true }
                             },
-                            key = { it.entity.suggestionId },
-                        ) { suggestion ->
-                            CrmDetailSuggestion(
-                                suggestion = suggestion,
-                                onAskAgent = {
-                                    onAskAgent(
-                                        crmSuggestionPrompt(
-                                            opportunityId = opportunity.entity.opportunityId,
-                                            suggestionTitle = suggestion.entity.title,
-                                            isDemo = opportunity.entity.sourceType == "DEMO",
-                                        ),
-                                    )
-                                },
-                                onDismiss = { viewModel.dismissSuggestion(suggestion.entity.suggestionId) },
-                                modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
-                            )
-                        }
+                            modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                        )
+                    }
+
+                    item {
+                        CrmDealFacts(opportunity, Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal))
                     }
 
                     item {
@@ -447,35 +438,6 @@ private fun CrmDetailAction(action: CrmActionUi, onCalendar: () -> Unit, onCompl
                 Spacer(Modifier.width(ZhiBanSpacing.Sm))
                 Text("标记完成")
             }
-        }
-    }
-}
-
-@Composable
-private fun CrmDetailSuggestion(suggestion: CrmSuggestionUi, onAskAgent: () -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
-    Column(
-        modifier.fillMaxWidth().zhiBanCardSurface(ZhiBanTerracottaSoft).padding(ZhiBanSpacing.Lg),
-        verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                Icons.Outlined.AutoAwesome,
-                contentDescription = null,
-                tint = ZhiBanTerracotta,
-                modifier = Modifier.size(ZhiBanIconSize.Leading),
-            )
-            Spacer(Modifier.width(ZhiBanSpacing.Md))
-            Text(suggestion.entity.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-        }
-        Text(suggestion.entity.summary, style = MaterialTheme.typography.bodyMedium)
-        Text(
-            "判断依据：${suggestion.entity.rationale}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            TextButton(onClick = onDismiss) { Text("忽略", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            TextButton(onClick = onAskAgent) { Text("让知伴准备", color = ZhiBanTerracotta) }
         }
     }
 }

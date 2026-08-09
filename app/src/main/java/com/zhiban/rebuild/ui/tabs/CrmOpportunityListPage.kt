@@ -42,8 +42,18 @@ fun CrmOpportunityListPage(
     val filters = remember {
         listOf<String?>(null) + crmVisibleStages + CrmOpportunityStage.LOST
     }
-    val visible = remember(state.opportunities, selectedStage) {
-        state.opportunities.filter { selectedStage == null || it.entity.stage == selectedStage }
+    val nowEpochMs = System.currentTimeMillis()
+    val visible = remember(state.opportunities, state.actions, selectedStage) {
+        state.opportunities.filter { selectedStage == null || it.entity.stage == selectedStage }.sortedWith(
+            compareBy<CrmOpportunityUi> {
+                val status = crmOpportunityStatusLine(it, state.actions, nowEpochMs)
+                when {
+                    status.startsWith("已逾期") -> 0
+                    status == "尚未安排下一步" -> 1
+                    else -> 2
+                }
+            }.thenByDescending { it.entity.updatedAtEpochMs },
+        )
     }
 
     ZhiBanPage {
@@ -90,6 +100,7 @@ fun CrmOpportunityListPage(
             items(visible, key = { it.entity.opportunityId }) { opportunity ->
                 CrmOpportunityRow(
                     opportunity = opportunity,
+                    statusLine = crmOpportunityStatusLine(opportunity, state.actions, nowEpochMs),
                     onClick = { onOpenOpportunity(opportunity.entity.opportunityId) },
                     modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
                 )

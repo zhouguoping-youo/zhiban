@@ -75,4 +75,33 @@ class CrmCandidatePoolUiTest {
 
         compose.runOnIdle { assertEquals(1, createCount) }
     }
+
+    @Test
+    fun primaryPriorityCanOpenAndAskAgentWithoutExtraDialog() {
+        var openCount = 0
+        var prepareCount = 0
+        compose.setContent {
+            ZhiBanTheme {
+                CrmPriorityCard(
+                    priority = CrmPriorityUi(
+                        kind = CrmPriorityKind.OVERDUE,
+                        title = "确认预算",
+                        context = "联系人 · 续约机会",
+                        reason = "已逾期",
+                        opportunityId = "opp-1",
+                    ),
+                    primary = true,
+                    onOpen = { openCount++ },
+                    onPrepare = { prepareCount++ },
+                )
+            }
+        }
+
+        compose.onNodeWithTag("crm-priority-overdue").assertIsDisplayed().performClick()
+        compose.onNodeWithTag("crm-priority-prepare").performClick()
+        compose.runOnIdle {
+            assertEquals(1, openCount)
+            assertEquals(1, prepareCount)
+        }
+    }
 }

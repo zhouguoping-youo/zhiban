@@ -226,9 +226,6 @@ fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L
                     onOpenOpportunity = { opportunityId ->
                         navController.navigate(CrmOpportunityDetail(opportunityId))
                     },
-                    onOpenCalendar = { epochMs ->
-                        navController.navigate(Calendar(epochMs ?: 0L)) { launchSingleTop = true }
-                    },
                     onAskAgent = { draft ->
                         navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK", workContext = true))
                     },

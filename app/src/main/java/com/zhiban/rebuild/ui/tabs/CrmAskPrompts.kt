@@ -24,3 +24,17 @@ internal fun crmSuggestionPrompt(opportunityId: String?, suggestionTitle: String
             "完成下一步动作时使用 crm.nextAction.complete，日程仍走独立确认，不要只给文字建议。"
     },
 )
+
+internal fun crmOpportunityCoachPrompt(opportunityId: String, opportunityTitle: String, guidanceTitle: String, evidence: String, isDemo: Boolean): String =
+    AgentPromptEnvelope.wrap(
+        displayText = "帮我准备：$guidanceTitle",
+        internalContext = if (isDemo) {
+            "这是演示数据中的机会“$opportunityTitle”（ID：$opportunityId）。请基于演示信息和依据“$evidence”，" +
+                "准备一份只读的下一步建议、沟通要点和需要确认的问题。不要调用任何真实写入工具。"
+        } else {
+            "请先调用 crm.opportunity.get 查询个人 CRM 机会 ID“$opportunityId”，再围绕“$guidanceTitle”开展工作。" +
+                "当前界面依据为“$evidence”，请核对机会、联系人、最近活动和下一步动作，不要把界面判断直接当成事实。" +
+                "先给出简短准备结果；需要写入活动、下一步动作、机会字段或阶段时，调用对应 CRM 工具逐项确认；" +
+                "需要安排时间时走 crm.nextAction.create 和日历确认链；对外发送必须由用户最后确认。"
+        },
+    )
