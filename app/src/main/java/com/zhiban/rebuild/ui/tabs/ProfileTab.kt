@@ -80,7 +80,14 @@ class ProfileTabViewModel @Inject constructor(store: UserProfileStore) : ViewMod
     val profile = store.profile
 }
 
-private data class ProfileSettingItem(val icon: ImageVector, val title: String, val subtitle: String, val isDanger: Boolean = false, val onClick: () -> Unit)
+internal data class ProfileSettingItem(
+    val icon: ImageVector,
+    val title: String,
+    val accessibilityDescription: String,
+    val supportingText: String? = null,
+    val isDanger: Boolean = false,
+    val onClick: () -> Unit,
+)
 
 @Composable
 fun ProfileTab(
@@ -120,17 +127,14 @@ fun ProfileTab(
         ProfileSettingItem(
             icon = Icons.Outlined.Psychology,
             title = "智能体设置",
-            subtitle = "大模型、记忆、对话风格和工具",
+            accessibilityDescription = "大模型、记忆、对话风格和工具",
             onClick = onNavigateToAgentSettings,
         ),
         ProfileSettingItem(
             icon = Icons.Outlined.AutoAwesome,
             title = "知伴帮你记的",
-            subtitle = if (pendingAutoWriteCount > 0) {
-                "$pendingAutoWriteCount 条待查看 · 可撤销或纠正"
-            } else {
-                "查看、撤销或纠正知伴自动记录的内容"
-            },
+            accessibilityDescription = "查看、撤销或纠正知伴自动记录的内容",
+            supportingText = pendingAutoWriteCount.takeIf { it > 0 }?.let { "$it 条待查看" },
             onClick = onNavigateToAutoWrites,
         ),
     )
@@ -232,7 +236,7 @@ fun ProfileTab(
 }
 
 @Composable
-private fun ProfileSettingsGroup(title: String?, items: List<ProfileSettingItem>) {
+internal fun ProfileSettingsGroup(title: String?, items: List<ProfileSettingItem>) {
     Column(verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm)) {
         if (title != null) {
             Text(
@@ -252,10 +256,12 @@ private fun ProfileSettingsGroup(title: String?, items: List<ProfileSettingItem>
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .defaultMinSize(minHeight = ZhiBanSize.ListRowWithSubtitle)
+                        .defaultMinSize(
+                            minHeight = if (item.supportingText == null) ZhiBanSize.ListRow else ZhiBanSize.ListRowWithSubtitle,
+                        )
                         .clickable(onClick = item.onClick)
                         .semantics {
-                            contentDescription = "${item.title}，${item.subtitle}"
+                            contentDescription = "${item.title}，${item.accessibilityDescription}"
                         }
                         .padding(horizontal = ZhiBanSpacing.Lg, vertical = ZhiBanSpacing.Md),
                     verticalAlignment = Alignment.CenterVertically,
@@ -273,13 +279,15 @@ private fun ProfileSettingsGroup(title: String?, items: List<ProfileSettingItem>
                             color = if (item.isDanger) SettingsDanger else SettingsPrimary,
                             fontWeight = FontWeight.Medium,
                         )
-                        Text(
-                            item.subtitle,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = SettingsSecondary,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        item.supportingText?.let {
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = SettingsSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                     Spacer(Modifier.width(ZhiBanSpacing.Sm))
                     Icon(
