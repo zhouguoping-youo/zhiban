@@ -85,6 +85,29 @@ class CrmContactLinkTest {
         assertEquals(listOf("o1"), forC1.map { it.opportunityId })
     }
 
+    @Test fun mergedContactSeesSourceCrmRecordsAndUndoRestoresOriginalScope() = runBlocking {
+        insertContact("canonical", "主联系人")
+        insertContact("source", "待合并联系人")
+        insertOpportunity("source-opportunity", "source")
+        database.contactIdentityDao().upsertMergeLink(
+            com.zhiban.rebuild.data.contact.ContactMergeLinkEntity(
+                sourceContactId = "source",
+                canonicalContactId = "canonical",
+                reason = "测试合并",
+                userConfirmed = true,
+                createdAtEpochMs = 10,
+                undoneAtEpochMs = null,
+            ),
+        )
+
+        assertEquals("source-opportunity", repository.observeCrmOpportunitiesByContact("canonical").first().single().opportunityId)
+        assertEquals("source-opportunity", repository.findOpenOpportunityForContact("canonical")?.opportunityId)
+
+        assertTrue(database.contactIdentityDao().undoConfirmedMerge("source", 20) == 1)
+        assertTrue(repository.observeCrmOpportunitiesByContact("canonical").first().isEmpty())
+        assertEquals("source-opportunity", repository.observeCrmOpportunitiesByContact("source").first().single().opportunityId)
+    }
+
     @Test fun suggestCallFollowUpCreatesPendingSuggestionForOpenOpportunity() = runBlocking {
         insertContact("c1")
         insertOpportunity("o1", "c1")

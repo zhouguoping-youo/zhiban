@@ -42,22 +42,82 @@ interface CrmDao {
     @Query("SELECT * FROM crm_opportunities WHERE sourceLeadId = :leadId ORDER BY createdAtEpochMs LIMIT 1")
     suspend fun findOpportunityBySourceLead(leadId: String): CrmOpportunityEntity?
 
-    @Query("SELECT * FROM crm_leads WHERE contactId = :contactId ORDER BY updatedAtEpochMs DESC")
+    @Query(
+        """SELECT * FROM crm_leads WHERE COALESCE(
+            (SELECT canonicalContactId FROM contact_merge_links
+             WHERE sourceContactId = crm_leads.contactId AND undoneAtEpochMs IS NULL),
+            contactId
+        ) = COALESCE(
+            (SELECT canonicalContactId FROM contact_merge_links
+             WHERE sourceContactId = :contactId AND undoneAtEpochMs IS NULL),
+            :contactId
+        ) ORDER BY updatedAtEpochMs DESC""",
+    )
     fun observeLeadsByContact(contactId: String): Flow<List<CrmLeadEntity>>
 
-    @Query("SELECT * FROM crm_opportunities WHERE primaryContactId = :contactId ORDER BY updatedAtEpochMs DESC")
+    @Query(
+        """SELECT * FROM crm_opportunities WHERE COALESCE(
+            (SELECT canonicalContactId FROM contact_merge_links
+             WHERE sourceContactId = crm_opportunities.primaryContactId AND undoneAtEpochMs IS NULL),
+            primaryContactId
+        ) = COALESCE(
+            (SELECT canonicalContactId FROM contact_merge_links
+             WHERE sourceContactId = :contactId AND undoneAtEpochMs IS NULL),
+            :contactId
+        ) ORDER BY updatedAtEpochMs DESC""",
+    )
     fun observeOpportunitiesByContact(contactId: String): Flow<List<CrmOpportunityEntity>>
 
-    @Query("SELECT * FROM crm_opportunities WHERE primaryContactId = :contactId AND status = 'OPEN' ORDER BY updatedAtEpochMs DESC LIMIT 1")
+    @Query(
+        """SELECT * FROM crm_opportunities WHERE COALESCE(
+            (SELECT canonicalContactId FROM contact_merge_links
+             WHERE sourceContactId = crm_opportunities.primaryContactId AND undoneAtEpochMs IS NULL),
+            primaryContactId
+        ) = COALESCE(
+            (SELECT canonicalContactId FROM contact_merge_links
+             WHERE sourceContactId = :contactId AND undoneAtEpochMs IS NULL),
+            :contactId
+        ) AND status = 'OPEN' ORDER BY updatedAtEpochMs DESC LIMIT 1""",
+    )
     suspend fun findOpenOpportunityByContact(contactId: String): CrmOpportunityEntity?
 
-    @Query("SELECT * FROM crm_leads WHERE contactId = :contactId ORDER BY updatedAtEpochMs DESC LIMIT 1")
+    @Query(
+        """SELECT * FROM crm_leads WHERE COALESCE(
+            (SELECT canonicalContactId FROM contact_merge_links
+             WHERE sourceContactId = crm_leads.contactId AND undoneAtEpochMs IS NULL),
+            contactId
+        ) = COALESCE(
+            (SELECT canonicalContactId FROM contact_merge_links
+             WHERE sourceContactId = :contactId AND undoneAtEpochMs IS NULL),
+            :contactId
+        ) ORDER BY updatedAtEpochMs DESC LIMIT 1""",
+    )
     suspend fun findLeadByContact(contactId: String): CrmLeadEntity?
 
-    @Query("SELECT * FROM crm_activities WHERE contactId = :contactId ORDER BY occurredAtEpochMs DESC")
+    @Query(
+        """SELECT * FROM crm_activities WHERE COALESCE(
+            (SELECT canonicalContactId FROM contact_merge_links
+             WHERE sourceContactId = crm_activities.contactId AND undoneAtEpochMs IS NULL),
+            contactId
+        ) = COALESCE(
+            (SELECT canonicalContactId FROM contact_merge_links
+             WHERE sourceContactId = :contactId AND undoneAtEpochMs IS NULL),
+            :contactId
+        ) ORDER BY occurredAtEpochMs DESC""",
+    )
     fun observeActivitiesByContact(contactId: String): Flow<List<CrmActivityEntity>>
 
-    @Query("SELECT * FROM crm_next_actions WHERE contactId = :contactId AND status = 'PENDING' ORDER BY dueAtEpochMs")
+    @Query(
+        """SELECT * FROM crm_next_actions WHERE COALESCE(
+            (SELECT canonicalContactId FROM contact_merge_links
+             WHERE sourceContactId = crm_next_actions.contactId AND undoneAtEpochMs IS NULL),
+            contactId
+        ) = COALESCE(
+            (SELECT canonicalContactId FROM contact_merge_links
+             WHERE sourceContactId = :contactId AND undoneAtEpochMs IS NULL),
+            :contactId
+        ) AND status = 'PENDING' ORDER BY dueAtEpochMs""",
+    )
     fun observePendingActionsByContact(contactId: String): Flow<List<CrmNextActionEntity>>
 
     @Query(
