@@ -207,19 +207,19 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 ## 维度 12 · 性能与内存
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
 |---|---|---|---|---|---|---|
-| 12.1 | 1000+联系人搜索卡顿 | ⬜ | | | | |
-| 12.2 | 500+日程日历卡顿 | ⬜ | | | | |
-| 12.3 | 100+商机看板卡顿 | ⬜ | | | | |
-| 12.4 | 100+待确认候选箱卡顿 | ⬜ | | | | |
-| 12.5 | 流式回复卡顿 | ⬜ | | | | |
-| 12.6 | 500+图谱节点卡顿 | ⬜ | | | | |
-| 12.7 | 图片加载过多 OOM | ⬜ | | | | |
-| 12.8 | Activity/Fragment 泄漏 | ⬜ | | | | |
-| 12.9 | ViewModel 泄漏 | ⬜ | | | | |
-| 12.10 | 协程未取消泄漏 | ⬜ | | | | |
-| 12.11 | 监听器未注销泄漏 | ⬜ | | | | |
-| 12.12 | 广播接收器未注销泄漏 | ⬜ | | | | |
-| 12.13 | 服务未停止泄漏 | ⬜ | | | | |
+| 12.1 | 1000+联系人搜索卡顿 | 🧪 | 性能（缺规模基准） | DAO 检索已用 FTS 且无 LIKE；关系页主列表仍观察全部联系人并在 Compose 内存过滤，同时有较多 StateFlow 订阅。未发现正确性 bug，但必须用 1k/5k 数据集测输入到首帧耗时与重组次数后才能判绿 | — | Macrobenchmark/Compose recomposition 基准待建 |
+| 12.2 | 500+日程日历卡顿 | 🧪 | 性能（缺规模基准） | 日程列表为带稳定 key 的 LazyColumn，范围查询有索引和 limit；尚无 500/5k 日程滚动与月份切换帧耗基准，不能仅凭 LazyColumn 声称通过 | — | 规模数据 Macrobenchmark 待建 |
+| 12.3 | 100+商机看板卡顿 | 🧪 | 性能（缺规模基准） | 机会列表与各看板列均使用 Lazy 容器和稳定 opportunityId；ViewModel 仍一次投影完整机会集合，需 100/1k 商机的列切换、滚动和 Room emit 基准 | — | CRM Macrobenchmark 待建 |
+| 12.4 | 100+待确认候选箱卡顿 | 🧪 | 性能（缺规模基准） | 候选箱使用带 candidateId key 的 LazyColumn，但数据库/状态层仍向 UI 发送完整待确认集合；需 100/1k 候选的打开、搜索与逐条处理基准 | — | 候选箱规模基准待建 |
+| 12.5 | 流式回复卡顿 | ⚪ | — | Delta 按事件增量写日志和 reducer 合并，消息 LazyColumn 使用稳定 id；滚动只在用户位于底部时跟随，运行状态不再每 token 双查数据库。真机完整对话设备回归无 ANR/崩溃 | 审计提交 | `AgentSessionReducerTest.assistant deltas merge once by attempt and ordinal then finalize` + `AgentConversationScreenE2ETest` |
+| 12.6 | 500+图谱节点卡顿 | ⚪ | — | 图谱数据可有 500+ 联系人，但当前画布严格只取当前中心的前 24 个邻居（总节点最多 25）并显示隐藏数量；O(n²) 斥力不会直接处理全部 500 节点 | 审计提交 | `RelationshipGraphSection.graphNeighborIds` 上限代码审查 + `ForceRelationshipGraphTest` |
+| 12.7 | 图片加载过多 OOM | ⚪ | — | 输入附件限制数量/单项/总字节；共享图片先读 bounds 并按尺寸采样，Provider 解码限制 10MiB、按目标尺寸分配 Bitmap 且 finally recycle，响应附件不会无界常驻 UI | 审计提交 | `AppPrivateAttachmentStagerTest` + `SharedImageDecodePolicyTest.oversizedDimensionsAreReducedBeforeBitmapAllocation` + `ProviderAttachmentResolverTest` |
+| 12.8 | Activity/Fragment 泄漏 | ⚪ | — | 应用为单 Activity Compose、无 Fragment；Activity 注册的 launcher/recognizer 绑定生命周期，异步图片 OCR 完成或失败均释放 Bitmap。未发现静态 Activity/Context 被长生命周期单例持有 | 审计提交 | Hilt/Compose 生命周期代码审查 |
+| 12.9 | ViewModel 泄漏 | ⚪ | — | ViewModel 协程统一使用 viewModelScope，未发现 ViewModel 保存 Activity/View/Composable lambda；注入对象使用 ApplicationContext 或纯仓库接口 | 审计提交 | 全 ViewModel 构造与 scope 静态审查 |
+| 12.10 | 协程未取消泄漏 | ⚪ | — | UI 使用 rememberCoroutineScope/viewModelScope；通知与无障碍 Service 在 onDestroy cancel，自有实时语音 stop/fail 释放硬件；应用级 runtime/startup scope 与进程同寿命。未发现 GlobalScope | 审计提交 | `rg CoroutineScope/GlobalScope` 静态审查 + 服务资源测试 |
+| 12.11 | 监听器未注销泄漏 | ⚪ | — | Relation/Settings 的 LifecycleObserver 均在 DisposableEffect.onDispose 移除；实时网络/语音回调由各自 stop/close 路径解除，未发现仅注册不注销的生产监听器 | 审计提交 | `rg addObserver/removeObserver` 静态审查 |
+| 12.12 | 广播接收器未注销泄漏 | ⚪ | — | 生产代码未动态调用 registerReceiver，也没有持有需要手动注销的 BroadcastReceiver；Manifest 静态组件由系统管理 | 审计提交 | 全生产源码 `registerReceiver/unregisterReceiver` 静态扫描 |
+| 12.13 | 服务未停止泄漏 | ⚪ | — | NotificationListener/AccessibilityService 由系统绑定，不自启常驻前台服务；onDestroy 关闭 Channel/Handler/Recognizer/scope。通话挂断对账使用一次性 WorkManager，不保活 Service | 审计提交 | `ZhiBanNotificationListenerService.onDestroy` + `OutgoingMessageAccessibilityService.onDestroy` 代码审查 |
 
 ## 维度 13 · 兼容性与边界
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
