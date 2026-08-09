@@ -54,6 +54,8 @@ import com.zhiban.rebuild.runtime.tool.RuntimeToolCatalog
 import com.zhiban.rebuild.ui.components.ZhiBanGlassCard
 import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
 import com.zhiban.rebuild.ui.components.ZhiBanPage
+import com.zhiban.rebuild.ui.components.ZhiBanSaveButton
+import com.zhiban.rebuild.ui.components.ZhiBanSaveState
 import com.zhiban.rebuild.ui.components.ZhiBanSectionTitle
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
 import com.zhiban.rebuild.ui.theme.*
@@ -571,9 +573,10 @@ fun AgentPersonalizationPage(onBack: () -> Unit, viewModel: AgentPersonalization
                     }
                 }
                 item {
-                    Button(viewModel::save, Modifier.fillMaxWidth()) {
-                        Text(if (s.saved) "已保存" else "保存")
-                    }
+                    ZhiBanSaveButton(
+                        state = if (s.saved) ZhiBanSaveState.SAVED else ZhiBanSaveState.IDLE,
+                        onClick = viewModel::save,
+                    )
                 }
             }
         }

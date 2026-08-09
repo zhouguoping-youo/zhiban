@@ -19,11 +19,13 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredHeightIn
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -48,7 +50,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination
@@ -74,8 +75,8 @@ import com.zhiban.rebuild.ui.theme.ZhiBanTerracottaSoft
 
 private val BottomBarReservedHeight = 104.dp
 private val BottomBarHeight = ZhiBanSize.BottomBar
-private val BottomBarContainerHeight = ZhiBanSize.BottomBar
 private val BottomBarBottomPadding = ZhiBanSpacing.Md
+private val BottomBarContainerHeight = ZhiBanSize.BottomBar + BottomBarBottomPadding
 private val BottomTabIconSize = ZhiBanIconSize.Navigation
 private val BottomBarShape = RoundedCornerShape(ZhiBanRadius.Full)
 private val NavigationRailWidth = 64.dp
@@ -224,14 +225,13 @@ fun ZhiBanBottomBar(
     Box(
         modifier = modifier
             .navigationBarsPadding()
-            .padding(bottom = BottomBarBottomPadding)
             .widthIn(max = 420.dp)
             .fillMaxWidth()
             .padding(horizontal = ZhiBanSpacing.Xxl)
             .height(BottomBarContainerHeight),
     ) {
         Box(
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(BottomBarHeight)
+            modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().height(BottomBarHeight)
                 .shadow(
                     14.dp,
                     BottomBarShape,
@@ -242,7 +242,7 @@ fun ZhiBanBottomBar(
         )
         Row(
             modifier = Modifier.align(
-                Alignment.BottomCenter,
+                Alignment.TopCenter,
             ).fillMaxWidth().height(BottomBarHeight).padding(horizontal = ZhiBanSpacing.Sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -314,18 +314,18 @@ private fun TabNavItem(
             tooltipState.show()
         }
     }
-    Box(modifier = modifier.height(ZhiBanSize.TouchTarget)) {
+    Box(modifier = modifier.requiredHeightIn(min = ZhiBanSize.TouchTarget)) {
         TooltipBox(
             positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
             tooltip = { PlainTooltip { Text(label) } },
             state = tooltipState,
             focusable = false,
+            modifier = Modifier.fillMaxSize(),
         ) {
             Box(
                 modifier = Modifier.fillMaxSize().semantics {
                     contentDescription = label
-                    this.selected = selected
-                }.clickable(role = Role.Tab, onClick = onClick),
+                }.selectable(selected = selected, role = Role.Tab, onClick = onClick),
                 contentAlignment = Alignment.Center,
             ) {
                 Box(
@@ -353,11 +353,8 @@ private fun RailNavItem(label: String, selected: Boolean, onClick: () -> Unit, i
         Box(
             modifier = Modifier
                 .size(ZhiBanSize.TouchTarget)
-                .semantics {
-                    contentDescription = label
-                    this.selected = selected
-                }
-                .clickable(role = Role.Tab, onClick = onClick),
+                .semantics { contentDescription = label }
+                .selectable(selected = selected, role = Role.Tab, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
             Box(

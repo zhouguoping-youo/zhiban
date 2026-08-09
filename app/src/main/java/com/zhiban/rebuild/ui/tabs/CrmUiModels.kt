@@ -26,6 +26,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -119,6 +120,7 @@ internal data class CrmOpportunityDetailUiState(
     val stakeholders: List<CrmStakeholderUi> = emptyList(),
     val stageHistory: List<CrmStageHistoryEntity> = emptyList(),
     val isLoading: Boolean = true,
+    val errorMessage: String? = null,
 )
 
 private data class CrmDetailCore(
@@ -250,6 +252,13 @@ class CrmCapabilityViewModel @Inject constructor(
                     )
                 }.combine(demoStore.dataset) { real, demo ->
                     demo?.toDetailState(opportunityId) ?: real
+                }.catch {
+                    emit(
+                        CrmOpportunityDetailUiState(
+                            isLoading = false,
+                            errorMessage = "机会详情读取失败，请稍后重试",
+                        ),
+                    )
                 }
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CrmOpportunityDetailUiState())

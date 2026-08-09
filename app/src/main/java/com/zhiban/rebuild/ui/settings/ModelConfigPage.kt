@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.CloudQueue
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
@@ -51,6 +50,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zhiban.rebuild.ui.chat.PreferencesManager
 import com.zhiban.rebuild.ui.components.ZhiBanGlassCard
 import com.zhiban.rebuild.ui.components.ZhiBanPage
+import com.zhiban.rebuild.ui.components.ZhiBanSaveButton
+import com.zhiban.rebuild.ui.components.ZhiBanSaveState
 import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
 import com.zhiban.rebuild.ui.theme.CloudBlue
@@ -233,46 +234,18 @@ fun ModelConfigPage(onBack: () -> Unit = {}, viewModel: ModelConfigViewModel = h
                     }
                 }
 
-                // ===== 保存按钮 =====
                 item {
-                    Column {
-                        Button(
-                            onClick = viewModel::save,
-                            modifier = Modifier.fillMaxWidth().height(ZhiBanSize.Input),
-                            enabled = !state.isLoading &&
-                                !state.isSaving &&
-                                (state.apiKey.isNotBlank() || state.isApiKeyConfigured),
-                            shape = RoundedCornerShape(ZhiBanRadius.Full),
-                        ) {
-                            Text(
-                                if (state.isSaving) {
-                                    "保存中…"
-                                } else if (state.isApiKeyConfigured && state.apiKey.isBlank()) {
-                                    "保存"
-                                } else {
-                                    "连接"
-                                },
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
-                        if (state.savedTick) {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(
-                                    Icons.Filled.CheckCircle,
-                                    contentDescription = null,
-                                    tint = SuccessText,
-                                    modifier = Modifier.size(ZhiBanIconSize.Inline),
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("已保存", color = SuccessText, style = MaterialTheme.typography.bodySmall)
-                            }
-                        }
-                    }
+                    ZhiBanSaveButton(
+                        state = when {
+                            state.isSaving -> ZhiBanSaveState.SAVING
+                            state.savedTick -> ZhiBanSaveState.SAVED
+                            else -> ZhiBanSaveState.IDLE
+                        },
+                        onClick = viewModel::save,
+                        enabled = !state.isLoading &&
+                            (state.apiKey.isNotBlank() || state.isApiKeyConfigured),
+                        idleLabel = if (state.isApiKeyConfigured && state.apiKey.isBlank()) "保存" else "连接",
+                    )
                 }
 
                 item { Spacer(modifier = Modifier.height(ZhiBanTabBottomSpacer)) }

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -86,7 +87,7 @@ fun CrmOpportunityDetailPage(
             item {
                 ZhiBanTopBar(
                     title = opportunity?.entity?.title ?: "机会详情",
-                    subtitle = opportunity?.entity?.accountNameSnapshot ?: "正在读取",
+                    subtitle = opportunity?.entity?.accountNameSnapshot ?: if (state.isLoading) "正在读取" else "个人 CRM",
                     onBack = onBack,
                     trailing = opportunity?.entity?.sourceType?.let { sourceType ->
                         if (sourceType == "DEMO") {
@@ -105,176 +106,200 @@ fun CrmOpportunityDetailPage(
                 )
             }
 
-            if (opportunity != null) {
-                item {
-                    Column(
-                        Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
-                        verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Lg),
-                    ) {
-                        CrmSectionHeader(
-                            title = "推进阶段",
-                            action = if (opportunity.entity.stage in CrmOpportunityStage.terminalStages) null else "调整",
-                            onAction = if (opportunity.entity.stage in
-                                CrmOpportunityStage.terminalStages
-                            ) {
-                                null
-                            } else {
-                                ({ showStageDialog = true })
-                            },
-                        )
-                        CrmStageProgress(opportunity.entity.stage)
-                    }
-                }
-
-                item {
-                    CrmDealFacts(opportunity, Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal))
-                }
-
-                item {
-                    CrmSectionHeader(
-                        title = "下一步动作",
-                        modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+            when {
+                state.isLoading -> item {
+                    CrmDetailPageState(
+                        title = "正在读取机会",
+                        message = "稍等一下，知伴正在整理联系人和推进记录。",
+                        loading = true,
                     )
                 }
-                val pendingActions = state.actions.filter { it.entity.status == CrmActionStatus.PENDING }
-                if (pendingActions.isEmpty()) {
-                    item {
-                        Text(
-                            "还没有已确认的下一步动作。",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
-                        )
-                    }
-                } else {
-                    items(pendingActions, key = { it.entity.actionId }) { action ->
-                        CrmDetailAction(
-                            action = action,
-                            onCalendar = { onOpenCalendar(action.entity.dueAtEpochMs) },
-                            onComplete = { viewModel.completeAction(action.entity.actionId) },
-                            modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
-                        )
-                    }
-                }
 
-                if (state.suggestions.any { it.entity.status == "PENDING" }) {
-                    item {
-                        CrmSectionHeader(
-                            title = "知伴建议",
-                            modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
-                        )
-                    }
-                    items(
-                        state.suggestions.filter {
-                            it.entity.status == "PENDING"
-                        },
-                        key = { it.entity.suggestionId },
-                    ) { suggestion ->
-                        CrmDetailSuggestion(
-                            suggestion = suggestion,
-                            onAskAgent = {
-                                onAskAgent(
-                                    crmSuggestionPrompt(
-                                        opportunityId = opportunity.entity.opportunityId,
-                                        suggestionTitle = suggestion.entity.title,
-                                        isDemo = opportunity.entity.sourceType == "DEMO",
-                                    ),
-                                )
-                            },
-                            onDismiss = { viewModel.dismissSuggestion(suggestion.entity.suggestionId) },
-                            modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
-                        )
-                    }
-                }
-
-                item {
-                    CrmSectionHeader(
-                        title = "关键关系人",
-                        action = "关系",
-                        onAction = onOpenRelation,
-                        modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                state.errorMessage != null -> item {
+                    CrmDetailPageState(
+                        title = "暂时无法读取",
+                        message = state.errorMessage.orEmpty(),
                     )
                 }
-                if (state.stakeholders.isEmpty()) {
-                    item {
-                        Text(
-                            "还没有确认决策人、推动者或使用人。",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
-                        )
-                    }
-                } else {
+
+                opportunity == null -> item {
+                    CrmDetailPageState(
+                        title = "没有找到这条机会",
+                        message = "它可能已被删除或退出了演示模式。",
+                    )
+                }
+
+                else -> {
                     item {
                         Column(
-                            Modifier.padding(
-                                horizontal = ZhiBanSpacing.PageHorizontal,
-                            ).fillMaxWidth().zhiBanCardSurface(),
+                            Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                            verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Lg),
                         ) {
-                            state.stakeholders.forEachIndexed { index, stakeholder ->
-                                if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                                Row(
-                                    Modifier.fillMaxWidth().defaultMinSize(
-                                        minHeight = ZhiBanSize.ListRowWithSubtitle,
-                                    ).clickable(onClick = onOpenRelation)
-                                        .padding(horizontal = ZhiBanSpacing.Lg, vertical = ZhiBanSpacing.Md),
-                                    verticalAlignment = Alignment.CenterVertically,
+                            CrmSectionHeader(
+                                title = "推进阶段",
+                                action = if (opportunity.entity.stage in CrmOpportunityStage.terminalStages) null else "调整",
+                                onAction = if (opportunity.entity.stage in
+                                    CrmOpportunityStage.terminalStages
                                 ) {
-                                    Box(
-                                        Modifier.size(40.dp).clip(CircleShape).background(ZhiBanTerracottaSoft),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        Text(
-                                            stakeholder.contactName.take(1),
-                                            color = ZhiBanTerracotta,
-                                            fontWeight = FontWeight.SemiBold,
-                                        )
-                                    }
-                                    Spacer(Modifier.width(ZhiBanSpacing.Md))
-                                    Column(Modifier.weight(1f)) {
-                                        Text(
-                                            stakeholder.contactName,
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.SemiBold,
-                                        )
-                                        Text(
-                                            listOfNotNull(stakeholder.company, stakeholder.title).joinToString(" · "),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
-                                    Text(
-                                        crmStakeholderRoleLabel(stakeholder.entity.roleType),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = ZhiBanTerracotta,
+                                    null
+                                } else {
+                                    ({ showStageDialog = true })
+                                },
+                            )
+                            CrmStageProgress(opportunity.entity.stage)
+                        }
+                    }
+
+                    item {
+                        CrmDealFacts(opportunity, Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal))
+                    }
+
+                    item {
+                        CrmSectionHeader(
+                            title = "下一步动作",
+                            modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                        )
+                    }
+                    val pendingActions = state.actions.filter { it.entity.status == CrmActionStatus.PENDING }
+                    if (pendingActions.isEmpty()) {
+                        item {
+                            Text(
+                                "还没有已确认的下一步动作。",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                            )
+                        }
+                    } else {
+                        items(pendingActions, key = { it.entity.actionId }) { action ->
+                            CrmDetailAction(
+                                action = action,
+                                onCalendar = { onOpenCalendar(action.entity.dueAtEpochMs) },
+                                onComplete = { viewModel.completeAction(action.entity.actionId) },
+                                modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                            )
+                        }
+                    }
+
+                    if (state.suggestions.any { it.entity.status == "PENDING" }) {
+                        item {
+                            CrmSectionHeader(
+                                title = "知伴建议",
+                                modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                            )
+                        }
+                        items(
+                            state.suggestions.filter {
+                                it.entity.status == "PENDING"
+                            },
+                            key = { it.entity.suggestionId },
+                        ) { suggestion ->
+                            CrmDetailSuggestion(
+                                suggestion = suggestion,
+                                onAskAgent = {
+                                    onAskAgent(
+                                        crmSuggestionPrompt(
+                                            opportunityId = opportunity.entity.opportunityId,
+                                            suggestionTitle = suggestion.entity.title,
+                                            isDemo = opportunity.entity.sourceType == "DEMO",
+                                        ),
                                     )
+                                },
+                                onDismiss = { viewModel.dismissSuggestion(suggestion.entity.suggestionId) },
+                                modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                            )
+                        }
+                    }
+
+                    item {
+                        CrmSectionHeader(
+                            title = "关键关系人",
+                            action = "关系",
+                            onAction = onOpenRelation,
+                            modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                        )
+                    }
+                    if (state.stakeholders.isEmpty()) {
+                        item {
+                            Text(
+                                "还没有确认决策人、推动者或使用人。",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                            )
+                        }
+                    } else {
+                        item {
+                            Column(
+                                Modifier.padding(
+                                    horizontal = ZhiBanSpacing.PageHorizontal,
+                                ).fillMaxWidth().zhiBanCardSurface(),
+                            ) {
+                                state.stakeholders.forEachIndexed { index, stakeholder ->
+                                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                    Row(
+                                        Modifier.fillMaxWidth().defaultMinSize(
+                                            minHeight = ZhiBanSize.ListRowWithSubtitle,
+                                        ).clickable(onClick = onOpenRelation)
+                                            .padding(horizontal = ZhiBanSpacing.Lg, vertical = ZhiBanSpacing.Md),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Box(
+                                            Modifier.size(40.dp).clip(CircleShape).background(ZhiBanTerracottaSoft),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Text(
+                                                stakeholder.contactName.take(1),
+                                                color = ZhiBanTerracotta,
+                                                fontWeight = FontWeight.SemiBold,
+                                            )
+                                        }
+                                        Spacer(Modifier.width(ZhiBanSpacing.Md))
+                                        Column(Modifier.weight(1f)) {
+                                            Text(
+                                                stakeholder.contactName,
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                            )
+                                            Text(
+                                                listOfNotNull(stakeholder.company, stakeholder.title).joinToString(" · "),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
+                                        Text(
+                                            crmStakeholderRoleLabel(stakeholder.entity.roleType),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = ZhiBanTerracotta,
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
-                }
 
-                item {
-                    CrmSectionHeader(
-                        title = "推进记录",
-                        modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
-                    )
-                }
-                items(state.activities, key = CrmActivityEntity::activityId) { activity ->
-                    CrmActivityRow(activity, Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal))
-                }
-
-                if (state.stageHistory.isNotEmpty()) {
                     item {
                         CrmSectionHeader(
-                            title = "阶段记录",
+                            title = "推进记录",
                             modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
                         )
                     }
-                    items(state.stageHistory.take(4), key = CrmStageHistoryEntity::historyId) { history ->
-                        CrmHistoryRow(history, Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal))
+                    items(state.activities, key = CrmActivityEntity::activityId) { activity ->
+                        CrmActivityRow(activity, Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal))
+                    }
+
+                    if (state.stageHistory.isNotEmpty()) {
+                        item {
+                            CrmSectionHeader(
+                                title = "阶段记录",
+                                modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                            )
+                        }
+                        items(state.stageHistory.take(4), key = CrmStageHistoryEntity::historyId) { history ->
+                            CrmHistoryRow(history, Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal))
+                        }
                     }
                 }
             }
@@ -289,6 +314,24 @@ fun CrmOpportunityDetailPage(
                 showStageDialog = false
                 viewModel.changeStage(opportunity.entity.opportunityId, stage)
             },
+        )
+    }
+}
+
+@Composable
+internal fun CrmDetailPageState(title: String, message: String, loading: Boolean = false) {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = ZhiBanSpacing.PageHorizontal)
+            .zhiBanCardSurface().padding(ZhiBanSpacing.Xxl),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
+    ) {
+        if (loading) CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 2.dp)
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text(
+            message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

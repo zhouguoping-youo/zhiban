@@ -64,6 +64,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -73,6 +75,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -148,6 +151,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlinx.coroutines.launch
 
 internal val RelationBackground: Color @Composable get() = MaterialTheme.colorScheme.background
 internal val RelationSurface: Color @Composable get() = MaterialTheme.colorScheme.surface
@@ -217,6 +221,9 @@ fun RelationTab(
     var outgoingAccessibilityEnabled by remember {
         mutableStateOf(isOutgoingAccessibilityEnabled(context))
     }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val showFeedback: (String) -> Unit = { message -> scope.launch { snackbarHostState.showSnackbar(message) } }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, context) {
         val observer = LifecycleEventObserver { _, event ->
@@ -242,7 +249,7 @@ fun RelationTab(
     }
     LaunchedEffect(autoWriteState.receipts.isNotEmpty()) {
         if (autoWriteViewModel.consumeFirstHintIfNeeded(autoWriteState.receipts.isNotEmpty())) {
-            Toast.makeText(context, "知伴帮你整理了一条，可看可撤", Toast.LENGTH_LONG).show()
+            snackbarHostState.showSnackbar("知伴帮你整理了一条，可看可撤")
         }
     }
     val contactPermissionLauncher =
@@ -590,6 +597,10 @@ fun RelationTab(
                 }
             }
         }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = ZhiBanTabBottomSpacer),
+        )
     }
 
     selected?.let { contact ->
@@ -683,7 +694,10 @@ fun RelationTab(
             onConfirm = { canonicalId, sourceId, result ->
                 viewModel.confirmMerge(canonicalId, sourceId, suggestion.reason) { error ->
                     result(error)
-                    if (error == null) selectedMergeSuggestion = null
+                    if (error == null) {
+                        selectedMergeSuggestion = null
+                        showFeedback("联系人已合并，可在详情中撤销")
+                    }
                 }
             },
         )
@@ -695,13 +709,19 @@ fun RelationTab(
             onSaveAlias = { value, result ->
                 viewModel.addAlias(contact.contactId, value) { error ->
                     result(error)
-                    if (error == null) identityEditorFor = null
+                    if (error == null) {
+                        identityEditorFor = null
+                        showFeedback("称呼已保存")
+                    }
                 }
             },
             onSavePlatform = { platform, handle, result ->
                 viewModel.addPlatformIdentity(contact.contactId, platform, handle) { error ->
                     result(error)
-                    if (error == null) identityEditorFor = null
+                    if (error == null) {
+                        identityEditorFor = null
+                        showFeedback("联系方式已保存")
+                    }
                 }
             },
         )
@@ -713,7 +733,10 @@ fun RelationTab(
             onSave = { id, name, phone, wechat, company, title, selectedTag, note, result ->
                 viewModel.save(id, name, phone, wechat, company, title, selectedTag, note) { error ->
                     result(error)
-                    if (error == null) showEditor = false
+                    if (error == null) {
+                        showEditor = false
+                        showFeedback(if (id == null) "联系人已添加" else "联系人已保存")
+                    }
                 }
             },
         )
@@ -792,7 +815,10 @@ fun RelationTab(
             onSave = { text, source, result ->
                 viewModel.saveCallNote(call.callRecordId, text, source) { error ->
                     result(error)
-                    if (error == null) selectedCallNote = null
+                    if (error == null) {
+                        selectedCallNote = null
+                        showFeedback("通话备注已保存")
+                    }
                 }
             },
         )
@@ -803,7 +829,12 @@ fun RelationTab(
             title = { Text("删除联系人？") },
             text = { Text("“${contact.displayName}”及其个人资料将从关系中移除。") },
             confirmButton = {
-                TextButton(onClick = { viewModel.delete(contact.contactId) { deleting = null } }) {
+                TextButton(onClick = {
+                    viewModel.delete(contact.contactId) {
+                        deleting = null
+                        showFeedback("联系人已删除")
+                    }
+                }) {
                     Text("删除", color = RelationDanger)
                 }
             },
@@ -841,7 +872,10 @@ fun RelationTab(
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.confirmContactIsOwner(contact.contactId) { error ->
-                        if (error == null) markingAsOwner = null
+                        if (error == null) {
+                            markingAsOwner = null
+                            showFeedback("已归入我的资料，可撤销")
+                        }
                     }
                 }) { Text("确认是我", color = RelationInk) }
             },
@@ -859,7 +893,10 @@ fun RelationTab(
             onSave = { from, to, type, result ->
                 viewModel.saveRelationship(from, to, type) { error ->
                     result(error)
-                    if (error == null) showRelationEditor = false
+                    if (error == null) {
+                        showRelationEditor = false
+                        showFeedback("关系已保存")
+                    }
                 }
             },
         )
@@ -878,7 +915,12 @@ fun RelationTab(
                 )
             },
             confirmButton = {
-                TextButton(onClick = { viewModel.deleteRelationship(edge.edgeId) { deletingEdge = null } }) {
+                TextButton(onClick = {
+                    viewModel.deleteRelationship(edge.edgeId) {
+                        deletingEdge = null
+                        showFeedback("关系已删除")
+                    }
+                }) {
                     Text("删除", color = RelationDanger)
                 }
             },
@@ -895,7 +937,10 @@ fun RelationTab(
             onUpdate = { type, result ->
                 viewModel.updateRelationship(edge.edgeId, type) { error ->
                     result(error)
-                    if (error == null) selectedEdge = null
+                    if (error == null) {
+                        selectedEdge = null
+                        showFeedback("关系已保存")
+                    }
                 }
             },
             onDelete = {
@@ -911,7 +956,10 @@ fun RelationTab(
             onSave = { text, type, result ->
                 viewModel.saveContactFact(contact.contactId, text, type) { error ->
                     result(error)
-                    if (error == null) addFactFor = null
+                    if (error == null) {
+                        addFactFor = null
+                        showFeedback("联系人信息已保存")
+                    }
                 }
             },
         )
@@ -940,6 +988,7 @@ fun RelationTab(
                     if (error == null) {
                         addEventFor = null
                         editingEvent = null
+                        showFeedback("经历已保存")
                     }
                 }
             },

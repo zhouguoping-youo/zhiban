@@ -27,7 +27,10 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -249,12 +252,54 @@ fun ZhiBanTopBar(title: String, onBack: (() -> Unit)?, modifier: Modifier = Modi
                     it,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
         }
         trailing?.invoke()
+    }
+}
+
+enum class ZhiBanSaveState {
+    IDLE,
+    SAVING,
+    SAVED,
+}
+
+/** Shared save action for editable secondary and tertiary pages. */
+@Composable
+fun ZhiBanSaveButton(state: ZhiBanSaveState, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, idleLabel: String = "保存") {
+    val saved = state == ZhiBanSaveState.SAVED
+    Button(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth().defaultMinSize(minHeight = ZhiBanSize.Control),
+        enabled = enabled && state != ZhiBanSaveState.SAVING,
+        shape = RoundedCornerShape(ZhiBanRadius.Card),
+        colors = if (saved) {
+            ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        } else {
+            ButtonDefaults.buttonColors()
+        },
+    ) {
+        if (saved) {
+            Icon(
+                Icons.Outlined.Check,
+                contentDescription = null,
+                modifier = Modifier.size(ZhiBanIconSize.Inline),
+            )
+            Spacer(Modifier.width(ZhiBanSpacing.Sm))
+        }
+        Text(
+            when (state) {
+                ZhiBanSaveState.IDLE -> idleLabel
+                ZhiBanSaveState.SAVING -> "保存中…"
+                ZhiBanSaveState.SAVED -> "已保存"
+            },
+        )
     }
 }
 

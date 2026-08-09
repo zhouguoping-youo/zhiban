@@ -1,13 +1,16 @@
 package com.zhiban.rebuild.ui.components
 
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.longClick
+import androidx.compose.ui.unit.dp
 import com.zhiban.rebuild.navigation.Calendar
 import com.zhiban.rebuild.navigation.Home
 import com.zhiban.rebuild.navigation.Profile
@@ -36,7 +39,11 @@ class ZhiBanBottomBarTest {
         }
 
         listOf("日历", "关系", "问问", "能力", "我的").forEach { label ->
-            compose.onNodeWithContentDescription(label).assertHasClickAction().performClick()
+            compose.onNodeWithContentDescription(label)
+                .assertHasClickAction()
+                .assertHeightIsAtLeast(48.dp)
+                .assertIsNotSelected()
+                .performClick()
         }
 
         assertEquals(

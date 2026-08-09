@@ -24,8 +24,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.CalendarMonth
@@ -117,7 +119,13 @@ private fun SettingsPageFrame(title: String, subtitle: String, onBack: () -> Uni
 @Composable
 fun LanguageSettingsPage(onBack: () -> Unit) {
     SettingsPageFrame("语言", "当前版本的显示语言", onBack) {
-        Column(Modifier.padding(ZhiBanSpacing.PageHorizontal)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = ZhiBanSpacing.PageHorizontal)
+                .padding(bottom = ZhiBanSpacing.PageBottom),
+        ) {
             SettingsCard {
                 SettingsRow("简体中文", "当前使用", trailing = {
                     Icon(Icons.Outlined.Check, contentDescription = null, tint = ZhiBanTerracotta)
@@ -545,7 +553,11 @@ fun NotificationSettingsPage(onBack: () -> Unit, categoryViewModel: Notification
 
     SettingsPageFrame("通知", "管理日程提醒和知伴通知", onBack) {
         Column(
-            Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = ZhiBanSpacing.PageHorizontal)
+                .padding(bottom = ZhiBanSpacing.PageBottom),
             verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
         ) {
             SettingsCard {
@@ -608,7 +620,11 @@ fun StorageSettingsPage(onBack: () -> Unit) {
     val databaseBytes = remember { agentDatabaseSize(context) }
     SettingsPageFrame("存储", "查看占用空间，清理可重新生成的临时文件", onBack) {
         Column(
-            Modifier.padding(ZhiBanSpacing.PageHorizontal),
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = ZhiBanSpacing.PageHorizontal)
+                .padding(bottom = ZhiBanSpacing.PageBottom),
             verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
         ) {
             SettingsCard {
@@ -803,7 +819,11 @@ fun ReportErrorSettingsPage(onBack: () -> Unit, onDiagnostics: () -> Unit) {
     val context = LocalContext.current
     SettingsPageFrame("报告问题", "描述问题，或生成脱敏诊断记录", onBack) {
         Column(
-            Modifier.padding(ZhiBanSpacing.PageHorizontal),
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = ZhiBanSpacing.PageHorizontal)
+                .padding(bottom = ZhiBanSpacing.PageBottom),
             verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
         ) {
             SettingsCard {
@@ -867,7 +887,10 @@ fun AboutZhiBanPage(onBack: () -> Unit) {
     var openEntry by remember { mutableStateOf<AboutLegalEntry?>(null) }
     SettingsPageFrame("关于知伴", "你的个人智能助理", onBack) {
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = ZhiBanSpacing.PageHorizontal, vertical = ZhiBanSpacing.Xxl),
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = ZhiBanSpacing.PageHorizontal, vertical = ZhiBanSpacing.Xxl),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(
@@ -921,7 +944,13 @@ fun AboutZhiBanPage(onBack: () -> Unit) {
 fun AppearanceSettingsPage(onBack: () -> Unit, themePreferenceStore: ThemePreferenceStore = hiltViewModel<AppearanceThemeViewModel>().store) {
     val preference by themePreferenceStore.preference.collectAsStateWithLifecycle()
     SettingsPageFrame("外观", "选择知伴的显示模式", onBack) {
-        Column(Modifier.padding(ZhiBanSpacing.PageHorizontal)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = ZhiBanSpacing.PageHorizontal)
+                .padding(bottom = ZhiBanSpacing.PageBottom),
+        ) {
             SettingsCard {
                 ThemeOptionRow(
                     title = "浅色",

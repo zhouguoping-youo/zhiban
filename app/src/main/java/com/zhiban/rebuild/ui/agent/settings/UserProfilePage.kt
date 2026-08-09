@@ -34,6 +34,8 @@ import androidx.lifecycle.viewModelScope
 import com.zhiban.rebuild.runtime.personalization.UserProfile
 import com.zhiban.rebuild.runtime.personalization.UserProfileStore
 import com.zhiban.rebuild.ui.components.ZhiBanPage
+import com.zhiban.rebuild.ui.components.ZhiBanSaveButton
+import com.zhiban.rebuild.ui.components.ZhiBanSaveState
 import com.zhiban.rebuild.ui.theme.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -338,14 +340,10 @@ fun UserProfilePage(onBack: () -> Unit, viewModel: UserProfileViewModel = hiltVi
                     )
                 }
                 item {
-                    Button(
+                    ZhiBanSaveButton(
+                        state = if (s.saved) ZhiBanSaveState.SAVED else ZhiBanSaveState.IDLE,
                         onClick = viewModel::save,
-                        modifier = Modifier.fillMaxWidth().height(ZhiBanSize.Control),
-                        colors = ButtonDefaults.buttonColors(containerColor = ZhiBanTerracotta),
-                        shape = RoundedCornerShape(ZhiBanRadius.Card),
-                    ) {
-                        Text(if (s.saved) "已保存" else "保存")
-                    }
+                    )
                 }
             }
         }
@@ -468,6 +466,7 @@ private fun AddAccountRow(onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
+            .defaultMinSize(minHeight = ZhiBanSize.TouchTarget)
             .clip(RoundedCornerShape(ZhiBanRadius.Small))
             .clickable(onClick = onClick)
             .padding(vertical = ZhiBanSpacing.Sm),

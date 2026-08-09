@@ -63,4 +63,37 @@ class ZhiBanVisualFontScaleTest {
         val height = bounds.bottom - bounds.top
         assertTrue("input must preserve its 52dp minimum", height >= 52.dp)
     }
+
+    @Test
+    fun secondaryHeaderKeepsLongContextAtDoubleFontScale() {
+        compose.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 2f)) {
+                ZhiBanTheme {
+                    ZhiBanTopBar(
+                        title = "隐私与权限",
+                        subtitle = "查看知伴可以使用的手机能力和数据发送范围",
+                        onBack = {},
+                        modifier = Modifier.testTag("secondary-header"),
+                    )
+                }
+            }
+        }
+
+        compose.onNodeWithText("隐私与权限").assertIsDisplayed()
+        compose.onNodeWithText("查看知伴可以使用的手机能力和数据发送范围").assertIsDisplayed()
+        val bounds = compose.onNodeWithTag("secondary-header").getUnclippedBoundsInRoot()
+        assertTrue("secondary header must expand for two-line context", bounds.bottom - bounds.top > 72.dp)
+    }
+
+    @Test
+    fun saveActionShowsCommittedState() {
+        compose.setContent {
+            ZhiBanTheme {
+                ZhiBanSaveButton(state = ZhiBanSaveState.SAVED, onClick = {})
+            }
+        }
+
+        compose.onNodeWithText("已保存").assertIsDisplayed()
+    }
 }

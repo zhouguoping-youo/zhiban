@@ -48,6 +48,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -56,6 +58,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -105,6 +108,7 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.time.temporal.TemporalAdjusters
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 internal val CalendarBackground: Color @Composable get() = MaterialTheme.colorScheme.background
 internal val CalendarSurface: Color @Composable get() = MaterialTheme.colorScheme.surface
@@ -146,6 +150,9 @@ fun CalendarTab(
     }
     var reminderPermissionMessage by remember { mutableStateOf(false) }
     var suggestionMessage by remember { mutableStateOf<String?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val showFeedback: (String) -> Unit = { message -> scope.launch { snackbarHostState.showSnackbar(message) } }
     LaunchedEffect(focusDateEpochMs) {
         focusDateEpochMs?.let { epochMs ->
             val focusedDate = Instant.ofEpochMilli(epochMs).atZone(ZoneId.systemDefault()).toLocalDate()
@@ -220,6 +227,7 @@ fun CalendarTab(
                                             viewModel.selectDay(selectedDate)
                                         }
                                         if (result.notificationPermissionNeeded) reminderPermissionMessage = true
+                                        showFeedback("日程已添加")
                                     }
 
                                     is CalendarAgentViewModel.SaveResult.Conflict -> suggestionMessage = result.message
@@ -292,6 +300,10 @@ fun CalendarTab(
                 Spacer(Modifier.height(24.dp))
             }
         }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = ZhiBanTabBottomSpacer),
+        )
     }
 
     if (showEditor) {
@@ -326,6 +338,7 @@ fun CalendarTab(
                         selectedDate = date
                         viewModel.selectDay(date)
                         showEditor = false
+                        showFeedback(if (id == null) "日程已添加" else "日程已保存")
                         if (result.notificationPermissionNeeded) reminderPermissionMessage = true
                     }
                 }
@@ -339,7 +352,10 @@ fun CalendarTab(
             text = { Text("“${schedule.title}”将从日历中移除。") },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.delete(schedule.id) { deleting = null }
+                    viewModel.delete(schedule.id) {
+                        deleting = null
+                        showFeedback("日程已删除")
+                    }
                 }) { Text("删除", color = CalendarDanger) }
             },
             dismissButton = { TextButton(onClick = { deleting = null }) { Text("取消", color = CalendarInk) } },
