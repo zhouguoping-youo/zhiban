@@ -112,11 +112,11 @@ class AgentDataRepository internal constructor(
                 ),
             )
         }
+        daos.notificationCandidateDao.upsert(enriched)
         // High-confidence contact match: offer a CRM new-lead suggestion (user confirms; nothing auto-written).
         enriched.suggestedContactId?.let { matchedContactId ->
             crm.suggestNewLeadFromNotification(matchedContactId, enriched.candidateId, enriched.suggestedContactConfidence, nowEpochMs)
         }
-        daos.notificationCandidateDao.upsert(enriched)
         daos.notificationCandidateDao.clearExpiredOrDismissed(
             nowEpochMs - 30L * 24 * 60 * 60 * 1_000,
         )

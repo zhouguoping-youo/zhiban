@@ -206,6 +206,8 @@ internal class CrmAgentDataRepository(private val database: AgentDatabase) {
         nowEpochMs: Long = System.currentTimeMillis(),
     ): Boolean = database.withTransaction {
         if (confidence < SUGGESTION_MIN_CONFIDENCE) return@withTransaction false
+        val candidate = database.notificationCandidateDao().find(candidateId) ?: return@withTransaction false
+        if (candidate.suggestedContactId != contactId) return@withTransaction false
         val contact = database.contactDao().findById(contactId) ?: return@withTransaction false
         if (database.crmDao().findLeadByContact(contactId) != null) return@withTransaction false
         if (database.crmDao().hasPendingSuggestionOfTypeForContact(contactId, CrmSuggestionType.NEW_LEAD)) {
@@ -221,7 +223,7 @@ internal class CrmAgentDataRepository(private val database: AgentDatabase) {
                     title = "新建线索",
                     summary = "识别到「${contact.displayName}」的新消息，要不要把 TA 加为线索？".take(200),
                     rationale = "高置信通知匹配到联系人「${contact.displayName}」（置信度 ${"%.2f".format(confidence)}），TA 还没有线索。".take(500),
-                    evidenceRefsJson = "[\"$candidateId\"]",
+                    evidenceRefsJson = buildJsonArray { add(JsonPrimitive(candidate.candidateId)) }.toString(),
                     confidence = confidence,
                     proposedActionJson = null,
                     status = CrmSuggestionStatus.PENDING,

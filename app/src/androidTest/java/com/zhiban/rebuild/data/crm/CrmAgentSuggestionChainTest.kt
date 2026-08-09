@@ -6,8 +6,12 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.CrmAgentDataRepository
 import com.zhiban.rebuild.data.contact.ContactEntity
+import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -128,6 +132,7 @@ class CrmAgentSuggestionChainTest {
 
     @Test fun newLeadSuggestedForHighConfidenceMatchWithoutLead() = runBlocking {
         db.contactDao().insert(contact("c1", "高置信联系人"))
+        insertCandidate("cand-1", "c1", 0.9)
 
         val created = repo.suggestNewLeadFromNotification("c1", "cand-1", confidence = 0.9, nowEpochMs = 1_000L)
 
@@ -137,11 +142,33 @@ class CrmAgentSuggestionChainTest {
         assertNull(suggestion.opportunityId)
         assertEquals("c1", suggestion.contactId)
         assertEquals(0.9, suggestion.confidence, 0.0001)
-        assertTrue(suggestion.evidenceRefsJson.contains("cand-1"))
+        assertEquals("cand-1", Json.parseToJsonElement(suggestion.evidenceRefsJson).jsonArray.single().jsonPrimitive.content)
+    }
+
+    @Test fun newLeadSuggestionRejectsMissingOrMismatchedEvidence() = runBlocking {
+        db.contactDao().insert(contact("c1", "联系人一"))
+        db.contactDao().insert(contact("c2", "联系人二"))
+        insertCandidate("cand-mismatch", "c2", 0.9)
+
+        assertTrue(!repo.suggestNewLeadFromNotification("c1", "missing", confidence = 0.9, nowEpochMs = 1_000L))
+        assertTrue(!repo.suggestNewLeadFromNotification("c1", "cand-mismatch", confidence = 0.9, nowEpochMs = 1_000L))
+        assertEquals(0, db.crmDao().observePendingSuggestions(0.0).first().size)
+    }
+
+    @Test fun newLeadSuggestionSerializesEvidenceIdAsJson() = runBlocking {
+        db.contactDao().insert(contact("c1", "联系人"))
+        val candidateId = "cand-\"quoted"
+        insertCandidate(candidateId, "c1", 0.9)
+
+        assertTrue(repo.suggestNewLeadFromNotification("c1", candidateId, confidence = 0.9, nowEpochMs = 1_000L))
+
+        val evidence = db.crmDao().observePendingSuggestions(0.0).first().single().evidenceRefsJson
+        assertEquals(candidateId, Json.parseToJsonElement(evidence).jsonArray.single().jsonPrimitive.content)
     }
 
     @Test fun newLeadNotSuggestedBelowConfidenceThreshold() = runBlocking {
         db.contactDao().insert(contact("c1", "联系人"))
+        insertCandidate("cand-1", "c1", 0.5)
 
         val created = repo.suggestNewLeadFromNotification("c1", "cand-1", confidence = 0.5, nowEpochMs = 1_000L)
 
@@ -152,6 +179,7 @@ class CrmAgentSuggestionChainTest {
     @Test fun newLeadNotSuggestedWhenContactAlreadyHasLead() = runBlocking {
         db.contactDao().insert(contact("c1", "联系人"))
         db.crmDao().insertLead(existingLead("lead-1", "c1"))
+        insertCandidate("cand-1", "c1", 0.9)
 
         val created = repo.suggestNewLeadFromNotification("c1", "cand-1", confidence = 0.9, nowEpochMs = 1_000L)
 
@@ -211,6 +239,7 @@ class CrmAgentSuggestionChainTest {
 
     @Test fun acceptNewLeadWritesUndoableLead() = runBlocking {
         db.contactDao().insert(contact("c1", "新线索联系人"))
+        insertCandidate("cand-1", "c1", 0.9)
         repo.suggestNewLeadFromNotification("c1", "cand-1", confidence = 0.9, nowEpochMs = 1_000L)
         val suggestion = db.crmDao().observePendingSuggestions(0.0).first().single()
 
@@ -230,6 +259,7 @@ class CrmAgentSuggestionChainTest {
 
     @Test fun undoAcceptedNewLeadRestoresPendingAndDeletesLead() = runBlocking {
         db.contactDao().insert(contact("c1", "新线索联系人"))
+        insertCandidate("cand-1", "c1", 0.9)
         repo.suggestNewLeadFromNotification("c1", "cand-1", confidence = 0.9, nowEpochMs = 1_000L)
         val suggestion = db.crmDao().observePendingSuggestions(0.0).first().single()
         repo.acceptNewLeadSuggestion(suggestion.suggestionId, nowEpochMs = 2_000L)
@@ -286,6 +316,22 @@ class CrmAgentSuggestionChainTest {
         createdAtEpochMs = 1,
         updatedAtEpochMs = 1,
     )
+
+    private suspend fun insertCandidate(candidateId: String, contactId: String, confidence: Double) {
+        db.notificationCandidateDao().upsert(
+            NotificationCandidateEntity(
+                candidateId = candidateId,
+                sourceKey = "source-$candidateId",
+                packageName = "com.tencent.mm",
+                appLabel = "微信",
+                title = "联系人",
+                body = "收到",
+                postedAtEpochMs = 1,
+                suggestedContactId = contactId,
+                suggestedContactConfidence = confidence,
+            ),
+        )
+    }
 
     private fun lowConfidenceSuggestion(id: String, opportunityId: String, contactId: String, confidence: Double, createdAt: Long = 1L) =
         CrmAgentSuggestionEntity(
