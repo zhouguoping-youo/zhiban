@@ -18,7 +18,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -41,7 +40,6 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -256,6 +254,16 @@ fun RelationTab(
                 showPermissionExplanation = true
             }
         }
+    val openContactImport = {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            showImportDialog = true
+            viewModel.loadSystemContacts()
+        } else {
+            contactPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+        }
+    }
 
     val ownerContactSources = remember(rawContacts, ownerContactLinks) {
         val ownerSourceIds = ownerContactLinks.mapTo(hashSetOf()) { it.contactId }
@@ -303,16 +311,7 @@ fun RelationTab(
                     ZhiBanHeaderIconAction(
                         icon = Icons.Outlined.PhoneAndroid,
                         contentDescription = "从手机通讯录导入",
-                        onClick = {
-                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) ==
-                                PackageManager.PERMISSION_GRANTED
-                            ) {
-                                showImportDialog = true
-                                viewModel.loadSystemContacts()
-                            } else {
-                                contactPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
-                            }
-                        },
+                        onClick = openContactImport,
                         tint = RelationInk,
                     )
                     ZhiBanHeaderIconAction(
@@ -424,22 +423,26 @@ fun RelationTab(
                         .fillMaxWidth()
                         .height(ZhiBanSize.Control)
                         .clip(RoundedCornerShape(ZhiBanRadius.Full))
-                        .background(RelationSoft)
-                        .padding(ZhiBanSpacing.Xs),
+                        .background(RelationSoft),
                 ) {
                     listOf("联系人" to "list", "关系图" to "graph").forEach { (label, value) ->
                         Box(
-                            Modifier.weight(1f).height(40.dp).clip(RoundedCornerShape(ZhiBanRadius.Full))
-                                .background(if (mode == value) RelationSurface else Color.Transparent)
-                                .clickable { mode = value },
+                            Modifier.weight(1f).fillMaxHeight().clickable { mode = value },
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text(
-                                label,
-                                color = if (mode == value) RelationInk else RelationMuted,
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Medium,
-                            )
+                            Box(
+                                Modifier.fillMaxSize().padding(ZhiBanSpacing.Xs)
+                                    .clip(RoundedCornerShape(ZhiBanRadius.Full))
+                                    .background(if (mode == value) RelationSurface else Color.Transparent),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    label,
+                                    color = if (mode == value) RelationInk else RelationMuted,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Medium,
+                                )
+                            }
                         }
                     }
                 }
@@ -447,18 +450,20 @@ fun RelationTab(
             }
             item {
                 Row(
-                    Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     RelationTags.forEach { label ->
                         Box(
-                            Modifier.defaultMinSize(minHeight = ZhiBanSize.TouchTarget).clickable { tag = label },
+                            Modifier.weight(1f).defaultMinSize(minHeight = ZhiBanSize.TouchTarget)
+                                .clickable { tag = label },
                             contentAlignment = Alignment.Center,
                         ) {
                             Box(
-                                Modifier.clip(RoundedCornerShape(ZhiBanRadius.Full))
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Full))
                                     .background(if (tag == label) RelationAccent else RelationSoft)
-                                    .padding(horizontal = 15.dp, vertical = 8.dp),
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center,
                             ) {
                                 Text(
                                     label,
@@ -533,11 +538,23 @@ fun RelationTab(
                         }
                     }
                 }
-                if (visible.isEmpty()) {
+                if (contacts.isEmpty() && query.isBlank() && tag == "全部") {
+                    item {
+                        RelationEmpty(
+                            searching = false,
+                            onImport = openContactImport,
+                            onAdd = {
+                                editing = null
+                                showEditor = true
+                            },
+                        )
+                    }
+                } else if (visible.isEmpty()) {
                     if (!(tag == "全部" && ownerProfile.matchesOwnerQuery(query))) {
                         item {
                             RelationEmpty(
                                 searching = query.isNotBlank() || tag != "全部",
+                                onImport = openContactImport,
                                 onAdd = {
                                     editing = null
                                     showEditor = true

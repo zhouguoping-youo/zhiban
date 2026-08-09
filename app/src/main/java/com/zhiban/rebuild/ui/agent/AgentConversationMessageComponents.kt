@@ -154,7 +154,7 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
     Text(
         "问问",
         color = MaterialTheme.colorScheme.onBackground,
-        style = MaterialTheme.typography.titleLarge,
+        style = MaterialTheme.typography.headlineSmall,
     )
     ZhiBanHeaderIconAction(
         icon = Icons.Outlined.History,

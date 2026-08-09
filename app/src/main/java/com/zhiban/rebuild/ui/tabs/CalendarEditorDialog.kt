@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -86,6 +87,10 @@ internal fun ScheduleEditorDialog(
     var error by remember { mutableStateOf<String?>(null) }
     var reminderMinutes by remember(schedule?.id) { mutableStateOf(schedule?.reminderMinutesBefore) }
     var pendingConflict by remember { mutableStateOf<String?>(null) }
+    val formValid = title.isNotBlank() &&
+        runCatching { LocalDate.parse(dateText) }.isSuccess &&
+        runCatching { LocalTime.parse(timeText) }.isSuccess &&
+        (durationText.toIntOrNull()?.let { it in 1..1440 } == true)
 
     fun submit(allowConflict: Boolean) {
         val date = runCatching { LocalDate.parse(dateText) }.getOrNull()
@@ -189,7 +194,8 @@ internal fun ScheduleEditorDialog(
                             val selected = reminderMinutes == minutes
                             Text(
                                 label,
-                                modifier = Modifier.clip(RoundedCornerShape(18.dp))
+                                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                                    .clip(RoundedCornerShape(24.dp))
                                     .background(if (selected) CalendarAccent else CalendarSoft)
                                     .clickable {
                                         reminderMinutes = minutes
@@ -234,6 +240,7 @@ internal fun ScheduleEditorDialog(
                     submit(false)
                 },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
+                enabled = formValid,
                 colors = ButtonDefaults.buttonColors(containerColor = CalendarAccent),
                 shape = RoundedCornerShape(25.dp),
             ) { Text("保存") }

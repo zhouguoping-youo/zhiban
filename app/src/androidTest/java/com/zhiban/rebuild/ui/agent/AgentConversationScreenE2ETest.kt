@@ -100,6 +100,25 @@ class AgentConversationScreenE2ETest {
         assertEquals("file", picked.get())
     }
 
+    @Test fun emptyConversationSuggestionsRunTheSelectedTask() {
+        val selected = AtomicReference<String>()
+        compose.setContent {
+            ZhiBanTheme {
+                AgentConversationScreen(
+                    state = AgentConversationUiState(),
+                    onWorkTaskClick = selected::set,
+                )
+            }
+        }
+
+        compose.onNodeWithText("看今天").assertIsDisplayed().performClick()
+        assertEquals("帮我看看今天最重要的安排", selected.get())
+        compose.onNodeWithText("找联系人").assertIsDisplayed().performClick()
+        assertEquals("帮我找一个联系人", selected.get())
+        compose.onNodeWithText("记下一步").assertIsDisplayed().performClick()
+        assertEquals("帮我记录一个下一步动作", selected.get())
+    }
+
     @Test fun unsentDraftSurvivesSavedInstanceStateRestoration() {
         val restoration = StateRestorationTester(compose)
         restoration.setContent {

@@ -569,7 +569,7 @@ fun AgentConversationRoute(
         state = state,
         voiceInputLevel = voiceInputLevel,
         inlineModelLabel = "$selectedModel 智能/$selectedLevel",
-        onWorkTaskClick = { input = it },
+        onWorkTaskClick = { viewModel.plan(it) },
         onModelLabelClick = {},
         availableModels = availableModels,
         availableLevels = viewModel.availableLevels(),

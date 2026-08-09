@@ -452,7 +452,7 @@ private fun ExtraAccountRow(row: ExtraAccount, onHandleChange: (String) -> Unit,
             shape = RoundedCornerShape(ZhiBanRadius.Small),
             colors = profileFieldColors(),
         )
-        IconButton(onClick = onRemove, modifier = Modifier.size(ZhiBanIconContainer.Compact)) {
+        IconButton(onClick = onRemove, modifier = Modifier.size(ZhiBanIconContainer.TouchTarget)) {
             Icon(
                 Icons.Outlined.Close,
                 contentDescription = "删除${row.platform}账号",

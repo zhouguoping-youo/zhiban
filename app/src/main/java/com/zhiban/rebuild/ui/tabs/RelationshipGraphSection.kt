@@ -464,7 +464,11 @@ internal fun RelationshipGraphCard(
             )
         }
         if (!inferredFromCompany) {
-            IconButton(onClick = { onDelete(edge) }, modifier = Modifier.size(42.dp), enabled = edge.userConfirmed) {
+            IconButton(
+                onClick = { onDelete(edge) },
+                modifier = Modifier.size(ZhiBanSize.TouchTarget),
+                enabled = edge.userConfirmed,
+            ) {
                 Icon(
                     Icons.Rounded.DeleteOutline,
                     "删除${from.displayName}和${to.displayName}的关系",
@@ -480,18 +484,22 @@ internal fun RelationshipGraphCard(
 internal fun GraphPersonAvatar(person: RelationshipPersonUi, onClick: () -> Unit) {
     Box(
         Modifier
-            .size(38.dp)
-            .clip(CircleShape)
-            .background(if (person.isOwner) RelationAccent else RelationSoft)
+            .size(ZhiBanSize.TouchTarget)
             .clickable { onClick() },
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            person.displayName.take(1),
-            color = if (person.isOwner) Color.White else RelationInk,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Medium,
-        )
+        Box(
+            Modifier.size(38.dp).clip(CircleShape)
+                .background(if (person.isOwner) RelationAccent else RelationSoft),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                person.displayName.take(1),
+                color = if (person.isOwner) Color.White else RelationInk,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium,
+            )
+        }
     }
 }
 

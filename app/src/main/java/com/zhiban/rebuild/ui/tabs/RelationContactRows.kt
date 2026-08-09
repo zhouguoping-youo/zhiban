@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -14,13 +15,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,6 +35,7 @@ import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.runtime.personalization.UserProfile
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
 import com.zhiban.rebuild.ui.theme.ZhiBanIconSize
+import com.zhiban.rebuild.ui.theme.ZhiBanSize
 
 @Composable
 internal fun OwnerContactRow(profile: UserProfile, onClick: () -> Unit) {
@@ -130,7 +133,7 @@ internal fun ContactRow(contact: ContactEntity, onClick: () -> Unit) {
 }
 
 @Composable
-internal fun RelationEmpty(searching: Boolean, onAdd: () -> Unit) {
+internal fun RelationEmpty(searching: Boolean, onImport: () -> Unit, onAdd: () -> Unit) {
     Column(
         Modifier.fillMaxWidth().zhiBanCardSurface(RelationSurface).padding(vertical = 30.dp, horizontal = 22.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -147,20 +150,23 @@ internal fun RelationEmpty(searching: Boolean, onAdd: () -> Unit) {
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            if (searching) "换个词或分类试试" else "添加联系人，开始整理关系",
+            if (searching) "换个词或分类试试" else "从通讯录选择重要的人",
             color = RelationMuted,
             style = MaterialTheme.typography.bodySmall,
         )
         if (!searching) {
             Spacer(Modifier.height(16.dp))
             Button(
-                onClick = onAdd,
+                onClick = onImport,
                 colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
                 shape = RoundedCornerShape(50),
             ) {
-                Icon(Icons.Outlined.Add, null, modifier = Modifier.size(ZhiBanIconSize.Inline))
+                Icon(Icons.Outlined.PhoneAndroid, null, modifier = Modifier.size(ZhiBanIconSize.Inline))
                 Spacer(Modifier.width(6.dp))
-                Text("添加联系人")
+                Text("导入联系人")
+            }
+            TextButton(onClick = onAdd, modifier = Modifier.defaultMinSize(minHeight = ZhiBanSize.TouchTarget)) {
+                Text("手动添加", color = RelationMuted)
             }
         }
     }

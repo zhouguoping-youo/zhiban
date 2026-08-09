@@ -169,16 +169,18 @@ fun AgentConversationScreen(
         state.memoryHint?.let { MemoryHint(it, onDismissMemory) }
         state.recoveredMessageCount?.let { RecoveryBanner(it, onOpenRecovery) }
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            // Per architect 807 派单 T + 老周 806: 彻底取消任何前置画面
-            // (无 hero / 无 chat hint / 无 work idle 任务建议). tap 问问
-            // → 直接 AssistantChat 空 input 容器, 不显示任何 hint.
-            // Work idle 任务建议若需保留改为 tap ⚡ 唤起 (未来派单).
             MessageList(
                 state, onConfirm, onReject, onRetry, onCancel, onResume,
                 onNavigateToSettings,
                 onCopyAssistant, onReadAssistant, onShareAssistant, onUndo,
                 onPositiveFeedback, onNegativeFeedback,
             )
+            if (state.stage == AgentConversationStage.EMPTY && state.messages.isEmpty() && state.userMessage == null) {
+                EmptyConversationSuggestions(
+                    onSuggestionClick = onWorkTaskClick,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
+            }
         }
         state.permission?.let { PermissionRationale(it) { onRequestPermission(it) } }
         MultimodalStatusBanner(multimodalState, onOpenAppSettings = onOpenAppSettings)
@@ -234,5 +236,32 @@ fun AgentConversationScreen(
                 modelPickerOpen = false
             },
         )
+    }
+}
+
+private data class ConversationSuggestion(val label: String, val prompt: String)
+
+private val EmptyConversationPrompts = listOf(
+    ConversationSuggestion("看今天", "帮我看看今天最重要的安排"),
+    ConversationSuggestion("找联系人", "帮我找一个联系人"),
+    ConversationSuggestion("记下一步", "帮我记录一个下一步动作"),
+)
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun EmptyConversationSuggestions(onSuggestionClick: (String) -> Unit, modifier: Modifier = Modifier) {
+    FlowRow(
+        modifier = modifier.fillMaxWidth().padding(horizontal = ZhiBanSpacing.Lg, vertical = ZhiBanSpacing.Md),
+        horizontalArrangement = Arrangement.Center,
+        verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm),
+        maxItemsInEachRow = 3,
+    ) {
+        EmptyConversationPrompts.forEach { suggestion ->
+            AssistChip(
+                onClick = { onSuggestionClick(suggestion.prompt) },
+                label = { Text(suggestion.label, style = MaterialTheme.typography.labelLarge) },
+                modifier = Modifier.defaultMinSize(minHeight = ZhiBanSize.TouchTarget).padding(horizontal = ZhiBanSpacing.Xs),
+            )
+        }
     }
 }

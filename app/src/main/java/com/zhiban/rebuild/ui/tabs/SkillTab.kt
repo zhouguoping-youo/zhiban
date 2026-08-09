@@ -84,7 +84,11 @@ fun SkillTab(modifier: Modifier = Modifier, onOpenCrm: () -> Unit = {}, isDataEm
                     Spacer(Modifier.height(ZhiBanSpacing.Lg))
                 }
             }
-            items(sceneCapabilities, key = { it.id }) { capability ->
+            items(
+                items = sceneCapabilities,
+                key = { it.id },
+                span = { if (sceneCapabilities.size == 1) GridItemSpan(maxLineSpan) else GridItemSpan(1) },
+            ) { capability ->
                 SceneCapabilityCard(capability)
             }
         }

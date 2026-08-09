@@ -534,7 +534,7 @@ internal fun ContactDetailDialog(
 internal fun ContactActionButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Row(
         modifier
-            .height(46.dp)
+            .defaultMinSize(minHeight = ZhiBanSize.TouchTarget)
             .clip(RoundedCornerShape(23.dp))
             .background(RelationSoft)
             .clickable(onClick = onClick)
