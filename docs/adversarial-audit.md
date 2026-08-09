@@ -137,14 +137,14 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 ## 维度 8 · 导航与路由
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
 |---|---|---|---|---|---|---|
-| 8.1 | 深链跳转返回正确页面 | ⬜ | | | | |
-| 8.2 | 底部 TAB 切换返回原位置 | ⬜ | | | | |
-| 8.3 | 页面嵌套过深返回键混乱 | ⬜ | | | | |
-| 8.4 | 路由参数缺失崩溃 | ⬜ | | | | |
-| 8.5 | 旋转后导航状态丢失 | ⬜ | | | | |
+| 8.1 | 深链跳转返回正确页面 | ⚪ | — | 当前版本未声明 URI/App Link 深链，只有受控的显式通知和 ACTION_SEND 入口；不存在可被外部构造的深链返回栈 | — | AndroidManifest + typed NavGraph 代码审查 |
+| 8.2 | 底部 TAB 切换返回原位置 | ⚪ | — | 检查文案与既定产品行为不一致：四个浏览 TAB 点击后明确回各自一级根页面，不恢复从能力页跨到关系页形成的旧子栈；这是此前修复“能力 TAB 再也回不去”的必要约束 | — | `AgentConversationUiStateTest.ask conversation and nested assistant chat are full screen` + NavGraph flat-tab 代码审查 |
+| 8.3 | 页面嵌套过深返回键混乱 | ⚪ | — | 未复现：设置与 CRM 子页逐层 `popBackStack`，对话从 CRM 使用 BACK 返回来源；问问主入口才回日历根页。各设置入口逐页进出真机通过 | — | `AgentSettingsNavigationE2ETest.everyAgentSettingsEntryOpensAndBackReturnsThenToolTogglePersists` + `AgentConversationScreenE2ETest.approvalReplyActionsErrorRecoveryAndBackCallbacksAreOperable` |
+| 8.4 | 路由参数缺失崩溃 | ⚪ | — | 未复现：路由使用 Kotlin Serialization typed route；可选参数有默认值，必需 opportunityId 只能由内部实体导航生成。实体随后消失时详情 Flow 返回空态而不解引用崩溃 | — | Screen/NavGraph typed-route 代码审查 + CRM 删除/引用完整性设备测试 |
+| 8.5 | 旋转后导航状态丢失 | ⚪ | — | 未复现：NavController 由 `rememberNavController` 保存/恢复返回栈，外部 Inbox 请求的已处理序号另用 rememberSaveable 防止旋转重开弹层；表单状态由 ViewModel 持有 | — | NavGraph/各设置 ViewModel 状态代码审查 + SM-W7023 完整设备回归 |
 | 8.6 | 通知点击进入正确页面 | ✅ | 功能不可用 | 日程提醒原先没有 contentIntent，App 已在后台其他页面时点击毫无动作；通知现携带目标日程时间，MainActivity 只消费一次并把 NavHost 导航到对应日期。通话备注仍进入关系页待备注项 | 本提交 `fix(8.6)` | `ScheduleReminderPrivacyTest.lockScreenVersionDoesNotContainScheduleDetails`（含 contentIntent）+ `SharedIntentExtractionTest.scheduleReminderFocusAcceptsOnlyPositiveEpochAndIgnoresMissingInput` |
-| 8.7 | 分享 Intent 进入正确页面 | ⬜ | | | | |
-| 8.8 | CRM 建议点击进入正确页面 | ⬜ | | | | |
+| 8.7 | 分享 Intent 进入正确页面 | ⚪ | — | 未复现：ACTION_SEND 文本/图片成功落候选后才递增一次性 inbox request，NavHost 切到关系页并打开候选箱；非法或空分享不导航 | — | `SharedIntentExtractionTest` + `SharedTextCandidateTest` + 关系页 inbox request 代码审查 |
+| 8.8 | CRM 建议点击进入正确页面 | ⚪ | — | 未复现：机会型建议“查看机会”使用其持久化 opportunityId 进入详情；联系人型新线索建议不显示无效机会入口；“问问知伴”进入 Work 上下文并以 BACK 返回 CRM | — | `CrmAgentSuggestionChainTest` + `CrmAskPromptsTest` + `CrmSuggestionCard` 分支代码审查 |
 
 ## 维度 9 · 数据与持久化
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
