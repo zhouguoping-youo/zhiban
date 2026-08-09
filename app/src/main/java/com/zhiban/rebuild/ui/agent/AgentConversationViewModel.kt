@@ -129,7 +129,11 @@ class AgentConversationViewModel @Inject constructor(
                         AgentArtifactKind.valueOf(it.kind.name),
                     )
                 }
-                state.copy(messages = messages, artifacts = artifacts)
+                state.copy(
+                    userMessage = state.userMessage?.let(AgentPromptEnvelope::displayText),
+                    messages = messages,
+                    artifacts = artifacts,
+                )
             }.collect(_uiState)
         }
     }
