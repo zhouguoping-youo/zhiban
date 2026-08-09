@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -60,6 +62,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -684,9 +687,10 @@ private fun WeekStrip(selected: LocalDate, onSelect: (LocalDate) -> Unit) {
             val date = monday.plusDays(offset)
             val active = date == selected
             Column(
-                Modifier.width(42.dp).clip(RoundedCornerShape(18.dp)).clickable {
-                    onSelect(date)
-                }.padding(vertical = 7.dp),
+                Modifier.weight(1f).defaultMinSize(minHeight = 48.dp).clip(RoundedCornerShape(18.dp))
+                    .semantics { contentDescription = "选择 $date" }
+                    .selectable(selected = active, role = Role.Button) { onSelect(date) }
+                    .padding(vertical = 7.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
@@ -714,7 +718,7 @@ private fun WeekStrip(selected: LocalDate, onSelect: (LocalDate) -> Unit) {
 }
 
 @Composable
-private fun MonthGrid(selected: LocalDate, onSelect: (LocalDate) -> Unit) {
+internal fun MonthGrid(selected: LocalDate, onSelect: (LocalDate) -> Unit) {
     val first = selected.withDayOfMonth(1)
     val gridStart = first.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
     Column(
@@ -734,9 +738,10 @@ private fun MonthGrid(selected: LocalDate, onSelect: (LocalDate) -> Unit) {
                 repeat(7) { day ->
                     val date = gridStart.plusDays((week * 7 + day).toLong())
                     Box(
-                        Modifier.size(40.dp).clip(CircleShape)
+                        Modifier.weight(1f).height(48.dp).clip(CircleShape)
                             .background(if (date == selected) CalendarAccent else Color.Transparent)
-                            .clickable { onSelect(date) },
+                            .semantics { contentDescription = "选择 $date" }
+                            .selectable(selected = date == selected, role = Role.Button) { onSelect(date) },
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(

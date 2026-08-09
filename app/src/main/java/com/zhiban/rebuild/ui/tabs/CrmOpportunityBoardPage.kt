@@ -8,9 +8,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -43,21 +41,30 @@ fun CrmOpportunityBoardPage(onBack: () -> Unit, onOpenOpportunity: (String) -> U
     ZhiBanPage {
         Column(Modifier.fillMaxSize()) {
             ZhiBanTopBar(title = "商机看板", subtitle = "${state.opportunities.size} 条商机", onBack = onBack)
-            LazyRow(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = ZhiBanSpacing.PageHorizontal, vertical = ZhiBanSpacing.Md),
-                horizontalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
-            ) {
-                items(columns, key = { it.stage }) { column ->
-                    CrmBoardColumnView(
-                        column = column,
-                        onOpenOpportunity = onOpenOpportunity,
-                        onAdvance = { opportunityId ->
-                            nextCrmBoardStage(column.stage)?.let { viewModel.changeStage(opportunityId, it) }
-                        },
-                    )
-                }
-            }
+            CrmOpportunityBoardContent(
+                columns = columns,
+                onOpenOpportunity = onOpenOpportunity,
+                onAdvance = { stage, opportunityId ->
+                    nextCrmBoardStage(stage)?.let { viewModel.changeStage(opportunityId, it) }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+internal fun CrmOpportunityBoardContent(columns: List<CrmBoardColumn>, onOpenOpportunity: (String) -> Unit, onAdvance: (String, String) -> Unit) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = ZhiBanSpacing.PageHorizontal, vertical = ZhiBanSpacing.Md),
+        verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Lg),
+    ) {
+        items(columns, key = { it.stage }) { column ->
+            CrmBoardColumnView(
+                column = column,
+                onOpenOpportunity = onOpenOpportunity,
+                onAdvance = { opportunityId -> onAdvance(column.stage, opportunityId) },
+            )
         }
     }
 }
@@ -65,7 +72,7 @@ fun CrmOpportunityBoardPage(onBack: () -> Unit, onOpenOpportunity: (String) -> U
 @Composable
 internal fun CrmBoardColumnView(column: CrmBoardColumn, onOpenOpportunity: (String) -> Unit, onAdvance: (String) -> Unit, modifier: Modifier = Modifier) {
     Column(
-        modifier.width(BOARD_COLUMN_WIDTH).testTag("crm-board-column-${column.stage}"),
+        modifier.fillMaxWidth().testTag("crm-board-column-${column.stage}"),
         verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm),
     ) {
         Column(
@@ -83,8 +90,8 @@ internal fun CrmBoardColumnView(column: CrmBoardColumn, onOpenOpportunity: (Stri
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm)) {
-            items(column.opportunities, key = { it.entity.opportunityId }) { opportunity ->
+        Column(verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm)) {
+            column.opportunities.forEach { opportunity ->
                 CrmBoardCard(
                     opportunity = opportunity,
                     isTerminal = column.isTerminal,
@@ -147,5 +154,3 @@ internal fun CrmBoardCard(
         }
     }
 }
-
-private val BOARD_COLUMN_WIDTH = 260.dp

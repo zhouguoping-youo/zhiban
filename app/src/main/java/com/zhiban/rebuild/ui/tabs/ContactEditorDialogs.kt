@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -316,6 +318,7 @@ internal fun ContactImportDialog(state: ContactImportUiState, onDismiss: () -> U
 }
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 internal fun ContactEditorDialog(
     contact: ContactEntity?,
     onDismiss: () -> Unit,
@@ -396,24 +399,25 @@ internal fun ContactEditorDialog(
                 item {
                     Text("关系", color = RelationMuted, style = MaterialTheme.typography.labelMedium)
                     Spacer(Modifier.height(7.dp))
-                    Row(
-                        Modifier.horizontalScroll(rememberScrollState()),
+                    FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(7.dp),
+                        verticalArrangement = Arrangement.spacedBy(7.dp),
                     ) {
                         RelationTags.drop(1).forEach {
                             Text(
                                 it,
                                 color = if (tag == it) Color.White else RelationMuted,
-                                modifier = Modifier.clip(RoundedCornerShape(16.dp)).background(
-                                    if (tag ==
-                                        it
-                                    ) {
-                                        RelationAccent
-                                    } else {
-                                        RelationSoft
-                                    },
-                                )
-                                    .clickable { tag = it }.padding(horizontal = 13.dp, vertical = 7.dp),
+                                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                                    .clip(RoundedCornerShape(24.dp)).background(
+                                        if (tag ==
+                                            it
+                                        ) {
+                                            RelationAccent
+                                        } else {
+                                            RelationSoft
+                                        },
+                                    )
+                                    .clickable { tag = it }.padding(horizontal = 13.dp, vertical = 8.dp),
                                 style = MaterialTheme.typography.labelMedium,
                             )
                         }

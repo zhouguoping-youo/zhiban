@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityStage
@@ -99,5 +100,18 @@ class CrmOpportunityBoardUiTest {
 
         compose.onNodeWithTag("crm-board-column-PROPOSAL").assertIsDisplayed()
         compose.onNodeWithText("2 条 · ¥200", substring = false).assertIsDisplayed()
+    }
+
+    @Test fun everyStageIsReachableWithoutHorizontalScrolling() {
+        val columns = buildCrmBoardColumns(
+            listOf(opportunity("lead", CrmOpportunityStage.LEAD), opportunity("lost", CrmOpportunityStage.LOST)),
+        )
+        compose.setContent {
+            ZhiBanTheme {
+                CrmOpportunityBoardContent(columns = columns, onOpenOpportunity = {}, onAdvance = { _, _ -> })
+            }
+        }
+
+        compose.onNodeWithTag("crm-board-column-LOST").performScrollTo().assertIsDisplayed()
     }
 }
