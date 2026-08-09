@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.ui.components
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,13 +26,25 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -67,6 +80,8 @@ private val BottomTabIconSize = ZhiBanIconSize.Navigation
 private val BottomBarShape = RoundedCornerShape(ZhiBanRadius.Full)
 private val NavigationRailWidth = 64.dp
 private val NavigationRailOuterPadding = ZhiBanSpacing.Md
+private const val NAVIGATION_HINTS_PREFERENCES = "navigation_hints"
+private const val FIRST_USE_HINT_SHOWN_KEY = "bottom_tabs_first_use_hint_shown"
 
 @Composable
 fun ZhiBanScaffold(
@@ -77,6 +92,13 @@ fun ZhiBanScaffold(
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val density = LocalDensity.current
+    val context = LocalContext.current
+    val navigationHintPreferences = remember(context) {
+        context.getSharedPreferences(NAVIGATION_HINTS_PREFERENCES, Context.MODE_PRIVATE)
+    }
+    var firstUseHintPending by remember {
+        mutableStateOf(!navigationHintPreferences.getBoolean(FIRST_USE_HINT_SHOWN_KEY, false))
+    }
     val isKeyboardVisible = WindowInsets.ime.getBottom(density) > 0
     val showBottomBarNow = showBottomBar && !isKeyboardVisible
     BoxWithConstraints(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -116,6 +138,11 @@ fun ZhiBanScaffold(
                     ZhiBanBottomBar(
                         currentDestination = currentDestination,
                         onTabSelected = onTabSelected,
+                        showFirstUseHint = firstUseHintPending,
+                        onFirstUseHintShown = {
+                            navigationHintPreferences.edit().putBoolean(FIRST_USE_HINT_SHOWN_KEY, true).apply()
+                            firstUseHintPending = false
+                        },
                         modifier = Modifier.align(Alignment.BottomCenter),
                     )
                 }
@@ -186,7 +213,13 @@ private fun ZhiBanNavigationRail(currentDestination: NavDestination?, onTabSelec
 }
 
 @Composable
-fun ZhiBanBottomBar(currentDestination: NavDestination?, onTabSelected: (Any) -> Unit, modifier: Modifier = Modifier) {
+fun ZhiBanBottomBar(
+    currentDestination: NavDestination?,
+    onTabSelected: (Any) -> Unit,
+    modifier: Modifier = Modifier,
+    showFirstUseHint: Boolean = false,
+    onFirstUseHintShown: () -> Unit = {},
+) {
     val tabs = MainTabContract.tabs.associateBy { it.key }
     Box(
         modifier = modifier
@@ -213,9 +246,10 @@ fun ZhiBanBottomBar(currentDestination: NavDestination?, onTabSelected: (Any) ->
             ).fillMaxWidth().height(BottomBarHeight).padding(horizontal = ZhiBanSpacing.Sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TabNavItem(tabs.getValue("calendar").label, currentDestination?.hasRoute(Calendar::class) == true, {
+            val calendarSelected = currentDestination?.hasRoute(Calendar::class) == true
+            TabNavItem(tabs.getValue("calendar").label, calendarSelected, {
                 onTabSelected(Calendar())
-            }, Modifier.weight(1f)) { selected ->
+            }, Modifier.weight(1f), showFirstUseHint && calendarSelected, onFirstUseHintShown) { selected ->
                 CalendarIcon(
                     selected = selected,
                     color = navigationIconColor(selected),
@@ -262,45 +296,77 @@ fun ZhiBanBottomBar(currentDestination: NavDestination?, onTabSelected: (Any) ->
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TabNavItem(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, iconContent: @Composable (Boolean) -> Unit) {
-    Box(
-        modifier = modifier.height(ZhiBanSize.TouchTarget).semantics {
-            contentDescription = label
-            this.selected = selected
-        }.clickable(role = Role.Tab, onClick = onClick),
-        contentAlignment = Alignment.Center,
+private fun TabNavItem(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    showInitialHint: Boolean = false,
+    onInitialHintShown: () -> Unit = {},
+    iconContent: @Composable (Boolean) -> Unit,
+) {
+    val tooltipState = rememberTooltipState()
+    LaunchedEffect(showInitialHint) {
+        if (showInitialHint) {
+            onInitialHintShown()
+            tooltipState.show()
+        }
+    }
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = { PlainTooltip { Text(label) } },
+        state = tooltipState,
+        focusable = false,
     ) {
         Box(
-            modifier = Modifier.size(ZhiBanIconContainer.Compact).clip(CircleShape)
-                .background(if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent),
+            modifier = modifier.height(ZhiBanSize.TouchTarget).semantics {
+                contentDescription = label
+                this.selected = selected
+            }.clickable(role = Role.Tab, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
-            iconContent(selected)
+            Box(
+                modifier = Modifier.size(ZhiBanIconContainer.Compact).clip(CircleShape)
+                    .background(if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent),
+                contentAlignment = Alignment.Center,
+            ) {
+                iconContent(selected)
+            }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RailNavItem(label: String, selected: Boolean, onClick: () -> Unit, iconContent: @Composable (Boolean) -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(ZhiBanSize.TouchTarget)
-            .semantics {
-                contentDescription = label
-                this.selected = selected
-            }
-            .clickable(role = Role.Tab, onClick = onClick),
-        contentAlignment = Alignment.Center,
+    val tooltipState = rememberTooltipState()
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = { PlainTooltip { Text(label) } },
+        state = tooltipState,
+        focusable = false,
     ) {
         Box(
             modifier = Modifier
-                .size(ZhiBanIconContainer.Compact)
-                .clip(CircleShape)
-                .background(if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent),
+                .size(ZhiBanSize.TouchTarget)
+                .semantics {
+                    contentDescription = label
+                    this.selected = selected
+                }
+                .clickable(role = Role.Tab, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
-            iconContent(selected)
+            Box(
+                modifier = Modifier
+                    .size(ZhiBanIconContainer.Compact)
+                    .clip(CircleShape)
+                    .background(if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent),
+                contentAlignment = Alignment.Center,
+            ) {
+                iconContent(selected)
+            }
         }
     }
 }

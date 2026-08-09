@@ -114,7 +114,11 @@ class AgentConversationViewModel @Inject constructor(
                 persistence.sessionWorkspace.observeArtifacts(sessionId),
             ) { state, turns, workspaceArtifacts ->
                 val messages = turns.map {
-                    AgentConversationMessageUi(turnId = it.turnId, role = it.role, text = it.text)
+                    AgentConversationMessageUi(
+                        turnId = it.turnId,
+                        role = it.role,
+                        text = if (it.role == "user") AgentPromptEnvelope.displayText(it.text) else it.text,
+                    )
                 }
                 val artifacts = workspaceArtifacts.map {
                     AgentArtifactUi(
