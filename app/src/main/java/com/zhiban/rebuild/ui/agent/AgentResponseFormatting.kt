@@ -110,7 +110,7 @@ internal object AgentResponseParser {
 @Composable
 internal fun AgentRichResponse(text: String, modifier: Modifier = Modifier) {
     SelectionContainer {
-        Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
             AgentResponseParser.parse(text).forEach { block ->
                 when (block) {
                     is AgentResponseBlock.Heading -> Text(
@@ -130,8 +130,14 @@ internal fun AgentRichResponse(text: String, modifier: Modifier = Modifier) {
                         style = MaterialTheme.typography.bodyLarge,
                     )
 
-                    is AgentResponseBlock.ListItem -> Row {
-                        Text(block.marker, Modifier.width(28.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    is AgentResponseBlock.ListItem -> Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            block.marker,
+                            Modifier.width(if (block.marker == "•") 14.dp else 20.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                         Text(
                             inlineMarkup(block.text),
                             Modifier.weight(1f),

@@ -627,14 +627,6 @@ fun AgentConversationRoute(
                 context.startActivity(Intent.createChooser(share, "分享知伴回复"))
             }
         },
-        onPositiveFeedback = {
-            viewModel.positiveFeedback()
-            Toast.makeText(context, "感谢反馈", Toast.LENGTH_SHORT).show()
-        },
-        onNegativeFeedback = {
-            viewModel.negativeFeedback()
-            Toast.makeText(context, "感谢反馈", Toast.LENGTH_SHORT).show()
-        },
         multimodalState = multimodal,
         onPickImage = {
             imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))

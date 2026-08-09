@@ -28,4 +28,10 @@ val answer = 42
         assertEquals("json", code.language)
         assertEquals("{\"ok\": true}", code.content)
     }
+
+    @Test fun `inline model label only exposes user facing response level`() {
+        assertEquals("标准", compactInlineModelLabel("step-3.5-flash 智能/标准"))
+        assertEquals("深入", compactInlineModelLabel("step-3.5-flash 智能/深入"))
+        assertEquals("快速", compactInlineModelLabel("step-3.5-flash 智能/快速"))
+    }
 }

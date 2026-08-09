@@ -28,9 +28,7 @@ import org.junit.Test
 class AgentConversationScreenE2ETest {
     @get:Rule val compose = createComposeRule()
 
-    @Test fun longPressAssistantMessageShowsFeedbackMenuAndInvokesCallbacks() {
-        val positive = AtomicInteger()
-        val negative = AtomicInteger()
+    @Test fun longPressAssistantMessageOnlyShowsUsefulReplyActions() {
         val state = AgentConversationUiState(
             messages = listOf(AgentConversationMessageUi(turnId = "t1", role = "assistant", text = "这是知伴的回答")),
         )
@@ -38,8 +36,6 @@ class AgentConversationScreenE2ETest {
             ZhiBanTheme {
                 AgentConversationScreen(
                     state = state,
-                    onPositiveFeedback = { positive.incrementAndGet() },
-                    onNegativeFeedback = { negative.incrementAndGet() },
                 )
             }
         }
@@ -49,15 +45,8 @@ class AgentConversationScreenE2ETest {
         compose.onNodeWithText("这是知伴的回答").performTouchInput { longClick() }
         compose.onNodeWithText("复制").assertIsDisplayed()
         compose.onNodeWithText("分享").assertIsDisplayed()
-        compose.onNodeWithText("点赞").assertIsDisplayed()
-        compose.onNodeWithText("点踩").assertIsDisplayed()
-
-        compose.onNodeWithText("点赞").performClick()
-        assertEquals(1, positive.get())
-
-        compose.onNodeWithText("这是知伴的回答").performTouchInput { longClick() }
-        compose.onNodeWithText("点踩").performClick()
-        assertEquals(1, negative.get())
+        assertTrue(compose.onAllNodesWithText("点赞").fetchSemanticsNodes().isEmpty())
+        assertTrue(compose.onAllNodesWithText("点踩").fetchSemanticsNodes().isEmpty())
     }
 
     @Test fun unifiedAgentInputAndAttachmentMenuAreOperable() {

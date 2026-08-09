@@ -373,15 +373,10 @@ private fun compactModelLabel(model: String) = when {
     else -> model
 }
 
-private fun compactInlineModelLabel(label: String): String {
-    val model = label.substringBefore(' ').trim()
+internal fun compactInlineModelLabel(label: String): String {
     val level = label.substringAfterLast('/').trim().takeIf { it != label }
         ?: label.substringAfter(' ', "").trim()
-    val compactModel = when (model) {
-        "step-3.5-flash" -> "3.5"
-        else -> model.removeSuffix("-flash").removePrefix("step-")
-    }
-    return listOf(compactModel, level).filter { it.isNotBlank() && it != "智能" }.joinToString(" ")
+    return level.takeIf { it.isNotBlank() && it != "智能" } ?: "标准"
 }
 
 @Composable

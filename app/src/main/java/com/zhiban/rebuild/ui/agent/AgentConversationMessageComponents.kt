@@ -209,8 +209,6 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
     onReadAssistant: () -> Unit = {},
     onShareAssistant: () -> Unit = {},
     onUndo: () -> Unit = {},
-    onPositiveFeedback: () -> Unit = {},
-    onNegativeFeedback: () -> Unit = {},
 ) {
     val listState = rememberLazyListState()
     val scrollScope = androidx.compose.runtime.rememberCoroutineScope()
@@ -326,14 +324,6 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
                 shareText(context, actionMessage?.text.orEmpty())
                 actionMessage = null
             },
-            onPositive = {
-                onPositiveFeedback()
-                actionMessage = null
-            },
-            onNegative = {
-                onNegativeFeedback()
-                actionMessage = null
-            },
         )
         ScrollToBottomFAB(
             visible = listState.canScrollForward,
@@ -417,8 +407,8 @@ private fun ReplyAction(icon: androidx.compose.ui.graphics.vector.ImageVector, l
 
 @Composable fun AssistantMessageBubble(text: String) = Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
     ConversationAvatar("知", ZhiBanTerracotta, MaterialTheme.colorScheme.onPrimary)
-    Spacer(Modifier.width(10.dp))
-    AgentRichResponse(text, Modifier.weight(1f).padding(top = 3.dp, end = 12.dp))
+    Spacer(Modifier.width(ZhiBanSpacing.Sm))
+    AgentRichResponse(text, Modifier.weight(1f).padding(top = 3.dp))
 }
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
@@ -435,20 +425,11 @@ private fun AssistantMessageWithActions(message: AgentConversationMessageUi, onL
 }
 
 @Composable
-private fun AssistantActionMenu(
-    message: AgentConversationMessageUi?,
-    onDismiss: () -> Unit,
-    onCopy: () -> Unit,
-    onShare: () -> Unit,
-    onPositive: () -> Unit,
-    onNegative: () -> Unit,
-) {
+private fun AssistantActionMenu(message: AgentConversationMessageUi?, onDismiss: () -> Unit, onCopy: () -> Unit, onShare: () -> Unit) {
     if (message == null) return
     DropdownMenu(expanded = true, onDismissRequest = onDismiss) {
         DropdownMenuItem(text = { Text("复制") }, onClick = onCopy)
         DropdownMenuItem(text = { Text("分享") }, onClick = onShare)
-        DropdownMenuItem(text = { Text("点赞") }, onClick = onPositive)
-        DropdownMenuItem(text = { Text("点踩") }, onClick = onNegative)
     }
 }
 

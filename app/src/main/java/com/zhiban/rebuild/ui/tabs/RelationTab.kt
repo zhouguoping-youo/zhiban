@@ -211,6 +211,7 @@ fun RelationTab(
     var showImportDialog by remember { mutableStateOf(false) }
     var identityEditorFor by remember { mutableStateOf<ContactEntity?>(null) }
     var selectedMergeSuggestion by remember { mutableStateOf<ContactMergeSuggestion?>(null) }
+    var showContactPermissionIntro by remember { mutableStateOf(false) }
     var showPermissionExplanation by remember { mutableStateOf(false) }
     var showNotificationCandidates by remember { mutableStateOf(false) }
     var selectedCallNote by remember { mutableStateOf<CallRecordEntity?>(null) }
@@ -268,7 +269,7 @@ fun RelationTab(
             showImportDialog = true
             viewModel.loadSystemContacts()
         } else {
-            contactPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+            showContactPermissionIntro = true
         }
     }
 
@@ -750,6 +751,23 @@ fun RelationTab(
                 viewModel.clearImportState()
             },
             onImport = viewModel::importSystemContacts,
+        )
+    }
+    if (showContactPermissionIntro) {
+        AlertDialog(
+            onDismissRequest = { showContactPermissionIntro = false },
+            title = { Text("导入手机联系人") },
+            text = { Text("知伴只会读取你接下来主动选择的人，不会上传、修改或默认全选通讯录。下一步 Android 会询问通讯录权限。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showContactPermissionIntro = false
+                    contactPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+                }) { Text("继续", color = RelationInk) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showContactPermissionIntro = false }) { Text("取消", color = RelationMuted) }
+            },
+            containerColor = RelationSurface,
         )
     }
     if (showPermissionExplanation) {

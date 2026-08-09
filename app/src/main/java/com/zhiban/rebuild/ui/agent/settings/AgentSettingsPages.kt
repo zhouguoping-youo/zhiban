@@ -100,78 +100,79 @@ fun AgentSettingsPage(
                 verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.ContentGap),
             ) {
                 item {
-                    SettingRow(
-                        Icons.Outlined.CloudQueue,
-                        "大模型连接",
-                        if (state.providerConfigured) "阶跃星辰 · 已连接" else "输入 API Key",
-                        onModel,
+                    AgentSettingsGroup(
+                        listOf(
+                            AgentSettingsEntry(
+                                Icons.Outlined.CloudQueue,
+                                "大模型连接",
+                                if (state.providerConfigured) "阶跃星辰 · 已连接" else "输入 API Key",
+                                onModel,
+                            ),
+                            AgentSettingsEntry(
+                                Icons.Outlined.Psychology,
+                                "记忆",
+                                if (state.memoryCount == 0) "还没有保存任何记忆" else "已保存 ${state.memoryCount} 条记忆",
+                                onMemory,
+                            ),
+                            AgentSettingsEntry(Icons.Outlined.Tune, "对话风格", state.personalizationSummary, onPersonalization),
+                            AgentSettingsEntry(Icons.Outlined.Construction, "工具", "${state.toolCount} 项可用", onTools),
+                            AgentSettingsEntry(Icons.Outlined.AutoAwesome, "技能", "${state.skillCount} 项可用", onSkills),
+                        ),
                     )
                 }
                 item {
-                    SettingRow(
-                        Icons.Outlined.Psychology,
-                        "记忆",
-                        if (state.memoryCount ==
-                            0
-                        ) {
-                            "还没有保存任何记忆"
-                        } else {
-                            "已保存 ${state.memoryCount} 条记忆"
-                        },
-                        onMemory,
+                    AgentSettingsGroup(
+                        listOf(
+                            AgentSettingsEntry(Icons.Outlined.Security, "行为与安全", "自动执行、确认与隐私边界", onBehavior),
+                            AgentSettingsEntry(Icons.Outlined.RateReview, "反馈与改进", "管理回答反馈和改进偏好", onFeedback),
+                            AgentSettingsEntry(Icons.Outlined.History, "运行记录", "查看知伴的执行与诊断记录", onRunHistory),
+                        ),
                     )
                 }
-                item { SettingRow(Icons.Outlined.Tune, "对话风格", state.personalizationSummary, onPersonalization) }
-                item { SettingRow(Icons.Outlined.Construction, "工具", "${state.toolCount} 项可用", onTools) }
-                item { SettingRow(Icons.Outlined.AutoAwesome, "技能", "${state.skillCount} 项可用", onSkills) }
-                item { SettingRow(Icons.Outlined.Security, "行为与安全", "自动执行、确认与隐私边界", onBehavior) }
-                item { SettingRow(Icons.Outlined.RateReview, "反馈与改进", "管理回答反馈和改进偏好", onFeedback) }
-                item { SettingRow(Icons.Outlined.History, "运行记录", "查看知伴的执行与诊断记录", onRunHistory) }
+            }
+        }
+    }
+}
+
+private data class AgentSettingsEntry(val icon: ImageVector, val title: String, val subtitle: String, val onClick: () -> Unit)
+
+@Composable
+private fun AgentSettingsGroup(entries: List<AgentSettingsEntry>) {
+    ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
+        entries.forEachIndexed { index, entry ->
+            SettingRowContent(entry.icon, entry.title, entry.subtitle, entry.onClick)
+            if (index < entries.lastIndex) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = 72.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                )
             }
         }
     }
 }
 
 @Composable internal fun SettingRow(icon: ImageVector, title: String, subtitle: String, onClick: (() -> Unit)? = null) {
-    val cardModifier = if (onClick ==
-        null
-    ) {
-        Modifier.fillMaxWidth()
-    } else {
-        Modifier.fillMaxWidth().clickable(onClick = onClick)
+    ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
+        SettingRowContent(icon, title, subtitle, onClick)
     }
-    ZhiBanGlassCard(cardModifier, cornerRadius = ZhiBanRadius.Card) {
-        Row(
-            Modifier.fillMaxWidth().defaultMinSize(
-                minHeight = ZhiBanSize.ListRowWithSubtitle,
-            ).padding(horizontal = ZhiBanSpacing.Lg, vertical = ZhiBanSpacing.Md),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            ZhiBanLeadingIcon(icon)
-            Spacer(Modifier.width(ZhiBanSpacing.Md))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    title,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                )
-                Text(
-                    subtitle,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            if (onClick !=
-                null
-            ) {
-                Icon(
-                    Icons.Outlined.ChevronRight,
-                    null,
-                    tint = AgentSettingsSecondary,
-                    modifier = Modifier.size(ZhiBanIconSize.Inline),
-                )
-            }
+}
+
+@Composable
+private fun SettingRowContent(icon: ImageVector, title: String, subtitle: String, onClick: (() -> Unit)?) {
+    Row(
+        Modifier.fillMaxWidth().clickable(enabled = onClick != null) { onClick?.invoke() }
+            .defaultMinSize(minHeight = ZhiBanSize.ListRowWithSubtitle)
+            .padding(horizontal = ZhiBanSpacing.Lg, vertical = ZhiBanSpacing.Md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ZhiBanLeadingIcon(icon)
+        Spacer(Modifier.width(ZhiBanSpacing.Md))
+        Column(Modifier.weight(1f)) {
+            Text(title, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        }
+        if (onClick != null) {
+            Icon(Icons.Outlined.ChevronRight, null, tint = AgentSettingsSecondary, modifier = Modifier.size(ZhiBanIconSize.Inline))
         }
     }
 }

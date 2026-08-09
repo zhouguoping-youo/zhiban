@@ -102,7 +102,7 @@ private fun SceneCapabilityCard(capability: SceneCapability) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 168.dp)
+            .heightIn(min = 144.dp)
             .zhiBanCardSurface()
             .clickable(onClick = capability.onClick)
             .semantics {

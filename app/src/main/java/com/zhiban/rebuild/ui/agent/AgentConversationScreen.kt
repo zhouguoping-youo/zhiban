@@ -86,8 +86,6 @@ fun AgentConversationScreen(
     onCopyAssistant: () -> Unit = {},
     onReadAssistant: () -> Unit = {},
     onShareAssistant: () -> Unit = {},
-    onPositiveFeedback: () -> Unit = {},
-    onNegativeFeedback: () -> Unit = {},
     onDismissMemory: () -> Unit = {},
     onOpenRecovery: () -> Unit = {},
     onSend: (String) -> Unit = {},
@@ -173,7 +171,6 @@ fun AgentConversationScreen(
                 state, onConfirm, onReject, onRetry, onCancel, onResume,
                 onNavigateToSettings,
                 onCopyAssistant, onReadAssistant, onShareAssistant, onUndo,
-                onPositiveFeedback, onNegativeFeedback,
             )
             if (state.stage == AgentConversationStage.EMPTY && state.messages.isEmpty() && state.userMessage == null) {
                 EmptyConversationSuggestions(
