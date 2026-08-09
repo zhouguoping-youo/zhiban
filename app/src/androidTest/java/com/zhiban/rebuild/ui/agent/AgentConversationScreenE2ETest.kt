@@ -84,6 +84,7 @@ class AgentConversationScreenE2ETest {
         assertEquals("帮我安排会议", sent.get())
 
         compose.onNodeWithText("问问").assertIsDisplayed()
+        compose.onNodeWithText("有什么可以帮忙的？").assertDoesNotExist()
 
         compose.onNodeWithContentDescription("添加附件").performClick()
         compose.onNodeWithText("相机").assertIsDisplayed()
@@ -241,6 +242,7 @@ class AgentConversationScreenE2ETest {
         compose.runOnUiThread { multimodal.value = MultimodalUiState() }
         compose.waitForIdle()
 
+        compose.onNodeWithContentDescription("消息输入框").performClick()
         compose.onNodeWithContentDescription("选择模型与思考强度").performClick()
         compose.onNodeWithText("模型").assertIsDisplayed()
         compose.onNodeWithText("中").performClick()

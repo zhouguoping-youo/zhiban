@@ -68,6 +68,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.zhiban.rebuild.ui.components.ZhiBanHeaderIconAction
 import com.zhiban.rebuild.ui.theme.*
 import kotlin.math.abs
 import kotlin.math.sin
@@ -150,58 +151,20 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Surface(
-            onClick = onBack,
-            modifier = Modifier.size(ZhiBanSize.TouchTarget),
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surface,
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    Icons.AutoMirrored.Outlined.ArrowBack,
-                    contentDescription = "返回",
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(ZhiBanIconSize.Action),
-                )
-            }
-        }
-        Surface(
-            onClick = onMenu,
-            modifier = Modifier.size(ZhiBanSize.TouchTarget),
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surface,
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Outlined.Menu,
-                    contentDescription = "更多",
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(ZhiBanIconSize.Action),
-                )
-            }
-        }
+        ZhiBanHeaderIconAction(Icons.AutoMirrored.Outlined.ArrowBack, "返回", onBack)
+        ZhiBanHeaderIconAction(Icons.Outlined.Menu, "更多", onMenu)
     }
     Text(
         "问问",
         color = MaterialTheme.colorScheme.onBackground,
         style = MaterialTheme.typography.titleLarge,
-        fontWeight = FontWeight.Bold,
     )
-    Surface(
+    ZhiBanHeaderIconAction(
+        icon = Icons.Outlined.History,
+        contentDescription = "对话历史",
         onClick = onHistory,
-        modifier = Modifier.align(Alignment.CenterEnd).size(ZhiBanSize.TouchTarget),
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surface,
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = Icons.Outlined.History,
-                contentDescription = "对话历史",
-                tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(ZhiBanIconSize.Action),
-            )
-        }
-    }
+        modifier = Modifier.align(Alignment.CenterEnd),
+    )
 }
 
 @Composable fun MemoryHint(text: String, onDismiss: () -> Unit) {

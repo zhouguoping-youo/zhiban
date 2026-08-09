@@ -253,17 +253,9 @@ internal fun shouldAutoScrollToLatest(totalItems: Int, lastVisibleIndex: Int): B
             )
                 .imePadding(),
             color = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(
-                if (inputFocused ||
-                    useCompactControls
-                ) {
-                    ZhiBanRadius.Dialog
-                } else {
-                    ZhiBanRadius.Full
-                },
-            ),
+            shape = RoundedCornerShape(if (inputFocused) ZhiBanRadius.Dialog else ZhiBanRadius.Full),
             tonalElevation = 0.dp,
-            shadowElevation = 5.dp,
+            shadowElevation = 2.dp,
         ) {
             if (inputFocused) {
                 Column(
@@ -319,37 +311,15 @@ internal fun shouldAutoScrollToLatest(totalItems: Int, lastVisibleIndex: Int): B
                         primaryAction()
                     }
                 }
-            } else if (useCompactControls) {
-                Column(
-                    Modifier.fillMaxWidth().padding(horizontal = ZhiBanSpacing.Md, vertical = ZhiBanSpacing.Xs),
-                ) {
-                    Row(
-                        Modifier.fillMaxWidth().height(ZhiBanSize.Control),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm),
-                    ) {
-                        attachmentControl()
-                        collapsedInput()
-                        primaryAction()
-                    }
-                    Row(
-                        Modifier.fillMaxWidth().height(ZhiBanSize.TouchTarget),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        modelControl()
-                        Spacer(Modifier.weight(1f))
-                        micControl()
-                    }
-                }
             } else {
                 Row(
-                    Modifier.fillMaxWidth().height(ZhiBanSize.BottomBar).padding(horizontal = ZhiBanSpacing.Md),
+                    Modifier.fillMaxWidth().height(ZhiBanSize.BottomBar).padding(horizontal = ZhiBanSpacing.Sm),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Xs),
                 ) {
                     attachmentControl()
                     collapsedInput()
-                    modelControl()
+                    if (!useCompactControls) modelControl()
                     micControl()
                     primaryAction()
                 }

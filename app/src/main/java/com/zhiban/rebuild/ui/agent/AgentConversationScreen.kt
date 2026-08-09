@@ -179,16 +179,6 @@ fun AgentConversationScreen(
                 onCopyAssistant, onReadAssistant, onShareAssistant, onUndo,
                 onPositiveFeedback, onNegativeFeedback,
             )
-            if (state.stage == AgentConversationStage.EMPTY && state.userMessage == null &&
-                state.assistantMessage == null
-            ) {
-                Text(
-                    "有什么可以帮忙的？",
-                    Modifier.align(Alignment.Center),
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
-            }
         }
         state.permission?.let { PermissionRationale(it) { onRequestPermission(it) } }
         MultimodalStatusBanner(multimodalState, onOpenAppSettings = onOpenAppSettings)
