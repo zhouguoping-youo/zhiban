@@ -24,6 +24,8 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -71,6 +73,8 @@ fun CrmCapabilityPage(
         it.status in
             setOf(CrmLeadStatus.NEW, CrmLeadStatus.CONTACTED, CrmLeadStatus.QUALIFIED)
     }
+    val isWorkbenchEmpty = state.candidateLeads.isEmpty() && activeFormalLeads.isEmpty() &&
+        state.opportunities.isEmpty() && state.actions.isEmpty() && state.suggestions.isEmpty()
 
     ZhiBanPage {
         LazyColumn(
@@ -161,7 +165,14 @@ fun CrmCapabilityPage(
                 }
             }
 
-            if (!state.dashboard.isEmpty) {
+            if (isWorkbenchEmpty) {
+                item {
+                    CrmEmptyWorkbench(
+                        onCreateOpportunity = { onAskAgent(newCrmOpportunityPrompt()) },
+                        modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                    )
+                }
+            } else if (!state.dashboard.isEmpty) {
                 item {
                     CrmDashboardSummaryRow(
                         dashboard = state.dashboard,
@@ -170,43 +181,49 @@ fun CrmCapabilityPage(
                 }
             }
 
-            item {
-                Column(
-                    Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
-                    verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Lg),
-                ) {
-                    CrmSectionHeader(
-                        title = "推进概览",
-                        action = "全部",
-                        onAction = { onOpenOpportunityList(null) },
-                    )
-                    CrmStageOverview(
-                        opportunities = state.opportunities,
-                        formalLeadCount = activeFormalLeads.size,
-                        onStageClick = { onOpenOpportunityList(it) },
+            if (!isWorkbenchEmpty) {
+                item {
+                    Column(
+                        Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                        verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Lg),
+                    ) {
+                        CrmSectionHeader(
+                            title = "推进概览",
+                            action = "全部",
+                            onAction = { onOpenOpportunityList(null) },
+                        )
+                        CrmStageOverview(
+                            opportunities = state.opportunities,
+                            formalLeadCount = activeFormalLeads.size,
+                            onStageClick = { onOpenOpportunityList(it) },
+                        )
+                    }
+                }
+            }
+
+            if (!isWorkbenchEmpty) {
+                item {
+                    CrmFollowUpSection(
+                        followUps = state.followUps,
+                        onOpenOpportunity = onOpenOpportunity,
+                        onOpenCalendar = onOpenCalendar,
+                        modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
                     )
                 }
             }
 
-            item {
-                CrmFollowUpSection(
-                    followUps = state.followUps,
-                    onOpenOpportunity = onOpenOpportunity,
-                    onOpenCalendar = onOpenCalendar,
-                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
-                )
+            if (!isWorkbenchEmpty) {
+                item {
+                    CrmSectionHeader(
+                        title = "今日推进",
+                        action = state.followUps.unscheduled.takeIf { it.isNotEmpty() }?.let { "日历" },
+                        onAction = state.followUps.unscheduled.takeIf { it.isNotEmpty() }?.let { { onOpenCalendar(null) } },
+                        modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                    )
+                }
             }
 
-            item {
-                CrmSectionHeader(
-                    title = "今日推进",
-                    action = state.followUps.unscheduled.takeIf { it.isNotEmpty() }?.let { "日历" },
-                    onAction = state.followUps.unscheduled.takeIf { it.isNotEmpty() }?.let { { onOpenCalendar(null) } },
-                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
-                )
-            }
-
-            if (state.followUps.unscheduled.isEmpty()) {
+            if (!isWorkbenchEmpty && state.followUps.unscheduled.isEmpty()) {
                 item {
                     Text(
                         "暂无待办",
@@ -215,7 +232,7 @@ fun CrmCapabilityPage(
                         modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
                     )
                 }
-            } else {
+            } else if (!isWorkbenchEmpty) {
                 items(state.followUps.unscheduled.take(3), key = { it.entity.actionId }) { action ->
                     CrmActionRow(
                         action = action,
@@ -263,13 +280,15 @@ fun CrmCapabilityPage(
                 }
             }
 
-            item {
-                CrmSectionHeader(
-                    title = "进行中的机会",
-                    action = "全部",
-                    onAction = { onOpenOpportunityList(null) },
-                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
-                )
+            if (!isWorkbenchEmpty) {
+                item {
+                    CrmSectionHeader(
+                        title = "进行中的机会",
+                        action = "全部",
+                        onAction = { onOpenOpportunityList(null) },
+                        modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                    )
+                }
             }
 
             items(
@@ -300,6 +319,51 @@ fun CrmCapabilityPage(
                 }) { Text("确认转正", color = ZhiBanTerracotta) }
             },
         )
+    }
+}
+
+@Composable
+internal fun CrmEmptyWorkbench(onCreateOpportunity: () -> Unit, modifier: Modifier = Modifier) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .testTag("crm-empty-workbench")
+            .zhiBanCardSurface()
+            .padding(horizontal = ZhiBanSpacing.Lg, vertical = ZhiBanSpacing.Xxl),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
+    ) {
+        Box(
+            Modifier.size(ZhiBanSize.TouchTarget).clip(CircleShape).background(ZhiBanTerracottaSoft),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Outlined.AutoAwesome,
+                contentDescription = null,
+                tint = ZhiBanTerracotta,
+                modifier = Modifier.size(ZhiBanIconSize.Leading),
+            )
+        }
+        Text(
+            "还没有客户进展",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            "从一个机会开始",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        FilledTonalButton(
+            onClick = onCreateOpportunity,
+            modifier = Modifier.defaultMinSize(minHeight = ZhiBanSize.TouchTarget).testTag("crm-empty-create"),
+            colors = ButtonDefaults.filledTonalButtonColors(
+                containerColor = ZhiBanTerracottaSoft,
+                contentColor = ZhiBanTerracotta,
+            ),
+        ) {
+            Text("新建机会", style = MaterialTheme.typography.labelLarge)
+        }
     }
 }
 

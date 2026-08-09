@@ -60,4 +60,19 @@ class CrmCandidatePoolUiTest {
         compose.onNodeWithTag("crm-formal-lead-lead-formal").assertIsDisplayed()
         compose.onNodeWithTag("crm-stage-LEAD-count-1").assertIsDisplayed()
     }
+
+    @Test
+    fun emptyWorkbenchOffersOneWorkingNextStep() {
+        var createCount = 0
+        compose.setContent {
+            ZhiBanTheme {
+                CrmEmptyWorkbench(onCreateOpportunity = { createCount++ })
+            }
+        }
+
+        compose.onNodeWithTag("crm-empty-workbench").assertIsDisplayed()
+        compose.onNodeWithTag("crm-empty-create").assertIsDisplayed().performClick()
+
+        compose.runOnIdle { assertEquals(1, createCount) }
+    }
 }
