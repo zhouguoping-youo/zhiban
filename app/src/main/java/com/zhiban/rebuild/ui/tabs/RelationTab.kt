@@ -572,12 +572,6 @@ fun RelationTab(
                     )
                 }
             }
-            item {
-                Spacer(Modifier.height(22.dp))
-                Box(Modifier.fillMaxWidth().zhiBanCardSurface(RelationSoft).padding(16.dp)) {
-                    Text("试试问知伴：\n“记住王老师是孩子的班主任”", color = RelationMuted, style = MaterialTheme.typography.bodySmall)
-                }
-            }
         }
     }
 

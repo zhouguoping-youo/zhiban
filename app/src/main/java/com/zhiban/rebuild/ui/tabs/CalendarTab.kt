@@ -287,7 +287,6 @@ fun CalendarTab(
             }
             item {
                 Spacer(Modifier.height(24.dp))
-                AgentHint()
             }
         }
     }
@@ -820,7 +819,7 @@ private fun ScheduleRow(schedule: ScheduleProjection, onClick: () -> Unit, onDel
 }
 
 @Composable
-private fun EmptyDay(onAdd: () -> Unit) {
+internal fun EmptyDay(onAdd: () -> Unit) {
     Column(
         Modifier.fillMaxWidth().zhiBanCardSurface(CalendarSurface).padding(horizontal = 22.dp, vertical = 30.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -852,16 +851,6 @@ private fun EmptyDay(onAdd: () -> Unit) {
             Spacer(Modifier.width(6.dp))
             Text("添加日程")
         }
-    }
-}
-
-@Composable
-private fun AgentHint() {
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(CalendarSoft).padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text("试试问知伴：\n“明天下午 3 点提醒我开会”", color = CalendarMuted, style = MaterialTheme.typography.bodySmall)
     }
 }
 
