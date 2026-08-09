@@ -67,16 +67,16 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 ## 维度 3 · 自动写链路
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
 |---|---|---|---|---|---|---|
-| 3.1 | 撤销后 Fact 真删除 | ⬜ | | | | |
-| 3.2 | 用户改联系人后撤销覆盖新内容 | ⬜ | | | | |
-| 3.3 | 回执过期后能否撤销 | ⬜ | | | | |
-| 3.4 | 互动摘要纠正联系人后原记录残留 | ⬜ | | | | |
-| 3.5 | ChangeLog inverse payload 可逆 | ⬜ | | | | |
+| 3.1 | 撤销后 Fact 真删除 | ⚪ | — | 未复现：互动摘要撤销经 FactIndex 同事务删除主表记录并同步 FTS，不是仅在 UI 隐藏 | — | `AgentDataRepositoryTest.structuredMessageSuggestsExactContactButWaitsForUserConfirmation` |
+| 3.2 | 用户改联系人后撤销覆盖新内容 | ⚪ | — | 未复现：联系人标签撤销先比对自动写后的规范 digest；用户随后改过 tags 时撤销失败且保留用户新值 | — | `ContactTagAutoWriteTest.userEditedTagsAreNeverOverwrittenByAutomaticUndo` |
+| 3.3 | 回执过期后能否撤销 | ⚪ | — | 未复现：维护任务把 90 天外 AVAILABLE 变为 EXPIRED 并擦除 inverse；协调器只接受 AVAILABLE，Fact 保留且不能再撤销 | — | `ChangeLogRetentionTest.oldUndoPayloadExpiresAndOnlyTerminalHistoryIsDeleted`、`AutoWriteCorrectionTest.expiredAutoWriteCannotBeUndoneAndKeepsItsFact` |
+| 3.4 | 互动摘要纠正联系人后原记录残留 | ⚪ | — | 未复现：纠正原地更新同一 factId 的 contactId 与 FTS，只保留一条 Fact；原撤销关闭、回执标 CORRECTED，并另写用户纠正审计 | — | `AutoWriteCorrectionTest.correctingInteractionMovesTheSingleFactAndClosesOriginalUndo` |
+| 3.5 | ChangeLog inverse payload 可逆 | ⚪ | — | 未复现：可见自动写入口拒绝空/`{}` inverse，领域写、ChangeLog、receipt 同事务；各首批自动写都有最终撤销回归 | — | `AutoWriteCorrectionTest.visibleAutoWriteWithoutInverseIsRejectedAtomically`、`AutoWriteAtomicityTest.injectedFailureRollsBackDomainChangeAuditAndReceiptTogether` |
 | 3.6 | auto_write_receipts reviewState 更新 | ✅ | 体验/状态一致性 | 成功撤销或“忽略候选”只把 ChangeLog 改为 UNDONE，回执仍为 UNREVIEWED，导致未读徽标继续计算已处理记录。撤销现于同一事务把 receipt 标为 CORRECTED，失败则整体回滚 | 本提交 `fix(3.6)` | `AgentDataRepositoryTest.structuredMessageSuggestsExactContactButWaitsForUserConfirmation`（撤销后回执与未读数）+ `RoomCrmToolExecutorTest.candidatePromotionEntersFormalListAndIgnoreRemovesCandidate` |
-| 3.7 | 同 source/idempotency 重放重复写入 | ⬜ | | | | |
-| 3.8 | undoState UNDONE 后能否再撤销 | ⬜ | | | | |
-| 3.9 | 目标被用户修改后撤销检测阻止覆盖 | ⬜ | | | | |
-| 3.10 | presentationType 映射错误标签 | ⬜ | | | | |
+| 3.7 | 同 source/idempotency 重放重复写入 | ⚪ | — | 未复现：工具执行以 idempotencyKey 唯一索引和 payload/providerCall 一致性校验重放原结果；通知自动摘要另以 sourceKey/确定性键去重 | — | `RoomCrmToolExecutorTest.allEightDuplicateSubmissionsReturnOriginalResultWithoutSecondWrite`、通知候选幂等回归 |
+| 3.8 | undoState UNDONE 后能否再撤销 | ⚪ | — | 未复现：markUndone 是 `WHERE undoState='AVAILABLE'` 的 CAS；二次撤销返回 false，不重复应用 inverse | — | `ContactTagAutoWriteTest.automaticContactTagIsVisibleAndCanBeUndone`（含二次撤销） |
+| 3.9 | 目标被用户修改后撤销检测阻止覆盖 | ⚪ | — | 未复现：Fact/CRM/联系人标签均在 inverse 前比较当前规范 digest；目标变化时拒绝撤销并保持 AVAILABLE，提示走纠正 | — | `RoomCrmToolExecutorTest.undoDoesNotOverwriteCandidateChangedAfterAutomaticWrite`、`ContactTagAutoWriteTest.userEditedTagsAreNeverOverwrittenByAutomaticUndo` |
+| 3.10 | presentationType 映射错误标签 | ⚪ | — | 未复现：五类自动写固定映射为 INTERACTION_SUMMARY/CONTACT_TAG/CRM_LEAD_CANDIDATE/CRM_ACTIVITY/CRM_NEXT_ACTION，设置页逐值映射中文标题，未知值安全回退 | — | `AutoWritePageTest` 各类型交互 + `RoomCrmToolExecutorTest.automaticActivityAndNextActionAreVisibleAndReversible` |
 
 ## 维度 4 · 联系人链路
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |

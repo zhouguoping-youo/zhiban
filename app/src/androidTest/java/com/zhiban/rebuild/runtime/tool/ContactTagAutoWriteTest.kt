@@ -74,6 +74,41 @@ class ContactTagAutoWriteTest {
         assertTrue(result.safeResultJson.contains("undoAvailable"))
         assertTrue(AutoWriteRepository(database, context).undo(change.changeId, 50))
         assertEquals("[]", database.contactDao().findRawById("contact-tag")?.tagsJson)
+        assertTrue(!AutoWriteRepository(database, context).undo(change.changeId, 51))
+    }
+
+    @Test
+    fun userEditedTagsAreNeverOverwrittenByAutomaticUndo() = runBlocking {
+        val route = routeContext()
+        val dataDigest = sha256("contact-tag-user-edit")
+        val plan = buildJsonObject {
+            put("toolName", ContactTagToolBinding.TOOL_NAME)
+            put("providerCallId", "call-tag-user-edit")
+            put("logicalStepId", "step-tag-user-edit")
+            put("proposalId", "proposal-tag-user-edit")
+            put("payloadRef", "contact-tag-$dataDigest")
+            put("revision", 1)
+            put("canonicalInputDigest", dataDigest)
+            put("idempotencyKey", sha256("contact-tag-user-edit-idempotency"))
+            put("runId", route.runId)
+            put("attemptId", route.attemptId)
+            put("contactId", "contact-tag")
+            put("tag", "客户")
+            put("evidenceSummary", "对方连续讨论采购需求")
+            put("sourceRef", "notification-tag-user-edit")
+            put("confidence", 0.99)
+        }
+        ContactTagDomainWriter(database, store).executeAuto(plan, route)
+        val change = database.changeLogDao().listByRun(route.runId).single()
+        val edited = requireNotNull(database.contactDao().findRawById("contact-tag")).copy(
+            tagsJson = "[\"客户\",\"重点\"]",
+            updatedAtEpochMs = 49,
+        )
+        assertEquals(1, database.contactDao().update(edited))
+
+        assertTrue(!AutoWriteRepository(database, context).undo(change.changeId, 50))
+        assertEquals("[\"客户\",\"重点\"]", database.contactDao().findRawById("contact-tag")?.tagsJson)
+        assertEquals("AVAILABLE", database.changeLogDao().find(change.changeId)?.undoState)
     }
 
     private suspend fun routeContext(): RuntimeToolRouteContext {
