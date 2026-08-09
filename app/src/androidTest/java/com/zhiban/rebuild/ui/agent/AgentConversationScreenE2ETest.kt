@@ -40,7 +40,7 @@ class AgentConversationScreenE2ETest {
             }
         }
 
-        // Hidden by default: no feedback actions until a long-press.
+        // Feedback belongs to completed replies, not the long-press menu.
         assertTrue(compose.onAllNodesWithText("点赞").fetchSemanticsNodes().isEmpty())
         compose.onNodeWithText("这是知伴的回答").performTouchInput { longClick() }
         compose.onNodeWithText("复制").assertIsDisplayed()
@@ -134,6 +134,7 @@ class AgentConversationScreenE2ETest {
         val back = AtomicInteger()
         val copy = AtomicInteger()
         val undo = AtomicInteger()
+        val positive = AtomicInteger()
         val screenState = mutableStateOf(
             AgentConversationUiState(
                 stage = AgentConversationStage.AWAITING_CONFIRMATION,
@@ -149,6 +150,7 @@ class AgentConversationScreenE2ETest {
                     onReject = { reject.incrementAndGet() },
                     onBackToHome = { back.incrementAndGet() },
                     onCopyAssistant = { copy.incrementAndGet() },
+                    onPositiveFeedback = { positive.incrementAndGet() },
                     onUndo = { undo.incrementAndGet() },
                 )
             }
@@ -175,13 +177,51 @@ class AgentConversationScreenE2ETest {
         compose.waitForIdle()
         compose.onNodeWithContentDescription("撤销刚才的更改").performClick()
         compose.onNodeWithContentDescription("复制").performClick()
-        assertTrue(compose.onAllNodesWithContentDescription("有帮助").fetchSemanticsNodes().isEmpty())
-        assertTrue(compose.onAllNodesWithContentDescription("需改进").fetchSemanticsNodes().isEmpty())
+        compose.onNodeWithContentDescription("有帮助").assertIsDisplayed().performClick()
+        compose.onNodeWithContentDescription("有帮助").performClick()
+        compose.onNodeWithContentDescription("需改进").assertIsDisplayed()
         assertTrue(compose.onAllNodesWithText("本次对话的文件").fetchSemanticsNodes().isEmpty())
         assertTrue(compose.onAllNodesWithText("本地图片.jpg").fetchSemanticsNodes().isEmpty())
         assertTrue(compose.onAllNodesWithText("会议纪要.pdf").fetchSemanticsNodes().isNotEmpty())
         assertEquals(1, undo.get())
         assertEquals(1, copy.get())
+        assertEquals(1, positive.get())
+    }
+
+    @Test fun negativeFeedbackActionCallsTheRealCallback() {
+        val negative = AtomicInteger()
+        compose.setContent {
+            ZhiBanTheme {
+                AgentConversationScreen(
+                    state = AgentConversationUiState(
+                        stage = AgentConversationStage.SUCCEEDED,
+                        assistantMessage = "这条回答需要改进。",
+                    ),
+                    onNegativeFeedback = { negative.incrementAndGet() },
+                )
+            }
+        }
+
+        compose.onNodeWithContentDescription("需改进").assertIsDisplayed().performClick()
+        assertEquals(1, negative.get())
+    }
+
+    @Test fun feedbackActionsFollowTheMyPagePreference() {
+        compose.setContent {
+            ZhiBanTheme {
+                AgentConversationScreen(
+                    state = AgentConversationUiState(
+                        stage = AgentConversationStage.SUCCEEDED,
+                        assistantMessage = "已完成。",
+                    ),
+                    feedbackEnabled = false,
+                )
+            }
+        }
+
+        assertTrue(compose.onAllNodesWithContentDescription("有帮助").fetchSemanticsNodes().isEmpty())
+        assertTrue(compose.onAllNodesWithContentDescription("需改进").fetchSemanticsNodes().isEmpty())
+        compose.onNodeWithContentDescription("复制").assertIsDisplayed()
     }
 
     @Test fun historyNewConversationAndPluginManagementAreOperable() {

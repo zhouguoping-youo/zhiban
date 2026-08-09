@@ -606,6 +606,7 @@ fun AgentConversationRoute(
         onCancel = viewModel::cancel,
         onResume = viewModel::resume,
         onUndo = viewModel::undo,
+        feedbackEnabled = viewModel.isHumanFeedbackEnabled(),
         onCopyAssistant = {
             state.assistantMessage?.takeIf { it.isNotBlank() }?.let { reply ->
                 val clipboard = context.getSystemService(ClipboardManager::class.java)
@@ -613,6 +614,8 @@ fun AgentConversationRoute(
                 Toast.makeText(context, "已复制回复", Toast.LENGTH_SHORT).show()
             }
         },
+        onPositiveFeedback = viewModel::positiveFeedback,
+        onNegativeFeedback = viewModel::negativeFeedback,
         onReadAssistant = {
             state.assistantMessage?.takeIf { it.isNotBlank() }?.let { reply ->
                 textToSpeech?.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "zhiban-agent-reply")

@@ -84,8 +84,11 @@ fun AgentConversationScreen(
     onResume: () -> Unit = {},
     onUndo: () -> Unit = {},
     onCopyAssistant: () -> Unit = {},
+    onPositiveFeedback: () -> Unit = {},
+    onNegativeFeedback: () -> Unit = {},
     onReadAssistant: () -> Unit = {},
     onShareAssistant: () -> Unit = {},
+    feedbackEnabled: Boolean = true,
     onDismissMemory: () -> Unit = {},
     onOpenRecovery: () -> Unit = {},
     onSend: (String) -> Unit = {},
@@ -168,9 +171,20 @@ fun AgentConversationScreen(
         state.recoveredMessageCount?.let { RecoveryBanner(it, onOpenRecovery) }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             MessageList(
-                state, onConfirm, onReject, onRetry, onCancel, onResume,
-                onNavigateToSettings,
-                onCopyAssistant, onReadAssistant, onShareAssistant, onUndo,
+                state = state,
+                onConfirm = onConfirm,
+                onReject = onReject,
+                onRetry = onRetry,
+                onCancel = onCancel,
+                onResume = onResume,
+                onNavigateToSettings = onNavigateToSettings,
+                onCopyAssistant = onCopyAssistant,
+                onPositiveFeedback = onPositiveFeedback,
+                onNegativeFeedback = onNegativeFeedback,
+                onReadAssistant = onReadAssistant,
+                onShareAssistant = onShareAssistant,
+                onUndo = onUndo,
+                feedbackEnabled = feedbackEnabled,
             )
             if (state.stage == AgentConversationStage.EMPTY && state.messages.isEmpty() && state.userMessage == null) {
                 EmptyConversationSuggestions(

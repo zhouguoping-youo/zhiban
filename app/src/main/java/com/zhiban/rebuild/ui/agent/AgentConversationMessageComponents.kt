@@ -40,6 +40,8 @@ import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.ThumbDown
+import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -206,9 +208,12 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
     onResume: () -> Unit,
     onNavigateToSettings: () -> Unit = {},
     onCopyAssistant: () -> Unit = {},
+    onPositiveFeedback: () -> Unit = {},
+    onNegativeFeedback: () -> Unit = {},
     onReadAssistant: () -> Unit = {},
     onShareAssistant: () -> Unit = {},
     onUndo: () -> Unit = {},
+    feedbackEnabled: Boolean = true,
 ) {
     val listState = rememberLazyListState()
     val scrollScope = androidx.compose.runtime.rememberCoroutineScope()
@@ -222,6 +227,9 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
         }
     }
     val generatedArtifacts = state.artifacts.filter(AgentArtifactUi::isUserVisibleOutput)
+    var feedbackSelection by remember(state.assistantMessage, state.messages.lastOrNull()?.turnId) {
+        androidx.compose.runtime.mutableStateOf<Boolean?>(null)
+    }
     LaunchedEffect(
         state.messages.size,
         state.userMessage,
@@ -305,10 +313,36 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        if (state.canUndo) ReplyAction(Icons.AutoMirrored.Outlined.Undo, "撤销刚才的更改", onUndo)
-                        ReplyAction(Icons.Outlined.ContentCopy, "复制", onCopyAssistant)
-                        ReplyAction(Icons.AutoMirrored.Outlined.VolumeUp, "朗读", onReadAssistant)
-                        ReplyAction(Icons.Outlined.IosShare, "分享", onShareAssistant)
+                        if (state.canUndo) {
+                            ReplyAction(Icons.AutoMirrored.Outlined.Undo, "撤销刚才的更改", onClick = onUndo)
+                        }
+                        ReplyAction(Icons.Outlined.ContentCopy, "复制", onClick = onCopyAssistant)
+                        if (feedbackEnabled) {
+                            ReplyAction(
+                                icon = Icons.Outlined.ThumbUp,
+                                label = "有帮助",
+                                selected = feedbackSelection == true,
+                                enabled = feedbackSelection == null,
+                            ) {
+                                if (feedbackSelection == null) {
+                                    feedbackSelection = true
+                                    onPositiveFeedback()
+                                }
+                            }
+                            ReplyAction(
+                                icon = Icons.Outlined.ThumbDown,
+                                label = "需改进",
+                                selected = feedbackSelection == false,
+                                enabled = feedbackSelection == null,
+                            ) {
+                                if (feedbackSelection == null) {
+                                    feedbackSelection = false
+                                    onNegativeFeedback()
+                                }
+                            }
+                        }
+                        ReplyAction(Icons.AutoMirrored.Outlined.VolumeUp, "朗读", onClick = onReadAssistant)
+                        ReplyAction(Icons.Outlined.IosShare, "分享", onClick = onShareAssistant)
                     }
                 }
             }
@@ -382,9 +416,28 @@ private fun GeneratedArtifactsCard(artifacts: List<AgentArtifactUi>) {
 }
 
 @Composable
-private fun ReplyAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
-    IconButton(onClick = onClick, modifier = Modifier.size(ZhiBanIconContainer.TouchTarget)) {
-        Icon(icon, label, tint = ZhiBanTextSecondary, modifier = Modifier.size(ZhiBanIconSize.Field))
+private fun ReplyAction(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    selected: Boolean = false,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled || selected,
+        modifier = Modifier.size(ZhiBanIconContainer.TouchTarget),
+    ) {
+        Icon(
+            icon,
+            label,
+            tint = when {
+                selected -> AgentAccent
+                enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .68f)
+                else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .30f)
+            },
+            modifier = Modifier.size(ZhiBanIconSize.Inline),
+        )
     }
 }
 

@@ -292,6 +292,7 @@ class AgentConversationViewModel @Inject constructor(
             v2Backend?.negativeFeedback()
         }
     }
+    fun isHumanFeedbackEnabled(): Boolean = agentControls.feedback().useHumanFeedback
     fun cancel() {
         v2Backend?.cancel()
     }
