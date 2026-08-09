@@ -142,8 +142,9 @@ internal class CrmAgentDataRepository(private val database: AgentDatabase) {
         System.currentTimeMillis(),
     ) == 1
 
-    suspend fun setCrmSuggestionStatus(suggestionId: String, accepted: Boolean): Boolean = database.crmDao().updateSuggestionStatus(
+    suspend fun setCrmSuggestionStatus(suggestionId: String, accepted: Boolean): Boolean = database.crmDao().transitionSuggestionStatus(
         suggestionId,
+        CrmSuggestionStatus.PENDING,
         if (accepted) CrmSuggestionStatus.ACCEPTED else CrmSuggestionStatus.DISMISSED,
         System.currentTimeMillis(),
     ) == 1
@@ -262,7 +263,14 @@ internal class CrmAgentDataRepository(private val database: AgentDatabase) {
             createdAtEpochMs = nowEpochMs,
         )
         database.crmDao().insertActivity(activity)
-        if (database.crmDao().updateSuggestionStatus(suggestionId, CrmSuggestionStatus.ACCEPTED, nowEpochMs) != 1) {
+        if (
+            database.crmDao().transitionSuggestionStatus(
+                suggestionId,
+                CrmSuggestionStatus.PENDING,
+                CrmSuggestionStatus.ACCEPTED,
+                nowEpochMs,
+            ) != 1
+        ) {
             return@withTransaction false
         }
         recordSuggestionAcceptAudit(
@@ -303,7 +311,14 @@ internal class CrmAgentDataRepository(private val database: AgentDatabase) {
             updatedAtEpochMs = nowEpochMs,
         )
         database.crmDao().insertLead(lead)
-        if (database.crmDao().updateSuggestionStatus(suggestionId, CrmSuggestionStatus.ACCEPTED, nowEpochMs) != 1) {
+        if (
+            database.crmDao().transitionSuggestionStatus(
+                suggestionId,
+                CrmSuggestionStatus.PENDING,
+                CrmSuggestionStatus.ACCEPTED,
+                nowEpochMs,
+            ) != 1
+        ) {
             return@withTransaction false
         }
         recordSuggestionAcceptAudit(

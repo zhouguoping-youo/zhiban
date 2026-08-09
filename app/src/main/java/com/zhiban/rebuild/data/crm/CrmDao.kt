@@ -182,9 +182,10 @@ interface CrmDao {
     suspend fun updateActionStatus(actionId: String, status: String, nowEpochMs: Long): Int
 
     @Query(
-        "UPDATE crm_agent_suggestions SET status = :status, updatedAtEpochMs = :nowEpochMs WHERE suggestionId = :suggestionId",
+        "UPDATE crm_agent_suggestions SET status = :status, updatedAtEpochMs = :nowEpochMs " +
+            "WHERE suggestionId = :suggestionId AND status = :expectedStatus",
     )
-    suspend fun updateSuggestionStatus(suggestionId: String, status: String, nowEpochMs: Long): Int
+    suspend fun transitionSuggestionStatus(suggestionId: String, expectedStatus: String, status: String, nowEpochMs: Long): Int
 
     @Query("SELECT * FROM crm_agent_suggestions WHERE suggestionId = :suggestionId")
     suspend fun findSuggestion(suggestionId: String): CrmAgentSuggestionEntity?

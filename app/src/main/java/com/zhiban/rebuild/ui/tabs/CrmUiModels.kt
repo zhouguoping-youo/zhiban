@@ -334,12 +334,6 @@ class CrmCapabilityViewModel @Inject constructor(
         }
     }
 
-    fun acceptSuggestion(suggestionId: String) {
-        if (!demoStore.setSuggestionStatus(suggestionId, accepted = true)) {
-            viewModelScope.launch { repository.setCrmSuggestionStatus(suggestionId, accepted = true) }
-        }
-    }
-
     fun acceptCallFollowUpSuggestion(suggestionId: String) {
         viewModelScope.launch {
             if (!repository.acceptCallFollowUpSuggestion(suggestionId)) {

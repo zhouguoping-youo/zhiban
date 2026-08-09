@@ -126,8 +126,9 @@ internal class ChangeUndoCoordinator(private val database: AgentDatabase) {
         val activity = database.crmDao().findActivity(activityId) ?: return false
         if (!changeDigestMatches(change.afterDigest, canonicalChangeDigest(activity), activity)) return false
         database.crmDao().deleteActivityById(activityId)
-        return database.crmDao().updateSuggestionStatus(
+        return database.crmDao().transitionSuggestionStatus(
             change.targetId,
+            com.zhiban.rebuild.data.crm.CrmSuggestionStatus.ACCEPTED,
             com.zhiban.rebuild.data.crm.CrmSuggestionStatus.PENDING,
             nowEpochMs,
         ) == 1
@@ -142,8 +143,9 @@ internal class ChangeUndoCoordinator(private val database: AgentDatabase) {
         val lead = database.crmDao().findLead(leadId) ?: return false
         if (!changeDigestMatches(change.afterDigest, canonicalChangeDigest(lead), lead)) return false
         database.crmDao().deleteLeadById(leadId)
-        return database.crmDao().updateSuggestionStatus(
+        return database.crmDao().transitionSuggestionStatus(
             change.targetId,
+            com.zhiban.rebuild.data.crm.CrmSuggestionStatus.ACCEPTED,
             com.zhiban.rebuild.data.crm.CrmSuggestionStatus.PENDING,
             nowEpochMs,
         ) == 1

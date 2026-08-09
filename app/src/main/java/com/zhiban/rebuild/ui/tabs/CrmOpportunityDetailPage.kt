@@ -173,7 +173,6 @@ fun CrmOpportunityDetailPage(
                         CrmDetailSuggestion(
                             suggestion = suggestion,
                             onAskAgent = {
-                                viewModel.acceptSuggestion(suggestion.entity.suggestionId)
                                 onAskAgent(
                                     crmSuggestionPrompt(
                                         opportunityId = opportunity.entity.opportunityId,

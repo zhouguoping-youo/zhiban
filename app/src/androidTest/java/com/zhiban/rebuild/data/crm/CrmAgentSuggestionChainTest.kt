@@ -261,6 +261,17 @@ class CrmAgentSuggestionChainTest {
         assertEquals(CrmSuggestionStatus.PENDING, db.crmDao().findSuggestion("sug-fresh")?.status)
     }
 
+    @Test fun expiredSuggestionCannotBeResurrectedByAStaleUiDecision() = runBlocking {
+        insertContactAndOpenOpportunity("c1", "o1")
+        repo.suggestCallFollowUpActivity("c1", "call-1", 600, nowEpochMs = 1_000L)
+        val suggestion = db.crmDao().observePendingSuggestions(0.0).first().single()
+        val now = 1_000L + 8L * 24 * 60 * 60 * 1_000
+        assertEquals(1, repo.expireStaleSuggestions(now))
+
+        assertTrue(!repo.setCrmSuggestionStatus(suggestion.suggestionId, accepted = true))
+        assertEquals(CrmSuggestionStatus.EXPIRED, db.crmDao().findSuggestion(suggestion.suggestionId)?.status)
+    }
+
     private fun existingLead(id: String, contactId: String) = CrmLeadEntity(
         leadId = id,
         contactId = contactId,
