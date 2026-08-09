@@ -289,14 +289,14 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 ## 维度 17 · 检索与上下文
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
 |---|---|---|---|---|---|---|
-| 17.1 | 检索空显示"没有找到"不卡住 | ⬜ | | | | |
-| 17.2 | 检索过多截断不 OOM | ⬜ | | | | |
-| 17.3 | 检索超时降级不卡住 | ⬜ | | | | |
-| 17.4 | 检索含敏感信息脱敏 | ⬜ | | | | |
-| 17.5 | 上下文 token 超限截断 | ⬜ | | | | |
-| 17.6 | 上下文含敏感信息脱敏 | ⬜ | | | | |
-| 17.7 | 上下文含错误信息过滤 | ⬜ | | | | |
-| 17.8 | LLM 重排失败降级 FTS | ⬜ | | | | |
+| 17.1 | 检索空显示"没有找到"不卡住 | ⚪ | — | 联系人/关系/CRM 空结果均由权威结果格式化为明确“没有找到”，不会等待模型补写结果 | 审计提交 | `ProviderExecutionDomainLogicTest`（空搜索权威文案） |
+| 17.2 | 检索过多截断不 OOM | ⚪ | — | RRF 强制 `limit <= 100`，各 Room 查询有固定 limit，越界直接拒绝而非无界聚合 | 审计提交 | `RetrievalPipelineTest.rrfRejectsUnboundedLimit` |
+| 17.3 | 检索超时降级不卡住 | ⚪ | — | 每条检索 path 有独立 timeout，返回固定 `path:timeout` degradation；取消仍上抛 | 审计提交 | `RetrievalAttemptTest.timeoutHasDistinctFixedReason` + `RuntimeInputProcessorTest.rerankTimeoutCancelsOnlyRerankAndFallsBackToRrf` |
+| 17.4 | 检索含敏感信息脱敏 | ⚪ | — | 自动检索候选携带 sensitivity/purpose，LLM 与 rerank 最终出站口统一脱敏，SENSITIVE 候选保持本地 | 审计提交 | `OutboundDataPolicyTest.userAuthoredIdentifiersRemainIntactButAutomaticSensitiveContentIsOmitted` + `ProviderRetrievalRerankerTest.governedRerankRedactsPersonalIdentifiersAndKeepsSensitiveCandidatesLocal` |
+| 17.5 | 上下文 token 超限截断 | ⚪ | — | PromptAssembler 按层级和 token budget 选择；稳定系统策略超限时 fail-closed，工具调用/结果原子对不拆分 | 审计提交 | `ContextModuleTest.promptAssemblyIsLayeredBudgetedAndFramesUntrustedData` + `stableContextOverflowFailsClosedInsteadOfSilentlyDroppingPolicy` + `toolCallAndResultAtomicPairIsNeverSplitByBudget` |
+| 17.6 | 上下文含敏感信息脱敏 | ⚪ | — | 最终 `ModelRequest` 经过 `PolicyEnforcingProviderAdapter`，自动召回手机号/邮箱被掩码或阻断；用户主动输入保持原意 | 审计提交 | `OutboundDataPolicyTest` |
+| 17.7 | 上下文含错误信息过滤 | ⚪ | — | 检索/快照异常只进入固定原因码，不带 exception message/SQL/用户正文；不可信工具/模型内容只能成为 DATA 角色，不能伪造 SYSTEM | 审计提交 | `RetrievalAttemptTest` + `GatewayRuntimeUiClientTest.malformedEventPayloadEmitsAFixedDegradationReason` + `ContextModuleTest.delimiterInjectionStaysDataAndCannotCreateSystemMessage` |
+| 17.8 | LLM 重排失败降级 FTS | ⚪ | — | 重排超时、能力缺失或响应非法均保留原 RRF/FTS 顺序并记录 `rerank_skipped:*`，主 run 继续完成 | 审计提交 | `ProviderRetrievalRerankerTest` + `RuntimeInputProcessorTest.rerankTimeoutCancelsOnlyRerankAndFallsBackToRrf` |
 
 ## 维度 18 · 工具执行与确认
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
