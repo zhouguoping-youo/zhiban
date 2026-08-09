@@ -1,0 +1,4984 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 17,
+    "identityHash": "570ae7f2677186c05e41cd6b06d76731",
+    "entities": [
+      {
+        "tableName": "schedules",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `startAtEpochMs` INTEGER NOT NULL, `durationMinutes` INTEGER NOT NULL, `note` TEXT, `createdByRunId` TEXT, `createdByRuntimeRunId` TEXT, `createdByRuntimeAttemptId` TEXT, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`createdByRunId`) REFERENCES `agent_runs`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startAtEpochMs",
+            "columnName": "startAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "durationMinutes",
+            "columnName": "durationMinutes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "note",
+            "columnName": "note",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdByRunId",
+            "columnName": "createdByRunId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdByRuntimeRunId",
+            "columnName": "createdByRuntimeRunId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdByRuntimeAttemptId",
+            "columnName": "createdByRuntimeAttemptId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMs",
+            "columnName": "updatedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_schedules_createdByRunId",
+            "unique": false,
+            "columnNames": [
+              "createdByRunId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_schedules_createdByRunId` ON `${TABLE_NAME}` (`createdByRunId`)"
+          },
+          {
+            "name": "index_schedules_createdByRuntimeRunId",
+            "unique": false,
+            "columnNames": [
+              "createdByRuntimeRunId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_schedules_createdByRuntimeRunId` ON `${TABLE_NAME}` (`createdByRuntimeRunId`)"
+          },
+          {
+            "name": "index_schedules_createdByRuntimeAttemptId",
+            "unique": false,
+            "columnNames": [
+              "createdByRuntimeAttemptId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_schedules_createdByRuntimeAttemptId` ON `${TABLE_NAME}` (`createdByRuntimeAttemptId`)"
+          },
+          {
+            "name": "index_schedules_startAtEpochMs",
+            "unique": false,
+            "columnNames": [
+              "startAtEpochMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_schedules_startAtEpochMs` ON `${TABLE_NAME}` (`startAtEpochMs`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "agent_runs",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "createdByRunId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "agent_runs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `userInput` TEXT, `status` TEXT NOT NULL, `pendingToolCallJson` TEXT, `schemaVersion` INTEGER NOT NULL, `expiresAtEpochMs` INTEGER, `errorCode` TEXT, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "userInput",
+            "columnName": "userInput",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pendingToolCallJson",
+            "columnName": "pendingToolCallJson",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "schemaVersion",
+            "columnName": "schemaVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "expiresAtEpochMs",
+            "columnName": "expiresAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "errorCode",
+            "columnName": "errorCode",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMs",
+            "columnName": "updatedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_agent_runs_expiresAtEpochMs",
+            "unique": false,
+            "columnNames": [
+              "expiresAtEpochMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_agent_runs_expiresAtEpochMs` ON `${TABLE_NAME}` (`expiresAtEpochMs`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "memories",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `kind` TEXT NOT NULL, `content` TEXT NOT NULL, `sourceRunId` TEXT, `schemaVersion` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`sourceRunId`) REFERENCES `agent_runs`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "content",
+            "columnName": "content",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceRunId",
+            "columnName": "sourceRunId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "schemaVersion",
+            "columnName": "schemaVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_memories_sourceRunId",
+            "unique": false,
+            "columnNames": [
+              "sourceRunId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_memories_sourceRunId` ON `${TABLE_NAME}` (`sourceRunId`)"
+          },
+          {
+            "name": "index_memories_kind",
+            "unique": false,
+            "columnNames": [
+              "kind"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_memories_kind` ON `${TABLE_NAME}` (`kind`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "agent_runs",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sourceRunId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "tool_audits",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `runId` TEXT, `subjectRunDigest` TEXT NOT NULL, `toolCallId` TEXT NOT NULL, `toolName` TEXT NOT NULL, `idempotencyKey` TEXT NOT NULL, `argumentsDigest` TEXT NOT NULL, `runtimeRunId` TEXT, `runtimeAttemptId` TEXT, `proposalId` TEXT, `payloadRefDigest` TEXT, `approvalRevision` INTEGER, `schemaVersion` INTEGER NOT NULL, `status` TEXT NOT NULL, `resultJson` TEXT, `expiresAtEpochMs` INTEGER, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`runId`) REFERENCES `agent_runs`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "runId",
+            "columnName": "runId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "subjectRunDigest",
+            "columnName": "subjectRunDigest",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "toolCallId",
+            "columnName": "toolCallId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "toolName",
+            "columnName": "toolName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "idempotencyKey",
+            "columnName": "idempotencyKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "argumentsDigest",
+            "columnName": "argumentsDigest",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "runtimeRunId",
+            "columnName": "runtimeRunId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "runtimeAttemptId",
+            "columnName": "runtimeAttemptId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "proposalId",
+            "columnName": "proposalId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "payloadRefDigest",
+            "columnName": "payloadRefDigest",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "approvalRevision",
+            "columnName": "approvalRevision",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "schemaVersion",
+            "columnName": "schemaVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "resultJson",
+            "columnName": "resultJson",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "expiresAtEpochMs",
+            "columnName": "expiresAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMs",
+            "columnName": "updatedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_tool_audits_runId",
+            "unique": false,
+            "columnNames": [
+              "runId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_tool_audits_runId` ON `${TABLE_NAME}` (`runId`)"
+          },
+          {
+            "name": "index_tool_audits_runtimeRunId",
+            "unique": false,
+            "columnNames": [
+              "runtimeRunId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_tool_audits_runtimeRunId` ON `${TABLE_NAME}` (`runtimeRunId`)"
+          },
+          {
+            "name": "index_tool_audits_runtimeAttemptId",
+            "unique": false,
+            "columnNames": [
+              "runtimeAttemptId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_tool_audits_runtimeAttemptId` ON `${TABLE_NAME}` (`runtimeAttemptId`)"
+          },
+          {
+            "name": "index_tool_audits_idempotencyKey",
+            "unique": true,
+            "columnNames": [
+              "idempotencyKey"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_tool_audits_idempotencyKey` ON `${TABLE_NAME}` (`idempotencyKey`)"
+          },
+          {
+            "name": "index_tool_audits_expiresAtEpochMs",
+            "unique": false,
+            "columnNames": [
+              "expiresAtEpochMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_tool_audits_expiresAtEpochMs` ON `${TABLE_NAME}` (`expiresAtEpochMs`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "agent_runs",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "runId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "runtime_sessions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sessionId` TEXT NOT NULL, `nextSequence` INTEGER NOT NULL, `leaseOwnerId` TEXT, `leaseEpoch` INTEGER NOT NULL, `leaseExpiresAtEpochMs` INTEGER, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`sessionId`))",
+        "fields": [
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nextSequence",
+            "columnName": "nextSequence",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "leaseOwnerId",
+            "columnName": "leaseOwnerId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "leaseEpoch",
+            "columnName": "leaseEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "leaseExpiresAtEpochMs",
+            "columnName": "leaseExpiresAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "updatedAtEpochMs",
+            "columnName": "updatedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "sessionId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "runtime_runs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`runId` TEXT NOT NULL, `sessionId` TEXT NOT NULL, `schemaVersion` INTEGER NOT NULL, `status` TEXT NOT NULL, `activeAttemptId` TEXT, `budgetJson` TEXT NOT NULL, `recoveryCursor` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`runId`), FOREIGN KEY(`sessionId`) REFERENCES `runtime_sessions`(`sessionId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "runId",
+            "columnName": "runId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "schemaVersion",
+            "columnName": "schemaVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "activeAttemptId",
+            "columnName": "activeAttemptId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "budgetJson",
+            "columnName": "budgetJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recoveryCursor",
+            "columnName": "recoveryCursor",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMs",
+            "columnName": "updatedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "runId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_runtime_runs_sessionId",
+            "unique": false,
+            "columnNames": [
+              "sessionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_runtime_runs_sessionId` ON `${TABLE_NAME}` (`sessionId`)"
+          },
+          {
+            "name": "index_runtime_runs_status",
+            "unique": false,
+            "columnNames": [
+              "status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_runtime_runs_status` ON `${TABLE_NAME}` (`status`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "runtime_sessions",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sessionId"
+            ],
+            "referencedColumns": [
+              "sessionId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "runtime_attempts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`attemptId` TEXT NOT NULL, `runId` TEXT NOT NULL, `ordinal` INTEGER NOT NULL, `status` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`attemptId`), FOREIGN KEY(`runId`) REFERENCES `runtime_runs`(`runId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "attemptId",
+            "columnName": "attemptId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "runId",
+            "columnName": "runId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ordinal",
+            "columnName": "ordinal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMs",
+            "columnName": "updatedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "attemptId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_runtime_attempts_runId",
+            "unique": false,
+            "columnNames": [
+              "runId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_runtime_attempts_runId` ON `${TABLE_NAME}` (`runId`)"
+          },
+          {
+            "name": "index_runtime_attempts_runId_ordinal",
+            "unique": true,
+            "columnNames": [
+              "runId",
+              "ordinal"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_runtime_attempts_runId_ordinal` ON `${TABLE_NAME}` (`runId`, `ordinal`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "runtime_runs",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "runId"
+            ],
+            "referencedColumns": [
+              "runId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "runtime_command_inbox",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`commandId` TEXT NOT NULL, `schemaVersion` INTEGER NOT NULL, `commandType` TEXT NOT NULL, `sessionId` TEXT NOT NULL, `runId` TEXT, `correlationId` TEXT NOT NULL, `payloadJson` TEXT NOT NULL, `status` TEXT NOT NULL, `receiptJson` TEXT, `resultJson` TEXT, `claimedBy` TEXT, `claimedLeaseEpoch` INTEGER, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`commandId`), FOREIGN KEY(`sessionId`) REFERENCES `runtime_sessions`(`sessionId`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`runId`) REFERENCES `runtime_runs`(`runId`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "fields": [
+          {
+            "fieldPath": "commandId",
+            "columnName": "commandId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "schemaVersion",
+            "columnName": "schemaVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "commandType",
+            "columnName": "commandType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "runId",
+            "columnName": "runId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "correlationId",
+            "columnName": "correlationId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payloadJson",
+            "columnName": "payloadJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "receiptJson",
+            "columnName": "receiptJson",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "resultJson",
+            "columnName": "resultJson",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "claimedBy",
+            "columnName": "claimedBy",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "claimedLeaseEpoch",
+            "columnName": "claimedLeaseEpoch",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMs",
+            "columnName": "updatedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "commandId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_runtime_command_inbox_sessionId",
+            "unique": false,
+            "columnNames": [
+              "sessionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_runtime_command_inbox_sessionId` ON `${TABLE_NAME}` (`sessionId`)"
+          },
+          {
+            "name": "index_runtime_command_inbox_runId",
+            "unique": false,
+            "columnNames": [
+              "runId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_runtime_command_inbox_runId` ON `${TABLE_NAME}` (`runId`)"
+          },
+          {
+            "name": "index_runtime_command_inbox_status",
+            "unique": false,
+            "columnNames": [
+              "status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_runtime_command_inbox_status` ON `${TABLE_NAME}` (`status`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "runtime_sessions",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sessionId"
+            ],
+            "referencedColumns": [
+              "sessionId"
+            ]
+          },
+          {
+            "table": "runtime_runs",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "runId"
+            ],
+            "referencedColumns": [
+              "runId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "runtime_events",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`eventId` TEXT NOT NULL, `schemaVersion` INTEGER NOT NULL, `eventType` TEXT NOT NULL, `sessionId` TEXT NOT NULL, `runId` TEXT NOT NULL, `attemptId` TEXT, `sequence` INTEGER NOT NULL, `causationId` TEXT, `correlationId` TEXT NOT NULL, `producerVersion` TEXT NOT NULL, `payloadJson` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `fencingEpoch` INTEGER NOT NULL, PRIMARY KEY(`eventId`), FOREIGN KEY(`sessionId`) REFERENCES `runtime_sessions`(`sessionId`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`runId`) REFERENCES `runtime_runs`(`runId`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`attemptId`) REFERENCES `runtime_attempts`(`attemptId`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "fields": [
+          {
+            "fieldPath": "eventId",
+            "columnName": "eventId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "schemaVersion",
+            "columnName": "schemaVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "eventType",
+            "columnName": "eventType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "runId",
+            "columnName": "runId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attemptId",
+            "columnName": "attemptId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "sequence",
+            "columnName": "sequence",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "causationId",
+            "columnName": "causationId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "correlationId",
+            "columnName": "correlationId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "producerVersion",
+            "columnName": "producerVersion",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payloadJson",
+            "columnName": "payloadJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fencingEpoch",
+            "columnName": "fencingEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "eventId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_runtime_events_sessionId_sequence",
+            "unique": true,
+            "columnNames": [
+              "sessionId",
+              "sequence"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_runtime_events_sessionId_sequence` ON `${TABLE_NAME}` (`sessionId`, `sequence`)"
+          },
+          {
+            "name": "index_runtime_events_runId",
+            "unique": false,
+            "columnNames": [
+              "runId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_runtime_events_runId` ON `${TABLE_NAME}` (`runId`)"
+          },
+          {
+            "name": "index_runtime_events_attemptId",
+            "unique": false,
+            "columnNames": [
+              "attemptId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_runtime_events_attemptId` ON `${TABLE_NAME}` (`attemptId`)"
+          },
+          {
+            "name": "index_runtime_events_correlationId",
+            "unique": false,
+            "columnNames": [
+              "correlationId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_runtime_events_correlationId` ON `${TABLE_NAME}` (`correlationId`)"
+          },
+          {
+            "name": "index_runtime_events_causationId",
+            "unique": false,
+            "columnNames": [
+              "causationId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_runtime_events_causationId` ON `${TABLE_NAME}` (`causationId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "runtime_sessions",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sessionId"
+            ],
+            "referencedColumns": [
+              "sessionId"
+            ]
+          },
+          {
+            "table": "runtime_runs",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "runId"
+            ],
+            "referencedColumns": [
+              "runId"
+            ]
+          },
+          {
+            "table": "runtime_attempts",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "attemptId"
+            ],
+            "referencedColumns": [
+              "attemptId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "runtime_conversation_turns",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`turnId` TEXT NOT NULL, `sessionId` TEXT NOT NULL, `runId` TEXT NOT NULL, `role` TEXT NOT NULL, `content` TEXT NOT NULL, `contentDigest` TEXT NOT NULL, `tokenEstimate` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`turnId`), FOREIGN KEY(`sessionId`) REFERENCES `runtime_sessions`(`sessionId`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`runId`) REFERENCES `runtime_runs`(`runId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "turnId",
+            "columnName": "turnId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "runId",
+            "columnName": "runId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "role",
+            "columnName": "role",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "content",
+            "columnName": "content",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contentDigest",
+            "columnName": "contentDigest",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tokenEstimate",
+            "columnName": "tokenEstimate",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "turnId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_runtime_conversation_turns_sessionId",
+            "unique": false,
+            "columnNames": [
+              "sessionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_runtime_conversation_turns_sessionId` ON `${TABLE_NAME}` (`sessionId`)"
+          },
+          {
+            "name": "index_runtime_conversation_turns_runId",
+            "unique": false,
+            "columnNames": [
+              "runId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_runtime_conversation_turns_runId` ON `${TABLE_NAME}` (`runId`)"
+          },
+          {
+            "name": "index_runtime_conversation_turns_runId_role",
+            "unique": true,
+            "columnNames": [
+              "runId",
+              "role"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_runtime_conversation_turns_runId_role` ON `${TABLE_NAME}` (`runId`, `role`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "runtime_sessions",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sessionId"
+            ],
+            "referencedColumns": [
+              "sessionId"
+            ]
+          },
+          {
+            "table": "runtime_runs",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "runId"
+            ],
+            "referencedColumns": [
+              "runId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "runtime_tool_executions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`executionId` TEXT NOT NULL, `runId` TEXT NOT NULL, `logicalStepId` TEXT NOT NULL, `toolName` TEXT NOT NULL, `toolSpecVersion` INTEGER NOT NULL, `canonicalInputDigest` TEXT NOT NULL, `idempotencyKey` TEXT NOT NULL, `providerCallId` TEXT, `proposalId` TEXT, `payloadRefDigest` TEXT, `approvalRevision` INTEGER, `attemptId` TEXT, `status` TEXT NOT NULL, `resultRef` TEXT, `safeResultJson` TEXT, `fencingEpoch` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`executionId`), FOREIGN KEY(`runId`) REFERENCES `runtime_runs`(`runId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "executionId",
+            "columnName": "executionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "runId",
+            "columnName": "runId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "logicalStepId",
+            "columnName": "logicalStepId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "toolName",
+            "columnName": "toolName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "toolSpecVersion",
+            "columnName": "toolSpecVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "canonicalInputDigest",
+            "columnName": "canonicalInputDigest",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "idempotencyKey",
+            "columnName": "idempotencyKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "providerCallId",
+            "columnName": "providerCallId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "proposalId",
+            "columnName": "proposalId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "payloadRefDigest",
+            "columnName": "payloadRefDigest",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "approvalRevision",
+            "columnName": "approvalRevision",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "attemptId",
+            "columnName": "attemptId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "resultRef",
+            "columnName": "resultRef",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "safeResultJson",
+            "columnName": "safeResultJson",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "fencingEpoch",
+            "columnName": "fencingEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMs",
+            "columnName": "updatedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "executionId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_runtime_tool_executions_runId",
+            "unique": false,
+            "columnNames": [
+              "runId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_runtime_tool_executions_runId` ON `${TABLE_NAME}` (`runId`)"
+          },
+          {
+            "name": "index_runtime_tool_executions_attemptId",
+            "unique": false,
+            "columnNames": [
+              "attemptId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_runtime_tool_executions_attemptId` ON `${TABLE_NAME}` (`attemptId`)"
+          },
+          {
+            "name": "index_runtime_tool_executions_logicalStepId",
+            "unique": false,
+            "columnNames": [
+              "logicalStepId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_runtime_tool_executions_logicalStepId` ON `${TABLE_NAME}` (`logicalStepId`)"
+          },
+          {
+            "name": "index_runtime_tool_executions_idempotencyKey",
+            "unique": true,
+            "columnNames": [
+              "idempotencyKey"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_runtime_tool_executions_idempotencyKey` ON `${TABLE_NAME}` (`idempotencyKey`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "runtime_runs",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "runId"
+            ],
+            "referencedColumns": [
+              "runId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "runtime_projections",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`projectionName` TEXT NOT NULL, `sessionId` TEXT NOT NULL, `consumedSequence` INTEGER NOT NULL, `snapshotJson` TEXT NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`projectionName`, `sessionId`), FOREIGN KEY(`sessionId`) REFERENCES `runtime_sessions`(`sessionId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "projectionName",
+            "columnName": "projectionName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "consumedSequence",
+            "columnName": "consumedSequence",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "snapshotJson",
+            "columnName": "snapshotJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMs",
+            "columnName": "updatedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "projectionName",
+            "sessionId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_runtime_projections_sessionId",
+            "unique": false,
+            "columnNames": [
+              "sessionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_runtime_projections_sessionId` ON `${TABLE_NAME}` (`sessionId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "runtime_sessions",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sessionId"
+            ],
+            "referencedColumns": [
+              "sessionId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "runtime_input_staging",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`inputRef` TEXT NOT NULL, `rawText` TEXT NOT NULL, `utf8Length` INTEGER NOT NULL, `sha256Digest` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `expiresAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`inputRef`))",
+        "fields": [
+          {
+            "fieldPath": "inputRef",
+            "columnName": "inputRef",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rawText",
+            "columnName": "rawText",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "utf8Length",
+            "columnName": "utf8Length",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sha256Digest",
+            "columnName": "sha256Digest",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "expiresAtEpochMs",
+            "columnName": "expiresAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "inputRef"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_runtime_input_staging_expiresAtEpochMs",
+            "unique": false,
+            "columnNames": [
+              "expiresAtEpochMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_runtime_input_staging_expiresAtEpochMs` ON `${TABLE_NAME}` (`expiresAtEpochMs`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "runtime_run_inputs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`inputRef` TEXT NOT NULL, `runId` TEXT NOT NULL, `rawText` TEXT NOT NULL, `utf8Length` INTEGER NOT NULL, `sha256Digest` TEXT NOT NULL, `expiresAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`inputRef`), FOREIGN KEY(`runId`) REFERENCES `runtime_runs`(`runId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "inputRef",
+            "columnName": "inputRef",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "runId",
+            "columnName": "runId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rawText",
+            "columnName": "rawText",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "utf8Length",
+            "columnName": "utf8Length",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sha256Digest",
+            "columnName": "sha256Digest",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "expiresAtEpochMs",
+            "columnName": "expiresAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "inputRef"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_runtime_run_inputs_runId",
+            "unique": true,
+            "columnNames": [
+              "runId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_runtime_run_inputs_runId` ON `${TABLE_NAME}` (`runId`)"
+          },
+          {
+            "name": "index_runtime_run_inputs_expiresAtEpochMs",
+            "unique": false,
+            "columnNames": [
+              "expiresAtEpochMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_runtime_run_inputs_expiresAtEpochMs` ON `${TABLE_NAME}` (`expiresAtEpochMs`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "runtime_runs",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "runId"
+            ],
+            "referencedColumns": [
+              "runId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "staged_memory_candidates",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `scope` TEXT NOT NULL, `scopeId` TEXT, `content` TEXT, `contentDigest` TEXT NOT NULL, `utf8Length` INTEGER NOT NULL, `sourceIdsJson` TEXT NOT NULL, `sensitivity` TEXT NOT NULL, `state` TEXT NOT NULL, `approvalRef` TEXT, `revision` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `expiresAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scope",
+            "columnName": "scope",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scopeId",
+            "columnName": "scopeId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "content",
+            "columnName": "content",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "contentDigest",
+            "columnName": "contentDigest",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "utf8Length",
+            "columnName": "utf8Length",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceIdsJson",
+            "columnName": "sourceIdsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sensitivity",
+            "columnName": "sensitivity",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "approvalRef",
+            "columnName": "approvalRef",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "revision",
+            "columnName": "revision",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "expiresAtEpochMs",
+            "columnName": "expiresAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMs",
+            "columnName": "updatedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_staged_memory_candidates_state",
+            "unique": false,
+            "columnNames": [
+              "state"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_staged_memory_candidates_state` ON `${TABLE_NAME}` (`state`)"
+          },
+          {
+            "name": "index_staged_memory_candidates_expiresAtEpochMs",
+            "unique": false,
+            "columnNames": [
+              "expiresAtEpochMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_staged_memory_candidates_expiresAtEpochMs` ON `${TABLE_NAME}` (`expiresAtEpochMs`)"
+          },
+          {
+            "name": "index_staged_memory_candidates_scope_scopeId",
+            "unique": false,
+            "columnNames": [
+              "scope",
+              "scopeId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_staged_memory_candidates_scope_scopeId` ON `${TABLE_NAME}` (`scope`, `scopeId`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "memory_namespaces",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`namespaceId` TEXT NOT NULL, `ownerUserId` TEXT NOT NULL, `profileId` TEXT NOT NULL, `scopeType` TEXT NOT NULL, `scopeId` TEXT NOT NULL, `state` TEXT NOT NULL, `revision` INTEGER NOT NULL, `invalidationGeneration` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`namespaceId`))",
+        "fields": [
+          {
+            "fieldPath": "namespaceId",
+            "columnName": "namespaceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ownerUserId",
+            "columnName": "ownerUserId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "profileId",
+            "columnName": "profileId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scopeType",
+            "columnName": "scopeType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scopeId",
+            "columnName": "scopeId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "revision",
+            "columnName": "revision",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "invalidationGeneration",
+            "columnName": "invalidationGeneration",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "namespaceId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_memory_namespaces_ownerUserId_profileId_scopeType_scopeId",
+            "unique": true,
+            "columnNames": [
+              "ownerUserId",
+              "profileId",
+              "scopeType",
+              "scopeId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_memory_namespaces_ownerUserId_profileId_scopeType_scopeId` ON `${TABLE_NAME}` (`ownerUserId`, `profileId`, `scopeType`, `scopeId`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "memory_records",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`namespaceId` TEXT NOT NULL, `memoryId` TEXT NOT NULL, `recordVersion` INTEGER NOT NULL, `logicalMemoryId` TEXT NOT NULL, `memoryType` TEXT NOT NULL, `subjectKey` TEXT NOT NULL, `predicateKey` TEXT NOT NULL, `objectText` TEXT NOT NULL, `canonicalText` TEXT NOT NULL, `canonicalDigest` TEXT NOT NULL, `sensitivity` TEXT NOT NULL, `confidence` REAL NOT NULL, `importance` REAL NOT NULL, `status` TEXT NOT NULL, `validFromEpochMs` INTEGER, `validToEpochMs` INTEGER, `observedAtEpochMs` INTEGER NOT NULL, `txFromEpochMs` INTEGER NOT NULL, `txToEpochMs` INTEGER, `createdAtEpochMs` INTEGER NOT NULL, `expiresAtEpochMs` INTEGER, `schemaVersion` INTEGER NOT NULL, `sourceSetDigest` TEXT NOT NULL, PRIMARY KEY(`namespaceId`, `memoryId`, `recordVersion`), FOREIGN KEY(`namespaceId`) REFERENCES `memory_namespaces`(`namespaceId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "namespaceId",
+            "columnName": "namespaceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "memoryId",
+            "columnName": "memoryId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recordVersion",
+            "columnName": "recordVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "logicalMemoryId",
+            "columnName": "logicalMemoryId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "memoryType",
+            "columnName": "memoryType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "subjectKey",
+            "columnName": "subjectKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "predicateKey",
+            "columnName": "predicateKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "objectText",
+            "columnName": "objectText",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "canonicalText",
+            "columnName": "canonicalText",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "canonicalDigest",
+            "columnName": "canonicalDigest",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sensitivity",
+            "columnName": "sensitivity",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "importance",
+            "columnName": "importance",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "validFromEpochMs",
+            "columnName": "validFromEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "validToEpochMs",
+            "columnName": "validToEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "observedAtEpochMs",
+            "columnName": "observedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "txFromEpochMs",
+            "columnName": "txFromEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "txToEpochMs",
+            "columnName": "txToEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "expiresAtEpochMs",
+            "columnName": "expiresAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "schemaVersion",
+            "columnName": "schemaVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceSetDigest",
+            "columnName": "sourceSetDigest",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "namespaceId",
+            "memoryId",
+            "recordVersion"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_memory_records_namespaceId",
+            "unique": false,
+            "columnNames": [
+              "namespaceId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_memory_records_namespaceId` ON `${TABLE_NAME}` (`namespaceId`)"
+          },
+          {
+            "name": "index_memory_records_namespaceId_logicalMemoryId",
+            "unique": false,
+            "columnNames": [
+              "namespaceId",
+              "logicalMemoryId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_memory_records_namespaceId_logicalMemoryId` ON `${TABLE_NAME}` (`namespaceId`, `logicalMemoryId`)"
+          },
+          {
+            "name": "index_memory_records_namespaceId_subjectKey_predicateKey",
+            "unique": false,
+            "columnNames": [
+              "namespaceId",
+              "subjectKey",
+              "predicateKey"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_memory_records_namespaceId_subjectKey_predicateKey` ON `${TABLE_NAME}` (`namespaceId`, `subjectKey`, `predicateKey`)"
+          },
+          {
+            "name": "index_memory_records_namespaceId_expiresAtEpochMs",
+            "unique": false,
+            "columnNames": [
+              "namespaceId",
+              "expiresAtEpochMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_memory_records_namespaceId_expiresAtEpochMs` ON `${TABLE_NAME}` (`namespaceId`, `expiresAtEpochMs`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "memory_namespaces",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "namespaceId"
+            ],
+            "referencedColumns": [
+              "namespaceId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "memory_current_versions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`namespaceId` TEXT NOT NULL, `logicalMemoryId` TEXT NOT NULL, `recordVersion` INTEGER NOT NULL, `memoryId` TEXT NOT NULL, `revision` INTEGER NOT NULL, PRIMARY KEY(`namespaceId`, `logicalMemoryId`), FOREIGN KEY(`namespaceId`, `memoryId`, `recordVersion`) REFERENCES `memory_records`(`namespaceId`, `memoryId`, `recordVersion`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "namespaceId",
+            "columnName": "namespaceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "logicalMemoryId",
+            "columnName": "logicalMemoryId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recordVersion",
+            "columnName": "recordVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "memoryId",
+            "columnName": "memoryId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "revision",
+            "columnName": "revision",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "namespaceId",
+            "logicalMemoryId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_memory_current_versions_namespaceId_memoryId_recordVersion",
+            "unique": true,
+            "columnNames": [
+              "namespaceId",
+              "memoryId",
+              "recordVersion"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_memory_current_versions_namespaceId_memoryId_recordVersion` ON `${TABLE_NAME}` (`namespaceId`, `memoryId`, `recordVersion`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "memory_records",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "namespaceId",
+              "memoryId",
+              "recordVersion"
+            ],
+            "referencedColumns": [
+              "namespaceId",
+              "memoryId",
+              "recordVersion"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "memory_evidence",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`namespaceId` TEXT NOT NULL, `memoryId` TEXT NOT NULL, `recordVersion` INTEGER NOT NULL, `evidenceId` TEXT NOT NULL, `sourceType` TEXT NOT NULL, `sourceRef` TEXT NOT NULL, `sourceDigest` TEXT NOT NULL, `observedAtEpochMs` INTEGER NOT NULL, `excerptDigest` TEXT NOT NULL, `trust` TEXT NOT NULL, `sensitivity` TEXT NOT NULL, PRIMARY KEY(`namespaceId`, `memoryId`, `recordVersion`, `evidenceId`), FOREIGN KEY(`namespaceId`, `memoryId`, `recordVersion`) REFERENCES `memory_records`(`namespaceId`, `memoryId`, `recordVersion`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "namespaceId",
+            "columnName": "namespaceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "memoryId",
+            "columnName": "memoryId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recordVersion",
+            "columnName": "recordVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "evidenceId",
+            "columnName": "evidenceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceType",
+            "columnName": "sourceType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceRef",
+            "columnName": "sourceRef",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceDigest",
+            "columnName": "sourceDigest",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "observedAtEpochMs",
+            "columnName": "observedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "excerptDigest",
+            "columnName": "excerptDigest",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "trust",
+            "columnName": "trust",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sensitivity",
+            "columnName": "sensitivity",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "namespaceId",
+            "memoryId",
+            "recordVersion",
+            "evidenceId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_memory_evidence_namespaceId_memoryId_recordVersion",
+            "unique": false,
+            "columnNames": [
+              "namespaceId",
+              "memoryId",
+              "recordVersion"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_memory_evidence_namespaceId_memoryId_recordVersion` ON `${TABLE_NAME}` (`namespaceId`, `memoryId`, `recordVersion`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "memory_records",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "namespaceId",
+              "memoryId",
+              "recordVersion"
+            ],
+            "referencedColumns": [
+              "namespaceId",
+              "memoryId",
+              "recordVersion"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "memory_relations",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`namespaceId` TEXT NOT NULL, `fromMemoryId` TEXT NOT NULL, `fromRecordVersion` INTEGER NOT NULL, `toMemoryId` TEXT NOT NULL, `toRecordVersion` INTEGER NOT NULL, `relationType` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`namespaceId`, `fromMemoryId`, `fromRecordVersion`, `toMemoryId`, `toRecordVersion`, `relationType`), FOREIGN KEY(`namespaceId`, `fromMemoryId`, `fromRecordVersion`) REFERENCES `memory_records`(`namespaceId`, `memoryId`, `recordVersion`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`namespaceId`, `toMemoryId`, `toRecordVersion`) REFERENCES `memory_records`(`namespaceId`, `memoryId`, `recordVersion`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "namespaceId",
+            "columnName": "namespaceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fromMemoryId",
+            "columnName": "fromMemoryId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fromRecordVersion",
+            "columnName": "fromRecordVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "toMemoryId",
+            "columnName": "toMemoryId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "toRecordVersion",
+            "columnName": "toRecordVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "relationType",
+            "columnName": "relationType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "namespaceId",
+            "fromMemoryId",
+            "fromRecordVersion",
+            "toMemoryId",
+            "toRecordVersion",
+            "relationType"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_memory_relations_namespaceId_fromMemoryId_fromRecordVersion",
+            "unique": false,
+            "columnNames": [
+              "namespaceId",
+              "fromMemoryId",
+              "fromRecordVersion"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_memory_relations_namespaceId_fromMemoryId_fromRecordVersion` ON `${TABLE_NAME}` (`namespaceId`, `fromMemoryId`, `fromRecordVersion`)"
+          },
+          {
+            "name": "index_memory_relations_namespaceId_toMemoryId_toRecordVersion",
+            "unique": false,
+            "columnNames": [
+              "namespaceId",
+              "toMemoryId",
+              "toRecordVersion"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_memory_relations_namespaceId_toMemoryId_toRecordVersion` ON `${TABLE_NAME}` (`namespaceId`, `toMemoryId`, `toRecordVersion`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "memory_records",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "namespaceId",
+              "fromMemoryId",
+              "fromRecordVersion"
+            ],
+            "referencedColumns": [
+              "namespaceId",
+              "memoryId",
+              "recordVersion"
+            ]
+          },
+          {
+            "table": "memory_records",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "namespaceId",
+              "toMemoryId",
+              "toRecordVersion"
+            ],
+            "referencedColumns": [
+              "namespaceId",
+              "memoryId",
+              "recordVersion"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "memory_index_outbox",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`jobId` TEXT NOT NULL, `namespaceId` TEXT NOT NULL, `memoryId` TEXT NOT NULL, `recordVersion` INTEGER NOT NULL, `indexType` TEXT NOT NULL, `contentDigest` TEXT NOT NULL, `status` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`jobId`), FOREIGN KEY(`namespaceId`, `memoryId`, `recordVersion`) REFERENCES `memory_records`(`namespaceId`, `memoryId`, `recordVersion`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "jobId",
+            "columnName": "jobId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "namespaceId",
+            "columnName": "namespaceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "memoryId",
+            "columnName": "memoryId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recordVersion",
+            "columnName": "recordVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "indexType",
+            "columnName": "indexType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contentDigest",
+            "columnName": "contentDigest",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "jobId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_memory_index_outbox_namespaceId_memoryId_recordVersion",
+            "unique": false,
+            "columnNames": [
+              "namespaceId",
+              "memoryId",
+              "recordVersion"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_memory_index_outbox_namespaceId_memoryId_recordVersion` ON `${TABLE_NAME}` (`namespaceId`, `memoryId`, `recordVersion`)"
+          },
+          {
+            "name": "index_memory_index_outbox_namespaceId_memoryId_recordVersion_indexType",
+            "unique": true,
+            "columnNames": [
+              "namespaceId",
+              "memoryId",
+              "recordVersion",
+              "indexType"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_memory_index_outbox_namespaceId_memoryId_recordVersion_indexType` ON `${TABLE_NAME}` (`namespaceId`, `memoryId`, `recordVersion`, `indexType`)"
+          },
+          {
+            "name": "index_memory_index_outbox_status",
+            "unique": false,
+            "columnNames": [
+              "status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_memory_index_outbox_status` ON `${TABLE_NAME}` (`status`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "memory_records",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "namespaceId",
+              "memoryId",
+              "recordVersion"
+            ],
+            "referencedColumns": [
+              "namespaceId",
+              "memoryId",
+              "recordVersion"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "memory_commit_receipts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`namespaceId` TEXT NOT NULL, `candidateId` TEXT NOT NULL, `approvalRef` TEXT NOT NULL, `canonicalDigest` TEXT NOT NULL, `memoryId` TEXT NOT NULL, `recordVersion` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`namespaceId`, `candidateId`), FOREIGN KEY(`namespaceId`, `memoryId`, `recordVersion`) REFERENCES `memory_records`(`namespaceId`, `memoryId`, `recordVersion`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "namespaceId",
+            "columnName": "namespaceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "candidateId",
+            "columnName": "candidateId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "approvalRef",
+            "columnName": "approvalRef",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "canonicalDigest",
+            "columnName": "canonicalDigest",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "memoryId",
+            "columnName": "memoryId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recordVersion",
+            "columnName": "recordVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "namespaceId",
+            "candidateId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_memory_commit_receipts_namespaceId_memoryId_recordVersion",
+            "unique": false,
+            "columnNames": [
+              "namespaceId",
+              "memoryId",
+              "recordVersion"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_memory_commit_receipts_namespaceId_memoryId_recordVersion` ON `${TABLE_NAME}` (`namespaceId`, `memoryId`, `recordVersion`)"
+          },
+          {
+            "name": "index_memory_commit_receipts_approvalRef",
+            "unique": true,
+            "columnNames": [
+              "approvalRef"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_memory_commit_receipts_approvalRef` ON `${TABLE_NAME}` (`approvalRef`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "memory_records",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "namespaceId",
+              "memoryId",
+              "recordVersion"
+            ],
+            "referencedColumns": [
+              "namespaceId",
+              "memoryId",
+              "recordVersion"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "memory_events",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`eventId` TEXT NOT NULL, `namespaceId` TEXT NOT NULL, `candidateId` TEXT NOT NULL, `memoryId` TEXT NOT NULL, `recordVersion` INTEGER NOT NULL, `eventType` TEXT NOT NULL, `payloadDigest` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`eventId`), FOREIGN KEY(`namespaceId`, `memoryId`, `recordVersion`) REFERENCES `memory_records`(`namespaceId`, `memoryId`, `recordVersion`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "eventId",
+            "columnName": "eventId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "namespaceId",
+            "columnName": "namespaceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "candidateId",
+            "columnName": "candidateId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "memoryId",
+            "columnName": "memoryId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recordVersion",
+            "columnName": "recordVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "eventType",
+            "columnName": "eventType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payloadDigest",
+            "columnName": "payloadDigest",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "eventId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_memory_events_namespaceId_memoryId_recordVersion",
+            "unique": false,
+            "columnNames": [
+              "namespaceId",
+              "memoryId",
+              "recordVersion"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_memory_events_namespaceId_memoryId_recordVersion` ON `${TABLE_NAME}` (`namespaceId`, `memoryId`, `recordVersion`)"
+          },
+          {
+            "name": "index_memory_events_namespaceId_candidateId_eventType",
+            "unique": true,
+            "columnNames": [
+              "namespaceId",
+              "candidateId",
+              "eventType"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_memory_events_namespaceId_candidateId_eventType` ON `${TABLE_NAME}` (`namespaceId`, `candidateId`, `eventType`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "memory_records",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "namespaceId",
+              "memoryId",
+              "recordVersion"
+            ],
+            "referencedColumns": [
+              "namespaceId",
+              "memoryId",
+              "recordVersion"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "memory_tombstones",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`namespaceId` TEXT NOT NULL, `logicalMemoryId` TEXT NOT NULL, `memoryId` TEXT NOT NULL, `highestRecordVersion` INTEGER NOT NULL, `deleteCommandDigest` TEXT NOT NULL, `deletionRevision` INTEGER NOT NULL, `barrierState` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`namespaceId`, `logicalMemoryId`), FOREIGN KEY(`namespaceId`) REFERENCES `memory_namespaces`(`namespaceId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "namespaceId",
+            "columnName": "namespaceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "logicalMemoryId",
+            "columnName": "logicalMemoryId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "memoryId",
+            "columnName": "memoryId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "highestRecordVersion",
+            "columnName": "highestRecordVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deleteCommandDigest",
+            "columnName": "deleteCommandDigest",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deletionRevision",
+            "columnName": "deletionRevision",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "barrierState",
+            "columnName": "barrierState",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "namespaceId",
+            "logicalMemoryId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_memory_tombstones_namespaceId",
+            "unique": false,
+            "columnNames": [
+              "namespaceId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_memory_tombstones_namespaceId` ON `${TABLE_NAME}` (`namespaceId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "memory_namespaces",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "namespaceId"
+            ],
+            "referencedColumns": [
+              "namespaceId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "memory_deletion_outbox",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`jobId` TEXT NOT NULL, `namespaceId` TEXT NOT NULL, `logicalMemoryId` TEXT NOT NULL, `deletionRevision` INTEGER NOT NULL, `targetIndex` TEXT NOT NULL, `status` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`jobId`), FOREIGN KEY(`namespaceId`) REFERENCES `memory_namespaces`(`namespaceId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "jobId",
+            "columnName": "jobId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "namespaceId",
+            "columnName": "namespaceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "logicalMemoryId",
+            "columnName": "logicalMemoryId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deletionRevision",
+            "columnName": "deletionRevision",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "targetIndex",
+            "columnName": "targetIndex",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "jobId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_memory_deletion_outbox_namespaceId",
+            "unique": false,
+            "columnNames": [
+              "namespaceId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_memory_deletion_outbox_namespaceId` ON `${TABLE_NAME}` (`namespaceId`)"
+          },
+          {
+            "name": "index_memory_deletion_outbox_namespaceId_logicalMemoryId_deletionRevision",
+            "unique": true,
+            "columnNames": [
+              "namespaceId",
+              "logicalMemoryId",
+              "deletionRevision"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_memory_deletion_outbox_namespaceId_logicalMemoryId_deletionRevision` ON `${TABLE_NAME}` (`namespaceId`, `logicalMemoryId`, `deletionRevision`)"
+          },
+          {
+            "name": "index_memory_deletion_outbox_status",
+            "unique": false,
+            "columnNames": [
+              "status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_memory_deletion_outbox_status` ON `${TABLE_NAME}` (`status`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "memory_namespaces",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "namespaceId"
+            ],
+            "referencedColumns": [
+              "namespaceId"
+            ]
+          }
+        ]
+      },
+      {
+        "ftsVersion": "FTS4",
+        "ftsOptions": {
+          "tokenizer": "unicode61",
+          "tokenizerArgs": [],
+          "contentTable": "",
+          "languageIdColumnName": "",
+          "matchInfo": "FTS4",
+          "notIndexedColumns": [],
+          "prefixSizes": [],
+          "preferredOrder": "ASC"
+        },
+        "contentSyncTriggers": [],
+        "tableName": "memory_fts",
+        "createSql": "CREATE VIRTUAL TABLE IF NOT EXISTS `${TABLE_NAME}` USING FTS4(`namespaceId` TEXT NOT NULL, `memoryId` TEXT NOT NULL, `recordVersion` INTEGER NOT NULL, `canonicalText` TEXT NOT NULL, tokenize=unicode61)",
+        "fields": [
+          {
+            "fieldPath": "namespaceId",
+            "columnName": "namespaceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "memoryId",
+            "columnName": "memoryId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recordVersion",
+            "columnName": "recordVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "canonicalText",
+            "columnName": "canonicalText",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": []
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "plan_versions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`versionId` TEXT NOT NULL, `schemaVersion` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `note` TEXT, PRIMARY KEY(`versionId`))",
+        "fields": [
+          {
+            "fieldPath": "versionId",
+            "columnName": "versionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "schemaVersion",
+            "columnName": "schemaVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "note",
+            "columnName": "note",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "versionId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_plan_versions_schemaVersion",
+            "unique": false,
+            "columnNames": [
+              "schemaVersion"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_plan_versions_schemaVersion` ON `${TABLE_NAME}` (`schemaVersion`)"
+          },
+          {
+            "name": "index_plan_versions_createdAtEpochMs",
+            "unique": false,
+            "columnNames": [
+              "createdAtEpochMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_plan_versions_createdAtEpochMs` ON `${TABLE_NAME}` (`createdAtEpochMs`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "plan_definitions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`definitionId` TEXT NOT NULL, `versionId` TEXT NOT NULL, `ownerNamespace` TEXT NOT NULL, `fingerprint` TEXT NOT NULL, `payloadJson` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`definitionId`), FOREIGN KEY(`versionId`) REFERENCES `plan_versions`(`versionId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "definitionId",
+            "columnName": "definitionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "versionId",
+            "columnName": "versionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ownerNamespace",
+            "columnName": "ownerNamespace",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fingerprint",
+            "columnName": "fingerprint",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payloadJson",
+            "columnName": "payloadJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "definitionId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_plan_definitions_versionId",
+            "unique": false,
+            "columnNames": [
+              "versionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_plan_definitions_versionId` ON `${TABLE_NAME}` (`versionId`)"
+          },
+          {
+            "name": "index_plan_definitions_ownerNamespace",
+            "unique": false,
+            "columnNames": [
+              "ownerNamespace"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_plan_definitions_ownerNamespace` ON `${TABLE_NAME}` (`ownerNamespace`)"
+          },
+          {
+            "name": "index_plan_definitions_fingerprint",
+            "unique": true,
+            "columnNames": [
+              "fingerprint"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_plan_definitions_fingerprint` ON `${TABLE_NAME}` (`fingerprint`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "plan_versions",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "versionId"
+            ],
+            "referencedColumns": [
+              "versionId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "plan_nodes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`nodeId` TEXT NOT NULL, `definitionId` TEXT NOT NULL, `nodeKey` TEXT NOT NULL, `nodeType` TEXT NOT NULL, `payloadJson` TEXT NOT NULL, `requiresApproval` INTEGER NOT NULL, `sensitivity` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`nodeId`), FOREIGN KEY(`definitionId`) REFERENCES `plan_definitions`(`definitionId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "nodeId",
+            "columnName": "nodeId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "definitionId",
+            "columnName": "definitionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nodeKey",
+            "columnName": "nodeKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nodeType",
+            "columnName": "nodeType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payloadJson",
+            "columnName": "payloadJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "requiresApproval",
+            "columnName": "requiresApproval",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sensitivity",
+            "columnName": "sensitivity",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "nodeId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_plan_nodes_definitionId",
+            "unique": false,
+            "columnNames": [
+              "definitionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_plan_nodes_definitionId` ON `${TABLE_NAME}` (`definitionId`)"
+          },
+          {
+            "name": "index_plan_nodes_definitionId_nodeKey",
+            "unique": true,
+            "columnNames": [
+              "definitionId",
+              "nodeKey"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_plan_nodes_definitionId_nodeKey` ON `${TABLE_NAME}` (`definitionId`, `nodeKey`)"
+          },
+          {
+            "name": "index_plan_nodes_nodeType",
+            "unique": false,
+            "columnNames": [
+              "nodeType"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_plan_nodes_nodeType` ON `${TABLE_NAME}` (`nodeType`)"
+          },
+          {
+            "name": "index_plan_nodes_requiresApproval",
+            "unique": false,
+            "columnNames": [
+              "requiresApproval"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_plan_nodes_requiresApproval` ON `${TABLE_NAME}` (`requiresApproval`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "plan_definitions",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "definitionId"
+            ],
+            "referencedColumns": [
+              "definitionId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "plan_edges",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`edgeId` TEXT NOT NULL, `definitionId` TEXT NOT NULL, `fromNodeId` TEXT NOT NULL, `toNodeId` TEXT NOT NULL, `condition` TEXT, `ordinal` INTEGER NOT NULL, PRIMARY KEY(`edgeId`), FOREIGN KEY(`definitionId`) REFERENCES `plan_definitions`(`definitionId`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`fromNodeId`) REFERENCES `plan_nodes`(`nodeId`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`toNodeId`) REFERENCES `plan_nodes`(`nodeId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "edgeId",
+            "columnName": "edgeId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "definitionId",
+            "columnName": "definitionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fromNodeId",
+            "columnName": "fromNodeId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "toNodeId",
+            "columnName": "toNodeId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "condition",
+            "columnName": "condition",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "ordinal",
+            "columnName": "ordinal",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "edgeId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_plan_edges_definitionId",
+            "unique": false,
+            "columnNames": [
+              "definitionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_plan_edges_definitionId` ON `${TABLE_NAME}` (`definitionId`)"
+          },
+          {
+            "name": "index_plan_edges_fromNodeId",
+            "unique": false,
+            "columnNames": [
+              "fromNodeId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_plan_edges_fromNodeId` ON `${TABLE_NAME}` (`fromNodeId`)"
+          },
+          {
+            "name": "index_plan_edges_toNodeId",
+            "unique": false,
+            "columnNames": [
+              "toNodeId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_plan_edges_toNodeId` ON `${TABLE_NAME}` (`toNodeId`)"
+          },
+          {
+            "name": "index_plan_edges_definitionId_fromNodeId_toNodeId",
+            "unique": true,
+            "columnNames": [
+              "definitionId",
+              "fromNodeId",
+              "toNodeId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_plan_edges_definitionId_fromNodeId_toNodeId` ON `${TABLE_NAME}` (`definitionId`, `fromNodeId`, `toNodeId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "plan_definitions",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "definitionId"
+            ],
+            "referencedColumns": [
+              "definitionId"
+            ]
+          },
+          {
+            "table": "plan_nodes",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "fromNodeId"
+            ],
+            "referencedColumns": [
+              "nodeId"
+            ]
+          },
+          {
+            "table": "plan_nodes",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "toNodeId"
+            ],
+            "referencedColumns": [
+              "nodeId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "plan_runs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`runId` TEXT NOT NULL, `definitionId` TEXT NOT NULL, `runStatus` TEXT NOT NULL, `activeAttemptId` TEXT, `startedAtEpochMs` INTEGER NOT NULL, `completedAtEpochMs` INTEGER, PRIMARY KEY(`runId`), FOREIGN KEY(`definitionId`) REFERENCES `plan_definitions`(`definitionId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "runId",
+            "columnName": "runId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "definitionId",
+            "columnName": "definitionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "runStatus",
+            "columnName": "runStatus",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "activeAttemptId",
+            "columnName": "activeAttemptId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "startedAtEpochMs",
+            "columnName": "startedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "completedAtEpochMs",
+            "columnName": "completedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "runId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_plan_runs_definitionId",
+            "unique": false,
+            "columnNames": [
+              "definitionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_plan_runs_definitionId` ON `${TABLE_NAME}` (`definitionId`)"
+          },
+          {
+            "name": "index_plan_runs_runStatus",
+            "unique": false,
+            "columnNames": [
+              "runStatus"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_plan_runs_runStatus` ON `${TABLE_NAME}` (`runStatus`)"
+          },
+          {
+            "name": "index_plan_runs_activeAttemptId",
+            "unique": false,
+            "columnNames": [
+              "activeAttemptId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_plan_runs_activeAttemptId` ON `${TABLE_NAME}` (`activeAttemptId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "plan_definitions",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "definitionId"
+            ],
+            "referencedColumns": [
+              "definitionId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "node_attempts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`attemptId` TEXT NOT NULL, `runId` TEXT NOT NULL, `nodeId` TEXT NOT NULL, `ordinal` INTEGER NOT NULL, `status` TEXT NOT NULL, `startedAtEpochMs` INTEGER NOT NULL, `finishedAtEpochMs` INTEGER, `idempotencyKey` TEXT NOT NULL, `errorCode` TEXT, PRIMARY KEY(`attemptId`), FOREIGN KEY(`runId`) REFERENCES `plan_runs`(`runId`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`nodeId`) REFERENCES `plan_nodes`(`nodeId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "attemptId",
+            "columnName": "attemptId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "runId",
+            "columnName": "runId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nodeId",
+            "columnName": "nodeId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ordinal",
+            "columnName": "ordinal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAtEpochMs",
+            "columnName": "startedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "finishedAtEpochMs",
+            "columnName": "finishedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "idempotencyKey",
+            "columnName": "idempotencyKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "errorCode",
+            "columnName": "errorCode",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "attemptId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_node_attempts_runId",
+            "unique": false,
+            "columnNames": [
+              "runId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_node_attempts_runId` ON `${TABLE_NAME}` (`runId`)"
+          },
+          {
+            "name": "index_node_attempts_nodeId",
+            "unique": false,
+            "columnNames": [
+              "nodeId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_node_attempts_nodeId` ON `${TABLE_NAME}` (`nodeId`)"
+          },
+          {
+            "name": "index_node_attempts_status",
+            "unique": false,
+            "columnNames": [
+              "status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_node_attempts_status` ON `${TABLE_NAME}` (`status`)"
+          },
+          {
+            "name": "index_node_attempts_idempotencyKey",
+            "unique": true,
+            "columnNames": [
+              "idempotencyKey"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_node_attempts_idempotencyKey` ON `${TABLE_NAME}` (`idempotencyKey`)"
+          },
+          {
+            "name": "index_node_attempts_runId_nodeId_ordinal",
+            "unique": true,
+            "columnNames": [
+              "runId",
+              "nodeId",
+              "ordinal"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_node_attempts_runId_nodeId_ordinal` ON `${TABLE_NAME}` (`runId`, `nodeId`, `ordinal`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "plan_runs",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "runId"
+            ],
+            "referencedColumns": [
+              "runId"
+            ]
+          },
+          {
+            "table": "plan_nodes",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "nodeId"
+            ],
+            "referencedColumns": [
+              "nodeId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "approval_grants",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`grantId` TEXT NOT NULL, `attemptId` TEXT NOT NULL, `decision` TEXT NOT NULL, `decidedByUser` TEXT NOT NULL, `title` TEXT NOT NULL, `impact` TEXT NOT NULL, `actions` TEXT NOT NULL, `verificationComponentKey` TEXT NOT NULL, `decidedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`grantId`), FOREIGN KEY(`attemptId`) REFERENCES `node_attempts`(`attemptId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "grantId",
+            "columnName": "grantId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attemptId",
+            "columnName": "attemptId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "decision",
+            "columnName": "decision",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "decidedByUser",
+            "columnName": "decidedByUser",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "impact",
+            "columnName": "impact",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actions",
+            "columnName": "actions",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "verificationComponentKey",
+            "columnName": "verificationComponentKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "decidedAtEpochMs",
+            "columnName": "decidedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "grantId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_approval_grants_attemptId",
+            "unique": false,
+            "columnNames": [
+              "attemptId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_approval_grants_attemptId` ON `${TABLE_NAME}` (`attemptId`)"
+          },
+          {
+            "name": "index_approval_grants_decision",
+            "unique": false,
+            "columnNames": [
+              "decision"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_approval_grants_decision` ON `${TABLE_NAME}` (`decision`)"
+          },
+          {
+            "name": "index_approval_grants_decidedByUser",
+            "unique": false,
+            "columnNames": [
+              "decidedByUser"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_approval_grants_decidedByUser` ON `${TABLE_NAME}` (`decidedByUser`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "node_attempts",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "attemptId"
+            ],
+            "referencedColumns": [
+              "attemptId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "dispatch_outbox",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`jobId` TEXT NOT NULL, `attemptId` TEXT NOT NULL, `toolName` TEXT NOT NULL, `argumentsDigest` TEXT NOT NULL, `idempotencyKey` TEXT NOT NULL, `status` TEXT NOT NULL, `ordinal` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`jobId`), FOREIGN KEY(`attemptId`) REFERENCES `node_attempts`(`attemptId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "jobId",
+            "columnName": "jobId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attemptId",
+            "columnName": "attemptId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "toolName",
+            "columnName": "toolName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "argumentsDigest",
+            "columnName": "argumentsDigest",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "idempotencyKey",
+            "columnName": "idempotencyKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ordinal",
+            "columnName": "ordinal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "jobId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_dispatch_outbox_attemptId",
+            "unique": false,
+            "columnNames": [
+              "attemptId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_dispatch_outbox_attemptId` ON `${TABLE_NAME}` (`attemptId`)"
+          },
+          {
+            "name": "index_dispatch_outbox_status",
+            "unique": false,
+            "columnNames": [
+              "status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_dispatch_outbox_status` ON `${TABLE_NAME}` (`status`)"
+          },
+          {
+            "name": "index_dispatch_outbox_idempotencyKey",
+            "unique": true,
+            "columnNames": [
+              "idempotencyKey"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_dispatch_outbox_idempotencyKey` ON `${TABLE_NAME}` (`idempotencyKey`)"
+          },
+          {
+            "name": "index_dispatch_outbox_attemptId_ordinal",
+            "unique": true,
+            "columnNames": [
+              "attemptId",
+              "ordinal"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_dispatch_outbox_attemptId_ordinal` ON `${TABLE_NAME}` (`attemptId`, `ordinal`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "node_attempts",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "attemptId"
+            ],
+            "referencedColumns": [
+              "attemptId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "result_ledger",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`resultId` TEXT NOT NULL, `attemptId` TEXT NOT NULL, `resultJson` TEXT NOT NULL, `durabilityClass` TEXT NOT NULL, `ordinal` INTEGER NOT NULL, `recordedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`resultId`), FOREIGN KEY(`attemptId`) REFERENCES `node_attempts`(`attemptId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "resultId",
+            "columnName": "resultId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attemptId",
+            "columnName": "attemptId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "resultJson",
+            "columnName": "resultJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "durabilityClass",
+            "columnName": "durabilityClass",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ordinal",
+            "columnName": "ordinal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recordedAtEpochMs",
+            "columnName": "recordedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "resultId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_result_ledger_attemptId",
+            "unique": false,
+            "columnNames": [
+              "attemptId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_result_ledger_attemptId` ON `${TABLE_NAME}` (`attemptId`)"
+          },
+          {
+            "name": "index_result_ledger_durabilityClass",
+            "unique": false,
+            "columnNames": [
+              "durabilityClass"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_result_ledger_durabilityClass` ON `${TABLE_NAME}` (`durabilityClass`)"
+          },
+          {
+            "name": "index_result_ledger_attemptId_ordinal",
+            "unique": true,
+            "columnNames": [
+              "attemptId",
+              "ordinal"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_result_ledger_attemptId_ordinal` ON `${TABLE_NAME}` (`attemptId`, `ordinal`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "node_attempts",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "attemptId"
+            ],
+            "referencedColumns": [
+              "attemptId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "resource_leases",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`leaseId` TEXT NOT NULL, `attemptId` TEXT NOT NULL, `resourceKey` TEXT NOT NULL, `epoch` INTEGER NOT NULL, `ownerId` TEXT NOT NULL, `expiresAtEpochMs` INTEGER, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`leaseId`), FOREIGN KEY(`attemptId`) REFERENCES `node_attempts`(`attemptId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "leaseId",
+            "columnName": "leaseId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attemptId",
+            "columnName": "attemptId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "resourceKey",
+            "columnName": "resourceKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "epoch",
+            "columnName": "epoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ownerId",
+            "columnName": "ownerId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "expiresAtEpochMs",
+            "columnName": "expiresAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMs",
+            "columnName": "updatedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "leaseId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_resource_leases_attemptId",
+            "unique": false,
+            "columnNames": [
+              "attemptId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_resource_leases_attemptId` ON `${TABLE_NAME}` (`attemptId`)"
+          },
+          {
+            "name": "index_resource_leases_resourceKey",
+            "unique": false,
+            "columnNames": [
+              "resourceKey"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_resource_leases_resourceKey` ON `${TABLE_NAME}` (`resourceKey`)"
+          },
+          {
+            "name": "index_resource_leases_ownerId",
+            "unique": false,
+            "columnNames": [
+              "ownerId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_resource_leases_ownerId` ON `${TABLE_NAME}` (`ownerId`)"
+          },
+          {
+            "name": "index_resource_leases_attemptId_resourceKey",
+            "unique": true,
+            "columnNames": [
+              "attemptId",
+              "resourceKey"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_resource_leases_attemptId_resourceKey` ON `${TABLE_NAME}` (`attemptId`, `resourceKey`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "node_attempts",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "attemptId"
+            ],
+            "referencedColumns": [
+              "attemptId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "session_leases",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`leaseId` TEXT NOT NULL, `runId` TEXT NOT NULL, `sessionKey` TEXT NOT NULL, `epoch` INTEGER NOT NULL, `ownerId` TEXT NOT NULL, `expiresAtEpochMs` INTEGER, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`leaseId`), FOREIGN KEY(`runId`) REFERENCES `plan_runs`(`runId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "leaseId",
+            "columnName": "leaseId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "runId",
+            "columnName": "runId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionKey",
+            "columnName": "sessionKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "epoch",
+            "columnName": "epoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ownerId",
+            "columnName": "ownerId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "expiresAtEpochMs",
+            "columnName": "expiresAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMs",
+            "columnName": "updatedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "leaseId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_session_leases_runId",
+            "unique": false,
+            "columnNames": [
+              "runId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_session_leases_runId` ON `${TABLE_NAME}` (`runId`)"
+          },
+          {
+            "name": "index_session_leases_sessionKey",
+            "unique": false,
+            "columnNames": [
+              "sessionKey"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_session_leases_sessionKey` ON `${TABLE_NAME}` (`sessionKey`)"
+          },
+          {
+            "name": "index_session_leases_ownerId",
+            "unique": false,
+            "columnNames": [
+              "ownerId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_session_leases_ownerId` ON `${TABLE_NAME}` (`ownerId`)"
+          },
+          {
+            "name": "index_session_leases_runId_sessionKey",
+            "unique": true,
+            "columnNames": [
+              "runId",
+              "sessionKey"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_session_leases_runId_sessionKey` ON `${TABLE_NAME}` (`runId`, `sessionKey`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "plan_runs",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "runId"
+            ],
+            "referencedColumns": [
+              "runId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "contacts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`contactId` TEXT NOT NULL, `displayName` TEXT NOT NULL, `normalizedName` TEXT NOT NULL, `phone` TEXT, `email` TEXT, `wechatId` TEXT, `company` TEXT, `title` TEXT, `aliasesJson` TEXT NOT NULL, `tagsJson` TEXT NOT NULL, `note` TEXT, `avatarUri` TEXT, `source` TEXT NOT NULL, `deletedAtEpochMs` INTEGER, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`contactId`))",
+        "fields": [
+          {
+            "fieldPath": "contactId",
+            "columnName": "contactId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "displayName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "normalizedName",
+            "columnName": "normalizedName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "phone",
+            "columnName": "phone",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "email",
+            "columnName": "email",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "wechatId",
+            "columnName": "wechatId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "company",
+            "columnName": "company",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "aliasesJson",
+            "columnName": "aliasesJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tagsJson",
+            "columnName": "tagsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "note",
+            "columnName": "note",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "avatarUri",
+            "columnName": "avatarUri",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deletedAtEpochMs",
+            "columnName": "deletedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMs",
+            "columnName": "updatedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "contactId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_contacts_normalizedName",
+            "unique": false,
+            "columnNames": [
+              "normalizedName"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_contacts_normalizedName` ON `${TABLE_NAME}` (`normalizedName`)"
+          },
+          {
+            "name": "index_contacts_phone",
+            "unique": false,
+            "columnNames": [
+              "phone"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_contacts_phone` ON `${TABLE_NAME}` (`phone`)"
+          },
+          {
+            "name": "index_contacts_email",
+            "unique": false,
+            "columnNames": [
+              "email"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_contacts_email` ON `${TABLE_NAME}` (`email`)"
+          },
+          {
+            "name": "index_contacts_company",
+            "unique": false,
+            "columnNames": [
+              "company"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_contacts_company` ON `${TABLE_NAME}` (`company`)"
+          },
+          {
+            "name": "index_contacts_source",
+            "unique": false,
+            "columnNames": [
+              "source"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_contacts_source` ON `${TABLE_NAME}` (`source`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "contact_roles",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`contactId` TEXT NOT NULL, `skillId` TEXT NOT NULL, `roleType` TEXT NOT NULL, `confidence` REAL NOT NULL, `userConfirmed` INTEGER NOT NULL, `profileJson` TEXT, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`contactId`, `skillId`, `roleType`), FOREIGN KEY(`contactId`) REFERENCES `contacts`(`contactId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "contactId",
+            "columnName": "contactId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "skillId",
+            "columnName": "skillId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "roleType",
+            "columnName": "roleType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "userConfirmed",
+            "columnName": "userConfirmed",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "profileJson",
+            "columnName": "profileJson",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMs",
+            "columnName": "updatedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "contactId",
+            "skillId",
+            "roleType"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_contact_roles_contactId",
+            "unique": false,
+            "columnNames": [
+              "contactId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_contact_roles_contactId` ON `${TABLE_NAME}` (`contactId`)"
+          },
+          {
+            "name": "index_contact_roles_skillId",
+            "unique": false,
+            "columnNames": [
+              "skillId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_contact_roles_skillId` ON `${TABLE_NAME}` (`skillId`)"
+          },
+          {
+            "name": "index_contact_roles_roleType",
+            "unique": false,
+            "columnNames": [
+              "roleType"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_contact_roles_roleType` ON `${TABLE_NAME}` (`roleType`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "contacts",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "contactId"
+            ],
+            "referencedColumns": [
+              "contactId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "change_log",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`changeId` TEXT NOT NULL, `runtimeRunId` TEXT NOT NULL, `toolName` TEXT NOT NULL, `idempotencyKey` TEXT NOT NULL, `targetDomain` TEXT NOT NULL, `targetId` TEXT NOT NULL, `operation` TEXT NOT NULL, `beforeDigest` TEXT, `afterDigest` TEXT, `inversePayloadJson` TEXT NOT NULL, `undoState` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `undoneAtEpochMs` INTEGER, PRIMARY KEY(`changeId`))",
+        "fields": [
+          {
+            "fieldPath": "changeId",
+            "columnName": "changeId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "runtimeRunId",
+            "columnName": "runtimeRunId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "toolName",
+            "columnName": "toolName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "idempotencyKey",
+            "columnName": "idempotencyKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "targetDomain",
+            "columnName": "targetDomain",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "targetId",
+            "columnName": "targetId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "operation",
+            "columnName": "operation",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "beforeDigest",
+            "columnName": "beforeDigest",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "afterDigest",
+            "columnName": "afterDigest",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "inversePayloadJson",
+            "columnName": "inversePayloadJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "undoState",
+            "columnName": "undoState",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "undoneAtEpochMs",
+            "columnName": "undoneAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "changeId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_change_log_runtimeRunId",
+            "unique": false,
+            "columnNames": [
+              "runtimeRunId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_change_log_runtimeRunId` ON `${TABLE_NAME}` (`runtimeRunId`)"
+          },
+          {
+            "name": "index_change_log_targetDomain_targetId",
+            "unique": false,
+            "columnNames": [
+              "targetDomain",
+              "targetId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_change_log_targetDomain_targetId` ON `${TABLE_NAME}` (`targetDomain`, `targetId`)"
+          },
+          {
+            "name": "index_change_log_undoState",
+            "unique": false,
+            "columnNames": [
+              "undoState"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_change_log_undoState` ON `${TABLE_NAME}` (`undoState`)"
+          },
+          {
+            "name": "index_change_log_idempotencyKey",
+            "unique": true,
+            "columnNames": [
+              "idempotencyKey"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_change_log_idempotencyKey` ON `${TABLE_NAME}` (`idempotencyKey`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "staged_contact_candidates",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`candidateId` TEXT NOT NULL, `payloadJson` TEXT NOT NULL, `payloadDigest` TEXT NOT NULL, `state` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `expiresAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`candidateId`))",
+        "fields": [
+          {
+            "fieldPath": "candidateId",
+            "columnName": "candidateId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payloadJson",
+            "columnName": "payloadJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payloadDigest",
+            "columnName": "payloadDigest",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "expiresAtEpochMs",
+            "columnName": "expiresAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMs",
+            "columnName": "updatedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "candidateId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_staged_contact_candidates_state",
+            "unique": false,
+            "columnNames": [
+              "state"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_staged_contact_candidates_state` ON `${TABLE_NAME}` (`state`)"
+          },
+          {
+            "name": "index_staged_contact_candidates_expiresAtEpochMs",
+            "unique": false,
+            "columnNames": [
+              "expiresAtEpochMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_staged_contact_candidates_expiresAtEpochMs` ON `${TABLE_NAME}` (`expiresAtEpochMs`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "facts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`factId` TEXT NOT NULL, `factType` TEXT NOT NULL, `textContent` TEXT NOT NULL, `structuredDataJson` TEXT, `sourceType` TEXT NOT NULL, `sourceRef` TEXT, `contactId` TEXT, `skillId` TEXT, `confidence` REAL NOT NULL, `sensitivity` TEXT NOT NULL, `status` TEXT NOT NULL, `ttlDays` INTEGER NOT NULL, `expiresAtEpochMs` INTEGER, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`factId`))",
+        "fields": [
+          {
+            "fieldPath": "factId",
+            "columnName": "factId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "factType",
+            "columnName": "factType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "textContent",
+            "columnName": "textContent",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "structuredDataJson",
+            "columnName": "structuredDataJson",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "sourceType",
+            "columnName": "sourceType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceRef",
+            "columnName": "sourceRef",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "contactId",
+            "columnName": "contactId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "skillId",
+            "columnName": "skillId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sensitivity",
+            "columnName": "sensitivity",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ttlDays",
+            "columnName": "ttlDays",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "expiresAtEpochMs",
+            "columnName": "expiresAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMs",
+            "columnName": "updatedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "factId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_facts_factType",
+            "unique": false,
+            "columnNames": [
+              "factType"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_facts_factType` ON `${TABLE_NAME}` (`factType`)"
+          },
+          {
+            "name": "index_facts_sourceType",
+            "unique": false,
+            "columnNames": [
+              "sourceType"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_facts_sourceType` ON `${TABLE_NAME}` (`sourceType`)"
+          },
+          {
+            "name": "index_facts_sourceRef",
+            "unique": false,
+            "columnNames": [
+              "sourceRef"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_facts_sourceRef` ON `${TABLE_NAME}` (`sourceRef`)"
+          },
+          {
+            "name": "index_facts_contactId",
+            "unique": false,
+            "columnNames": [
+              "contactId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_facts_contactId` ON `${TABLE_NAME}` (`contactId`)"
+          },
+          {
+            "name": "index_facts_skillId",
+            "unique": false,
+            "columnNames": [
+              "skillId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_facts_skillId` ON `${TABLE_NAME}` (`skillId`)"
+          },
+          {
+            "name": "index_facts_expiresAtEpochMs",
+            "unique": false,
+            "columnNames": [
+              "expiresAtEpochMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_facts_expiresAtEpochMs` ON `${TABLE_NAME}` (`expiresAtEpochMs`)"
+          },
+          {
+            "name": "index_facts_status",
+            "unique": false,
+            "columnNames": [
+              "status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_facts_status` ON `${TABLE_NAME}` (`status`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "embedding_vectors",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`embeddingId` TEXT NOT NULL, `factId` TEXT NOT NULL, `providerId` TEXT NOT NULL, `modelId` TEXT NOT NULL, `dimensions` INTEGER NOT NULL, `vectorBlob` BLOB NOT NULL, `generatedAtEpochMs` INTEGER NOT NULL, `modelVersion` TEXT, PRIMARY KEY(`embeddingId`), FOREIGN KEY(`factId`) REFERENCES `facts`(`factId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "embeddingId",
+            "columnName": "embeddingId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "factId",
+            "columnName": "factId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "providerId",
+            "columnName": "providerId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "modelId",
+            "columnName": "modelId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dimensions",
+            "columnName": "dimensions",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "vectorBlob",
+            "columnName": "vectorBlob",
+            "affinity": "BLOB",
+            "notNull": true
+          },
+          {
+            "fieldPath": "generatedAtEpochMs",
+            "columnName": "generatedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "modelVersion",
+            "columnName": "modelVersion",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "embeddingId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_embedding_vectors_factId",
+            "unique": false,
+            "columnNames": [
+              "factId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_embedding_vectors_factId` ON `${TABLE_NAME}` (`factId`)"
+          },
+          {
+            "name": "index_embedding_vectors_providerId_modelId",
+            "unique": false,
+            "columnNames": [
+              "providerId",
+              "modelId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_embedding_vectors_providerId_modelId` ON `${TABLE_NAME}` (`providerId`, `modelId`)"
+          },
+          {
+            "name": "index_embedding_vectors_factId_providerId_modelId",
+            "unique": true,
+            "columnNames": [
+              "factId",
+              "providerId",
+              "modelId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_embedding_vectors_factId_providerId_modelId` ON `${TABLE_NAME}` (`factId`, `providerId`, `modelId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "facts",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "factId"
+            ],
+            "referencedColumns": [
+              "factId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "relationship_edges",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`edgeId` TEXT NOT NULL, `fromContactId` TEXT NOT NULL, `toContactId` TEXT NOT NULL, `relationType` TEXT NOT NULL, `evidenceDigest` TEXT NOT NULL, `evidenceRefsJson` TEXT NOT NULL, `confidence` REAL NOT NULL, `userConfirmed` INTEGER NOT NULL, `skillId` TEXT, `status` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`edgeId`))",
+        "fields": [
+          {
+            "fieldPath": "edgeId",
+            "columnName": "edgeId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fromContactId",
+            "columnName": "fromContactId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "toContactId",
+            "columnName": "toContactId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "relationType",
+            "columnName": "relationType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "evidenceDigest",
+            "columnName": "evidenceDigest",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "evidenceRefsJson",
+            "columnName": "evidenceRefsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "userConfirmed",
+            "columnName": "userConfirmed",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "skillId",
+            "columnName": "skillId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMs",
+            "columnName": "updatedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "edgeId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_relationship_edges_fromContactId",
+            "unique": false,
+            "columnNames": [
+              "fromContactId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_relationship_edges_fromContactId` ON `${TABLE_NAME}` (`fromContactId`)"
+          },
+          {
+            "name": "index_relationship_edges_toContactId",
+            "unique": false,
+            "columnNames": [
+              "toContactId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_relationship_edges_toContactId` ON `${TABLE_NAME}` (`toContactId`)"
+          },
+          {
+            "name": "index_relationship_edges_skillId",
+            "unique": false,
+            "columnNames": [
+              "skillId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_relationship_edges_skillId` ON `${TABLE_NAME}` (`skillId`)"
+          },
+          {
+            "name": "index_relationship_edges_status",
+            "unique": false,
+            "columnNames": [
+              "status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_relationship_edges_status` ON `${TABLE_NAME}` (`status`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "relationship_events",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`eventId` TEXT NOT NULL, `eventType` TEXT NOT NULL, `title` TEXT NOT NULL, `note` TEXT, `occurredAtEpochMs` INTEGER, `evidenceDigest` TEXT NOT NULL, `evidenceRefsJson` TEXT NOT NULL, `userConfirmed` INTEGER NOT NULL, `status` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`eventId`))",
+        "fields": [
+          {
+            "fieldPath": "eventId",
+            "columnName": "eventId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "eventType",
+            "columnName": "eventType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "note",
+            "columnName": "note",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "occurredAtEpochMs",
+            "columnName": "occurredAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "evidenceDigest",
+            "columnName": "evidenceDigest",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "evidenceRefsJson",
+            "columnName": "evidenceRefsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "userConfirmed",
+            "columnName": "userConfirmed",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMs",
+            "columnName": "updatedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "eventId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_relationship_events_eventType",
+            "unique": false,
+            "columnNames": [
+              "eventType"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_relationship_events_eventType` ON `${TABLE_NAME}` (`eventType`)"
+          },
+          {
+            "name": "index_relationship_events_status",
+            "unique": false,
+            "columnNames": [
+              "status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_relationship_events_status` ON `${TABLE_NAME}` (`status`)"
+          },
+          {
+            "name": "index_relationship_events_occurredAtEpochMs",
+            "unique": false,
+            "columnNames": [
+              "occurredAtEpochMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_relationship_events_occurredAtEpochMs` ON `${TABLE_NAME}` (`occurredAtEpochMs`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "relationship_event_participants",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`participantId` TEXT NOT NULL, `eventId` TEXT NOT NULL, `participantKind` TEXT NOT NULL, `contactId` TEXT, `participantRole` TEXT NOT NULL, `displayNameSnapshot` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`participantId`), FOREIGN KEY(`eventId`) REFERENCES `relationship_events`(`eventId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "participantId",
+            "columnName": "participantId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "eventId",
+            "columnName": "eventId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "participantKind",
+            "columnName": "participantKind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contactId",
+            "columnName": "contactId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "participantRole",
+            "columnName": "participantRole",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayNameSnapshot",
+            "columnName": "displayNameSnapshot",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "participantId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_relationship_event_participants_eventId",
+            "unique": false,
+            "columnNames": [
+              "eventId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_relationship_event_participants_eventId` ON `${TABLE_NAME}` (`eventId`)"
+          },
+          {
+            "name": "index_relationship_event_participants_contactId",
+            "unique": false,
+            "columnNames": [
+              "contactId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_relationship_event_participants_contactId` ON `${TABLE_NAME}` (`contactId`)"
+          },
+          {
+            "name": "index_relationship_event_participants_participantRole",
+            "unique": false,
+            "columnNames": [
+              "participantRole"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_relationship_event_participants_participantRole` ON `${TABLE_NAME}` (`participantRole`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "relationship_events",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "eventId"
+            ],
+            "referencedColumns": [
+              "eventId"
+            ]
+          }
+        ]
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '570ae7f2677186c05e41cd6b06d76731')"
+    ]
+  }
+}

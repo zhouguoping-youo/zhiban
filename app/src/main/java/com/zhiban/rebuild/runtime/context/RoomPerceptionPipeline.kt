@@ -1,0 +1,34 @@
+package com.zhiban.rebuild.runtime.context
+import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.runtime.runSuspendCatching
+import kotlinx.serialization.json.Json
+
+internal interface PerceptionGateway {
+    suspend fun perceive(text: String, mode: String): QueryContext
+    fun fallback(text: String, mode: String): QueryContext
+}
+
+internal class RoomPerceptionPipeline(
+    private val database: AgentDatabase,
+    private val clock: () -> Long = System::currentTimeMillis,
+    private val extractor: LocalEntityExtractor = LocalEntityExtractor(),
+) : PerceptionGateway {
+    override suspend fun perceive(text: String, mode: String): QueryContext {
+        val contacts = database.contactDao().findMentionedIn(text)
+        val dictionary = contacts.map { contact ->
+            val role = database.contactDao().roles(contact.contactId).firstOrNull()
+            EntityDictionaryEntry(
+                value = contact.displayName,
+                entityId = contact.contactId,
+                aliases = runSuspendCatching {
+                    Json.decodeFromString<List<String>>(contact.aliasesJson)
+                }.getOrDefault(emptyList()),
+                roleType = role?.roleType,
+                skillId = role?.skillId,
+            )
+        }
+        return extractor.extract(text, mode, clock(), dictionary)
+    }
+
+    override fun fallback(text: String, mode: String): QueryContext = extractor.extract(text, mode, clock())
+}

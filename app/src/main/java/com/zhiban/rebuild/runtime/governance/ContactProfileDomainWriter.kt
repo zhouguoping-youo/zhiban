@@ -1,0 +1,285 @@
+package com.zhiban.rebuild.runtime.governance
+
+import androidx.room.withTransaction
+import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.agent.ToolAuditEntity
+import com.zhiban.rebuild.runtime.context.FactEntity
+import com.zhiban.rebuild.runtime.context.FactIndex
+import com.zhiban.rebuild.runtime.spi.RUNTIME_SCHEMA_VERSION
+import com.zhiban.rebuild.runtime.spi.RuntimeRunStatus
+import com.zhiban.rebuild.runtime.store.RuntimeEventEntity
+import com.zhiban.rebuild.runtime.store.RuntimeToolExecutionEntity
+import com.zhiban.rebuild.runtime.tool.ConfirmedToolExecutionContext
+import com.zhiban.rebuild.runtime.tool.SafeToolResult
+import com.zhiban.rebuild.runtime.tool.ToolConfirmation
+import com.zhiban.rebuild.runtime.tool.auditIdFor
+import com.zhiban.rebuild.runtime.tool.changeIdFor
+import com.zhiban.rebuild.runtime.tool.sha256
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+
+data class ContactProfileCandidateCall(
+    val providerCallId: String,
+    val logicalStepId: String,
+    val proposalId: String,
+    val payloadRef: String,
+    val revision: Long,
+    val canonicalInputDigest: String,
+    val idempotencyKey: String,
+    val candidateId: String,
+    val contactId: String,
+    val confidence: Double,
+)
+
+/** Applies an approved, additive-only profile patch. Existing non-blank fields are never replaced. */
+internal class ContactProfileDomainWriter(private val database: AgentDatabase) {
+    suspend fun execute(context: ConfirmedToolExecutionContext, call: ContactProfileCandidateCall, confirmation: ToolConfirmation): SafeToolResult =
+        database.withTransaction {
+            val start = database.validateConfirmedContactWrite(
+                context,
+                call.proposalId,
+                call.payloadRef,
+                call.revision,
+                call.canonicalInputDigest,
+                call.idempotencyKey,
+                confirmation,
+            )
+            start.replay?.let { return@withTransaction it }
+            val applied = validateAndApplyProfile(context, call)
+            val changeId = approveAndWriteChangeLog(applied, call, context)
+            val safe = writeAuditRecords(call, context, start, applied, changeId)
+            completeProfileRun(call, context, start, safe)
+        }
+
+    private suspend fun validateAndApplyProfile(context: ConfirmedToolExecutionContext, call: ContactProfileCandidateCall): AppliedProfile {
+        val staged = requireNotNull(database.stagedContactCandidateDao().find(call.candidateId))
+        require(staged.state in setOf("PENDING", "APPROVED") && staged.expiresAtEpochMs > context.nowEpochMs)
+        require(staged.payloadDigest == call.canonicalInputDigest)
+        val payload = Json.parseToJsonElement(staged.payloadJson).jsonObject
+        val contact = requireNotNull(database.contactDao().findById(call.contactId))
+        fun proposed(name: String) = payload[name]?.jsonPrimitive?.content?.trim()?.takeIf(String::isNotBlank)
+        fun additive(current: String?, name: String): String? {
+            val value = proposed(name) ?: return current
+            require(current.isNullOrBlank() || current == value) { "CONTACT_FIELD_CONFLICT:$name" }
+            return current ?: value
+        }
+
+        val updated = contact.copy(
+            phone = additive(contact.phone, "phone"),
+            email = additive(contact.email, "email"),
+            wechatId = additive(contact.wechatId, "wechatId"),
+            company = additive(contact.company, "company"),
+            title = additive(contact.title, "title"),
+            note = additive(contact.note, "note"),
+            updatedAtEpochMs = context.nowEpochMs,
+        )
+        val changedFields = PROFILE_FIELDS.filter { name ->
+            proposed(name) != null &&
+                fieldValue(contact, name).isNullOrBlank()
+        }
+        val factText = proposed("factText")
+        val factType = proposed("factType")
+        require(changedFields.isNotEmpty() || factText != null) { "CONTACT_PROFILE_NO_CHANGE" }
+        if (changedFields.isNotEmpty()) check(database.contactDao().update(updated) == 1)
+
+        val factId = factText?.let { text ->
+            val type = requireNotNull(factType).also { require(it in FACT_TYPES) }
+            val id = "contact-profile:${call.contactId}:${sha256("$type:$text").take(24)}"
+            FactIndex(database).upsert(
+                FactEntity(
+                    factId = id,
+                    factType = type,
+                    textContent = text.take(1_000),
+                    structuredDataJson = null,
+                    sourceType = "AGENT_DOMAIN_WRITE",
+                    sourceRef = context.runId,
+                    contactId = call.contactId,
+                    skillId = "contact_relationship",
+                    confidence = call.confidence,
+                    sensitivity = if (type == "IMPORTANT_DATE") "SENSITIVE" else "NORMAL",
+                    status = "ACTIVE",
+                    ttlDays = 0,
+                    expiresAtEpochMs = null,
+                    createdAtEpochMs = context.nowEpochMs,
+                    updatedAtEpochMs = context.nowEpochMs,
+                ),
+            )
+            id
+        }
+        return AppliedProfile(updated, changedFields, factText, factType, factId)
+    }
+
+    private suspend fun approveAndWriteChangeLog(applied: AppliedProfile, call: ContactProfileCandidateCall, context: ConfirmedToolExecutionContext): String {
+        database.stagedContactCandidateDao().approve(call.candidateId, context.nowEpochMs)
+
+        val appliedDigest = contactProfileFieldsDigest(applied.updated, applied.changedFields)
+        val inverse = buildJsonObject {
+            put("clearFields", buildJsonArray { applied.changedFields.forEach { add(JsonPrimitive(it)) } })
+            applied.factId?.let { put("deleteFactId", it) }
+        }.toString()
+        val changeId = changeIdFor(call.idempotencyKey)
+        database.changeLogDao().insert(
+            ChangeLogEntity(
+                changeId,
+                context.runId,
+                TOOL_NAME,
+                call.idempotencyKey,
+                "CONTACT",
+                call.contactId,
+                "UPDATE",
+                null,
+                appliedDigest,
+                inverse,
+                "AVAILABLE",
+                context.nowEpochMs,
+                null,
+            ),
+        )
+        return changeId
+    }
+
+    private suspend fun writeAuditRecords(
+        call: ContactProfileCandidateCall,
+        context: ConfirmedToolExecutionContext,
+        start: ConfirmedContactWriteStart,
+        applied: AppliedProfile,
+        changeId: String,
+    ): String {
+        val attemptId = start.attemptId
+        val safe = buildJsonObject {
+            put("contactId", call.contactId)
+            put("updatedFieldCount", applied.changedFields.size)
+            put("factAdded", applied.factId != null)
+            put("confidence", call.confidence)
+            put("status", "profile_enriched")
+            put("changeId", changeId)
+            put("undoAvailable", true)
+        }.toString()
+        database.toolAuditDao().insert(
+            ToolAuditEntity(
+                auditIdFor(call.idempotencyKey),
+                null,
+                sha256(context.runId),
+                call.providerCallId,
+                TOOL_NAME,
+                call.idempotencyKey,
+                call.canonicalInputDigest,
+                context.runId,
+                attemptId,
+                call.proposalId,
+                sha256(call.payloadRef),
+                call.revision,
+                status = "SUCCEEDED",
+                resultJson = safe,
+                expiresAtEpochMs = null,
+                createdAtEpochMs = context.nowEpochMs,
+                updatedAtEpochMs = context.nowEpochMs,
+            ),
+        )
+        database.runtimeToolExecutionDao().insert(
+            RuntimeToolExecutionEntity(
+                "exec-${sha256(call.idempotencyKey).take(32)}",
+                context.runId,
+                call.logicalStepId,
+                TOOL_NAME,
+                1,
+                call.canonicalInputDigest,
+                call.idempotencyKey,
+                call.providerCallId,
+                call.proposalId,
+                sha256(call.payloadRef),
+                call.revision,
+                attemptId,
+                "SUCCEEDED",
+                call.contactId,
+                safe,
+                context.fencingEpoch,
+                context.nowEpochMs,
+                context.nowEpochMs,
+            ),
+        )
+        return safe
+    }
+
+    private suspend fun completeProfileRun(
+        call: ContactProfileCandidateCall,
+        context: ConfirmedToolExecutionContext,
+        start: ConfirmedContactWriteStart,
+        safe: String,
+    ): SafeToolResult {
+        val attemptId = start.attemptId
+        database.stagedContactCandidateDao().consumeAndScrub(call.candidateId, context.nowEpochMs)
+        check(database.runtimeAttemptDao().finish(attemptId, "SUCCEEDED", context.nowEpochMs) == 1)
+        val sequence = start.nextSequence
+        check(
+            database.runtimeSessionDao().advanceSequence(
+                start.sessionId,
+                sequence,
+                sequence + 1,
+                context.nowEpochMs,
+            ) == 1,
+        )
+        database.runtimeEventDao().insert(
+            RuntimeEventEntity(
+                "event-${sha256("ContactProfileEnriched:${context.runId}:${call.providerCallId}").take(32)}",
+                RUNTIME_SCHEMA_VERSION,
+                "ContactProfileEnriched",
+                start.sessionId,
+                context.runId,
+                attemptId,
+                sequence,
+                call.providerCallId,
+                context.runId,
+                "contact-profile-domain-writer-v1",
+                safe,
+                context.nowEpochMs,
+                context.fencingEpoch,
+            ),
+        )
+        check(
+            database.runtimeRunDao().transition(
+                context.runId,
+                RuntimeRunStatus.EXECUTING.name,
+                RuntimeRunStatus.OBSERVING.name,
+                sequence,
+                context.nowEpochMs,
+            ) == 1,
+        )
+        return SafeToolResult(call.contactId, safe)
+    }
+
+    private data class AppliedProfile(
+        val updated: com.zhiban.rebuild.data.contact.ContactEntity,
+        val changedFields: List<String>,
+        val factText: String?,
+        val factType: String?,
+        val factId: String?,
+    )
+
+    companion object {
+        const val TOOL_NAME = "contact.profile.proposeUpdate"
+        val PROFILE_FIELDS = listOf("phone", "email", "wechatId", "company", "title", "note")
+        val FACT_TYPES = setOf("CONTACT_MEMORY", "IMPORTANT_DATE", "COMMUNICATION_PREFERENCE", "CURRENT_MATTER")
+    }
+}
+
+internal fun contactProfileFieldsDigest(contact: com.zhiban.rebuild.data.contact.ContactEntity, fields: List<String>): String = sha256(
+    buildJsonObject {
+        fields.sorted().forEach { name -> fieldValue(contact, name)?.let { put(name, it) } }
+    }.toString(),
+)
+
+internal fun fieldValue(contact: com.zhiban.rebuild.data.contact.ContactEntity, name: String): String? = when (name) {
+    "phone" -> contact.phone
+    "email" -> contact.email
+    "wechatId" -> contact.wechatId
+    "company" -> contact.company
+    "title" -> contact.title
+    "note" -> contact.note
+    else -> null
+}

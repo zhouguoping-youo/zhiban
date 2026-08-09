@@ -1,0 +1,335 @@
+# 知伴 App 全面破坏者测试 · 主权审计表
+
+> 分支 `fix/agent-conversation-ux` 之上的全 App 审计。每个检查点一行。
+> 状态：`未测` / `已复现` / `无法复现` / `已修复` / `需人工` / `需环境` / `上一轮已修`
+> 严重度：`崩溃` > `数据丢失` > `功能不可用` > `体验` > `文案`
+> 复现方式：`真机` / `设备测试` / `单测` / `代码审查`
+
+## 状态图例
+- ✅ 已修复（含 commit + 回归测试）
+- ❌ 已复现待修
+- ⚪ 无法复现（注明原因）
+- 🖐 需人工验证（附操作步骤）
+- 🧪 需特定环境（注明条件）
+- ⏭ 上一轮（对话链路）已修，见 `fix/agent-conversation-ux` 11 commit
+- ⬜ 未测
+
+## 维度 6 · 对话链路（⏭ 上一轮已修，不在本轮重复跑）
+对话链路 27 项已在 `907fb05..HEAD` 11 个 commit 全部修复并真机/设备验证：
+幻觉已创建、确认卡缺参/不消失/拒绝无效/pending 死锁、流式丢正文、日历不显示、
+CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记忆卡预览（隐私边界）等。
+详见各 commit message。本轮**跳过**，聚焦其余 19 个维度。
+
+---
+
+## 维度 1 · 采集链路
+| ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
+|---|---|---|---|---|---|---|
+| 1.1 | 通知监听断开/重连后通知丢失 | ⚪ | — | Android 无法补回所有已消失通知；当前实现会恢复近 15 分钟仍活跃的通知，并把超过 30 分钟的监听断档作为无内容的固定 degradation 带入下一次上下文，符合可感知降级边界 | 审计提交 | `MessageCollectionPreferencesTest.markGapOnlyWhenGapExceedsThreshold` + `consumeGapReasonClearsAfterRead` |
+| 1.2 | 无障碍被杀后消息漏采 | 🖐 | 功能不可用 | 需三星系统真实后台回收；`am force-stop` 会人为禁止组件重启，不能作为有效复现。步骤：开启“发出消息采集”→锁屏并在系统设备维护中清理后台→等待 10 分钟→从微信发送唯一文本→解锁检查无障碍服务仍开启且关系候选箱出现该文本；若缺失同时记录 `dumpsys accessibility` | — | SM-W7023 人工步骤 |
+| 1.3 | 通话记录同步中断漏记 | ✅ | 数据丢失 | 通话已提交后若进程在 CRM 建议前中断，重试会因 `createdAt != 本次同步时间` 永久跳过跟进建议；改为按通话证据 ID 幂等重放，旧记录可补、同一通话不重复提示 | 本提交 `fix(1.3)` | `CallLogImporterTest.replayAfterImportCanRecoverMissingCrmSuggestionExactlyOnce` + `CrmAgentSuggestionChainTest.processedCallEvidenceIsNeverSuggestedAgainButANewCallCanBeSuggested` |
+| 1.4 | 语音转写网络超时丢录音 | ✅ | 功能不可用 | 批量 ASR 在凭据回调内嵌套 `runBlocking`，外层取消无法可靠终止；凭据/意外传输异常还会逃到 UI 令“转写中”卡住。凭据作用域改为 suspend，取消正常传播，非取消异常返回安全失败码且临时录音保留供重试 | 本提交 `fix(1.4)` | `ProviderCloudAsrGatewayTest.unexpected transport failure becomes retryable result instead of escaping to UI` + `transcription cancellation propagates through credential scope` |
+| 1.5 | 分享文本/图片格式异常崩溃 | ✅ | 崩溃 | 外部 ACTION_SEND 的 EXTRA_TEXT/EXTRA_STREAM 原先直接解包，损坏或类型错误的 Parcelable 异常可逃到 Activity；改为在入口失败关闭，非法字段忽略且不入库 | 本提交 `fix(1.5)` | `SharedIntentExtractionTest.malformedExtraTypesAreRejectedWithoutEscapingAnException` |
+| 1.6 | 通知含验证码/密码是否过滤 | ✅ | 隐私 | 收到消息已覆盖验证码、动态口令、交易密码和上下文密钥；发出消息过滤器规则较窄，交易密码和密钥仍会落候选库。收发两条采集入口现统一使用同一敏感消息过滤器 | 本提交 `fix(1.6)` | `SocialMessagePerceptionTest.verificationCodesAndUnsupportedAppsAreNeverStaged` + `OutgoingMessageCandidateTest.rejectsUnsupportedPackageAndOneTimeCodes` |
+| 1.7 | 通话同步时联系人不存在崩溃 | ⚪ | — | 导入先按规范号码查询，零匹配明确写为 UNMATCHED 且 linkedContactId 为空，不会解引用联系人；设备回归未复现崩溃 | 审计提交 | `CallLogImporterTest.unknownContactIsStoredAsUnmatchedWithoutCrashing` |
+| 1.8 | 录音中途权限撤销卡死 | ✅ | 功能不可用 | 实时语音已在 AudioRecord 负读数时失败退出；普通 MediaRecorder 原先吞掉 maxAmplitude 异常且不复查权限，可能永久停在录音态。现权限消失或 recorder 错误均立即释放资源、删除失败录音并显示可重试失败 | 本提交 `fix(1.8)` | `RecordingHealthPolicyTest.revokedPermissionOrRecorderErrorTerminatesRecording` + `StepFunRealtimeProtocolTest.negative recorder read is treated as terminal microphone failure` |
+| 1.9 | 通知监听被杀 requestRebind 恢复 | ⚪ | — | onListenerDisconnected 记录断开时间并调用 requestRebind；onListenerConnected 恢复活跃通知且标记长断档。OEM 是否及时回调仍属系统边界，代码路径未复现缺失 | 审计提交 | `MessageCollectionPreferencesTest` + 代码审查 |
+| 1.10 | 无障碍截图 Bitmap 是否释放 | ✅ | 崩溃 | 正常 OCR 完成会 recycle Bitmap、hardwareBuffer 也立即 close；但 ML Kit process 同步抛错时原先既不回收 Bitmap 也不清 in-flight。现资源与启动绑定，启动失败立即且仅释放一次 | 本提交 `fix(1.10)` | `ScreenshotOcrResourceTest.synchronousOcrStartFailureReleasesCapturedResourceExactlyOnce` |
+| 1.11 | 号码格式异常(+86/空格/横线)匹配失败 | ⚪ | — | 通话导入与联系人方法共用 normalizeContactPhone；+86、空格和横线均归一成 canonical phone 后匹配 | 审计提交 | `CallLogImporterTest.importsIdempotentlyAndLinksCountryCodeVariantThroughCanonicalPhone` + `unknownContactIsStoredAsUnmatchedWithoutCrashing` |
+| 1.12 | 语音转写返回空文本崩溃 | ✅ | 功能不可用 | 系统识别与实时交换已有空值保护；CloudAsrGateway 原先仍信任 transport 的 Success 空串，可能进入空 FINAL。最终 Provider 边界现统一 trim 并把空成功降为 ASR_EMPTY_RESULT | 本提交 `fix(1.12)` | `ProviderCloudAsrGatewayTest.blank transport success is rejected at the gateway boundary` |
+| 1.13 | 分享图片>10MB 是否 OOM | ✅ | 崩溃 | 图片分享原先在主线程直接按原始分辨率解码，既无压缩大小上限也无像素上限；改为后台读取，声明大小超过 20MB 先拒绝，其他图片在分配 Bitmap 前缩到最长边 2048，OCR 完成后显式回收 | 本提交 `fix(1.13)` | `SharedImageDecodePolicyTest`（文件上限 + 分配前尺寸约束） |
+| 1.14 | 分享文本特殊字符(emoji/换行/链接)崩溃 | ⚪ | — | 合法 CharSequence 会安全转 String；候选规范化空白并限制长度，不解释 emoji/链接，设备回归未复现崩溃 | 审计提交 | `SharedIntentExtractionTest.validSpecialCharactersAndImageUriArePreserved` + `SharedTextCandidateTest` |
+
+## 维度 2 · CRM 链路
+| ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
+|---|---|---|---|---|---|---|
+| 2.1 | 线索转商机网络断开留半成品 | ⬜ | | | | |
+| 2.2 | 看板拖动改阶段 App 被杀回滚 | ⬜ | | | | |
+| 2.3 | 建议过期重新触发重复生成 | ⬜ | | | | |
+| 2.4 | 商机删除后联系人详情仍显示 | ⬜ | | | | |
+| 2.5 | 仪表盘数据与实际不符 | ⬜ | | | | |
+| 2.6 | 线索候选转正后候选区仍显示 | ⬜ | | | | |
+| 2.7 | 活动追加时联系人不存在崩溃 | ⬜ | | | | |
+| 2.8 | 下一步动作创建时商机不存在崩溃 | ⬜ | | | | |
+| 2.9 | 阶段 WON→LEAD 终态守卫拦截 | ⬜ | | | | |
+| 2.10 | 阶段概率错误(CONTACTED 25 非 20) | ⬜ | | | | |
+| 2.11 | 建议接受后状态更新 ACCEPTED | ⬜ | | | | |
+| 2.12 | 建议撤销后写入的活动/线索删除 | ⬜ | | | | |
+| 2.13 | 建议拒绝后状态更新 DISMISSED | ⬜ | | | | |
+| 2.14 | 商机金额分/元混淆 | ⬜ | | | | |
+| 2.15 | 阶段历史记录完整 | ⬜ | | | | |
+
+## 维度 3 · 自动写链路
+| ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
+|---|---|---|---|---|---|---|
+| 3.1 | 撤销后 Fact 真删除 | ⬜ | | | | |
+| 3.2 | 用户改联系人后撤销覆盖新内容 | ⬜ | | | | |
+| 3.3 | 回执过期后能否撤销 | ⬜ | | | | |
+| 3.4 | 互动摘要纠正联系人后原记录残留 | ⬜ | | | | |
+| 3.5 | ChangeLog inverse payload 可逆 | ⬜ | | | | |
+| 3.6 | auto_write_receipts reviewState 更新 | ⬜ | | | | |
+| 3.7 | 同 source/idempotency 重放重复写入 | ⬜ | | | | |
+| 3.8 | undoState UNDONE 后能否再撤销 | ⬜ | | | | |
+| 3.9 | 目标被用户修改后撤销检测阻止覆盖 | ⬜ | | | | |
+| 3.10 | presentationType 映射错误标签 | ⬜ | | | | |
+
+## 维度 4 · 联系人链路
+| ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
+|---|---|---|---|---|---|---|
+| 4.1 | 合并联系人撤销图谱恢复 | ⬜ | | | | |
+| 4.2 | 软删联系人后 Fact/关系/活动清理 | ⬜ | | | | |
+| 4.3 | 通讯录导入重复联系人重复条目 | ⬜ | | | | |
+| 4.4 | 智能完善建议过期后能否确认 | ⬜ | | | | |
+| 4.5 | 合并后搜索仍显示已合并联系人 | ⬜ | | | | |
+| 4.6 | 编辑后 normalizedValue 更新 | ⬜ | | | | |
+| 4.7 | 删除后 CRM primaryContactId SET_NULL | ⬜ | | | | |
+| 4.8 | 智能完善模型返回非法 JSON 崩溃 | ⬜ | | | | |
+| 4.9 | 合并后通话记录仍关联已合并联系人 | ⬜ | | | | |
+| 4.10 | 合并后通知候选仍关联已合并联系人 | ⬜ | | | | |
+| 4.11 | 合并后 CRM 商机仍关联已合并联系人 | ⬜ | | | | |
+| 4.12 | 智能完善确认覆盖用户已有数据 | ⬜ | | | | |
+| 4.13 | 智能完善拒绝后能否再生成 | ⬜ | | | | |
+| 4.14 | 多平台账号(微信/飞书/钉钉/QQ)匹配 | ⬜ | | | | |
+| 4.15 | 电话格式不一致匹配失败 | ⬜ | | | | |
+
+## 维度 5 · 日历链路
+| ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
+|---|---|---|---|---|---|---|
+| 5.1 | 时间解析错误("明天下午3点") | ⬜ | | | | |
+| 5.2 | 改期后旧提醒仍触发 | ⬜ | | | | |
+| 5.3 | 系统日历和本地日程冲突误报 | ⬜ | | | | |
+| 5.4 | 重复事件最后一天取消误报冲突 | ⬜ | | | | |
+| 5.5 | 标题特殊字符(emoji/换行)崩溃 | ⬜ | | | | |
+| 5.6 | 提醒到期 App 被杀提醒丢失 | ⬜ | | | | |
+| 5.7 | 删除日程后关联 CRM 下一步清理 | ⬜ | | | | |
+| 5.8 | 系统日历权限关闭本地日程正常 | ⬜ | | | | |
+| 5.9 | 跨天日程显示正确 | ⬜ | | | | |
+| 5.10 | 提醒提前时间按设置触发 | ⬜ | | | | |
+| 5.11 | 创建冲突检测误报 | ⬜ | | | | |
+| 5.12 | 时间已过(昨天)是否警告 | ⬜ | | | | |
+| 5.13 | 系统日历同步重复事件实例去重 | ⬜ | | | | |
+
+## 维度 7 · 设置链路
+| ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
+|---|---|---|---|---|---|---|
+| 7.1 | 个人资料保存返回数据丢失 | ⬜ | | | | |
+| 7.2 | 智能体档位改后行为真变化 | ⬜ | | | | |
+| 7.3 | 隐私权限关闭后数据仍发送 | ⬜ | | | | |
+| 7.4 | 外观切换主题立即生效 | ⬜ | | | | |
+| 7.5 | 记忆开关关后 Agent 仍读取 | ⬜ | | | | |
+| 7.6 | 对话风格切换回答风格变化 | ⬜ | | | | |
+| 7.7 | 工具开关关后仍调用该工具 | ⬜ | | | | |
+| 7.8 | 技能开关关后仍触发该技能 | ⬜ | | | | |
+| 7.9 | 自动写开关关后仍自动写入 | ⬜ | | | | |
+| 7.10 | 通知分类开关关后仍发送 | ⬜ | | | | |
+| 7.11 | 头像选择后立即显示 | ⬜ | | | | |
+| 7.12 | 多平台账号添加后保存 | ⬜ | | | | |
+| 7.13 | 职业多选后保存 | ⬜ | | | | |
+| 7.14 | 给知伴指令注入 prompt | ⬜ | | | | |
+| 7.15 | API Key 修改后立即生效 | ⬜ | | | | |
+| 7.16 | API Key 删除后显示未配置 | ⬜ | | | | |
+
+## 维度 8 · 导航与路由
+| ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
+|---|---|---|---|---|---|---|
+| 8.1 | 深链跳转返回正确页面 | ⬜ | | | | |
+| 8.2 | 底部 TAB 切换返回原位置 | ⬜ | | | | |
+| 8.3 | 页面嵌套过深返回键混乱 | ⬜ | | | | |
+| 8.4 | 路由参数缺失崩溃 | ⬜ | | | | |
+| 8.5 | 旋转后导航状态丢失 | ⬜ | | | | |
+| 8.6 | 通知点击进入正确页面 | ⬜ | | | | |
+| 8.7 | 分享 Intent 进入正确页面 | ⬜ | | | | |
+| 8.8 | CRM 建议点击进入正确页面 | ⬜ | | | | |
+
+## 维度 9 · 数据与持久化
+| ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
+|---|---|---|---|---|---|---|
+| 9.1 | 数据库迁移失败崩溃 | ⬜ | | | | |
+| 9.2 | SQLCipher 密钥丢失打不开 | ⬜ | | | | |
+| 9.3 | 数据库文件损坏崩溃 | ⬜ | | | | |
+| 9.4 | 并发写入死锁 | ⬜ | | | | |
+| 9.5 | Room 查询超时 ANR | ⬜ | | | | |
+| 9.6 | 导出文件过大 OOM | ✅ | 功能不可用 | 原实现一次加载各表全部实体，再构建完整 JSON 树和编码字符串，峰值内存随全量数据多重增长；改为每页 200 条读取并直接流式写入临时文件，完成后原子提交 | 本提交 `fix(9.6)` | `AgentDataExportServiceTest.exportStreamsEveryPageWithoutDroppingRows` + 既有完整性/脱敏测试 |
+| 9.7 | 导出含敏感信息脱敏 | ⬜ | | | | |
+| 9.8 | 清除后是否真删除(非软删) | ⬜ | | | | |
+| 9.9 | 迁移后旧数据保留 | ⬜ | | | | |
+| 9.10 | 迁移后索引正确 | ⬜ | | | | |
+| 9.11 | 迁移后外键约束正确 | ⬜ | | | | |
+| 9.12 | SQLCipher 加密查询性能下降 | ⬜ | | | | |
+| 9.13 | 备份恢复后数据完整 | ⬜ | | | | |
+| 9.14 | 清除后 WAL 文件清理 | ⬜ | | | | |
+| 9.15 | 真机测试清空生产用户资料 | ✅ | 数据丢失 | 两个设备测试直接复用 `user_profile_secure` 并调用 `clear()`；为 UserProfileStore 增加测试命名空间，测试结束只删除隔离数据 | 本提交 `fix(9.15)` | `UserProfileStoreTest` + `UserProfilePageTest` |
+
+## 维度 10 · 网络与 Provider
+| ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
+|---|---|---|---|---|---|---|
+| 10.1 | StepFun 超时卡住 | ⬜ | | | | |
+| 10.2 | 返回错误码显示错误不崩溃 | ⬜ | | | | |
+| 10.3 | 返回非法 JSON 崩溃 | ⬜ | | | | |
+| 10.4 | 返回空响应显示空不崩溃 | ⬜ | | | | |
+| 10.5 | 网络断开离线提示 | ⬜ | | | | |
+| 10.6 | 网络恢复自动重试 | ⬜ | | | | |
+| 10.7 | API Key 过期明确提示 | ⬜ | | | | |
+| 10.8 | 证书锁定失败明确提示 | ⬜ | | | | |
+| 10.9 | 流式中断显示已接收部分 | ⬜ | | | | |
+| 10.10 | 流式重复去重 | ⬜ | | | | |
+| 10.11 | 响应>100KB OOM | ⬜ | | | | |
+| 10.12 | 响应特殊字符崩溃 | ⬜ | | | | |
+
+## 维度 11 · 权限与隐私
+| ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
+|---|---|---|---|---|---|---|
+| 11.1 | 通知监听撤销后仍采集 | ⬜ | | | | |
+| 11.2 | 无障碍撤销后崩溃 | ⬜ | | | | |
+| 11.3 | 通话记录撤销后崩溃 | ⬜ | | | | |
+| 11.4 | 录音撤销后崩溃 | ⬜ | | | | |
+| 11.5 | 通讯录撤销后崩溃 | ⬜ | | | | |
+| 11.6 | 日历撤销后崩溃 | ⬜ | | | | |
+| 11.7 | 敏感数据脱敏后发送 | ⬜ | | | | |
+| 11.8 | 敏感数据写入日志 | ⬜ | | | | |
+| 11.9 | 敏感数据写未加密存储 | ⬜ | | | | |
+| 11.10 | 无障碍截图 Bitmap 释放 | ⬜ | | | | |
+| 11.11 | 通知含验证码过滤 | ⬜ | | | | |
+| 11.12 | 通知含银行卡号过滤 | ⬜ | | | | |
+| 11.13 | 通话含敏感号码(10086)过滤 | ⬜ | | | | |
+| 11.14 | 语音上传前明确授权 | ⬜ | | | | |
+| 11.15 | 联系人上传前明确授权 | ⬜ | | | | |
+| 11.16 | 消息内容上传前明确授权 | ⬜ | | | | |
+
+## 维度 12 · 性能与内存
+| ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
+|---|---|---|---|---|---|---|
+| 12.1 | 1000+联系人搜索卡顿 | ⬜ | | | | |
+| 12.2 | 500+日程日历卡顿 | ⬜ | | | | |
+| 12.3 | 100+商机看板卡顿 | ⬜ | | | | |
+| 12.4 | 100+待确认候选箱卡顿 | ⬜ | | | | |
+| 12.5 | 流式回复卡顿 | ⬜ | | | | |
+| 12.6 | 500+图谱节点卡顿 | ⬜ | | | | |
+| 12.7 | 图片加载过多 OOM | ⬜ | | | | |
+| 12.8 | Activity/Fragment 泄漏 | ⬜ | | | | |
+| 12.9 | ViewModel 泄漏 | ⬜ | | | | |
+| 12.10 | 协程未取消泄漏 | ⬜ | | | | |
+| 12.11 | 监听器未注销泄漏 | ⬜ | | | | |
+| 12.12 | 广播接收器未注销泄漏 | ⬜ | | | | |
+| 12.13 | 服务未停止泄漏 | ⬜ | | | | |
+
+## 维度 13 · 兼容性与边界
+| ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
+|---|---|---|---|---|---|---|
+| 13.1 | 屏幕密度 420/560dpi UI 变形 | ⬜ | | | | |
+| 13.2 | 手机/平板 UI 变形 | ⬜ | | | | |
+| 13.3 | 深色模式颜色正确 | ⬜ | | | | |
+| 13.4 | 字体放大2倍 UI 溢出 | ⬜ | | | | |
+| 13.5 | 横屏 UI 变形 | ⬜ | | | | |
+| 13.6 | Android 26/30/33/35 功能一致 | ⬜ | | | | |
+| 13.7 | 2GB 低端设备卡顿 | ⬜ | | | | |
+| 13.8 | 中英文混合输入处理 | ⬜ | | | | |
+| 13.9 | 特殊字符输入崩溃 | ⬜ | | | | |
+| 13.10 | 超长文本(>1000字)卡顿 | ⬜ | | | | |
+| 13.11 | 快速连续点击重复触发 | ⬜ | | | | |
+| 13.12 | 快速滑动卡顿 | ⬜ | | | | |
+
+## 维度 14 · 状态与生命周期
+| ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
+|---|---|---|---|---|---|---|
+| 14.1 | 杀后重启会话状态恢复 | ⬜ | | | | |
+| 14.2 | 杀后重启草稿保留 | ⬜ | | | | |
+| 14.3 | 杀后重启未发消息保留 | ⬜ | | | | |
+| 14.4 | 杀后重启未完成确认保留 | ⬜ | | | | |
+| 14.5 | 杀后重启自动写回执保留 | ⬜ | | | | |
+| 14.6 | 覆盖安装 API Key 丢失 | ⏭ | | 上一轮 #22 已修+真机验证 | `c685d9b` | 真机 |
+| 14.7 | 覆盖安装用户数据保留 | ⬜ | | | | |
+| 14.8 | 覆盖安装设置保留 | ⬜ | | | | |
+| 14.9 | 清除数据后真清空 | ⬜ | | | | |
+| 14.10 | 清除后残留文件 | ⬜ | | | | |
+| 14.11 | 清除后残留数据库 | ⬜ | | | | |
+| 14.12 | 清除后残留缓存 | ⬜ | | | | |
+| 14.13 | 卸载重装数据清空 | ⬜ | | | | |
+
+## 维度 15 · 特殊场景（多需人工/环境）
+| ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
+|---|---|---|---|---|---|---|
+| 15.1 | 双卡通话识别 SIM 卡 | 🧪 | | 需双卡设备 | | |
+| 15.2 | 飞行模式降级不崩溃 | 🖐 | | | | |
+| 15.3 | 低电量后台任务受限 | 🖐 | | | | |
+| 15.4 | 充电/不充电行为一致 | 🖐 | | | | |
+| 15.5 | 耳机插拔语音中断 | 🧪 | | 需耳机 | | |
+| 15.6 | 蓝牙连接/断开语音中断 | 🧪 | | 需蓝牙设备 | | |
+| 15.7 | 锁屏后台采集继续 | 🖐 | | | | |
+| 15.8 | 解锁 UI 正常恢复 | 🖐 | | | | |
+| 15.9 | 分屏 UI 变形 | 🖐 | | | | |
+| 15.10 | 弹出窗口 UI 变形 | 🖐 | | | | |
+| 15.11 | 系统字体繁体 UI 变形 | 🖐 | | | | |
+| 15.12 | 系统语言英文 UI 变形 | 🖐 | | | | |
+| 15.13 | 系统时间未来日程异常 | 🖐 | | | | |
+| 15.14 | 系统时间过去日程异常 | 🖐 | | | | |
+
+## 维度 16 · Agent 内核与状态机
+| ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
+|---|---|---|---|---|---|---|
+| 16.1 | 状态机转换合法性 | ⚪ | — | 当前实现按合法路径原子更新 run/attempt 并追加事件，真机回归未复现错序或丢事件 | 审计提交 | `RoomRuntimeStoreTest.runAndAttemptTerminalTransitionAppendEventAtomically` |
+| 16.2 | 非法转换被拒绝 | ⚪ | — | 状态机拒绝非法信号，失败后 run 状态与事件流均不变化 | 审计提交 | `RoomRuntimeStoreTest.persistentKernelRejectsIllegalTransitionWithoutEventOrStateChange` |
+| 16.3 | 命令分发正确 | ⚪ | — | START/APPROVE/REJECT/CANCEL/RETRY/RESUME 六类命令均按 CAS revision 持久化；重复命令不重复追加 | 审计提交 | `RuntimeGatewayTest.sixCommandsPersistWithCasAndDuplicateDoesNotAppendAgain` |
+| 16.4 | 退避策略正确 | ⚪ | — | 临时失败按 1s/2s 有界退避；首个流事件后不重试；致命错误不重试；取消直接传播 | 审计提交 | `ResilientProviderAdapterTest`（有界退避、流式边界、熔断、取消） |
+| 16.5 | 会话租约 fencing 正确 | ⚪ | — | 租约到期可由新 owner 原子接管；旧 owner 的 command/tool 写入被 fencing 拒绝，projection 不允许倒退 | 审计提交 | `RoomRuntimeStoreTest.expiredLeaseCanBeReclaimedAndRejectsStaleWriter` + `fencedLedgersRejectOldWriterAndProjectionCannotMoveBackward` |
+| 16.6 | 事件溯源回放正确 | ⚪ | — | 恢复快照包含 run/attempt/projection/单调事件序列；snapshot 后观察能补齐竞态窗口且不重复 | 审计提交 | `RoomRuntimeStoreTest.attemptRunEventAndProjectionArePersistedForRecovery` + `RuntimeGatewayTest.snapshotThenObserveCatchesEventsWrittenBeforeCollectionWithoutDuplicates` |
+| 16.7 | 幂等 eventId 去重 | ✅ | 数据一致性 | Provider/Runtime 已校验重放载荷；补齐 Observation 同 eventId 不同载荷的冲突拒绝，防止恢复分叉被静默隐藏 | `b24e824` | `RoomRuntimeStoreTest.observationReplayWithChangedPayloadIsRejectedWithoutSecondEvent` |
+| 16.8 | 恢复扫描器完整重放 | ⚪ | — | 只扫描租约已过期且未终止的会话；数据库重开后可携快照重新 claim 并继续状态转换 | 审计提交 | `RoomRuntimeStoreTest.recoveryScannerOnlyReturnsExpiredNonTerminalSessions` + `fileReopenRecoveryHandleCarriesSnapshotAndCanContinueWithClaimedLease` |
+| 16.9 | 工具确认门拦截 | ⚪ | — | 未确认或确认载荷不匹配时，日程、审计和工具结果均保持零写入 | 审计提交 | `RoomScheduleToolExecutorTest.unconfirmedOrMismatchedApprovalWritesNothing` |
+| 16.10 | 工具执行幂等 | ⚪ | — | 同一幂等键重复执行返回原结果，仅保留一条日程与一条审计；同键不同 digest 明确冲突 | 审计提交 | `RoomScheduleToolExecutorTest.confirmedWriteIsAtomicAndDuplicateReturnsOriginalResult` + `idempotencyKeyWithDifferentCanonicalDigestIsConflictWithoutSecondWrite` |
+
+## 维度 17 · 检索与上下文
+| ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
+|---|---|---|---|---|---|---|
+| 17.1 | 检索空显示"没有找到"不卡住 | ⬜ | | | | |
+| 17.2 | 检索过多截断不 OOM | ⬜ | | | | |
+| 17.3 | 检索超时降级不卡住 | ⬜ | | | | |
+| 17.4 | 检索含敏感信息脱敏 | ⬜ | | | | |
+| 17.5 | 上下文 token 超限截断 | ⬜ | | | | |
+| 17.6 | 上下文含敏感信息脱敏 | ⬜ | | | | |
+| 17.7 | 上下文含错误信息过滤 | ⬜ | | | | |
+| 17.8 | LLM 重排失败降级 FTS | ⬜ | | | | |
+
+## 维度 18 · 工具执行与确认
+| ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
+|---|---|---|---|---|---|---|
+| 18.1 | 参数缺失拒绝不崩溃 | ⬜ | | | | |
+| 18.2 | 参数非法拒绝不崩溃 | ⬜ | | | | |
+| 18.3 | 执行超时显示错误 | ⬜ | | | | |
+| 18.4 | 执行失败显示错误不卡住 | ⬜ | | | | |
+| 18.5 | 确认后执行失败显示错误 | ⬜ | | | | |
+| 18.6 | 确认后执行成功显示权威结果 | ⬜ | | | | |
+| 18.7 | 拒绝后能否再提议 | ⬜ | | | | |
+| 18.8 | 执行后 safeResult 权威结果 | ⬜ | | | | |
+| 18.9 | 执行后 ChangeLog 记录 | ⬜ | | | | |
+| 18.10 | 执行后 ToolAudit 记录 | ⬜ | | | | |
+| 18.11 | 目标 App 启动失败后立即重试被误判已打开 | ✅ | 功能不可用 | 去重占位在解析/启动前写入且失败不释放；改为可释放 reservation，失败路径立即回收 | 本提交 `fix(18.11)` | `RecentHandoffLaunchGuardTest.failedLaunchReservationCanBeReleasedForImmediateRetry` |
+
+## 维度 19 · 记忆与个性化
+| ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
+|---|---|---|---|---|---|---|
+| 19.1 | 记忆保存后 Agent 能读取 | ⬜ | | | | |
+| 19.2 | 记忆删除后 Agent 还读取 | ⬜ | | | | |
+| 19.3 | 记忆过期后被清理 | ⬜ | | | | |
+| 19.4 | 记忆冲突时合并 | ⬜ | | | | |
+| 19.5 | 记忆含敏感信息脱敏 | ⬜ | | | | |
+| 19.6 | 个性化修改后立即生效 | ⬜ | | | | |
+| 19.7 | 个性化删除后恢复默认 | ⬜ | | | | |
+| 19.8 | 对话风格修改后风格变化 | ⬜ | | | | |
+| 19.9 | 对话风格删除后恢复默认 | ⬜ | | | | |
+
+## 维度 20 · 错误处理与恢复（静态扫描）
+| ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
+|---|---|---|---|---|---|---|
+| 20.1 | suspend 全用 runSuspendCatching | ✅ | 功能不可用 | 启动协程曾用 `runCatching` 包裹配置迁移、健康检查、维护和通话设置读取，会吞取消；统一走传播取消的 `runStartupAction` | 本提交 `fix(20.1)` | `ZhiBanAppCancellationTest.startupActionPropagatesCoroutineCancellation` + `auditCancellationSafety` |
+| 20.2 | 资源(Cursor/Stream/WS/Bitmap)finally/use 释放 | ✅ | 数据丢失 | Cursor/Stream/Bitmap/实时语音资源均有 use/finally；会话工件原子写入失败会遗留 `.part`，现失败路径删除临时文件 | 本提交 `fix(20.2)` | `SessionWorkspaceAtomicWriteTest.failedAtomicRenameDeletesPartialArtifact` |
+| 20.3 | 异常捕获并记录降级原因 | ⬜ | | | | |
+| 20.3a | Embedding 维护失败被空 catch 静默吞掉 | ✅ | 可调试性 | 本地 FTS 仍可用时保留韧性，但返回固定 `embedding_backfill:failure`；不记录异常详情，取消仍上抛 | 本提交 `fix(20.3a)` | `AgentMaintenanceDegradationTest`（失败原因码 + 取消传播） |
+| 20.4 | 空 catch 块存在 | ✅ | — | 全量 Kotlin 正则扫描无字面空 catch；Embedding 维护原“仅注释 catch”已在 20.3a 改为可见降级原因 | 审计提交 | `detekt` + `rg -U 'catch...{\\s*}'` |
+| 20.5 | 硬编码密钥存在 | ✅ | — | 仓库扫描无硬编码 key/token/password，凭据走 Keystore vault；根 check 已包含秘密扫描 | 审计提交 | `verifyNoCommittedSecrets` |
+| 20.6 | 敏感数据脱敏后发送 | ✅ | — | LLM/重排统一经 PolicyEnforcingProviderAdapter；ASR/MCP/Embedding 经 OutboundExportGate，生产 Embedding 当前为 FTS-only | 审计提交 | `OutboundDataPolicyTest` + `ProviderRetrievalRerankerTest` + ASR/MCP/Embedding gate 测试 |
+| 20.7 | 敏感数据写入日志 | ✅ | — | 生产源码无 Log/println/Timber；OkHttp 仅 debug BASIC 且 Authorization 脱敏，release NONE；出站审计只存摘要元数据 | 审计提交 | `NetworkModuleTest` + `SecretRedactor` 相关测试 |
+| 20.8 | 敏感数据写未加密存储 | ✅ | — | SQLCipher 保护领域数据，个人资料/提示词/旧称呼使用 Keystore 加密；长期头像文件也已加密，临时附件只落 app cache 且有清理策略 | `a33435a` + `cc4a691` + 本提交 | 20.8a–20.8c 对应设备测试 |
+| 20.8a | 自定义系统提示词明文写入 DataStore | ✅ | 数据丢失 | 用户提示词可能含客户/个人信息；改存 EncryptedSharedPreferences，读取时迁移并删除旧明文 | 本提交 `fix(20.8a)` | `PreferencesManagerSecurityTest.customSystemPromptIsNotPersistedAsPlaintext` |
+| 20.8b | 旧版用户称呼明文留在 SharedPreferences | ✅ | 隐私 | AgentPersonalizationStore 改用加密偏好；首次读取迁移旧称呼/风格并清除旧明文 | 本提交 `fix(20.8b)` | `AgentPersonalizationStoreSecurityTest.legacyPreferredNameMigratesWithoutPlaintextResidue` |
+| 20.8c | 用户头像长期明文写入 filesDir | ✅ | 隐私 | 改为 Keystore-backed EncryptedFile；旧 `avatar.png` 首次读取后迁移并删除，UI 仅使用解密后的内存字节 | 本提交 `fix(20.8c)` | `UserProfileStoreTest`（静态加密 + 旧头像迁移） |

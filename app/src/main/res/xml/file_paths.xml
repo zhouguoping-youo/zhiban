@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <cache-path name="camera" path="camera/" />
+    <cache-path name="multimodal" path="multimodal/" />
+    <cache-path name="voice" path="voice/" />
+    <cache-path name="diagnostics" path="diagnostics/" />
+    <cache-path name="data-export" path="data-export/" />
+</paths>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeViewTextChanged|typeViewClicked|typeWindowContentChanged|typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows"
+    android:canRetrieveWindowContent="true"
+    android:canTakeScreenshot="true"
+    android:description="@string/outgoing_message_accessibility_description"
+    android:notificationTimeout="100"
+    android:packageNames="com.tencent.mm,com.tencent.mobileqq,com.tencent.mobileqqi,com.tencent.tim,com.ss.android.lark,com.larksuite.suite,com.tencent.wework,com.alibaba.android.rimet,com.android.mms,com.android.messaging,com.google.android.apps.messaging,com.samsung.android.messaging,com.samsung.android.messagingui,com.samsung.android.app.messaging,com.coloros.mms,com.oplus.mms,com.vivo.message,com.huawei.android.messaging,com.huawei.mms"
+    android:settingsActivity="com.zhiban.rebuild.MainActivity" />

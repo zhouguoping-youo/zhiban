@@ -1,0 +1,133 @@
+build:
+  maxIssues: 0
+  excludeCorrectable: false
+  weights:
+    # These two structural metrics remain visible as warnings in every report;
+    # correctness rules and the dedicated file-size/cancellation/clone gates block builds.
+    LongMethod: 0
+    CyclomaticComplexMethod: 0
+
+config:
+  validation: true
+  warningsAsErrors: false
+
+complexity:
+  active: true
+  CyclomaticComplexMethod:
+    active: true
+    severity: warning
+    threshold: 15
+    ignoreSimpleWhenEntries: true
+    ignoreSingleWhenExpression: true
+    ignoreAnnotated:
+      - Composable
+  LongMethod:
+    active: true
+    severity: warning
+    threshold: 80
+    excludes:
+      - "**/AgentDatabase.kt"
+      - "**/RuntimeToolCatalog.kt"
+      - "**/CrmDemoSessionStore.kt"
+    ignoreAnnotated:
+      - Composable
+  NestedBlockDepth:
+    active: true
+    threshold: 4
+
+empty-blocks:
+  active: true
+  EmptyCatchBlock:
+    active: true
+    allowedExceptionNameRegex: "^(_|ignore|expected).*"
+
+exceptions:
+  active: true
+  TooGenericExceptionCaught:
+    # Coroutine cancellation is enforced more precisely by auditCancellationSafety;
+    # generic exceptions remain valid at provider, parser, crypto, and hardware boundaries.
+    active: false
+    exceptionNames:
+      - ArrayIndexOutOfBoundsException
+      - Error
+      - Exception
+      - IllegalMonitorStateException
+      - NullPointerException
+      - RuntimeException
+      - Throwable
+    allowedExceptionNameRegex: "^(_|ignore|expected).*"
+
+style:
+  active: true
+  MagicNumber:
+    active: true
+    excludes:
+      - "**/test/**"
+      - "**/androidTest/**"
+      - "**/ui/**"
+      - "**/data/**"
+      - "**/runtime/tool/RuntimeToolCatalog.kt"
+    ignoreNumbers:
+      - "-1"
+      - "0"
+      - "1"
+      - "2"
+      - "3"
+      - "4"
+      - "5"
+      - "8"
+      - "9"
+      - "10"
+      - "12"
+      - "15"
+      - "16"
+      - "20"
+      - "24"
+      - "30"
+      - "32"
+      - "50"
+      - "60"
+      - "64"
+      - "72"
+      - "80"
+      - "100"
+      - "120"
+      - "128"
+      - "200"
+      - "256"
+      - "300"
+      - "500"
+      - "512"
+      - "650"
+      - "1000"
+      - "1024"
+      - "1440"
+      - "2000"
+      - "2048"
+      - "4000"
+      - "4096"
+      - "5000"
+      - "8000"
+      - "15000"
+      - "16000"
+      - "60000"
+      - "128000"
+    ignoreHashCodeFunction: true
+    ignorePropertyDeclaration: true
+    ignoreLocalVariableDeclaration: true
+    ignoreConstantDeclaration: true
+    ignoreCompanionObjectPropertyDeclaration: true
+    ignoreAnnotation: true
+    ignoreNamedArgument: true
+    ignoreEnums: true
+    ignoreRanges: true
+    ignoreExtensionFunctions: true
+  MaxLineLength:
+    # Ktlint is the single strict owner for source line length. Detekt counts
+    # embedded Room SQL and JSON schemas as code lines and duplicates that gate.
+    active: false
+    maxLineLength: 160
+    excludePackageStatements: true
+    excludeImportStatements: true
+    excludeCommentStatements: true
+    excludeRawStrings: true

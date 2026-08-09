@@ -1,0 +1,34 @@
+# Android / Gradle
+*.iml
+.gradle/
+build/
+/local.properties
+.idea/
+.DS_Store
+/captures
+.externalNativeBuild/
+.cxx/
+.kotlin/
+*.hprof
+*.log
+local.properties
+*.jks
+*.keystore
+signing.properties
+/release-signing/
+
+# Vendor ASR test SDK is supplied locally for controlled debug builds only.
+/app/libs/baidu-asr-debug/
+
+# Agent / runtime local state (not app source)
+.loop/
+.claude/
+
+# Local design review and device-acceptance output
+/artifacts/
+/.impeccable/
+/prototype.html
+/docs/*mockup*.html
+
+# Empty local orchestration scratch file
+/orkmode.py
