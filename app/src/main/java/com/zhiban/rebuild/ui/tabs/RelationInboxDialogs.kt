@@ -47,8 +47,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Done
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
@@ -399,6 +401,7 @@ internal fun NotificationCandidateDialog(
     onDismiss: () -> Unit,
 ) {
     var linking by remember { mutableStateOf<NotificationCandidateEntity?>(null) }
+    var showCollectionSettings by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     ZhiBanDialogHost(onDismissRequest = onDismiss) {
         Column(
@@ -410,26 +413,40 @@ internal fun NotificationCandidateDialog(
                 }
                 Column(Modifier.weight(1f)) {
                     Text(
-                        if (linking ==
-                            null
-                        ) {
-                            "待确认内容"
-                        } else {
-                            "选择其他联系人"
+                        when {
+                            linking != null -> "选择其他联系人"
+                            showCollectionSettings -> "消息感知设置"
+                            else -> "知伴需要你确认"
                         },
                         color = RelationInk,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        if (linking == null) "通知和你分享的内容，只在本机等待确认" else "只有当前匹配不正确时才需要重新选择",
+                        when {
+                            linking != null -> "只有当前匹配不正确时才需要重新选择"
+                            showCollectionSettings -> "选择知伴可以整理的消息来源"
+                            candidates.isEmpty() -> "明确内容会自动整理，拿不准的才会来到这里"
+                            else -> "已整理完成，只留下 ${candidates.size} 个关键歧义"
+                        },
                         color = RelationMuted,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
+                if (linking == null) {
+                    IconButton(
+                        onClick = { showCollectionSettings = !showCollectionSettings },
+                        modifier = Modifier.size(ZhiBanIconContainer.TouchTarget),
+                    ) {
+                        Icon(
+                            if (showCollectionSettings) Icons.Outlined.Done else Icons.Outlined.Settings,
+                            if (showCollectionSettings) "完成设置" else "消息感知设置",
+                        )
+                    }
+                }
             }
             Spacer(Modifier.height(12.dp))
-            if (linking == null) {
+            if (linking == null && showCollectionSettings) {
                 Text("采集来源", color = RelationMuted, style = MaterialTheme.typography.labelSmall)
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -499,7 +516,14 @@ internal fun NotificationCandidateDialog(
                 )
                 Spacer(Modifier.height(8.dp))
             }
-            if (linking != null) {
+            if (showCollectionSettings && linking == null) {
+                TextButton(
+                    onClick = { showCollectionSettings = false },
+                    modifier = Modifier.fillMaxWidth().height(ZhiBanSize.TouchTarget),
+                ) {
+                    Text("完成", color = RelationInk)
+                }
+            } else if (linking != null) {
                 val candidate = requireNotNull(linking)
                 Text(
                     listOfNotNull(candidate.title, candidate.body).joinToString("：").ifBlank { candidate.appLabel },
@@ -519,7 +543,20 @@ internal fun NotificationCandidateDialog(
                                 Modifier.fillMaxWidth().clickable {
                                     error = null
                                     onConfirmCandidate(candidate.candidateId, contact.contactId) { result ->
-                                        if (result == null) linking = null else error = result
+                                        if (result == null) {
+                                            val pendingSchedule = ScheduleInsight.from(candidate) != null &&
+                                                candidate.createdScheduleId == null
+                                            if (pendingSchedule) {
+                                                onConfirmSchedule(candidate.candidateId) { scheduleError ->
+                                                    error = scheduleError
+                                                    if (scheduleError == null) linking = null
+                                                }
+                                            } else {
+                                                linking = null
+                                            }
+                                        } else {
+                                            error = result
+                                        }
                                     }
                                 }.padding(vertical = 13.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -563,60 +600,73 @@ internal fun NotificationCandidateDialog(
                     items(candidates.size, key = { candidates[it].candidateId }) { index ->
                         val item = candidates[index]
                         val suggestedContact = contacts.firstOrNull { it.contactId == item.suggestedContactId }
+                        val matchedContact = contacts.firstOrNull {
+                            it.contactId == (item.linkedContactId ?: item.suggestedContactId)
+                        }
                         val schedule = ScheduleInsight.from(item)
-                        Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
+                        val review = buildNotificationCandidateReview(item, matchedContact?.displayName)
+                        val needsContact = item.linkedContactId == null && item.senderName != null
+                        val needsSchedule = schedule != null && item.createdScheduleId == null
+                        val canUseSuggestion = needsContact && suggestedContact != null
+                        val canCreateContact = needsContact && !item.isGroupChat
+                        val primaryLabel = when {
+                            canUseSuggestion && needsSchedule -> "确认关联并加入日历"
+                            canUseSuggestion -> "关联为 ${suggestedContact.displayName}"
+                            canCreateContact && needsSchedule -> "新建联系人并加入日历"
+                            canCreateContact -> "新建联系人"
+                            needsContact -> "选择联系人"
+                            needsSchedule -> "确认加入日历"
+                            else -> null
+                        }
+                        Column(
+                            Modifier.fillMaxWidth().padding(vertical = ZhiBanSpacing.Md),
+                            verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Xs),
+                        ) {
                             Text(
-                                buildString {
-                                    append(item.appLabel)
-                                    append(if (item.direction == "OUTGOING") " · 我发出" else " · 收到")
-                                    if (item.isGroupChat) append(" · 群聊")
-                                    item.conversationTitle?.let { append(" · ").append(it) }
-                                },
+                                "知伴整理",
+                                color = RelationAccent,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                review.headline,
+                                color = RelationInk,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                review.reason,
+                                color = RelationMuted,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            review.contactLine?.let {
+                                Text(it, color = RelationInk, style = MaterialTheme.typography.bodyMedium)
+                            }
+                            review.scheduleLine?.let {
+                                Text(it, color = RelationInk, style = MaterialTheme.typography.bodyMedium)
+                            }
+                            Text(
+                                listOf(
+                                    item.appLabel,
+                                    if (item.direction == "OUTGOING") "我发出" else "收到",
+                                    item.conversationTitle,
+                                ).filterNotNull().joinToString(" · "),
                                 color = RelationMuted,
                                 style = MaterialTheme.typography.labelSmall,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            item.senderName?.let {
+                            review.evidence?.let {
                                 Text(
-                                    it,
-                                    color = RelationInk,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                            item.body?.let {
-                                Text(
-                                    it,
+                                    "依据 · $it",
                                     color = RelationMuted,
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = MaterialTheme.typography.labelSmall,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             }
-                            if (schedule != null && item.createdScheduleId == null) {
-                                Spacer(Modifier.height(8.dp))
-                                Text(
-                                    "日程建议 · ${formatMessageSchedule(schedule.startAtEpochMs)}",
-                                    color = RelationInk,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Medium,
-                                )
-                            }
-                            item.linkedContactId?.let {
-                                Text("已关联联系人", color = RelationMuted, style = MaterialTheme.typography.labelSmall)
-                            }
-                            item.createdScheduleId?.let {
-                                Text("已加入日程", color = RelationMuted, style = MaterialTheme.typography.labelSmall)
-                            }
-                            val canUseSuggestion = item.linkedContactId == null &&
-                                suggestedContact != null &&
-                                item.suggestedContactConfidence >= 0.9
-                            val needsSchedule = schedule != null && item.createdScheduleId == null
-                            if (canUseSuggestion || needsSchedule) {
-                                Spacer(Modifier.height(8.dp))
+                            if (primaryLabel != null) {
+                                Spacer(Modifier.height(ZhiBanSpacing.Xs))
                                 Button(
                                     onClick = {
                                         error = null
@@ -637,6 +687,21 @@ internal fun NotificationCandidateDialog(
                                                 requireNotNull(suggestedContact).contactId,
                                             ) { error = it }
 
+                                            canCreateContact -> onCreateContact(
+                                                item.candidateId,
+                                                requireNotNull(item.senderName),
+                                            ) { contactError ->
+                                                if (contactError == null && needsSchedule) {
+                                                    onConfirmSchedule(item.candidateId) { error = it }
+                                                } else {
+                                                    error = contactError
+                                                }
+                                            }
+
+                                            needsContact -> {
+                                                linking = item
+                                            }
+
                                             needsSchedule -> onConfirmSchedule(item.candidateId) { error = it }
                                         }
                                     },
@@ -644,7 +709,7 @@ internal fun NotificationCandidateDialog(
                                     shape = RoundedCornerShape(ZhiBanRadius.Card),
                                     colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
                                 ) {
-                                    Text(if (needsSchedule) "确认安排" else "确认整理")
+                                    Text(primaryLabel)
                                 }
                             }
                             Row(
@@ -654,22 +719,15 @@ internal fun NotificationCandidateDialog(
                                 TextButton(onClick = { onDismissCandidate(item.candidateId) }) {
                                     Text("忽略", color = RelationMuted)
                                 }
-                                if (item.linkedContactId == null && item.senderName != null) {
-                                    Row {
-                                        if (suggestedContact == null) {
-                                            TextButton(onClick = {
-                                                error = null
-                                                onCreateContact(item.candidateId, item.senderName) { error = it }
-                                            }) {
-                                                Text("新建", color = RelationInk)
-                                            }
-                                        }
-                                        TextButton(onClick = {
-                                            linking = item
-                                            error = null
-                                        }) {
-                                            Text(if (suggestedContact == null) "选择联系人" else "联系人不对", color = RelationInk)
-                                        }
+                                if (needsContact && (canUseSuggestion || canCreateContact)) {
+                                    TextButton(onClick = {
+                                        linking = item
+                                        error = null
+                                    }) {
+                                        Text(
+                                            if (canUseSuggestion) "不是这个人" else "关联已有联系人",
+                                            color = RelationInk,
+                                        )
                                     }
                                 }
                             }
