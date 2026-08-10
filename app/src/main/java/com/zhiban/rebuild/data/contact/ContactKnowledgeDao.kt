@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -11,11 +12,17 @@ interface ContactKnowledgeDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertMethods(values: List<ContactMethodEntity>)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun upsertOrganization(value: OrganizationEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun upsertEmployment(value: ContactEmploymentEntity)
+
+    @Query("SELECT * FROM organizations WHERE organizationId = :organizationId")
+    suspend fun findOrganization(organizationId: String): OrganizationEntity?
+
+    @Query("SELECT * FROM contact_employments WHERE employmentId = :employmentId")
+    suspend fun findEmployment(employmentId: String): ContactEmploymentEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAddresses(values: List<ContactAddressEntity>)
@@ -118,6 +125,13 @@ interface ContactKnowledgeDao {
 
     @Query("SELECT * FROM contact_enrichment_candidates WHERE candidateId = :candidateId")
     suspend fun findEnrichmentCandidate(candidateId: String): ContactEnrichmentCandidateEntity?
+
+    @Query(
+        """SELECT COUNT(*) FROM contact_enrichment_candidates
+        WHERE contactId = :contactId AND providerId = :providerId AND fieldKind = :fieldKind
+        AND (expiresAtEpochMs IS NULL OR expiresAtEpochMs > :nowEpochMs)""",
+    )
+    suspend fun countActiveEnrichmentCandidates(contactId: String, providerId: String, fieldKind: String, nowEpochMs: Long): Int
 
     @Query(
         "UPDATE contact_enrichment_candidates SET status = :status, updatedAtEpochMs = :nowEpochMs WHERE candidateId = :candidateId AND status = 'PENDING'",

@@ -9,6 +9,7 @@ build/
 .externalNativeBuild/
 .cxx/
 .kotlin/
+node_modules/
 *.hprof
 *.log
 local.properties

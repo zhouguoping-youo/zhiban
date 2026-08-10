@@ -1020,10 +1020,31 @@ internal fun enrichmentValueSummary(proposedValueJson: String): String {
     val obj = runCatching {
         kotlinx.serialization.json.Json.parseToJsonElement(proposedValueJson).jsonObject
     }.getOrNull() ?: return proposedValueJson.take(60)
-    return obj.entries
-        .mapNotNull { (key, value) -> value.jsonPrimitive.contentOrNull?.takeIf(String::isNotBlank)?.let { "$key：$it" } }
+    val displayKeys = if (obj["canonicalName"] != null) {
+        listOf("canonicalName", "registrationStatus", "creditCode", "registeredAddress")
+    } else {
+        listOf("company", "title", "phone", "email", "wechatId", "formattedAddress")
+    }
+    return displayKeys
+        .mapNotNull { key ->
+            (obj[key] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
+                ?.takeIf(String::isNotBlank)
+                ?.let { "${enrichmentValueLabel(key)}：$it" }
+        }
         .joinToString(" · ")
         .ifBlank { proposedValueJson.take(60) }
+}
+
+private fun enrichmentValueLabel(key: String): String = when (key) {
+    "canonicalName", "company" -> "公司"
+    "registrationStatus" -> "状态"
+    "creditCode" -> "统一信用代码"
+    "registeredAddress", "formattedAddress" -> "地址"
+    "title" -> "职位"
+    "phone" -> "电话"
+    "email" -> "邮箱"
+    "wechatId" -> "微信"
+    else -> key
 }
 
 @Composable

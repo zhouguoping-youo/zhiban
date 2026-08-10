@@ -130,6 +130,84 @@ class ContactEnrichmentConfirmTest {
         assertEquals("可信候选", db.contactDao().findRawById("c1")!!.company)
     }
 
+    @Test fun confirmRegistryCompanyWritesCanonicalOrganizationAndEmployment() = runBlocking {
+        db.contactDao().insert(contact(company = "星河科技", title = null))
+        val registry = candidate(
+            id = "registry-company",
+            value = """{
+                "company":"星河科技有限公司",
+                "canonicalName":"星河科技有限公司",
+                "matchedCompanyHint":"星河科技",
+                "creditCode":"91310000TEST",
+                "registrationStatus":"存续",
+                "registeredAddress":"上海市徐汇区"
+            }
+            """.trimIndent(),
+        ).copy(providerId = "company-registry:qichacha", sourceRef = "企查查 · 工商主体")
+        repository.stageContactEnrichmentCandidate(registry)
+
+        assertTrue(repository.applyContactEnrichmentCandidate(registry, nowEpochMs = 100))
+
+        assertEquals("星河科技有限公司", db.contactDao().findRawById("c1")!!.company)
+        val employment = db.contactKnowledgeDao().observeEmployments("c1").first().single()
+        assertEquals("星河科技有限公司", employment.companyNameSnapshot)
+        assertTrue(employment.userConfirmed)
+        val organization = db.contactKnowledgeDao().findOrganization(employment.organizationId!!)!!
+        assertEquals("91310000TEST", organization.creditCode)
+        assertEquals("存续", organization.status)
+        assertEquals("上海市徐汇区", organization.registeredAddress)
+    }
+
+    @Test fun registryConfirmationDoesNotOverwriteCompanyChangedAfterLookup() = runBlocking {
+        db.contactDao().insert(contact(company = "用户后来修改的公司", title = null))
+        val registry = candidate(
+            id = "stale-registry-company",
+            value = """{
+                "company":"星河科技有限公司",
+                "canonicalName":"星河科技有限公司",
+                "matchedCompanyHint":"星河科技"
+            }
+            """.trimIndent(),
+        ).copy(providerId = "company-registry:qichacha")
+        repository.stageContactEnrichmentCandidate(registry)
+
+        val failure = runCatching {
+            repository.applyContactEnrichmentCandidate(registry, nowEpochMs = 100)
+        }.exceptionOrNull()
+
+        assertEquals("CONTACT_COMPANY_CHANGED", failure?.message)
+        assertEquals("用户后来修改的公司", db.contactDao().findRawById("c1")!!.company)
+        assertEquals("PENDING", db.contactKnowledgeDao().findEnrichmentCandidate(registry.candidateId)!!.status)
+    }
+
+    @Test fun confirmingSharedOrganizationKeepsEveryEmploymentLinked() = runBlocking {
+        db.contactDao().insert(contact(company = "星河科技", title = null))
+        db.contactDao().insert(contact(company = "星河科技", title = null).copy(contactId = "c2", displayName = "李四"))
+        val first = registryCandidate("registry-c1", "c1")
+        val second = registryCandidate("registry-c2", "c2")
+        repository.stageContactEnrichmentCandidate(first)
+        repository.stageContactEnrichmentCandidate(second)
+
+        assertTrue(repository.applyContactEnrichmentCandidate(first, nowEpochMs = 100))
+        assertTrue(repository.applyContactEnrichmentCandidate(second, nowEpochMs = 101))
+
+        val firstEmployment = db.contactKnowledgeDao().observeEmployments("c1").first().single()
+        val secondEmployment = db.contactKnowledgeDao().observeEmployments("c2").first().single()
+        assertEquals(firstEmployment.organizationId, secondEmployment.organizationId)
+        assertTrue(firstEmployment.organizationId != null)
+    }
+
+    private fun registryCandidate(id: String, contactId: String) = candidate(
+        id = id,
+        value = """{
+            "company":"星河科技有限公司",
+            "canonicalName":"星河科技有限公司",
+            "matchedCompanyHint":"星河科技",
+            "creditCode":"91310000TEST"
+        }
+        """.trimIndent(),
+    ).copy(contactId = contactId, providerId = "company-registry:qichacha")
+
     private fun contact(company: String?, title: String?) = ContactEntity(
         "c1", "张三", "张三", null, null, null, company, title, "[]", "[]", null, null, "USER", null, 1, 2,
     )

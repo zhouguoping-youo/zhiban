@@ -16,6 +16,7 @@ import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventWithParticipants
 import com.zhiban.rebuild.data.contact.SystemContactCandidate
 import com.zhiban.rebuild.data.contact.SystemContactReader
+import com.zhiban.rebuild.data.contact.enrichment.CompanyEnrichmentRefresher
 import com.zhiban.rebuild.data.contact.normalizeContactPhone
 import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
 import com.zhiban.rebuild.data.notification.MessageCollectionPreferences
@@ -62,6 +63,7 @@ class RelationViewModel @Inject constructor(
     private val callLogRepository: CallLogRepository,
     private val cloudAsrGateway: CloudAsrGateway,
     private val outboundDataPreferences: OutboundDataPreferences,
+    private val companyEnrichment: CompanyEnrichmentRefresher,
 ) : ViewModel() {
     val contacts: StateFlow<List<ContactEntity>> = repository.observeContacts()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -114,7 +116,10 @@ class RelationViewModel @Inject constructor(
 
     init {
         viewModelScope.launch { repository.purgeNonPersonalSmsCandidates() }
-        viewModelScope.launch { repository.refreshLocalContactIntelligence() }
+        viewModelScope.launch {
+            repository.refreshLocalContactIntelligence()
+            companyEnrichment.refresh()
+        }
         refreshCloudAsrAvailability()
     }
 
@@ -231,13 +236,15 @@ class RelationViewModel @Inject constructor(
             val current = mutableImportState.value
             mutableImportState.value = current.copy(isImporting = true, error = null, resultMessage = null)
             runSuspendCatching {
-                repository.importConfirmedSystemContacts(
+                val summary = repository.importConfirmedSystemContacts(
                     contacts = current.contacts.filter { it.sourceId in sourceIds },
                     ownerPhone = userProfileStore.profile.value.phone,
                     ownerWechatId = userProfileStore.profile.value.wechatId,
                     ownerName = userProfileStore.profile.value.name,
                     nowEpochMs = System.currentTimeMillis(),
                 )
+                companyEnrichment.refresh()
+                summary
             }.onSuccess { summary ->
                 if (summary.selfIdentityMissing) {
                     userProfileStore.mergeMissingIdentity(

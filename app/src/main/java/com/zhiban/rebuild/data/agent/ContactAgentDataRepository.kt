@@ -62,12 +62,11 @@ import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import org.json.JSONObject
 
 internal class ContactAgentDataRepository(private val database: AgentDatabase) {
+    private val enrichmentWriter = ContactEnrichmentDomainWriter(database)
+
     fun observeRawContacts(): Flow<List<ContactEntity>> = database.contactDao().observeAllActive()
 
     fun observeContactRoles(): Flow<List<ContactRoleEntity>> = database.contactDao().observeRoles()
@@ -871,85 +870,8 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
         nowEpochMs = System.currentTimeMillis(),
     ) == 1
 
-    /**
-     * Applies an accepted enrichment candidate to the contact profile, additive-only: a non-blank
-     * existing value is never overwritten. Only candidates that map to a scalar profile field are
-     * applied; resolves the candidate regardless so it leaves the pending list. Returns true when a
-     * field was written.
-     */
-    suspend fun applyContactEnrichmentCandidate(candidate: ContactEnrichmentCandidateEntity, nowEpochMs: Long = System.currentTimeMillis()): Boolean {
-        return database.withTransaction {
-            val persisted = database.contactKnowledgeDao().findEnrichmentCandidate(candidate.candidateId)
-                ?: return@withTransaction false
-            if (persisted.status != "PENDING" ||
-                persisted.expiresAtEpochMs?.let { it <= nowEpochMs } == true
-            ) {
-                return@withTransaction false
-            }
-            val contactId = persisted.contactId ?: return@withTransaction false
-            val contact = database.contactDao().findRawById(contactId) ?: return@withTransaction false
-            val patch = enrichmentProfilePatch(persisted.fieldKind, persisted.proposedValueJson) ?: emptyMap()
-            var applied = false
-            var updated = contact
-            for ((field, value) in patch) {
-                val current = when (field) {
-                    "phone" -> updated.phone
-                    "email" -> updated.email
-                    "wechatId" -> updated.wechatId
-                    "company" -> updated.company
-                    "title" -> updated.title
-                    else -> null
-                }
-                if (current.isNullOrBlank()) {
-                    updated = when (field) {
-                        "phone" -> updated.copy(phone = value)
-                        "email" -> updated.copy(email = value)
-                        "wechatId" -> updated.copy(wechatId = value)
-                        "company" -> updated.copy(company = value)
-                        "title" -> updated.copy(title = value)
-                        else -> updated
-                    }
-                    applied = true
-                }
-            }
-            if (applied) {
-                check(database.contactDao().update(updated.copy(updatedAtEpochMs = nowEpochMs)) == 1)
-            }
-            check(
-                database.contactKnowledgeDao().resolveEnrichmentCandidate(
-                    candidateId = persisted.candidateId,
-                    status = "APPROVED",
-                    nowEpochMs = nowEpochMs,
-                ) == 1,
-            )
-            applied
-        }
-    }
-
-    /** Maps an enrichment candidate to the scalar contact profile fields it can fill, if any. */
-    private fun enrichmentProfilePatch(fieldKind: String, proposedValueJson: String): Map<String, String>? {
-        val obj = runCatching {
-            kotlinx.serialization.json.Json.parseToJsonElement(proposedValueJson).jsonObject
-        }.getOrNull() ?: return null
-        fun text(key: String) = obj[key]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf(String::isNotEmpty)
-        return when (fieldKind) {
-            "ORGANIZATION" -> listOfNotNull(text("company")?.let { "company" to it }).toMap()
-
-            "EMPLOYMENT" -> listOfNotNull(
-                text("title")?.let { "title" to it },
-                text("company")?.let { "company" to it },
-            ).toMap()
-
-            "COMMUNICATION_METHOD" -> listOfNotNull(
-                text("phone")?.let { "phone" to it },
-                text("email")?.let { "email" to it },
-                text("wechatId")?.let { "wechatId" to it },
-            ).toMap()
-
-            // ADDRESS and other structured kinds have no scalar profile field; left for future writers.
-            else -> emptyMap()
-        }
-    }
+    suspend fun applyContactEnrichmentCandidate(candidate: ContactEnrichmentCandidateEntity, nowEpochMs: Long = System.currentTimeMillis()): Boolean =
+        enrichmentWriter.apply(candidate.candidateId, nowEpochMs)
 
     private fun String?.cleanContactField(): String? = this?.trim()?.takeIf(String::isNotEmpty)
     private fun normalizeContactMethodHandle(raw: String): String = raw
