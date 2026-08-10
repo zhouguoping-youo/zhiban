@@ -45,6 +45,9 @@ import com.zhiban.rebuild.ui.tabs.CrmLeadListPage
 import com.zhiban.rebuild.ui.tabs.CrmOpportunityBoardPage
 import com.zhiban.rebuild.ui.tabs.CrmOpportunityDetailPage
 import com.zhiban.rebuild.ui.tabs.CrmOpportunityListPage
+import com.zhiban.rebuild.ui.tabs.EventPlanningDetailPage
+import com.zhiban.rebuild.ui.tabs.EventPlanningListPage
+import com.zhiban.rebuild.ui.tabs.EventPlanningPage
 import com.zhiban.rebuild.ui.tabs.HomeTab
 import com.zhiban.rebuild.ui.tabs.LifeAssistantDetailPage
 import com.zhiban.rebuild.ui.tabs.LifeAssistantListPage
@@ -157,6 +160,7 @@ fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L
                 SkillTab(
                     onOpenCrm = { navController.navigate(CrmCapability) },
                     onOpenLifeAssistant = { navController.navigate(LifeAssistant) },
+                    onOpenEventPlanning = { navController.navigate(EventPlanning) },
                 )
             }
             composable<Profile> {
@@ -259,6 +263,32 @@ fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L
                 val route = entry.toRoute<LifeAssistantDetail>()
                 LifeAssistantDetailPage(
                     itemId = route.itemId,
+                    onBack = { navController.popBackStack() },
+                    onAskAgent = { draft ->
+                        navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK", workContext = true))
+                    },
+                )
+            }
+
+            composable<EventPlanning> {
+                EventPlanningPage(
+                    onBack = { navController.popBackStack() },
+                    onOpenAll = { navController.navigate(EventPlanningList) },
+                    onOpenPlan = { planId -> navController.navigate(EventPlanningDetail(planId)) },
+                )
+            }
+
+            composable<EventPlanningList> {
+                EventPlanningListPage(
+                    onBack = { navController.popBackStack() },
+                    onOpenPlan = { planId -> navController.navigate(EventPlanningDetail(planId)) },
+                )
+            }
+
+            composable<EventPlanningDetail> { entry ->
+                val route = entry.toRoute<EventPlanningDetail>()
+                EventPlanningDetailPage(
+                    planId = route.planId,
                     onBack = { navController.popBackStack() },
                     onAskAgent = { draft ->
                         navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK", workContext = true))

@@ -18,6 +18,12 @@ import kotlinx.serialization.Serializable
 
 @Serializable data class LifeAssistantDetail(val itemId: String)
 
+@Serializable data object EventPlanning
+
+@Serializable data object EventPlanningList
+
+@Serializable data class EventPlanningDetail(val planId: String)
+
 @Serializable data object CrmLeads
 
 @Serializable data class CrmOpportunityList(val stage: String? = null)

@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.WorkOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -46,7 +47,13 @@ import com.zhiban.rebuild.ui.theme.ZhiBanSpacing
 import com.zhiban.rebuild.ui.theme.ZhiBanTerracotta
 
 @Composable
-fun SkillTab(modifier: Modifier = Modifier, onOpenCrm: () -> Unit = {}, onOpenLifeAssistant: () -> Unit = {}, isDataEmpty: Boolean = false) {
+fun SkillTab(
+    modifier: Modifier = Modifier,
+    onOpenCrm: () -> Unit = {},
+    onOpenLifeAssistant: () -> Unit = {},
+    onOpenEventPlanning: () -> Unit = {},
+    isDataEmpty: Boolean = false,
+) {
     if (isDataEmpty) {
         MainTabEmptyPage("skill", modifier)
         return
@@ -56,6 +63,9 @@ fun SkillTab(modifier: Modifier = Modifier, onOpenCrm: () -> Unit = {}, onOpenLi
     }
     val lifeAssistant = BuiltInSkills.all.first {
         it.id == "personal_life" && it.level == SkillLevel.SCENE
+    }
+    val eventPlanning = BuiltInSkills.all.first {
+        it.id == "social_planning" && it.level == SkillLevel.SCENE
     }
     val sceneCapabilities = listOf(
         SceneCapability(
@@ -71,6 +81,13 @@ fun SkillTab(modifier: Modifier = Modifier, onOpenCrm: () -> Unit = {}, onOpenLi
             description = "重要的人与事",
             icon = Icons.Outlined.FavoriteBorder,
             onClick = onOpenLifeAssistant,
+        ),
+        SceneCapability(
+            id = eventPlanning.id,
+            title = eventPlanning.displayName,
+            description = "聚会、探望与出行",
+            icon = Icons.Outlined.Groups,
+            onClick = onOpenEventPlanning,
         ),
     )
 

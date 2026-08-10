@@ -8,6 +8,7 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Contacts
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,6 +37,8 @@ internal fun skillTagline(id: String): String = when (id) {
     "calendar_coordination" -> "协调日程：先核对时间，创建修改前与你确认"
     "contact_relationship" -> "识别对话里的人，补全资料、梳理关系"
     "sales_crm" -> "以销售机会为主线，推进客户关系"
+    "personal_life" -> "重要日期与承诺，提前做好准备"
+    "social_planning" -> "协调参与人、时间与邀请"
     "memory_preference" -> "区分临时与长期偏好，记住你的习惯"
     else -> "内置技能"
 }
@@ -44,6 +47,8 @@ internal fun skillIcon(id: String): ImageVector = when (id) {
     "calendar_coordination" -> Icons.Outlined.Event
     "contact_relationship" -> Icons.Outlined.Contacts
     "sales_crm" -> Icons.Outlined.AutoAwesome
+    "personal_life" -> Icons.Outlined.FavoriteBorder
+    "social_planning" -> Icons.Outlined.Groups
     "memory_preference" -> Icons.Outlined.FavoriteBorder
     else -> Icons.Outlined.AutoAwesome
 }

@@ -40,6 +40,9 @@ import com.zhiban.rebuild.data.crm.CrmNextActionEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityStakeholderEntity
 import com.zhiban.rebuild.data.crm.CrmStageHistoryEntity
+import com.zhiban.rebuild.data.event.EventPlanEntity
+import com.zhiban.rebuild.data.event.EventPlanParticipantEntity
+import com.zhiban.rebuild.data.event.EventPlanningDao
 import com.zhiban.rebuild.data.notification.NotificationCandidateDao
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.runtime.context.EmbeddingVectorDao
@@ -102,8 +105,10 @@ const val AGENT_DATABASE_FILE_NAME = "zhiban-agent.db"
         CrmDemoCleanupAuditEntity::class,
         CallRecordEntity::class,
         CallNoteEntity::class,
+        EventPlanEntity::class,
+        EventPlanParticipantEntity::class,
     ],
-    version = 34,
+    version = 35,
     exportSchema = true,
 )
 internal abstract class AgentDatabase : RoomDatabase() {
@@ -138,6 +143,7 @@ internal abstract class AgentDatabase : RoomDatabase() {
     abstract fun notificationCandidateDao(): NotificationCandidateDao
     abstract fun crmDao(): CrmDao
     abstract fun callLogDao(): CallLogDao
+    abstract fun eventPlanningDao(): EventPlanningDao
 
     companion object {
         const val NAME = AGENT_DATABASE_FILE_NAME
@@ -1403,6 +1409,58 @@ internal abstract class AgentDatabase : RoomDatabase() {
                         arrayOf(method.normalizedValue, method.methodId),
                     )
                 }
+            }
+        }
+
+        val MIGRATION_34_35 = object : Migration(34, 35) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `event_plans` (
+                        `planId` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `proposedStartAtEpochMs` INTEGER NOT NULL,
+                        `durationMinutes` INTEGER NOT NULL,
+                        `location` TEXT,
+                        `note` TEXT,
+                        `status` TEXT NOT NULL,
+                        `scheduleId` TEXT,
+                        `sourceType` TEXT NOT NULL,
+                        `createdAtEpochMs` INTEGER NOT NULL,
+                        `updatedAtEpochMs` INTEGER NOT NULL,
+                        PRIMARY KEY(`planId`),
+                        FOREIGN KEY(`scheduleId`) REFERENCES `schedules`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL
+                    )""",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_event_plans_status` ON `event_plans` (`status`)")
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_event_plans_proposedStartAtEpochMs` " +
+                        "ON `event_plans` (`proposedStartAtEpochMs`)",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_event_plans_scheduleId` ON `event_plans` (`scheduleId`)")
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `event_plan_participants` (
+                        `planId` TEXT NOT NULL,
+                        `contactId` TEXT NOT NULL,
+                        `responseStatus` TEXT NOT NULL,
+                        `responseSource` TEXT NOT NULL,
+                        `updatedAtEpochMs` INTEGER NOT NULL,
+                        PRIMARY KEY(`planId`, `contactId`),
+                        FOREIGN KEY(`planId`) REFERENCES `event_plans`(`planId`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`contactId`) REFERENCES `contacts`(`contactId`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )""",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_event_plan_participants_planId` " +
+                        "ON `event_plan_participants` (`planId`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_event_plan_participants_contactId` " +
+                        "ON `event_plan_participants` (`contactId`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_event_plan_participants_responseStatus` " +
+                        "ON `event_plan_participants` (`responseStatus`)",
+                )
             }
         }
 

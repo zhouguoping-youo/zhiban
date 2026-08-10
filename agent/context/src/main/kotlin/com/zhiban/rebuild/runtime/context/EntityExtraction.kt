@@ -20,6 +20,7 @@ enum class IntentLabel {
     RELATIONSHIP_WRITE,
     SALES_CRM,
     PERSONAL_LIFE,
+    SOCIAL_PLANNING,
 }
 
 enum class ExtractedEntityType { PERSON, PHONE, EMAIL, DATE, TIME_RANGE, KEYWORD }
@@ -142,6 +143,18 @@ class LocalEntityExtractor(private val zoneId: ZoneId = ZoneId.systemDefault()) 
         text.lowercase().contains("crm") ||
             text.containsAny("销售线索", "客户跟进", "跟进客户", "销售商机", "销售机会", "客户池", "回访客户", "成交进展") ->
             IntentLabel.SALES_CRM to SALES_CRM_CONFIDENCE
+
+        text.containsAny(
+            "一起安排",
+            "组织聚会",
+            "安排聚会",
+            "约大家",
+            "约几个",
+            "邀请大家",
+            "邀请朋友",
+            "协调大家时间",
+            "安排集体出行",
+        ) -> IntentLabel.SOCIAL_PLANNING to SOCIAL_PLANNING_CONFIDENCE
 
         text.containsAny(
             "生活助理",
@@ -377,6 +390,7 @@ private const val MEMORY_QUERY_CONFIDENCE = 0.92
 private const val CONTACT_CREATE_CONFIDENCE = 0.96
 private const val SALES_CRM_CONFIDENCE = 0.93
 private const val PERSONAL_LIFE_CONFIDENCE = 0.92
+private const val SOCIAL_PLANNING_CONFIDENCE = 0.94
 private const val CONTACT_QUERY_CONFIDENCE = 0.88
 private const val CALENDAR_CREATE_CONFIDENCE = 0.94
 private const val CALENDAR_QUERY_CONFIDENCE = 0.86

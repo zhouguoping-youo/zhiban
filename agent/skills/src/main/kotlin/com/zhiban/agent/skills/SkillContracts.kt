@@ -130,6 +130,25 @@ object BuiltInSkills {
             level = SkillLevel.SCENE,
         ),
         SkillSpec(
+            "social_planning",
+            1,
+            "一起安排",
+            setOf("SOCIAL_PLANNING"),
+            setOf(
+                "contact.search",
+                "contact.getDetail",
+                "relationship.search",
+                "relationship.getEvidence",
+                "calendar.schedule.search",
+                "calendar.schedule.conflicts",
+                "calendar.schedule.create",
+                "communication.message.compose",
+            ),
+            "围绕一次多人聚会、探望或出行推进安排。先确认参与人身份和用户自己的日程冲突，再准备候选时间与邀请文案。" +
+                "不得声称知道其他人的空闲时间；回复只能依据用户确认或可追溯消息整理。写入日历前由用户确认，任何邀请或变更消息由用户最后发送。",
+            level = SkillLevel.SCENE,
+        ),
+        SkillSpec(
             "memory_preference",
             1,
             "偏好记忆",

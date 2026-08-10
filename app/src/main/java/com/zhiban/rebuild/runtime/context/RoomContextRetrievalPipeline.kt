@@ -141,6 +141,7 @@ internal class RoomContextRetrievalPipeline(
                 IntentLabel.GENERAL_WORK,
                 IntentLabel.SALES_CRM,
                 IntentLabel.PERSONAL_LIFE,
+                IntentLabel.SOCIAL_PLANNING,
             ) &&
             context.entities.none { it.type == ExtractedEntityType.PERSON }
         ) {
@@ -160,7 +161,13 @@ internal class RoomContextRetrievalPipeline(
 
     private suspend fun scheduleCandidates(context: QueryContext, query: String): List<RetrievalCandidate> {
         if (context.intentLabel !in
-            setOf(IntentLabel.CALENDAR_QUERY, IntentLabel.CALENDAR_CREATE, IntentLabel.GENERAL_WORK, IntentLabel.PERSONAL_LIFE) &&
+            setOf(
+                IntentLabel.CALENDAR_QUERY,
+                IntentLabel.CALENDAR_CREATE,
+                IntentLabel.GENERAL_WORK,
+                IntentLabel.PERSONAL_LIFE,
+                IntentLabel.SOCIAL_PLANNING,
+            ) &&
             context.timeRange == null
         ) {
             return emptyList()

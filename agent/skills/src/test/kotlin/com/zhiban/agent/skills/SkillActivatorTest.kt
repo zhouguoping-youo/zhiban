@@ -48,7 +48,7 @@ class SkillActivatorTest {
         val sceneSkills = BuiltInSkills.all.filter { it.level == SkillLevel.SCENE }
         val systemSkills = BuiltInSkills.all.filter { it.level == SkillLevel.SYSTEM }.map { it.id }.toSet()
 
-        assertEquals(listOf("sales_crm", "personal_life"), sceneSkills.map { it.id })
+        assertEquals(listOf("sales_crm", "personal_life", "social_planning"), sceneSkills.map { it.id })
         assertTrue("contact_relationship" in systemSkills)
         assertTrue("calendar_coordination" in systemSkills)
         assertTrue("memory_preference" in systemSkills)
@@ -62,6 +62,17 @@ class SkillActivatorTest {
         assertEquals("personal_life", activation.skillId)
         assertTrue("relationship.getEvidence" in activation.requiredTools)
         assertTrue("calendar.schedule.create" in activation.requiredTools)
+        assertTrue("communication.message.compose" in activation.requiredTools)
+    }
+
+    @Test fun socialPlanningActivatesWithRelationshipsCalendarAndConfirmedCommunication() {
+        val spec = BuiltInSkills.all.single { it.id == "social_planning" }
+
+        val activation = SkillActivator().activate("SOCIAL_PLANNING", "Work", spec.requiredTools).single()
+
+        assertEquals("social_planning", activation.skillId)
+        assertTrue("relationship.getEvidence" in activation.requiredTools)
+        assertTrue("calendar.schedule.conflicts" in activation.requiredTools)
         assertTrue("communication.message.compose" in activation.requiredTools)
     }
 }
