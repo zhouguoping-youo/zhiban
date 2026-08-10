@@ -417,7 +417,7 @@ internal fun RelationshipGraphCard(
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(ZhiBanRadius.Medium))
             .background(RelationSoft)
             .clickable(enabled = !inferredFromEvidence) { onInspect(edge) }
             .padding(12.dp),

@@ -235,7 +235,7 @@ internal fun ContactDetailDialog(
                     onClick = onEdit,
                     Modifier.fillMaxWidth().height(48.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(ZhiBanRadius.Dialog),
                 ) {
                     Text("编辑基本资料")
                 }
@@ -540,7 +540,7 @@ internal fun ContactActionButton(icon: androidx.compose.ui.graphics.vector.Image
     Row(
         modifier
             .defaultMinSize(minHeight = ZhiBanSize.TouchTarget)
-            .clip(RoundedCornerShape(23.dp))
+            .clip(RoundedCornerShape(ZhiBanRadius.Dialog))
             .background(RelationSoft)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp),
@@ -601,7 +601,7 @@ internal fun ContactMergeReviewDialog(suggestion: ContactMergeSuggestion, onDism
             listOf(suggestion.first, suggestion.second).forEach { contact ->
                 val selected = canonicalId == contact.contactId
                 Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Card))
                         .background(if (selected) RelationSoft else Color.Transparent)
                         .clickable {
                             canonicalId = contact.contactId
@@ -641,7 +641,7 @@ internal fun ContactMergeReviewDialog(suggestion: ContactMergeSuggestion, onDism
                 }
                 Spacer(Modifier.height(6.dp))
             }
-            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(RelationSoft).padding(14.dp)) {
+            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Card)).background(RelationSoft).padding(14.dp)) {
                 Text(
                     "合并后只显示一个联系人，原始资料、记忆和关系不会删除。你可以随时在联系人详情中恢复。",
                     color = RelationMuted,
@@ -744,10 +744,10 @@ internal fun ContactIdentityEditorDialog(
                 }
             }
             Spacer(Modifier.height(16.dp))
-            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(RelationSoft).padding(4.dp)) {
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Input)).background(RelationSoft).padding(4.dp)) {
                 listOf("常用称呼" to "ALIAS", "社交账号" to "PLATFORM").forEach { (label, itemMode) ->
                     Box(
-                        Modifier.weight(1f).clip(RoundedCornerShape(16.dp))
+                        Modifier.weight(1f).clip(RoundedCornerShape(ZhiBanRadius.Card))
                             .background(if (mode == itemMode) RelationSurface else Color.Transparent)
                             .clickable {
                                 mode = itemMode
@@ -791,7 +791,7 @@ internal fun ContactIdentityEditorDialog(
                         Text(
                             label,
                             color = if (platform == id) MaterialTheme.colorScheme.onPrimary else RelationMuted,
-                            modifier = Modifier.clip(RoundedCornerShape(16.dp))
+                            modifier = Modifier.clip(RoundedCornerShape(ZhiBanRadius.Card))
                                 .background(if (platform == id) RelationAccent else RelationSoft)
                                 .clickable {
                                     platform = id
@@ -815,7 +815,7 @@ internal fun ContactIdentityEditorDialog(
                 placeholder = { Text(if (mode == "ALIAS") "例如：王老师" else "输入对方在该平台的账号") },
                 singleLine = true,
                 enabled = !saving,
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(ZhiBanRadius.Input),
             )
             Text(
                 if (mode == "ALIAS") {
@@ -930,7 +930,7 @@ internal fun ContactFactEditorDialog(contact: ContactEntity, onDismiss: () -> Un
                     Text(
                         label,
                         color = if (type == value) MaterialTheme.colorScheme.onPrimary else RelationMuted,
-                        modifier = Modifier.clip(RoundedCornerShape(16.dp))
+                        modifier = Modifier.clip(RoundedCornerShape(ZhiBanRadius.Card))
                             .background(if (type == value) RelationAccent else RelationSoft)
                             .clickable { type = value }.padding(horizontal = 13.dp, vertical = 8.dp),
                         style = MaterialTheme.typography.labelMedium,

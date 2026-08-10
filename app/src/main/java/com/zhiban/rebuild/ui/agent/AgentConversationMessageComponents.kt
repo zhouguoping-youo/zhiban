@@ -166,7 +166,7 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
         Modifier.fillMaxWidth().padding(
             horizontal = 16.dp,
             vertical = 4.dp,
-        ).background(ZhiBanTerracotta.copy(alpha = .10f), RoundedCornerShape(14.dp)).padding(12.dp),
+        ).background(ZhiBanTerracotta.copy(alpha = .10f), RoundedCornerShape(ZhiBanRadius.Medium)).padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text("记忆 · $text", Modifier.weight(1f), color = ZhiBanTextSecondary, style = MaterialTheme.typography.bodySmall)

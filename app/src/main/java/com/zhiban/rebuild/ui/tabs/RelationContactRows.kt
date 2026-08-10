@@ -35,6 +35,7 @@ import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.runtime.personalization.UserProfile
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
 import com.zhiban.rebuild.ui.theme.ZhiBanIconSize
+import com.zhiban.rebuild.ui.theme.ZhiBanRadius
 import com.zhiban.rebuild.ui.theme.ZhiBanSize
 
 @Composable
@@ -79,7 +80,7 @@ internal fun OwnerContactRow(profile: UserProfile, onClick: () -> Unit) {
             "本人",
             color = RelationInk,
             style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.background(RelationSoft, RoundedCornerShape(12.dp))
+            modifier = Modifier.background(RelationSoft, RoundedCornerShape(ZhiBanRadius.Medium))
                 .padding(horizontal = 8.dp, vertical = 4.dp),
         )
     }
@@ -125,7 +126,7 @@ internal fun ContactRow(contact: ContactEntity, onClick: () -> Unit) {
                 style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.background(
                     RelationSoft,
-                    RoundedCornerShape(12.dp),
+                    RoundedCornerShape(ZhiBanRadius.Medium),
                 ).padding(horizontal = 8.dp, vertical = 4.dp),
             )
         }
@@ -159,7 +160,7 @@ internal fun RelationEmpty(searching: Boolean, onImport: () -> Unit, onAdd: () -
             Button(
                 onClick = onImport,
                 colors = ButtonDefaults.buttonColors(containerColor = RelationAccent),
-                shape = RoundedCornerShape(50),
+                shape = CircleShape,
             ) {
                 Icon(Icons.Outlined.PhoneAndroid, null, modifier = Modifier.size(ZhiBanIconSize.Inline))
                 Spacer(Modifier.width(6.dp))

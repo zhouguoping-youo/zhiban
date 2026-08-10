@@ -166,6 +166,9 @@ tasks.register("verifyUiConsistency") {
             if (!relative.endsWith("ui/theme/Type.kt") && !relative.endsWith("ui/components/ZhiBanVisual.kt") && Regex("fontSize\\s*=").containsMatchIn(text)) {
                 violations += "$relative declares a font size; use MaterialTheme.typography"
             }
+            if (Regex("RoundedCornerShape\\((?!2\\.dp\\))[0-9]").containsMatchIn(text)) {
+                violations += "$relative declares an arbitrary radius; use ZhiBanRadius by semantic role"
+            }
         }
         check(violations.isEmpty()) {
             violations.joinToString("\n", prefix = "UI consistency violations:\n")

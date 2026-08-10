@@ -407,7 +407,7 @@ internal fun ContactEditorDialog(
                                 it,
                                 color = if (tag == it) MaterialTheme.colorScheme.onPrimary else RelationMuted,
                                 modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                                    .clip(RoundedCornerShape(24.dp)).background(
+                                    .clip(RoundedCornerShape(ZhiBanRadius.Dialog)).background(
                                         if (tag ==
                                             it
                                         ) {

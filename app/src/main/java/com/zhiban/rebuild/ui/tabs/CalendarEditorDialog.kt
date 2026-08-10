@@ -200,7 +200,7 @@ internal fun ScheduleEditorDialog(
                             Text(
                                 label,
                                 modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                                    .clip(RoundedCornerShape(24.dp))
+                                    .clip(RoundedCornerShape(ZhiBanRadius.Dialog))
                                     .background(if (selected) CalendarAccent else CalendarSoft)
                                     .clickable {
                                         reminderMinutes = minutes
@@ -221,7 +221,7 @@ internal fun ScheduleEditorDialog(
             Spacer(Modifier.height(18.dp))
             pendingConflict?.let {
                 Column(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(CalendarSoft).padding(14.dp),
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Medium)).background(CalendarSoft).padding(14.dp),
                 ) {
                     Text(
                         it,

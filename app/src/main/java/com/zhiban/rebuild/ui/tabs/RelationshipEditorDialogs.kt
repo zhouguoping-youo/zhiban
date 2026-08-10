@@ -247,7 +247,7 @@ internal fun RelationshipEditorDialog(
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
+                            .clip(RoundedCornerShape(ZhiBanRadius.Medium))
                             .background(RelationSoft)
                             .padding(4.dp),
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -379,7 +379,7 @@ internal fun RelationshipSourceOption(label: String, selected: Boolean, modifier
     Box(
         modifier
             .height(ZhiBanSize.Control)
-            .clip(RoundedCornerShape(11.dp))
+            .clip(RoundedCornerShape(ZhiBanRadius.Small))
             .background(if (selected) RelationSurface else Color.Transparent)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -405,7 +405,7 @@ internal fun RelationshipTypeGrid(relationTypes: List<String>, selectedType: Str
                     Modifier
                         .weight(1f)
                         .height(ZhiBanSize.Control)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(ZhiBanRadius.Medium))
                         .background(if (selectedType == value) RelationAccent else RelationSoft)
                         .clickable(enabled = enabled) { onSelect(value) },
                     contentAlignment = Alignment.Center,
@@ -446,7 +446,7 @@ internal fun PersonChoiceRow(people: List<RelationshipPersonUi>, selectedId: Str
                     person.displayName
                 },
                 color = if (selectedId == person.personId) MaterialTheme.colorScheme.onPrimary else RelationMuted,
-                modifier = Modifier.clip(RoundedCornerShape(16.dp))
+                modifier = Modifier.clip(RoundedCornerShape(ZhiBanRadius.Card))
                     .background(if (selectedId == person.personId) RelationAccent else RelationSoft)
                     .clickable { onSelect(person.personId) }
                     .padding(horizontal = 13.dp, vertical = 8.dp),
@@ -494,7 +494,7 @@ internal fun relationshipEventRoleLabel(role: String): String = when (role) {
 @Composable
 internal fun RelationshipEventRow(value: RelationshipEventWithParticipants, onClick: (RelationshipEventWithParticipants) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable { onClick(value) }.padding(vertical = 10.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Medium)).clickable { onClick(value) }.padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(38.dp).clip(CircleShape).background(RelationSoft), contentAlignment = Alignment.Center) {
@@ -590,7 +590,7 @@ internal fun RelationshipEventEditorDialog(
                         Text(
                             relationshipEventTypeLabel(value),
                             color = if (type == value) MaterialTheme.colorScheme.onPrimary else RelationMuted,
-                            modifier = Modifier.clip(RoundedCornerShape(16.dp))
+                            modifier = Modifier.clip(RoundedCornerShape(ZhiBanRadius.Card))
                                 .background(if (type == value) RelationAccent else RelationSoft)
                                 .clickable {
                                     type = value
@@ -624,7 +624,7 @@ internal fun RelationshipEventEditorDialog(
                             "只有我和TA",
                             color = if (relatedId.isBlank()) MaterialTheme.colorScheme.onPrimary else RelationMuted,
                             modifier = Modifier.clip(
-                                RoundedCornerShape(16.dp),
+                                RoundedCornerShape(ZhiBanRadius.Card),
                             ).background(if (relatedId.isBlank()) RelationAccent else RelationSoft)
                                 .clickable {
                                     relatedId = ""
@@ -638,7 +638,7 @@ internal fun RelationshipEventEditorDialog(
                         Text(
                             contact.displayName,
                             color = if (relatedId == contact.contactId) MaterialTheme.colorScheme.onPrimary else RelationMuted,
-                            modifier = Modifier.clip(RoundedCornerShape(16.dp)).background(
+                            modifier = Modifier.clip(RoundedCornerShape(ZhiBanRadius.Card)).background(
                                 if (relatedId ==
                                     contact.contactId
                                 ) {
@@ -783,7 +783,7 @@ internal fun RelationshipEventDetailDialog(value: RelationshipEventWithParticipa
             }
             value.event.note?.takeIf(String::isNotBlank)?.let {
                 Spacer(Modifier.height(12.dp))
-                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(RelationSoft).padding(14.dp)) {
+                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Card)).background(RelationSoft).padding(14.dp)) {
                     Text(it, color = RelationInk, style = MaterialTheme.typography.bodySmall)
                 }
             }
@@ -849,7 +849,7 @@ internal fun RelationshipEvidenceDialog(
                 error = null
             }
             Spacer(Modifier.height(18.dp))
-            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(RelationSoft).padding(14.dp)) {
+            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Card)).background(RelationSoft).padding(14.dp)) {
                 Column {
                     Text("来源", color = RelationMuted, style = MaterialTheme.typography.labelSmall)
                     Text(

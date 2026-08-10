@@ -447,7 +447,7 @@ fun RowScope.ZhiBanStatTile(value: String, label: String, iconText: String, acce
 fun RowScope.ZhiBanCompactMetric(value: String, label: String, iconText: String, accent: Color = ZhiBanTerracotta) {
     Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
         Box(
-            modifier = Modifier.size(30.dp).clip(RoundedCornerShape(10.dp)).background(accent.copy(alpha = 0.14f)),
+            modifier = Modifier.size(30.dp).clip(RoundedCornerShape(ZhiBanRadius.Small)).background(accent.copy(alpha = 0.14f)),
             contentAlignment = Alignment.Center,
         ) {
             Text(iconText, style = MaterialTheme.typography.labelMedium, color = accent, fontWeight = FontWeight.Bold)
@@ -599,14 +599,14 @@ fun ZhiBanProgressBar(progress: Float, modifier: Modifier = Modifier, height: Dp
     Box(
         modifier = modifier.fillMaxWidth().height(
             height,
-        ).clip(RoundedCornerShape(999.dp)).background(com.zhiban.rebuild.ui.theme.Gray100),
+        ).clip(RoundedCornerShape(ZhiBanRadius.Full)).background(com.zhiban.rebuild.ui.theme.Gray100),
     ) {
         Box(
             modifier = Modifier.fillMaxWidth(
                 progress.coerceIn(0f, 1f),
             ).height(
                 height,
-            ).clip(RoundedCornerShape(999.dp)).background(Brush.horizontalGradient(listOf(color, ZhiBanTerracotta))),
+            ).clip(RoundedCornerShape(ZhiBanRadius.Full)).background(Brush.horizontalGradient(listOf(color, ZhiBanTerracotta))),
         )
     }
 }

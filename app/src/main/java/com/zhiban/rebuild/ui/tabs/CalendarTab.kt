@@ -697,7 +697,7 @@ private fun WeekStrip(selected: LocalDate, onSelect: (LocalDate) -> Unit) {
             val date = monday.plusDays(offset)
             val active = date == selected
             Column(
-                Modifier.weight(1f).defaultMinSize(minHeight = 48.dp).clip(RoundedCornerShape(18.dp))
+                Modifier.weight(1f).defaultMinSize(minHeight = 48.dp).clip(RoundedCornerShape(ZhiBanRadius.Input))
                     .semantics { contentDescription = "选择 $date" }
                     .selectable(selected = active, role = Role.Button) { onSelect(date) }
                     .padding(vertical = 7.dp),
@@ -860,7 +860,7 @@ internal fun EmptyDay(onAdd: () -> Unit) {
         Button(
             onClick = onAdd,
             colors = ButtonDefaults.buttonColors(containerColor = CalendarAccent),
-            shape = RoundedCornerShape(50),
+            shape = CircleShape,
         ) {
             Icon(Icons.Outlined.Add, null, modifier = Modifier.size(ZhiBanIconSize.Inline))
             Spacer(Modifier.width(6.dp))

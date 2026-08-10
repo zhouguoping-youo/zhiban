@@ -286,7 +286,7 @@ private fun StatusBadge(configured: Boolean) {
     }
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(999.dp))
+            .clip(RoundedCornerShape(ZhiBanRadius.Full))
             .background(background)
             .padding(horizontal = 10.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -302,14 +302,14 @@ private fun HeroBlock(providerName: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(ZhiBanRadius.Input))
             .background(CloudBlue.copy(alpha = 0.10f))
-            .border(1.dp, CloudBlue.copy(alpha = 0.20f), RoundedCornerShape(20.dp))
+            .border(1.dp, CloudBlue.copy(alpha = 0.20f), RoundedCornerShape(ZhiBanRadius.Input))
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            modifier = Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(CloudBlue.copy(alpha = 0.20f)),
+            modifier = Modifier.size(44.dp).clip(RoundedCornerShape(ZhiBanRadius.Medium)).background(CloudBlue.copy(alpha = 0.20f)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -350,9 +350,9 @@ private fun ErrorBanner(message: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(ZhiBanRadius.Medium))
             .background(ErrorRed.copy(alpha = 0.10f))
-            .border(1.dp, ErrorRed.copy(alpha = 0.25f), RoundedCornerShape(14.dp))
+            .border(1.dp, ErrorRed.copy(alpha = 0.25f), RoundedCornerShape(ZhiBanRadius.Medium))
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -370,9 +370,9 @@ private fun ModelRow(option: ModelOption, selected: Boolean, onClick: () -> Unit
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(ZhiBanRadius.Medium))
             .background(bgColor)
-            .border(if (selected) 1.5.dp else 1.dp, borderColor, RoundedCornerShape(14.dp))
+            .border(if (selected) 1.5.dp else 1.dp, borderColor, RoundedCornerShape(ZhiBanRadius.Medium))
             .clickable { onClick() }
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -401,7 +401,7 @@ private fun ModelRow(option: ModelOption, selected: Boolean, onClick: () -> Unit
                     Spacer(modifier = Modifier.width(6.dp))
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
+                            .clip(RoundedCornerShape(ZhiBanRadius.Full))
                             .background(ZhiBanTerracotta)
                             .padding(horizontal = 6.dp, vertical = 1.dp),
                     ) {

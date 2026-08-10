@@ -45,6 +45,7 @@ import com.zhiban.rebuild.ui.theme.SuccessText
 import com.zhiban.rebuild.ui.theme.ZhiBanCard
 import com.zhiban.rebuild.ui.theme.ZhiBanIconContainer
 import com.zhiban.rebuild.ui.theme.ZhiBanIconSize
+import com.zhiban.rebuild.ui.theme.ZhiBanRadius
 import com.zhiban.rebuild.ui.theme.ZhiBanTerracotta
 import com.zhiban.rebuild.ui.theme.ZhiBanTextPrimary
 import com.zhiban.rebuild.ui.theme.ZhiBanTextSecondary
@@ -179,7 +180,7 @@ fun HomeTab(modifier: Modifier = Modifier, onOpenAssistantChat: (String) -> Unit
                         Spacer(modifier = Modifier.weight(1f))
                         Box(
                             modifier = Modifier.clip(
-                                RoundedCornerShape(999.dp),
+                                RoundedCornerShape(ZhiBanRadius.Full),
                             ).background(
                                 ZhiBanTerracotta.copy(alpha = 0.10f),
                             ).padding(horizontal = 14.dp, vertical = 8.dp),

@@ -455,7 +455,7 @@ internal fun NotificationCandidateDialog(
                 Spacer(Modifier.height(8.dp))
                 Row(
                     Modifier.fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(ZhiBanRadius.Card))
                         .background(RelationSoft)
                         .clickable {
                             onOutgoingCollectionEnabled(

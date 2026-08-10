@@ -847,7 +847,7 @@ private fun RunTraceCard(trace: com.zhiban.rebuild.runtime.observability.AgentRu
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     color = status.color.copy(alpha = .12f),
-                    shape = RoundedCornerShape(6.dp),
+                    shape = RoundedCornerShape(ZhiBanRadius.ExtraSmall),
                 ) {
                     Text(
                         status.label,

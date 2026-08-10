@@ -560,7 +560,7 @@ internal fun VoiceInputBar(state: TranscriptionUiState, onCancel: () -> Unit, on
     Surface(
         Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 10.dp),
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(30.dp),
+        shape = RoundedCornerShape(ZhiBanRadius.Full),
         shadowElevation = 5.dp,
     ) {
         Row(
@@ -600,7 +600,7 @@ internal fun VoiceInputBar(state: TranscriptionUiState, onCancel: () -> Unit, on
                 color = MaterialTheme.colorScheme.surfaceVariant,
             ) {
                 Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                    Box(Modifier.size(17.dp).background(Gray500, RoundedCornerShape(4.dp)))
+                    Box(Modifier.size(17.dp).background(Gray500, RoundedCornerShape(ZhiBanRadius.ExtraSmall)))
                 }
             }
             Spacer(Modifier.width(8.dp))
