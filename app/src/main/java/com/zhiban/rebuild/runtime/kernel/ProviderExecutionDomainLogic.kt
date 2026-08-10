@@ -118,8 +118,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
-private val ENGLISH_CALLED_TITLE = Regex(
-    """\bcalled\s+(.+?)(?=,\s*remind\b|,\s*with\b|[.!?]\s*$|$)""",
+private val ENGLISH_NAMED_TITLE = Regex(
+    """\b(?:called|titled|named)\s+(.+?)(?=,?\s+(?:with\s+)?remind(?:er|\s+me)?\b|,\s*with\b|[.!?]\s*$|$)""",
     RegexOption.IGNORE_CASE,
 )
 private val CHINESE_NAMED_TITLE = Regex("""(?:叫|名为|标题是)\s*([^，。,.]{1,80})""")
@@ -180,7 +180,7 @@ internal fun normalizeCalendarToolCall(
 
 internal fun deterministicCalendarToolCall(input: DecodedInput, queryContext: QueryContext, nowEpochMs: Long? = null): ModelEvent.ToolCall? {
     val startAt = resolveCalendarStartEpochMs(input.text, queryContext.timeRange, nowEpochMs = nowEpochMs) ?: return null
-    val title = ENGLISH_CALLED_TITLE.find(input.text)?.groupValues?.get(1)
+    val title = ENGLISH_NAMED_TITLE.find(input.text)?.groupValues?.get(1)
         ?: CHINESE_NAMED_TITLE.find(input.text)?.groupValues?.get(1)
         ?: CHINESE_AFTER_TIME_TITLE.find(input.text)?.groupValues?.get(1)
         ?: "新日程"

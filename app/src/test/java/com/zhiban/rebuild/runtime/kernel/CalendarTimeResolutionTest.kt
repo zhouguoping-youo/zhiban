@@ -60,5 +60,16 @@ class CalendarTimeResolutionTest {
         assertEquals(expectedTomorrow3pm, normalized.startAt())
     }
 
+    @Test fun deterministicCalendarCallKeepsEnglishTitledNameAndExcludesReminderClause() {
+        val text = "Create a calendar schedule tomorrow at 4 PM titled Resume Confirmation Test with reminder 10 minutes before"
+        val queryContext = extractor.extract(text, "Work", now)
+
+        val toolCall = requireNotNull(deterministicCalendarToolCall(DecodedInput(text, "Work"), queryContext, now))
+        val arguments = Json.parseToJsonElement(toolCall.argumentsJson).jsonObject
+
+        assertEquals("Resume Confirmation Test", arguments.getValue("title").jsonPrimitive.content)
+        assertEquals(10, arguments.getValue("reminderMinutesBefore").jsonPrimitive.content.toInt())
+    }
+
     private fun ModelEvent.ToolCall.startAt(): Long = Json.parseToJsonElement(argumentsJson).jsonObject["startAtEpochMs"]!!.jsonPrimitive.long
 }
