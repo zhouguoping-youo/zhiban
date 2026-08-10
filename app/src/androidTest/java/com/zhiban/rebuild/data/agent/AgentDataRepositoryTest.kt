@@ -225,6 +225,25 @@ class AgentDataRepositoryTest {
     }
 
     @Test
+    fun duplicateEmailsInsideOneSystemImportBatchCollapseToOneContact() = runBlocking {
+        val summary = repository.importConfirmedSystemContacts(
+            listOf(
+                systemContact("email-a", "张老师", emails = listOf("USER@Example.com")),
+                systemContact("email-b", "张三", emails = listOf(" user@example.com ")),
+            ),
+            ownerPhone = null,
+            ownerWechatId = null,
+            ownerName = null,
+            nowEpochMs = 2_000L,
+        )
+
+        assertEquals(1, summary.created)
+        assertEquals(1, summary.updated)
+        assertEquals(1, repository.observeRawContacts().first().size)
+        assertNotNull(database.contactKnowledgeDao().findContactByMethod("EMAIL", "user@example.com"))
+    }
+
+    @Test
     fun editingUserPhoneRemovesStaleNormalizedIdentity() = runBlocking {
         val contactId = repository.saveUserContact(
             null, "联系人", "138-0013-8000", "old-wechat", "旧公司", "旧职位", "旧标签", null, 1_000L,
@@ -834,6 +853,101 @@ class AgentDataRepositoryTest {
     }
 
     @Test
+    fun uniqueExactNameAutomaticallyLinksMessageAndKeepsUndoReceipt() = runBlocking {
+        val now = System.currentTimeMillis()
+        val contactId = repository.saveUserContact(
+            null, "唯一联系人", null, null, null, null, null, null, nowEpochMs = now,
+        )
+
+        repository.stageNotificationCandidate(
+            NotificationCandidateEntity(
+                candidateId = "unique-name-message",
+                sourceKey = "unique-name-source",
+                packageName = "com.tencent.mm",
+                appLabel = "微信",
+                title = "唯一联系人",
+                body = "资料已经发给你",
+                postedAtEpochMs = now,
+                platform = "WECHAT",
+                conversationTitle = "唯一联系人",
+                senderName = "唯一联系人",
+                direction = "INCOMING",
+            ),
+        )
+
+        assertTrue(repository.observeNotificationCandidates().first().isEmpty())
+        val fact = repository.observeContactFacts(contactId).first().single()
+        assertEquals("INTERACTION_SUMMARY", fact.factType)
+        val receipt = database.changeLogDao().observeAutoWriteReceipts().first().single()
+        assertEquals(0.99, receipt.confidence ?: 0.0, 0.0)
+        assertTrue(AutoWriteRepository(database, context).undo(receipt.changeId, now + 1_000L))
+    }
+
+    @Test
+    fun duplicateDisplayNameNeverAutomaticallyChoosesOneContact() = runBlocking {
+        val now = System.currentTimeMillis()
+        repository.saveUserContact(null, "张伟", "13800138001", null, null, null, null, null, now)
+        repository.saveUserContact(null, "张伟", "13800138002", null, null, null, null, null, now + 1)
+
+        repository.stageNotificationCandidate(
+            NotificationCandidateEntity(
+                candidateId = "duplicate-name-message",
+                sourceKey = "duplicate-name-source",
+                packageName = "com.tencent.mm",
+                appLabel = "微信",
+                title = "张伟",
+                body = "收到",
+                postedAtEpochMs = now,
+                platform = "WECHAT",
+                conversationTitle = "张伟",
+                senderName = "张伟",
+                direction = "INCOMING",
+            ),
+        )
+
+        val pending = repository.observeNotificationCandidates().first().single()
+        assertNull(pending.linkedContactId)
+        assertNull(pending.suggestedContactId)
+        assertTrue(database.changeLogDao().observeAutoWriteReceipts().first().isEmpty())
+    }
+
+    @Test
+    fun explicitHighConfidenceMessageAutomaticallyCreatesReversibleSchedule() = runBlocking {
+        val now = System.currentTimeMillis()
+        val start = now + 24 * 60 * 60_000L
+        repository.saveUserContact(null, "王敏", null, null, null, null, null, null, now)
+
+        repository.stageNotificationCandidate(
+            NotificationCandidateEntity(
+                candidateId = "auto-schedule-message",
+                sourceKey = "auto-schedule-source",
+                packageName = "com.ss.android.lark",
+                appLabel = "飞书",
+                title = "王敏",
+                body = "明天下午三点开会",
+                postedAtEpochMs = now,
+                platform = "FEISHU",
+                conversationTitle = "王敏",
+                senderName = "王敏",
+                direction = "INCOMING",
+                messageKind = "SCHEDULE_CANDIDATE",
+                insightJson = NotificationInsights(
+                    schedule = ScheduleInsight("项目会议", start, confidence = 0.99),
+                ).toJsonOrNull(),
+            ),
+        )
+
+        assertTrue(repository.observeNotificationCandidates().first().isEmpty())
+        val schedule =
+            requireNotNull(database.scheduleDao().findById("notification-schedule-${com.zhiban.rebuild.runtime.tool.sha256("auto-schedule-source").take(32)}"))
+        val receipt = database.changeLogDao().observeAutoWriteReceipts().first()
+            .single { it.presentationType == "SCHEDULE_CREATE" }
+        assertEquals(schedule.id, receipt.targetId)
+        assertTrue(AutoWriteRepository(database, context).undo(receipt.changeId, now + 1_000L))
+        assertNull(database.scheduleDao().findById(schedule.id))
+    }
+
+    @Test
     fun confirmedPlatformHandlesMatchWechatFeishuDingtalkAndQqCandidates() = runBlocking {
         val now = System.currentTimeMillis()
         val contactId = repository.saveUserContact(
@@ -922,13 +1036,12 @@ class AgentDataRepositoryTest {
                 ).toJsonOrNull(),
             ),
         )
+        assertEquals(1, repository.observeNotificationCandidates().first().size)
+        assertEquals(1, repository.observeContactFacts(contactId).first().size)
 
         val scheduleId = repository.confirmNotificationSchedule("notification-schedule")
         assertEquals(scheduleId, repository.confirmNotificationSchedule("notification-schedule"))
         assertEquals(1, database.scheduleDao().count())
-        assertEquals(1, repository.observeNotificationCandidates().first().size)
-
-        assertEquals(true, repository.confirmNotificationCandidate("notification-schedule", contactId))
         assertEquals(0, repository.observeNotificationCandidates().first().size)
         assertEquals(1, database.scheduleDao().count())
     }

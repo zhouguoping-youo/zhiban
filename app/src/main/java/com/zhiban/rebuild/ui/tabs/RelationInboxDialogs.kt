@@ -611,57 +611,65 @@ internal fun NotificationCandidateDialog(
                             item.createdScheduleId?.let {
                                 Text("已加入日程", color = RelationMuted, style = MaterialTheme.typography.labelSmall)
                             }
+                            val canUseSuggestion = item.linkedContactId == null &&
+                                suggestedContact != null &&
+                                item.suggestedContactConfidence >= 0.9
+                            val needsSchedule = schedule != null && item.createdScheduleId == null
+                            if (canUseSuggestion || needsSchedule) {
+                                Spacer(Modifier.height(8.dp))
+                                Button(
+                                    onClick = {
+                                        error = null
+                                        when {
+                                            canUseSuggestion && needsSchedule -> onConfirmCandidate(
+                                                item.candidateId,
+                                                requireNotNull(suggestedContact).contactId,
+                                            ) { contactError ->
+                                                if (contactError == null) {
+                                                    onConfirmSchedule(item.candidateId) { error = it }
+                                                } else {
+                                                    error = contactError
+                                                }
+                                            }
+
+                                            canUseSuggestion -> onConfirmCandidate(
+                                                item.candidateId,
+                                                requireNotNull(suggestedContact).contactId,
+                                            ) { error = it }
+
+                                            needsSchedule -> onConfirmSchedule(item.candidateId) { error = it }
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth().height(ZhiBanSize.Control),
+                                    shape = RoundedCornerShape(ZhiBanRadius.Card),
+                                    colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
+                                ) {
+                                    Text(if (needsSchedule) "确认安排" else "确认整理")
+                                }
+                            }
                             Row(
-                                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
-                                TextButton(onClick = {
-                                    onDismissCandidate(item.candidateId)
-                                }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                                TextButton(onClick = { onDismissCandidate(item.candidateId) }) {
                                     Text("忽略", color = RelationMuted)
                                 }
                                 if (item.linkedContactId == null && item.senderName != null) {
-                                    if (suggestedContact != null && item.suggestedContactConfidence >= 0.9) {
-                                        TextButton(
-                                            onClick = {
-                                                error = null
-                                                onConfirmCandidate(item.candidateId, suggestedContact.contactId) {
-                                                    error =
-                                                        it
-                                                }
-                                            },
-                                            contentPadding = PaddingValues(horizontal = 8.dp),
-                                        ) {
-                                            Text("关联“${suggestedContact.displayName}”", color = RelationInk)
-                                        }
-                                    }
-                                    TextButton(onClick = {
-                                        linking = item
-                                        error = null
-                                    }, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                                        Text(if (suggestedContact == null) "选择联系人" else "不是TA", color = RelationInk)
-                                    }
-                                    if (suggestedContact == null) {
-                                        TextButton(
-                                            onClick = {
+                                    Row {
+                                        if (suggestedContact == null) {
+                                            TextButton(onClick = {
                                                 error = null
                                                 onCreateContact(item.candidateId, item.senderName) { error = it }
-                                            },
-                                            contentPadding = PaddingValues(horizontal = 8.dp),
-                                        ) {
-                                            Text("新建联系人", color = RelationInk)
+                                            }) {
+                                                Text("新建", color = RelationInk)
+                                            }
                                         }
-                                    }
-                                }
-                                if (schedule != null && item.createdScheduleId == null) {
-                                    TextButton(
-                                        onClick = {
+                                        TextButton(onClick = {
+                                            linking = item
                                             error = null
-                                            onConfirmSchedule(item.candidateId) { error = it }
-                                        },
-                                        contentPadding = PaddingValues(horizontal = 8.dp),
-                                    ) {
-                                        Text("加入日程", color = RelationInk)
+                                        }) {
+                                            Text(if (suggestedContact == null) "选择联系人" else "联系人不对", color = RelationInk)
+                                        }
                                     }
                                 }
                             }
@@ -683,7 +691,7 @@ internal fun NotificationCandidateDialog(
                 }
             } else if (!enabled) {
                 Text(
-                    "开启后，知伴只读取微信、短信、QQ、飞书等应用的新消息通知，识别发送者和明确的日程线索。原文加密保存在本机；验证码、密码和系统通知不会保存，也不会自动创建联系人或日程。",
+                    "开启后，知伴会整理新消息。明确的人和安排自动归档，可随时撤销；拿不准的才请你确认。",
                     color = RelationMuted,
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -696,7 +704,7 @@ internal fun NotificationCandidateDialog(
                 ) { Text("我知道了，去开启") }
             } else if (candidates.isEmpty()) {
                 Text(
-                    "信息采集已开启。新的微信、短信、QQ、飞书消息会先在这里生成建议，由你确认后才会写入联系人或日程。",
+                    "信息采集已开启。明确内容会自动整理，只有不确定的才会出现在这里。",
                     modifier = Modifier.fillMaxWidth().padding(vertical = 44.dp),
                     color = RelationMuted,
                     style = MaterialTheme.typography.bodyMedium,

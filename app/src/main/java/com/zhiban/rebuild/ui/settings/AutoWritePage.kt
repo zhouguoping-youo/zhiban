@@ -189,7 +189,13 @@ internal fun AutoWriteContent(
             // 非互动摘要类型：无就地纠正入口，提示去对应页面修改。
             LaunchedEffect(receipt.changeId) {
                 correcting = null
-                showSnackbar("请到联系人或个人 CRM 页面修改这条内容")
+                showSnackbar(
+                    if (receipt.correctionRoute == "CALENDAR") {
+                        "请到日历修改这条安排"
+                    } else {
+                        "请到联系人或个人 CRM 页面修改这条内容"
+                    },
+                )
             }
         }
     }
@@ -200,6 +206,7 @@ private fun AutoWriteReceiptCard(receipt: AutoWriteReceiptRow, onUndo: () -> Uni
     val title = when (receipt.presentationType) {
         "INTERACTION_SUMMARY" -> "整理了一条互动摘要"
         "CONTACT_TAG" -> "补充了联系人标签"
+        "SCHEDULE_CREATE" -> "创建了一条日程"
         "CRM_LEAD_CANDIDATE" -> "发现了一条候选线索"
         "CRM_ACTIVITY" -> "记录了一次客户互动"
         "CRM_NEXT_ACTION" -> "创建了下一步动作"

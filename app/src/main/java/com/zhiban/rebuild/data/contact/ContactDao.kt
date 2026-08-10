@@ -73,6 +73,16 @@ interface ContactDao {
     suspend fun findByNormalizedName(normalizedName: String): ContactEntity?
 
     @Query(
+        """SELECT COUNT(*) FROM contacts
+           WHERE normalizedName = :normalizedName
+             AND deletedAtEpochMs IS NULL
+             AND contactId NOT IN (
+                 SELECT sourceContactId FROM contact_merge_links WHERE undoneAtEpochMs IS NULL
+             )""",
+    )
+    suspend fun countActiveByNormalizedName(normalizedName: String): Int
+
+    @Query(
         """SELECT * FROM contact_roles WHERE contactId = COALESCE(
             (SELECT canonicalContactId FROM contact_merge_links WHERE sourceContactId = :contactId AND undoneAtEpochMs IS NULL),
             :contactId
@@ -260,6 +270,20 @@ interface ContactIdentityDao {
            LIMIT 1""",
     )
     suspend fun findContactByAlias(normalizedAlias: String): ContactEntity?
+
+    @Query(
+        """SELECT COUNT(DISTINCT COALESCE(link.canonicalContactId, aliases.contactId))
+           FROM contact_aliases aliases
+           INNER JOIN contacts source ON source.contactId = aliases.contactId
+           LEFT JOIN contact_merge_links link
+             ON link.sourceContactId = source.contactId AND link.undoneAtEpochMs IS NULL
+           INNER JOIN contacts canonical
+             ON canonical.contactId = COALESCE(link.canonicalContactId, source.contactId)
+           WHERE aliases.normalizedAlias = :normalizedAlias
+             AND aliases.userConfirmed = 1
+             AND canonical.deletedAtEpochMs IS NULL""",
+    )
+    suspend fun countConfirmedContactsByAlias(normalizedAlias: String): Int
 
     @Query("DELETE FROM contact_aliases WHERE aliasId = :aliasId AND userConfirmed = 1")
     suspend fun deleteConfirmedAlias(aliasId: String): Int

@@ -66,6 +66,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
+import com.zhiban.rebuild.data.notification.ScheduleInsight
 import com.zhiban.rebuild.ui.theme.*
 import kotlin.math.abs
 import kotlin.math.sin
@@ -76,6 +78,9 @@ private val AgentAccent = ZhiBanTerracotta
 @Composable
 fun AgentConversationScreen(
     state: AgentConversationUiState,
+    perceptionCandidates: List<NotificationCandidateEntity> = emptyList(),
+    onConfirmPerception: (NotificationCandidateEntity) -> Unit = {},
+    onDismissPerception: (String) -> Unit = {},
     inputText: String = "",
     onConfirm: () -> Unit = {},
     onReject: () -> Unit = {},
@@ -193,6 +198,16 @@ fun AgentConversationScreen(
                 )
             }
         }
+        perceptionCandidates.firstOrNull { candidate ->
+            candidate.suggestedContactId != null || ScheduleInsight.from(candidate) != null
+        }?.let { candidate ->
+            PerceptionConfirmationBar(
+                candidate = candidate,
+                remainingCount = perceptionCandidates.size - 1,
+                onConfirm = { onConfirmPerception(candidate) },
+                onDismiss = { onDismissPerception(candidate.candidateId) },
+            )
+        }
         state.permission?.let { PermissionRationale(it) { onRequestPermission(it) } }
         MultimodalStatusBanner(multimodalState, onOpenAppSettings = onOpenAppSettings)
         if (multimodalState.microphonePermission == DevicePermissionState.PERMANENTLY_DENIED &&
@@ -247,6 +262,42 @@ fun AgentConversationScreen(
                 modelPickerOpen = false
             },
         )
+    }
+}
+
+@Composable
+private fun PerceptionConfirmationBar(candidate: NotificationCandidateEntity, remainingCount: Int, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val schedule = ScheduleInsight.from(candidate)
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = ZhiBanSpacing.Lg, vertical = ZhiBanSpacing.Xs),
+        shape = RoundedCornerShape(ZhiBanRadius.Card),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        Row(
+            modifier = Modifier.padding(start = ZhiBanSpacing.Lg, end = ZhiBanSpacing.Sm, top = ZhiBanSpacing.Md, bottom = ZhiBanSpacing.Md),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm),
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Xs)) {
+                Text(
+                    if (schedule != null) "识别到一项安排" else "识别到一位联系人",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    listOfNotNull(candidate.senderName, schedule?.title ?: candidate.body)
+                        .joinToString(" · ") + if (remainingCount > 0) " · 另有 $remainingCount 项" else "",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                )
+            }
+            TextButton(onClick = onDismiss) { Text("忽略") }
+            TextButton(onClick = onConfirm) {
+                Text(if (schedule != null) "确认安排" else "确认")
+            }
+        }
     }
 }
 

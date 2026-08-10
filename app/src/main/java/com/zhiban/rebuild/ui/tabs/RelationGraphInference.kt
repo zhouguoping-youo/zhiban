@@ -69,16 +69,38 @@ private fun inferEvidencePairs(
     confidence: Double,
     blockedPairs: Set<String>,
 ): List<RelationshipEdgeEntity> = buildList {
-    val people = evidenceByPerson.keys.sorted()
-    people.forEachIndexed { index, firstId ->
-        people.drop(index + 1).forEach { secondId ->
-            val sharedKey = evidenceByPerson.getValue(firstId).keys
-                .firstOrNull(evidenceByPerson.getValue(secondId)::containsKey)
-                ?: return@forEach
+    val emittedPairs = blockedPairs.toMutableSet()
+    val peopleByEvidence = buildMap<String, MutableList<String>> {
+        evidenceByPerson.forEach { (personId, evidence) ->
+            evidence.keys.forEach { key -> getOrPut(key, ::mutableListOf).add(personId) }
+        }
+    }
+    peopleByEvidence.toSortedMap().forEach evidenceGroup@{ (evidenceKey, rawPeople) ->
+        val people = rawPeople.distinct().sorted()
+        if (people.size < 2) return@evidenceGroup
+        val pairs = if (RelationshipPersonIds.SELF in people) {
+            people.asSequence()
+                .filterNot { it == RelationshipPersonIds.SELF }
+                .map { RelationshipPersonIds.SELF to it }
+        } else {
+            people.zipWithNext().asSequence()
+        }
+        pairs.forEach pair@{ (firstId, secondId) ->
             val pairKey = relationshipPairKey(firstId, secondId)
-            if (pairKey in blockedPairs) return@forEach
-            val displayValue = evidenceByPerson.getValue(firstId).getValue(sharedKey)
-            add(inferredColleagueEdge(firstId, secondId, pairKey, status, "$evidencePrefix：$displayValue", evidenceRef, confidence))
+            if (!emittedPairs.add(pairKey)) return@pair
+            val displayValue = evidenceByPerson.getValue(firstId)[evidenceKey]
+                ?: evidenceByPerson.getValue(secondId).getValue(evidenceKey)
+            add(
+                inferredColleagueEdge(
+                    firstId,
+                    secondId,
+                    pairKey,
+                    status,
+                    "$evidencePrefix：$displayValue",
+                    evidenceRef,
+                    confidence,
+                ),
+            )
         }
     }
 }

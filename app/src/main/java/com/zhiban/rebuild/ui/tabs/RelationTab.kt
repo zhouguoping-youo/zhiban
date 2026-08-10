@@ -1070,6 +1070,7 @@ fun RelationTab(
 private fun autoWriteActionTitle(presentationType: String): String = when (presentationType) {
     "INTERACTION_SUMMARY" -> "整理了一条互动摘要"
     "CONTACT_TAG" -> "补充了联系人标签"
+    "SCHEDULE_CREATE" -> "创建了一条日程"
     "CRM_LEAD_CANDIDATE" -> "发现了一条候选线索"
     "CRM_ACTIVITY" -> "记录了一次客户互动"
     "CRM_NEXT_ACTION" -> "创建了下一步动作"

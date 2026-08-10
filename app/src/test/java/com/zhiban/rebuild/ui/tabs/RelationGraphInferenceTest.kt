@@ -41,7 +41,7 @@ class RelationGraphInferenceTest {
             savedEdges = listOf(savedSelfToLi),
         )
 
-        assertEquals(3, result.size)
+        assertEquals(2, result.size)
         assertEquals(1, result.count { unorderedPair(it) == setOf(RelationshipPersonIds.SELF, "li") })
         assertTrue(
             result.any {
@@ -49,7 +49,7 @@ class RelationGraphInferenceTest {
                     it.isInferredCompanyRelationship()
             },
         )
-        assertTrue(result.any { unorderedPair(it) == setOf("li", "ding") && it.isInferredCompanyRelationship() })
+        assertFalse(result.any { unorderedPair(it) == setOf("li", "ding") && it.isInferredCompanyRelationship() })
     }
 
     @Test
@@ -113,6 +113,22 @@ class RelationGraphInferenceTest {
         assertFalse(contactMatchesRelationCategory(li, "家人", inferred))
         assertFalse(contactMatchesRelationCategory(li, "朋友", inferred))
         assertFalse(contactMatchesRelationCategory(li, "客户", inferred))
+    }
+
+    @Test
+    fun `large company produces a sparse connected graph instead of a quadratic clique`() {
+        val contacts = (1..500).map { index ->
+            contact("person-$index", "联系人$index", "知伴科技有限公司")
+        }
+
+        val result = withInferredCompanyRelationships(
+            contacts = contacts,
+            ownerContactSources = emptyList(),
+            savedEdges = emptyList(),
+        )
+
+        assertEquals(499, result.size)
+        assertEquals(500, result.flatMap { listOf(it.fromContactId, it.toContactId) }.toSet().size)
     }
 
     private fun contact(id: String, name: String, company: String?, email: String? = null) = ContactEntity(

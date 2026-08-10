@@ -104,7 +104,26 @@ object AgentDataModule {
         crm: com.zhiban.rebuild.data.agent.CrmAgentDataRepository,
         contacts: com.zhiban.rebuild.data.agent.ContactAgentDataRepository,
         relationships: com.zhiban.rebuild.data.agent.RelationshipAgentDataRepository,
-    ): AgentDataRepository = AgentDataRepository(daos, transactions, factIndex, autoWriteSink, calendar, crm, contacts, relationships)
+        systemCalendarReader: com.zhiban.rebuild.data.calendar.SystemCalendarReader,
+        reminderScheduler: com.zhiban.rebuild.data.calendar.ScheduleReminderScheduler,
+    ): AgentDataRepository = AgentDataRepository(
+        daos,
+        transactions,
+        factIndex,
+        autoWriteSink,
+        calendar,
+        crm,
+        contacts,
+        relationships,
+        externalCalendarConflicts = systemCalendarReader,
+        scheduleReminderSink = com.zhiban.rebuild.data.agent.ScheduleReminderSink { schedule ->
+            reminderScheduler.replace(
+                schedule.id,
+                schedule.startAtEpochMs,
+                schedule.reminderMinutesBefore,
+            )
+        },
+    )
 
     @Provides
     internal fun provideAgentDataDaos(database: AgentDatabase): com.zhiban.rebuild.data.agent.AgentDataDaos = com.zhiban.rebuild.data.agent.AgentDataDaos(

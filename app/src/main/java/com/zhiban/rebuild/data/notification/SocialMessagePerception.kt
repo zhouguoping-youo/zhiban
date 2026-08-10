@@ -169,9 +169,17 @@ object NotificationInsightAnalyzer {
             ScheduleInsight(
                 title = title,
                 startAtEpochMs = start,
-                confidence = 0.92,
+                confidence = scheduleConfidence(normalized),
             ),
         )
+    }
+
+    private fun scheduleConfidence(text: String): Double = when {
+        ABSOLUTE_DATE.containsMatchIn(text) -> 0.99
+        listOf("今天", "明天", "后天").any(text::contains) -> 0.99
+        "下周" in text || "下星期" in text -> 0.96
+        WEEKDAY.containsMatchIn(text) -> 0.94
+        else -> 0.92
     }
 
     internal fun sanitizeScheduleTitle(rawText: String, source: String?): String = cleanScheduleTitle(rawText, source)

@@ -3,6 +3,8 @@ package com.zhiban.rebuild.ui.agent
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.zhiban.rebuild.data.agent.AgentDataRepository
+import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.runtime.input.AttachmentStagingGateway
 import com.zhiban.rebuild.runtime.input.asr.RealtimeVoiceState
 import com.zhiban.rebuild.runtime.input.asr.StepFunRealtimeVoiceController
@@ -16,9 +18,11 @@ import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -50,6 +54,7 @@ class AgentConversationViewModel @Inject constructor(
     private val persistence: ConversationPersistence,
     private val voice: VoiceEntryPoints,
     private val gateways: BackendGateways,
+    private val agentDataRepository: AgentDataRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AgentConversationUiState())
     val uiState: StateFlow<AgentConversationUiState> = _uiState.asStateFlow()
@@ -62,6 +67,12 @@ class AgentConversationViewModel @Inject constructor(
         MutableStateFlow<List<com.zhiban.rebuild.runtime.store.ConversationSummary>>(emptyList())
     val conversationHistory: StateFlow<List<com.zhiban.rebuild.runtime.store.ConversationSummary>> = _conversationHistory.asStateFlow()
     val realtimeVoiceState: StateFlow<RealtimeVoiceState> = voice.realtimeVoice.state
+    val perceptionCandidates: StateFlow<List<NotificationCandidateEntity>> =
+        agentDataRepository.observeNotificationCandidates().stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000L),
+            emptyList(),
+        )
 
     fun initialize(initialDraft: String, initialMode: String = "Chat") {
         if (initialized) {
@@ -148,6 +159,28 @@ class AgentConversationViewModel @Inject constructor(
 
     fun newConversation() {
         viewModelScope.launch { activateSession(UUID.randomUUID().toString()) }
+    }
+
+    fun confirmPerceptionCandidate(candidate: NotificationCandidateEntity) {
+        viewModelScope.launch {
+            runSuspendCatching {
+                val contactId = candidate.linkedContactId ?: candidate.suggestedContactId
+                if (candidate.linkedContactId == null && contactId != null) {
+                    check(agentDataRepository.confirmNotificationCandidate(candidate.candidateId, contactId))
+                }
+                if (com.zhiban.rebuild.data.notification.ScheduleInsight.from(candidate) != null &&
+                    candidate.createdScheduleId == null
+                ) {
+                    agentDataRepository.confirmNotificationSchedule(candidate.candidateId)
+                }
+            }.onFailure { failure ->
+                _uiState.update { it.copy(safeMessage = failure.message ?: "这条建议暂时无法整理") }
+            }
+        }
+    }
+
+    fun dismissPerceptionCandidate(candidateId: String) {
+        viewModelScope.launch { agentDataRepository.dismissNotificationCandidate(candidateId) }
     }
 
     fun deleteConversation(sessionId: String) {

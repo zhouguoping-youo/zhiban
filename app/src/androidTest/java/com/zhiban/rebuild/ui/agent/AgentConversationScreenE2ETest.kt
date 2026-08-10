@@ -17,6 +17,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
+import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
+import com.zhiban.rebuild.data.notification.NotificationInsights
+import com.zhiban.rebuild.data.notification.ScheduleInsight
 import com.zhiban.rebuild.ui.theme.ZhiBanTheme
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -106,6 +109,47 @@ class AgentConversationScreenE2ETest {
         assertEquals("帮我找一个联系人", selected.get())
         compose.onNodeWithText("记下一步").assertIsDisplayed().performClick()
         assertEquals("帮我记录一个下一步动作", selected.get())
+    }
+
+    @Test fun uncertainRecognizedScheduleCanBeConfirmedWithoutLeavingConversation() {
+        val confirmed = AtomicReference<String>()
+        val dismissed = AtomicReference<String>()
+        val candidate = NotificationCandidateEntity(
+            candidateId = "candidate-1",
+            sourceKey = "source-1",
+            packageName = "com.tencent.mm",
+            appLabel = "微信",
+            title = "项目群",
+            body = "老周，下周三下午三点开会",
+            postedAtEpochMs = 1_700_000_000_000L,
+            senderName = "王敏",
+            suggestedContactId = "contact-1",
+            suggestedContactConfidence = 0.94,
+            insightJson = NotificationInsights(
+                ScheduleInsight(
+                    title = "项目会议",
+                    startAtEpochMs = 1_700_100_000_000L,
+                    confidence = 0.94,
+                ),
+            ).toJsonOrNull(),
+        )
+        compose.setContent {
+            ZhiBanTheme {
+                AgentConversationScreen(
+                    state = AgentConversationUiState(),
+                    perceptionCandidates = listOf(candidate),
+                    onConfirmPerception = { confirmed.set(it.candidateId) },
+                    onDismissPerception = dismissed::set,
+                )
+            }
+        }
+
+        compose.onNodeWithText("识别到一项安排").assertIsDisplayed()
+        compose.onNodeWithText("王敏 · 项目会议").assertIsDisplayed()
+        compose.onNodeWithText("确认安排").assertIsDisplayed().performClick()
+        assertEquals("candidate-1", confirmed.get())
+        compose.onNodeWithText("忽略").performClick()
+        assertEquals("candidate-1", dismissed.get())
     }
 
     @Test fun unsentDraftSurvivesSavedInstanceStateRestoration() {

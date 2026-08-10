@@ -1,6 +1,7 @@
 package com.zhiban.rebuild.data.agent
 
 import androidx.room.withTransaction
+import com.zhiban.rebuild.data.calendar.ExternalCalendarConflictSource
 import com.zhiban.rebuild.data.calendar.SystemCalendarEvent
 import com.zhiban.rebuild.data.contact.ContactAddressEntity
 import com.zhiban.rebuild.data.contact.ContactAliasEntity
@@ -57,6 +58,7 @@ import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.time.ZoneId
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -88,6 +90,8 @@ class AgentDataRepository internal constructor(
     private val crm: CrmAgentDataRepository,
     private val contacts: ContactAgentDataRepository,
     private val relationships: RelationshipAgentDataRepository,
+    private val externalCalendarConflicts: ExternalCalendarConflictSource = ExternalCalendarConflictSource { _, _, _, _ -> emptyList() },
+    private val scheduleReminderSink: ScheduleReminderSink = ScheduleReminderSink { },
 ) {
     fun observeNotificationCandidates(): Flow<List<NotificationCandidateEntity>> = combine(
         daos.notificationCandidateDao.observePending(),
@@ -102,35 +106,48 @@ class AgentDataRepository internal constructor(
         }
     }
 
-    suspend fun stageNotificationCandidate(candidate: NotificationCandidateEntity) = transactions.runInTransaction {
-        val existing = daos.notificationCandidateDao.findBySourceKey(candidate.sourceKey)
-        if (existing?.status in setOf("CONFIRMED", "DISMISSED")) return@runInTransaction
+    suspend fun stageNotificationCandidate(candidate: NotificationCandidateEntity) {
         val nowEpochMs = System.currentTimeMillis()
-        var enriched = enrichNotificationCandidate(candidate)
-        if (enriched.suggestedContactId != null && enriched.suggestedContactConfidence >= 0.99 &&
-            recordAutoInteractionEvidence(enriched, enriched.suggestedContactId, nowEpochMs)
-        ) {
-            enriched = enriched.copy(
-                linkedContactId = enriched.suggestedContactId,
-                status = enriched.completionStatus(linkedContactId = enriched.suggestedContactId),
+        val externalConflict = hasExternalConflictForAutomaticSchedule(candidate)
+        val automaticSchedule = transactions.runInTransaction {
+            val existing = daos.notificationCandidateDao.findBySourceKey(candidate.sourceKey)
+            if (existing?.status in setOf("CONFIRMED", "DISMISSED")) return@runInTransaction null
+            var enriched = enrichNotificationCandidate(candidate)
+            var automaticallyProcessed = false
+            if (isLikelyReplyContext(enriched, nowEpochMs) &&
+                recordInferredInteractionEvidence(enriched, nowEpochMs)
+            ) {
+                enriched = enriched.copy(linkedContactId = enriched.linkedContactId ?: enriched.suggestedContactId)
+                automaticallyProcessed = true
+            } else if (enriched.suggestedContactId != null && enriched.suggestedContactConfidence >= AUTO_LINK_CONFIDENCE &&
+                recordAutoInteractionEvidence(enriched, enriched.suggestedContactId, nowEpochMs)
+            ) {
+                enriched = enriched.copy(linkedContactId = enriched.suggestedContactId)
+                automaticallyProcessed = true
+            }
+            val createdSchedule = if (!externalConflict) {
+                recordAutomaticSchedule(enriched, nowEpochMs)
+            } else {
+                null
+            }
+            if (createdSchedule != null) {
+                enriched = enriched.copy(createdScheduleId = createdSchedule.id)
+                automaticallyProcessed = true
+            }
+            if (automaticallyProcessed) {
+                enriched = enriched.copy(status = enriched.completionStatus())
+            }
+            daos.notificationCandidateDao.upsert(enriched)
+            // A matched contact may become a CRM lead candidate, but never a formal lead without confirmation.
+            enriched.suggestedContactId?.let { matchedContactId ->
+                crm.suggestNewLeadFromNotification(matchedContactId, enriched.candidateId, nowEpochMs)
+            }
+            daos.notificationCandidateDao.clearExpiredOrDismissed(
+                nowEpochMs - 30L * 24 * 60 * 60 * 1_000,
             )
-        } else if (isLikelyReplyContext(enriched, nowEpochMs) &&
-            recordInferredInteractionEvidence(enriched, nowEpochMs)
-        ) {
-            enriched = enriched.copy(
-                status = enriched.completionStatus(
-                    linkedContactId = enriched.linkedContactId ?: enriched.suggestedContactId,
-                ),
-            )
+            createdSchedule
         }
-        daos.notificationCandidateDao.upsert(enriched)
-        // High-confidence contact match: offer a CRM new-lead suggestion (user confirms; nothing auto-written).
-        enriched.suggestedContactId?.let { matchedContactId ->
-            crm.suggestNewLeadFromNotification(matchedContactId, enriched.candidateId, nowEpochMs)
-        }
-        daos.notificationCandidateDao.clearExpiredOrDismissed(
-            nowEpochMs - 30L * 24 * 60 * 60 * 1_000,
-        )
+        automaticSchedule?.let(scheduleReminderSink::replace)
     }
 
     suspend fun dismissNotificationCandidate(candidateId: String): Boolean = daos.notificationCandidateDao.dismiss(candidateId) == 1
@@ -209,36 +226,42 @@ class AgentDataRepository internal constructor(
             contactId
         }
 
-    suspend fun confirmNotificationSchedule(candidateId: String, nowEpochMs: Long = System.currentTimeMillis()): String = transactions.runInTransaction {
-        val candidate = daos.notificationCandidateDao.find(candidateId)
-            ?: error("候选内容已不存在")
-        require(candidate.status == "PENDING") { "这条内容已经处理" }
-        candidate.createdScheduleId?.let { return@runInTransaction it }
-        val insight = ScheduleInsight.from(candidate) ?: error("这条内容没有完整的日期和时间")
-        require(insight.confidence >= 0.85) { "日程判断还不够明确" }
-        require(insight.startAtEpochMs >= nowEpochMs - 5 * 60_000L) { "这个时间已经过去" }
-        val scheduleId = "notification-schedule-${candidate.sourceKey.take(32)}"
-        val source = candidate.senderName ?: candidate.conversationTitle
-        val cleanTitle = resolveScheduleTitleFromCandidate(candidate, insight, source)
-        saveUserSchedule(
-            scheduleId = scheduleId,
-            title = cleanTitle,
-            startAtEpochMs = insight.startAtEpochMs,
-            durationMinutes = insight.durationMinutes,
-            note = buildString {
-                append("由").append(candidate.appLabel).append("消息确认添加")
-                candidate.senderName?.let { append(" · ").append(it) }
-            },
-            reminderMinutesBefore = insight.reminderMinutesBefore,
-            nowEpochMs = nowEpochMs,
-        )
-        daos.notificationCandidateDao.upsert(
-            candidate.copy(
-                createdScheduleId = scheduleId,
-                status = candidate.completionStatus(createdScheduleId = scheduleId),
-            ),
-        )
-        scheduleId
+    suspend fun confirmNotificationSchedule(candidateId: String, nowEpochMs: Long = System.currentTimeMillis()): String {
+        val schedule = transactions.runInTransaction {
+            val candidate = daos.notificationCandidateDao.find(candidateId)
+                ?: error("候选内容已不存在")
+            candidate.createdScheduleId?.let { existingId ->
+                return@runInTransaction calendar.findSchedule(existingId) ?: error("已创建的日程不存在")
+            }
+            require(candidate.status == "PENDING") { "这条内容已经处理" }
+            val insight = ScheduleInsight.from(candidate) ?: error("这条内容没有完整的日期和时间")
+            require(insight.confidence >= 0.85) { "日程判断还不够明确" }
+            require(insight.startAtEpochMs >= nowEpochMs - 5 * 60_000L) { "这个时间已经过去" }
+            val scheduleId = "notification-schedule-${candidate.sourceKey.take(32)}"
+            val source = candidate.senderName ?: candidate.conversationTitle
+            val cleanTitle = resolveScheduleTitleFromCandidate(candidate, insight, source)
+            saveUserSchedule(
+                scheduleId = scheduleId,
+                title = cleanTitle,
+                startAtEpochMs = insight.startAtEpochMs,
+                durationMinutes = insight.durationMinutes,
+                note = buildString {
+                    append("由").append(candidate.appLabel).append("消息确认添加")
+                    candidate.senderName?.let { append(" · ").append(it) }
+                },
+                reminderMinutesBefore = insight.reminderMinutesBefore,
+                nowEpochMs = nowEpochMs,
+            )
+            daos.notificationCandidateDao.upsert(
+                candidate.copy(
+                    createdScheduleId = scheduleId,
+                    status = candidate.completionStatus(createdScheduleId = scheduleId),
+                ),
+            )
+            calendar.findSchedule(scheduleId) ?: error("日程没有保存成功")
+        }
+        scheduleReminderSink.replace(schedule)
+        return schedule.id
     }
 
     private fun resolveScheduleTitleFromCandidate(candidate: NotificationCandidateEntity, insight: ScheduleInsight, source: String?): String {
@@ -274,8 +297,12 @@ class AgentDataRepository internal constructor(
                 ?: return candidate
         } else {
             daos.contactIdentityDao.findContactByPlatformHandle(candidate.platform, normalized)?.let { it to 1.0 }
-                ?: daos.contactIdentityDao.findContactByAlias(normalized)?.let { it to 0.95 }
-                ?: daos.contactDao.findByNormalizedName(normalized)?.let { it to 0.9 }
+                ?: daos.contactIdentityDao.findContactByAlias(normalized)?.takeIf {
+                    daos.contactIdentityDao.countConfirmedContactsByAlias(normalized) == 1
+                }?.let { it to AUTO_LINK_CONFIDENCE }
+                ?: daos.contactDao.findByNormalizedName(normalized)?.takeIf {
+                    daos.contactDao.countActiveByNormalizedName(normalized) == 1
+                }?.let { it to AUTO_LINK_CONFIDENCE }
                 ?: return candidate
         }
         return candidate.copy(
@@ -283,6 +310,87 @@ class AgentDataRepository internal constructor(
             suggestedContactConfidence = confidence,
         )
     }
+
+    private suspend fun hasExternalConflictForAutomaticSchedule(candidate: NotificationCandidateEntity): Boolean {
+        val insight = ScheduleInsight.from(candidate) ?: return false
+        if (!candidate.isEligibleForAutomaticSchedule(insight)) return false
+        return try {
+            externalCalendarConflicts.findConflicts(
+                insight.startAtEpochMs,
+                insight.startAtEpochMs + insight.durationMinutes * 60_000L,
+                null,
+                1,
+            ).isNotEmpty()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Fail closed: inability to inspect the device calendar must never create a silent conflict.
+            true
+        }
+    }
+
+    private suspend fun recordAutomaticSchedule(candidate: NotificationCandidateEntity, nowEpochMs: Long): ScheduleEntity? {
+        val insight = ScheduleInsight.from(candidate) ?: return null
+        if (candidate.linkedContactId == null || !candidate.isEligibleForAutomaticSchedule(insight)) return null
+        val policySpec = RuntimeToolSpec(
+            AutoWriteToolNames.SCHEDULE_CREATE,
+            1,
+            RuntimeToolRisk.REVERSIBLE_AUTO_WRITE,
+            "{}",
+            1,
+        )
+        if (ActionPolicy().evaluate(
+                policySpec,
+                reversibleWriteReadiness = ReversibleWriteReadiness(true, true, true),
+            ) != ActionDecision.AutoExecuteReversibleWrite
+        ) {
+            return null
+        }
+        val idempotencyKey = sha256("notification-schedule:${candidate.sourceKey}")
+        daos.changeLogDao.findByIdempotencyKey(idempotencyKey)?.let { existing ->
+            return calendar.findSchedule(existing.targetId)
+        }
+        if (calendar.findScheduleConflicts(insight.startAtEpochMs, insight.durationMinutes).isNotEmpty()) return null
+        val scheduleId = "notification-schedule-${sha256(candidate.sourceKey).take(32)}"
+        val source = candidate.senderName ?: candidate.conversationTitle
+        calendar.saveUserSchedule(
+            scheduleId = scheduleId,
+            title = resolveScheduleTitleFromCandidate(candidate, insight, source),
+            startAtEpochMs = insight.startAtEpochMs,
+            durationMinutes = insight.durationMinutes,
+            note = "知伴根据${candidate.appLabel}消息自动整理，可撤销",
+            reminderMinutesBefore = insight.reminderMinutesBefore,
+            nowEpochMs = nowEpochMs,
+        )
+        val schedule = calendar.findSchedule(scheduleId) ?: error("自动日程没有保存成功")
+        autoWriteSink.insertVisible(
+            AutoWriteAuditDraft(
+                changeId = changeIdFor(idempotencyKey),
+                runtimeRunId = null,
+                toolName = AutoWriteToolNames.SCHEDULE_CREATE,
+                idempotencyKey = idempotencyKey,
+                targetDomain = "SCHEDULE",
+                targetId = schedule.id,
+                operation = "CREATE",
+                afterDigest = canonicalChangeDigest(schedule),
+                inversePayloadJson = "{\"deleteScheduleId\":\"${schedule.id}\"}",
+                originType = "SYSTEM_PERCEPTION",
+                subjectContactId = candidate.linkedContactId,
+                sourceType = candidate.platform,
+                sourceRef = candidate.sourceKey,
+                confidence = insight.confidence,
+                presentationType = "SCHEDULE_CREATE",
+                correctionRoute = "CALENDAR",
+                createdAtEpochMs = nowEpochMs,
+            ),
+        )
+        return schedule
+    }
+
+    private fun NotificationCandidateEntity.isEligibleForAutomaticSchedule(insight: ScheduleInsight): Boolean = direction == "INCOMING" &&
+        !isGroupChat &&
+        insight.confidence >= AUTO_SCHEDULE_CONFIDENCE &&
+        insight.startAtEpochMs >= postedAtEpochMs - 5 * 60_000L
 
     private suspend fun recordAutoInteractionEvidence(candidate: NotificationCandidateEntity, contactId: String, nowEpochMs: Long): Boolean {
         if (candidate.platform !in MessageCollectionPreferences.SUPPORTED_PLATFORMS) return false
@@ -769,6 +877,8 @@ class AgentDataRepository internal constructor(
 
     private companion object {
         const val NOTIFICATION_EVIDENCE_PREFIX = "notification-evidence:"
+        const val AUTO_LINK_CONFIDENCE = 0.99
+        const val AUTO_SCHEDULE_CONFIDENCE = 0.98
     }
 }
 

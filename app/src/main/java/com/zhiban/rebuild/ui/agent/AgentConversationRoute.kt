@@ -565,8 +565,12 @@ fun AgentConversationRoute(
     val availableModels by viewModel.availableModels.collectAsState()
     val selectedLevel by viewModel.selectedLevel.collectAsState()
     val conversationHistory by viewModel.conversationHistory.collectAsState()
+    val perceptionCandidates by viewModel.perceptionCandidates.collectAsState()
     AgentConversationScreen(
         state = state,
+        perceptionCandidates = perceptionCandidates,
+        onConfirmPerception = viewModel::confirmPerceptionCandidate,
+        onDismissPerception = viewModel::dismissPerceptionCandidate,
         voiceInputLevel = voiceInputLevel,
         inlineModelLabel = "$selectedModel 智能/$selectedLevel",
         onWorkTaskClick = { viewModel.plan(it) },

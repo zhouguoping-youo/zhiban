@@ -6,6 +6,7 @@ import com.zhiban.rebuild.runtime.tool.sha256
 internal object AutoWriteToolNames {
     const val INTERACTION_SUMMARY = "contact.interactionSummary.record"
     const val CONTACT_TAG_ADD = "contact.tag.add"
+    const val SCHEDULE_CREATE = "calendar.schedule.autoCreate"
     const val CRM_LEAD_CANDIDATE = "crm.lead.createCandidate"
     const val CRM_ACTIVITY_APPEND = "crm.activity.append"
     const val CRM_NEXT_ACTION_CREATE = "crm.nextAction.create"
@@ -19,6 +20,7 @@ internal object AutoWriteToolNames {
     val all = setOf(
         INTERACTION_SUMMARY,
         CONTACT_TAG_ADD,
+        SCHEDULE_CREATE,
         CRM_LEAD_CANDIDATE,
         CRM_ACTIVITY_APPEND,
         CRM_NEXT_ACTION_CREATE,

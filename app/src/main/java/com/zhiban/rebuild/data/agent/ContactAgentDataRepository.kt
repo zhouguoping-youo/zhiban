@@ -474,6 +474,9 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
     private suspend fun processSystemContactCandidate(ctx: SystemContactImportContext, candidate: SystemContactCandidate) {
         val name = candidate.displayName.trim().take(100)
         val phones = candidate.phones.mapNotNull(::normalizeContactPhone).distinct()
+        val emails = candidate.emails.mapNotNull { value ->
+            value.trim().lowercase().takeIf { '@' in it && it.length <= 254 }
+        }.distinct()
         val platformIdentities = candidate.platformIdentities
             .plus(candidate.wechatIds.map { com.zhiban.rebuild.data.contact.SystemContactPlatformIdentity("WECHAT", it) })
             .map { it.copy(handle = normalizeContactMethodHandle(it.handle)) }
@@ -504,6 +507,8 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
         val existing = sourceMatch ?: phones.firstOrNull()?.let { normalized ->
             database.contactKnowledgeDao().findContactByMethod("PHONE", normalized)
                 ?: ctx.dao.findByPhone(normalized)
+        } ?: emails.firstOrNull()?.let { normalized ->
+            database.contactKnowledgeDao().findContactByMethod("EMAIL", normalized)
         } ?: wechats.firstOrNull()?.let { normalized ->
             database.contactKnowledgeDao().findContactByMethod("WECHAT", normalized)
         } ?: platformIdentities.firstNotNullOfOrNull { identity ->

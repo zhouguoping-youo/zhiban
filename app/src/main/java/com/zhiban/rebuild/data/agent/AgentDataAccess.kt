@@ -39,3 +39,8 @@ internal class RoomAgentTransactionRunner(private val database: AgentDatabase) :
 internal fun interface AutoWriteSink {
     suspend fun insertVisible(draft: AutoWriteAuditDraft)
 }
+
+/** Side effect kept outside the Room transaction that creates an automatic schedule. */
+internal fun interface ScheduleReminderSink {
+    fun replace(schedule: ScheduleEntity)
+}
