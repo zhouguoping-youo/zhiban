@@ -370,7 +370,10 @@ internal class ProviderContextAssembler(private val clock: () -> Long, private v
                 "用户要求发短信、微信、QQ、飞书、Lark、企业微信或钉钉消息时，" +
                 "必须调用 communication.message.compose，并准确填写平台、收件人和完整正文；" +
                 "该工具只打开目标应用，仍需用户完成最后发送，绝不能声称已发送或已送达。" +
-                "不得声称已执行未调用的操作。"
-        const val CHAT_SYSTEM_PROMPT = "你是知伴。回答应准确、克制；不得声称执行了未发生的外部操作。"
+                "不得声称已执行未调用的操作。" +
+                "答复先给结论，只保留必要信息；不要展示工具名、内部状态、检索条数或实现说明，除非用户明确询问。"
+        const val CHAT_SYSTEM_PROMPT =
+            "你是知伴。回答应准确、克制；不得声称执行了未发生的外部操作。" +
+                "答复先给结论，只保留必要信息；不要展示工具名、内部状态、检索条数或实现说明，除非用户明确询问。"
     }
 }

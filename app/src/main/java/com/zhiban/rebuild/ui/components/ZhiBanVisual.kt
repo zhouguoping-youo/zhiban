@@ -36,6 +36,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -300,6 +301,38 @@ fun ZhiBanSaveButton(state: ZhiBanSaveState, onClick: () -> Unit, modifier: Modi
                 ZhiBanSaveState.SAVED -> "已保存"
             },
         )
+    }
+}
+
+/** Canonical row for mutually-exclusive settings. */
+@Composable
+fun ZhiBanSingleChoiceRow(title: String, subtitle: String = "", selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .defaultMinSize(
+                minHeight = if (subtitle.isBlank()) ZhiBanSize.ListRow else ZhiBanSize.ListRowWithSubtitle,
+            )
+            .clickable(onClick = onClick)
+            .padding(vertical = ZhiBanSpacing.Md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            )
+            if (subtitle.isNotBlank()) {
+                Text(
+                    subtitle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+        RadioButton(selected = selected, onClick = onClick)
     }
 }
 

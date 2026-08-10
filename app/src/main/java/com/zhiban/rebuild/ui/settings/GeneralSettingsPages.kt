@@ -81,6 +81,7 @@ import com.zhiban.rebuild.data.notification.OutgoingMessageAccessibilityService
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
 import com.zhiban.rebuild.ui.components.ZhiBanPage
+import com.zhiban.rebuild.ui.components.ZhiBanSingleChoiceRow
 import com.zhiban.rebuild.ui.components.ZhiBanToggleRow
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
 import com.zhiban.rebuild.ui.theme.Gray200
@@ -773,30 +774,7 @@ class AppearanceThemeViewModel @Inject constructor(val store: ThemePreferenceSto
 
 @Composable
 private fun ThemeOptionRow(title: String, subtitle: String, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().defaultMinSize(
-            minHeight = if (subtitle.isBlank()) ZhiBanSize.ListRow else ZhiBanSize.ListRowWithSubtitle,
-        ).clickable(onClick = onClick).padding(vertical = ZhiBanSpacing.Md),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                title,
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (selected) ZhiBanTerracotta else MaterialTheme.colorScheme.onSurface,
-            )
-            if (subtitle.isNotBlank()) {
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        if (selected) {
-            Icon(Icons.Outlined.Check, contentDescription = null, tint = ZhiBanTerracotta)
-        }
-    }
+    ZhiBanSingleChoiceRow(title = title, subtitle = subtitle, selected = selected, onClick = onClick)
 }
 
 @Composable

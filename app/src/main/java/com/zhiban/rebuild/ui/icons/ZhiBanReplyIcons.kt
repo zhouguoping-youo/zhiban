@@ -28,7 +28,7 @@ internal enum class ReplyGlyph {
 internal fun ZhiBanReplyIcon(glyph: ReplyGlyph, label: String, color: Color, modifier: Modifier = Modifier) {
     Canvas(modifier.semantics { contentDescription = label }) {
         val stroke = Stroke(
-            width = 1.35.dp.toPx(),
+            width = 1.6.dp.toPx(),
             cap = StrokeCap.Round,
             join = StrokeJoin.Round,
         )

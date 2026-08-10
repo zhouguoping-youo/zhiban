@@ -28,7 +28,9 @@ val Gray800 = Color(0xFF262626)
 
 // Material scheme anchors.
 val SurfaceLight = Color(0xFFFFFFFF)
-val SurfaceDark = Color(0xFF121212)
+val DarkBackground = Color(0xFF171722)
+val SurfaceDark = Color(0xFF222231)
+val SurfaceVariantDark = Color(0xFF2A2A3A)
 val OnSurfaceDark = Color(0xFFE8E8E8)
 
 // Current warm product system.

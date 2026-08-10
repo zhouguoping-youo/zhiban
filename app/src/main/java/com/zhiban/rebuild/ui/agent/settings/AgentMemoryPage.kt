@@ -58,6 +58,7 @@ import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.components.ZhiBanSaveButton
 import com.zhiban.rebuild.ui.components.ZhiBanSaveState
 import com.zhiban.rebuild.ui.components.ZhiBanSectionTitle
+import com.zhiban.rebuild.ui.components.ZhiBanSingleChoiceRow
 import com.zhiban.rebuild.ui.components.ZhiBanToggleRow
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
 import com.zhiban.rebuild.ui.theme.*
@@ -606,29 +607,7 @@ fun AgentPersonalizationPage(onBack: () -> Unit, viewModel: AgentPersonalization
 
 @Composable
 private fun AnswerPreferenceRow(label: String, hint: String, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .defaultMinSize(minHeight = ZhiBanSize.ListRowWithSubtitle)
-            .clickable(onClick = onClick)
-            .padding(vertical = ZhiBanSpacing.Md),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                label,
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (selected) ZhiBanTerracotta else MaterialTheme.colorScheme.onSurface,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            )
-            Text(
-                hint,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
-        RadioButton(selected = selected, onClick = onClick)
-    }
+    ZhiBanSingleChoiceRow(title = label, subtitle = hint, selected = selected, onClick = onClick)
 }
 data class AgentToolsState(
     val enabled: Map<String, Boolean> = emptyMap(),

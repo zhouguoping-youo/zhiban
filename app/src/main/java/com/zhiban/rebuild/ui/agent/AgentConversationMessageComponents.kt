@@ -419,14 +419,14 @@ private fun ReplyAction(glyph: ReplyGlyph, label: String, selected: Boolean = fa
     ) {
         val tint = when {
             selected -> AgentAccent
-            enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .68f)
+            enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .82f)
             else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .30f)
         }
         ZhiBanReplyIcon(
             glyph = glyph,
             label = label,
             color = tint,
-            modifier = Modifier.size(17.dp),
+            modifier = Modifier.size(18.dp),
         )
     }
 }
@@ -440,8 +440,8 @@ private fun ReplyVectorAction(icon: androidx.compose.ui.graphics.vector.ImageVec
         Icon(
             imageVector = icon,
             contentDescription = label,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .68f),
-            modifier = Modifier.size(17.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .82f),
+            modifier = Modifier.size(18.dp),
         )
     }
 }
