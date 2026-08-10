@@ -88,4 +88,7 @@ object ZhiBanSize {
     val ListRow = 64.dp
     val ListRowWithSubtitle = 72.dp
     val DialogAction = 48.dp
+
+    /** Material 3 visible switch width; the surrounding touch target remains 48 dp high. */
+    val SwitchWidth = 52.dp
 }

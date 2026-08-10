@@ -25,6 +25,7 @@ import com.zhiban.rebuild.runtime.config.AgentControlStore
 import com.zhiban.rebuild.ui.components.ZhiBanGlassCard
 import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
 import com.zhiban.rebuild.ui.components.ZhiBanPage
+import com.zhiban.rebuild.ui.components.ZhiBanToggleRow
 import com.zhiban.rebuild.ui.theme.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -97,23 +98,12 @@ fun AgentSkillsPage(onBack: () -> Unit, viewModel: AgentSkillsViewModel = hiltVi
 @Composable
 private fun SkillCard(skill: SkillSpec, enabled: Boolean, onToggle: (Boolean) -> Unit) {
     ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
-        Row(
-            Modifier.fillMaxWidth().defaultMinSize(minHeight = ZhiBanSize.ListRowWithSubtitle)
-                .padding(horizontal = ZhiBanSpacing.Lg, vertical = ZhiBanSpacing.Md),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            ZhiBanLeadingIcon(skillIcon(skill.id))
-            Spacer(Modifier.width(ZhiBanSpacing.Md))
-            Column(Modifier.weight(1f)) {
-                Text(skill.displayName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                Text(
-                    skillTagline(skill.id),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            Spacer(Modifier.width(ZhiBanSpacing.Sm))
-            Switch(enabled, onToggle)
-        }
+        ZhiBanToggleRow(
+            title = skill.displayName,
+            subtitle = skillTagline(skill.id),
+            checked = enabled,
+            onCheckedChange = onToggle,
+            leading = { ZhiBanLeadingIcon(skillIcon(skill.id)) },
+        )
     }
 }

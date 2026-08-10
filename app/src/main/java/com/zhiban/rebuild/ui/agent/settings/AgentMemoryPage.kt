@@ -20,7 +20,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -58,6 +57,7 @@ import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.components.ZhiBanSaveButton
 import com.zhiban.rebuild.ui.components.ZhiBanSaveState
 import com.zhiban.rebuild.ui.components.ZhiBanSectionTitle
+import com.zhiban.rebuild.ui.components.ZhiBanToggleRow
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
 import com.zhiban.rebuild.ui.theme.*
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -141,7 +141,7 @@ fun AgentMemoryPage(onBack: () -> Unit, viewModel: AgentMemoryViewModel = hiltVi
                 item {
                     ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
                         Column {
-                            CompactMemoryToggle(
+                            ZhiBanToggleRow(
                                 "记住对话内容",
                                 "跨对话使用",
                                 s.policy.longTermMemoryEnabled,
@@ -151,7 +151,7 @@ fun AgentMemoryPage(onBack: () -> Unit, viewModel: AgentMemoryViewModel = hiltVi
                                 Modifier.padding(horizontal = 16.dp),
                                 color = ZhiBanTextSecondary.copy(alpha = .12f),
                             )
-                            CompactMemoryToggle(
+                            ZhiBanToggleRow(
                                 "自动发现新记忆",
                                 "自动提炼",
                                 s.policy.learnFromConversations,
@@ -186,7 +186,7 @@ fun AgentMemoryPage(onBack: () -> Unit, viewModel: AgentMemoryViewModel = hiltVi
                                     Modifier.padding(horizontal = 16.dp),
                                     color = ZhiBanTextSecondary.copy(alpha = .12f),
                                 )
-                                CompactMemoryToggle(
+                                ZhiBanToggleRow(
                                     "临时对话",
                                     "不读不存",
                                     s.policy.temporaryModeEnabled,
@@ -334,22 +334,6 @@ fun AgentMemoryPage(onBack: () -> Unit, viewModel: AgentMemoryViewModel = hiltVi
                 }) { Text("全部忘掉", color = MaterialTheme.colorScheme.error) }
             },
         )
-    }
-}
-
-@Composable private fun CompactMemoryToggle(title: String, subtitle: String, checked: Boolean, onChecked: (Boolean) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 13.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge)
-            if (subtitle.isNotBlank()) {
-                Text(subtitle, color = ZhiBanTextSecondary, style = MaterialTheme.typography.bodySmall)
-            }
-        }
-        Spacer(Modifier.width(8.dp))
-        Switch(checked, onChecked, modifier = Modifier.scale(.82f))
     }
 }
 

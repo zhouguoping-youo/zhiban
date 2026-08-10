@@ -61,6 +61,8 @@ import com.zhiban.rebuild.ui.components.ZhiBanGlassCard
 import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
 import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.components.ZhiBanSectionTitle
+import com.zhiban.rebuild.ui.components.ZhiBanSwitch
+import com.zhiban.rebuild.ui.components.ZhiBanToggleRow
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
 import com.zhiban.rebuild.ui.theme.*
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -347,7 +349,11 @@ data class MemoryUiState(
                                         style = MaterialTheme.typography.bodySmall,
                                     )
                                 }
-                                Switch(server.enabled, { vm.serverEnabled(server.id, it) }, enabled = !state.busy)
+                                ZhiBanSwitch(
+                                    checked = server.enabled,
+                                    onCheckedChange = { vm.serverEnabled(server.id, it) },
+                                    enabled = !state.busy,
+                                )
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm)) {
                                 TextButton(onClick = { vm.health(server.id) }, enabled = !state.busy) { Text("检测连接") }
@@ -486,25 +492,7 @@ private fun toolDisplayName(name: String) = when (name) {
 
 @Composable private fun ToggleRow(title: String, subtitle: String, checked: Boolean, onChecked: (Boolean) -> Unit) {
     ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
-        Row(
-            Modifier.fillMaxWidth().defaultMinSize(
-                minHeight = if (subtitle.isBlank()) ZhiBanSize.ListRow else ZhiBanSize.ListRowWithSubtitle,
-            ).padding(horizontal = ZhiBanSpacing.Lg, vertical = ZhiBanSpacing.Md),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                if (subtitle.isNotBlank()) {
-                    Text(
-                        subtitle,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            }
-            Spacer(Modifier.width(ZhiBanSpacing.Sm))
-            Switch(checked, onChecked)
-        }
+        ZhiBanToggleRow(title, subtitle, checked, onChecked)
     }
 }
 
