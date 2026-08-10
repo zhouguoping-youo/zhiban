@@ -98,7 +98,6 @@ import java.time.format.DateTimeFormatter
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -375,14 +374,13 @@ internal class ProviderExecutionEngine(
     private val recoveryQueueMutex = Mutex()
 
     fun launch(runId: String, sessionId: String, fencingEpoch: Long): Boolean {
-        val job = scope.launch(start = CoroutineStart.LAZY) {
-            try {
-                execute(runId, sessionId, fencingEpoch)
-            } finally {
+        val job = scope.launchGuardedRuntimeJob(
+            onFailure = { containEscapedFailure(runId, sessionId, fencingEpoch) },
+            onFinally = {
                 activeRequests.remove(runId)
                 activeJobs.remove(runId)
-            }
-        }
+            },
+        ) { execute(runId, sessionId, fencingEpoch) }
         val previous = activeJobs.putIfAbsent(runId, job)
         if (previous != null) {
             job.cancel()
@@ -439,19 +437,20 @@ internal class ProviderExecutionEngine(
         }
         if (handle.snapshot.run.status == RuntimeRunStatus.OBSERVING.name) {
             val execution = store.latestToolExecution(handle.snapshot.run.runId) ?: return false
-            val job = scope.launch(start = CoroutineStart.LAZY) {
-                try {
-                    observeToolResult(
-                        handle.snapshot.run.runId,
-                        handle.sessionId,
-                        handle.leaseEpoch,
-                        execution.toolName,
-                        execution.providerCallId.orEmpty(),
-                        execution.safeResultJson.orEmpty(),
-                    )
-                } finally {
+            val job = scope.launchGuardedRuntimeJob(
+                onFailure = { containEscapedFailure(handle.snapshot.run.runId, handle.sessionId, handle.leaseEpoch) },
+                onFinally = {
                     activeJobs.remove(handle.snapshot.run.runId)
-                }
+                },
+            ) {
+                observeToolResult(
+                    handle.snapshot.run.runId,
+                    handle.sessionId,
+                    handle.leaseEpoch,
+                    execution.toolName,
+                    execution.providerCallId.orEmpty(),
+                    execution.safeResultJson.orEmpty(),
+                )
             }
             val previous = activeJobs.putIfAbsent(handle.snapshot.run.runId, job)
             if (previous != null) {
@@ -462,16 +461,6 @@ internal class ProviderExecutionEngine(
             return true
         }
         return launch(handle.snapshot.run.runId, handle.sessionId, handle.leaseEpoch)
-    }
-
-    private fun networkPreflightFailure(current: NetworkQuality, hasAttachments: Boolean): Pair<String, Boolean>? = if (current == NetworkQuality.OFFLINE) {
-        "NETWORK_OFFLINE" to true
-    } else if (current == NetworkQuality.EXTREME) {
-        "NETWORK_TOO_SLOW" to true
-    } else if (current == NetworkQuality.WEAK && hasAttachments) {
-        "MULTIMODAL_PAUSED_ON_WEAK_NETWORK" to true
-    } else {
-        null
     }
 
     private suspend fun performRetrieval(
@@ -760,7 +749,7 @@ internal class ProviderExecutionEngine(
     private sealed interface ReActStreamOutcome {
         data class ToolCompleted(val result: RoutedToolResult) : ReActStreamOutcome
         data object PendingApproval : ReActStreamOutcome
-        data object Streamed : ReActStreamOutcome
+        data class Streamed(val assistantText: String) : ReActStreamOutcome
     }
 
     private suspend fun handleReActToolCall(
@@ -979,8 +968,7 @@ internal class ProviderExecutionEngine(
             return ReActStreamOutcome.PendingApproval
         }
         if (assistantText.isBlank()) throw ProviderFailure("EMPTY_RESPONSE", retryable = true)
-        store.saveAssistantTurn(sessionId, runId, assistantText.toString(), clock())
-        return ReActStreamOutcome.Streamed
+        return ReActStreamOutcome.Streamed(assistantText.toString())
     }
 
     private suspend fun runReActLoop(ready: PreparedRun.Ready, runId: String, sessionId: String, fencingEpoch: Long): Boolean {
@@ -1058,10 +1046,13 @@ internal class ProviderExecutionEngine(
 
             ReActStreamOutcome.PendingApproval -> true
 
-            ReActStreamOutcome.Streamed -> {
-                store.finishProviderRun(
-                    runId, RuntimeRunStatus.SUCCEEDED.name, "RunCompleted", "{}", "SUCCEEDED",
-                    ownerId, fencingEpoch, clock(), deleteInput = true,
+            is ReActStreamOutcome.Streamed -> {
+                store.completeProviderRunWithAssistantTurn(
+                    runId,
+                    outcome.assistantText,
+                    ownerId,
+                    fencingEpoch,
+                    clock(),
                 )
                 true
             }
@@ -1109,14 +1100,13 @@ internal class ProviderExecutionEngine(
     }
 
     fun launchApprovedTool(runId: String, sessionId: String, fencingEpoch: Long): Boolean {
-        val job = scope.launch(start = CoroutineStart.LAZY) {
-            try {
-                executeApprovedTool(runId, sessionId, fencingEpoch)
-            } finally {
+        val job = scope.launchGuardedRuntimeJob(
+            onFailure = { containEscapedFailure(runId, sessionId, fencingEpoch) },
+            onFinally = {
                 activeRequests.remove(runId)
                 activeJobs.remove(runId)
-            }
-        }
+            },
+        ) { executeApprovedTool(runId, sessionId, fencingEpoch) }
         val previous = activeJobs.putIfAbsent(runId, job)
         if (previous != null) {
             job.cancel()
@@ -1124,6 +1114,33 @@ internal class ProviderExecutionEngine(
         }
         job.start()
         return true
+    }
+
+    private suspend fun containEscapedFailure(runId: String, sessionId: String, fencingEpoch: Long) {
+        activeRequests[runId]?.let(provider::cancel)
+        when (store.runById(runId)?.status) {
+            RuntimeRunStatus.RECEIVED.name,
+            RuntimeRunStatus.ASSEMBLING_CONTEXT.name,
+            -> events.failBeforeAttempt(runId, sessionId, fencingEpoch, "RUNTIME_INTERRUPTED", retryable = true)
+
+            RuntimeRunStatus.INFERENCING.name ->
+                finishFailure(runId, fencingEpoch, ProviderFailure("RUNTIME_INTERRUPTED", retryable = true))
+
+            RuntimeRunStatus.EXECUTING.name ->
+                store.finishExecutingRunFailure(runId, "RUNTIME_INTERRUPTED", ownerId, fencingEpoch, clock())
+
+            RuntimeRunStatus.OBSERVING.name -> store.finishObservationRun(
+                runId,
+                RuntimeRunStatus.FAILED_RETRYABLE,
+                "RunFailedRetryable",
+                "{\"errorCode\":\"RUNTIME_INTERRUPTED\"}",
+                ownerId,
+                fencingEpoch,
+                clock(),
+            )
+
+            RuntimeRunStatus.CANCEL_REQUESTED.name -> store.cancelProviderRun(runId, ownerId, fencingEpoch, clock())
+        }
     }
 
     private suspend fun prepareObservationContext(ids: RunIdentifiers): ObservationSetup {
@@ -1228,11 +1245,9 @@ internal class ProviderExecutionEngine(
                     put("finishReason", "verified_local_write")
                 }.toString(),
             )
-            store.saveAssistantTurn(sessionId, runId, summary, clock())
-            store.finishObservationRun(
+            store.completeObservationWithAssistantTurn(
                 runId,
-                RuntimeRunStatus.SUCCEEDED,
-                "RunCompleted",
+                summary,
                 "{\"observation\":\"verified_local_write\"}",
                 ownerId,
                 fencingEpoch,
@@ -1466,11 +1481,9 @@ internal class ProviderExecutionEngine(
                 put("finishReason", "tool_result_fallback")
             }.toString(),
         )
-        store.saveAssistantTurn(sessionId, runId, fallback, clock())
-        store.finishObservationRun(
+        store.completeObservationWithAssistantTurn(
             runId,
-            RuntimeRunStatus.SUCCEEDED,
-            "RunCompleted",
+            fallback,
             "{\"degradation\":\"tool_observation_fallback\"}",
             ownerId,
             fencingEpoch,
@@ -1547,8 +1560,7 @@ internal class ProviderExecutionEngine(
             !finalSeen -> throw ProviderFailure("PROVIDER_STREAM_INCOMPLETE", true)
 
             else -> {
-                store.saveAssistantTurn(sessionId, runId, assistantText.toString(), clock())
-                ReActStreamOutcome.Streamed
+                ReActStreamOutcome.Streamed(assistantText.toString())
             }
         }
     }
@@ -1601,11 +1613,10 @@ internal class ProviderExecutionEngine(
 
             ReActStreamOutcome.PendingApproval -> true
 
-            ReActStreamOutcome.Streamed -> {
-                store.finishObservationRun(
+            is ReActStreamOutcome.Streamed -> {
+                store.completeObservationWithAssistantTurn(
                     runId,
-                    RuntimeRunStatus.SUCCEEDED,
-                    "RunCompleted",
+                    outcome.assistantText,
                     "{}",
                     ownerId,
                     fencingEpoch,

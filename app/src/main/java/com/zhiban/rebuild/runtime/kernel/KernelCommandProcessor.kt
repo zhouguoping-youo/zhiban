@@ -61,6 +61,9 @@ internal class KernelCommandProcessor(
     fun observeWorkCount() = store.observeWorkCount()
     suspend fun millisUntilNextLeaseExpiry(): Long? {
         val now = clock()
-        return store.nextForeignLeaseExpiry(ownerId, now)?.let { (it - now).coerceAtLeast(1) }
+        return listOfNotNull(
+            store.nextForeignLeaseExpiry(ownerId, now),
+            store.nextRecoverableLeaseExpiry(now),
+        ).minOrNull()?.let { (it - now).coerceAtLeast(1) }
     }
 }

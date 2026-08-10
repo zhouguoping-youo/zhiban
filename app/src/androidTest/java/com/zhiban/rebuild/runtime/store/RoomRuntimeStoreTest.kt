@@ -180,6 +180,35 @@ class RoomRuntimeStoreTest {
     }
 
     @Test
+    fun assistantTurnAndProviderTerminalStateRollbackTogether() = runBlocking {
+        val input = RoomTextInputGateway(database, { true }, { 10 }).stage("atomic reply")
+        RoomRuntimeGateways(database, "test") { 11 }.accept(
+            com.zhiban.rebuild.runtime.spi.RuntimeUiCommand.Start(
+                "s-reply-atomic", input.inputRef, "c-reply-atomic", "a-reply-atomic", 0, "chat", "r-reply-atomic",
+            ),
+        )
+        com.zhiban.rebuild.runtime.kernel.KernelCommandProcessor(database, "owner", { true }, { 12 }).processNext()
+        val session = database.runtimeSessionDao().find("s-reply-atomic")!!
+        store.startAttempt(AttemptStartRequest("attempt-reply", "r-reply-atomic", 1, "owner", session.leaseEpoch, 13))
+        database.openHelper.writableDatabase.execSQL(
+            "CREATE TRIGGER abort_reply_terminal BEFORE UPDATE OF status ON runtime_runs " +
+                "WHEN NEW.status='SUCCEEDED' BEGIN SELECT RAISE(ABORT, 'crash-before-terminal'); END",
+        )
+
+        assertTrue(
+            runCatching {
+                store.completeProviderRunWithAssistantTurn(
+                    "r-reply-atomic", "操作已完成。", "owner", session.leaseEpoch, 14,
+                )
+            }.isFailure,
+        )
+
+        assertEquals("INFERENCING", database.runtimeRunDao().find("r-reply-atomic")?.status)
+        assertEquals(null, database.runtimeConversationTurnDao().assistantTurnContent("s-reply-atomic", "r-reply-atomic"))
+        assertTrue(database.runtimeEventDao().listByRunId("r-reply-atomic").none { it.eventType == "RunCompleted" })
+    }
+
+    @Test
     fun lateProviderEventsAfterTerminalOrSupersedeAreRejectedWithoutWrite() = runBlocking {
         val input = RoomTextInputGateway(database, { true }, { 10 }).stage("late")
         RoomRuntimeGateways(database, "test") { 11 }

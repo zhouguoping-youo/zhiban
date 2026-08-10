@@ -35,6 +35,14 @@ internal interface RuntimeSessionDao {
     suspend fun findRecoverableSessionIds(nowEpochMs: Long): List<String>
 
     @Query(
+        """SELECT MIN(s.leaseExpiresAtEpochMs) FROM runtime_sessions s
+        JOIN runtime_runs r ON r.sessionId = s.sessionId
+        WHERE r.status IN ('ASSEMBLING_CONTEXT','INFERENCING','EXECUTING','OBSERVING')
+        AND s.leaseExpiresAtEpochMs IS NOT NULL AND s.leaseExpiresAtEpochMs > :nowEpochMs""",
+    )
+    suspend fun nextRecoverableLeaseExpiry(nowEpochMs: Long): Long?
+
+    @Query(
         """SELECT s.sessionId AS sessionId,
         COALESCE((SELECT t.content FROM runtime_conversation_turns t WHERE t.sessionId = s.sessionId AND t.role = 'user' ORDER BY t.createdAtEpochMs DESC LIMIT 1), '新对话') AS preview,
         s.updatedAtEpochMs AS updatedAtEpochMs

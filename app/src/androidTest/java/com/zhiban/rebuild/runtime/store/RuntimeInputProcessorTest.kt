@@ -1551,9 +1551,16 @@ class RuntimeInputProcessorTest {
             override fun cancel(requestId: String) = true
         }
         val engine = com.zhiban.rebuild.runtime.kernel.ProviderExecutionEngine(
-            database, provider, fixedProfileStore(), "processor", { now++ },
+            database,
+            provider,
+            fixedProfileStore(),
+            "processor",
+            { now++ },
             config = com.zhiban.rebuild.runtime.kernel.ProviderEngineConfig(
-                totalTimeoutMs = 500, idleTimeoutMs = 40, heartbeatIntervalMs = 10, leaseDurationMs = 100,
+                totalTimeoutMs = 500,
+                idleTimeoutMs = 40,
+                heartbeatIntervalMs = 10,
+                leaseDurationMs = 100,
             ),
         )
 
@@ -1696,7 +1703,9 @@ class RuntimeInputProcessorTest {
             { now++ },
             provider = provider,
             profiles = fixedProfileStore(),
-            config = com.zhiban.rebuild.runtime.kernel.ProviderEngineConfig(dynamicConfig = { com.zhiban.rebuild.runtime.config.AgentDynamicConfig(forceFtsOnly = true) }),
+            config = com.zhiban.rebuild.runtime.kernel.ProviderEngineConfig(dynamicConfig = {
+                com.zhiban.rebuild.runtime.config.AgentDynamicConfig(forceFtsOnly = true)
+            }),
         )
         forcedFts.processNext()
         awaitRunStatus("r-forced-fts", "SUCCEEDED")
@@ -2031,6 +2040,71 @@ class RuntimeInputProcessorTest {
         }
         runner.stopForTest()
         assertEquals("COMPLETED", database.runtimeCommandInboxDao().find("c1")?.status)
+    }
+
+    @Test fun runnerWakesForCompletedCommandWhoseRunLeaseExpiresAfterProcessDeath() = runBlocking {
+        val staged = RoomTextInputGateway(database, { true }).stage("recover completed command")
+        RoomRuntimeGateways(database, "test")
+            .accept(RuntimeUiCommand.Start("s-recover-wake", staged.inputRef, "c-recover-wake", "a-recover-wake", 0, "chat", "r-recover-wake"))
+        assertEquals(
+            KernelCommandProcessor.Outcome.PROCESSED,
+            KernelCommandProcessor(database, "dead-process", { true }).processNext(),
+        )
+        val leaseExpiresAt = System.currentTimeMillis() + 250
+        database.openHelper.writableDatabase.execSQL(
+            "UPDATE runtime_sessions SET leaseExpiresAtEpochMs=? WHERE sessionId=?",
+                arrayOf<Any>(leaseExpiresAt, "s-recover-wake"),
+        )
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile) = capability(profile)
+            override fun stream(request: ModelRequest) = flowOf(ModelEvent.Delta(0, "已恢复"), ModelEvent.Final("stop"))
+            override fun cancel(requestId: String) = true
+        }
+        val runner = RuntimeCommandRunner(
+            KernelCommandProcessor(database, "new-process", { true }, provider = provider, profiles = fixedProfileStore()),
+        )
+
+        runner.start()
+        repeat(80) {
+            if (database.runtimeRunDao().find("r-recover-wake")?.status == "SUCCEEDED") return@repeat
+            delay(25)
+        }
+        runner.stopForTest()
+
+        assertEquals("COMPLETED", database.runtimeCommandInboxDao().find("c-recover-wake")?.status)
+        assertEquals("SUCCEEDED", database.runtimeRunDao().find("r-recover-wake")?.status)
+    }
+
+    @Test fun escapedProviderFailureIsContainedAndMakesSessionRetryable() = runBlocking {
+        val staged = RoomTextInputGateway(database, { true }, { now }).stage("trigger unexpected provider failure")
+        RoomRuntimeGateways(database, "test") { now++ }
+            .accept(RuntimeUiCommand.Start("s-contained", staged.inputRef, "c-contained", "a-contained", 0, "chat", "r-contained"))
+        KernelCommandProcessor(database, "processor", { true }, { now++ }).processNext()
+        val lease = database.runtimeSessionDao().find("s-contained")!!
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile): CapabilitySnapshot = capability(profile)
+            override fun stream(request: ModelRequest) = flowOf(ModelEvent.Final("stop"))
+            override fun cancel(requestId: String) = true
+        }
+        val engine = com.zhiban.rebuild.runtime.kernel.ProviderExecutionEngine(
+            database,
+            provider,
+            fixedProfileStore(),
+            "processor",
+            { now++ },
+            com.zhiban.rebuild.runtime.kernel.ProviderEngineConfig(
+                networkQuality = { error("unexpected runtime defect") },
+            ),
+        )
+
+        assertTrue(engine.launch("r-contained", "s-contained", lease.leaseEpoch))
+        awaitRunStatus("r-contained", "FAILED_RETRYABLE")
+
+        assertTrue(
+            database.runtimeEventDao().listByRunId("r-contained").any {
+                it.eventType == "RunFailedRetryable" && it.payloadJson.contains("RUNTIME_INTERRUPTED")
+            },
+        )
     }
 
     @Test fun typedRunActionsUseStateMachineAndIllegalActionFailsClosed() = runBlocking {

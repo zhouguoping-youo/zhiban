@@ -98,6 +98,8 @@ internal class RoomRuntimeStore(private val database: AgentDatabase, private val
     fun observeWorkCount() = database.runtimeCommandInboxDao().observeWorkCount()
     suspend fun nextForeignLeaseExpiry(ownerId: String, nowEpochMs: Long) = database.runtimeCommandInboxDao().nextForeignLeaseExpiry(ownerId, nowEpochMs)
 
+    suspend fun nextRecoverableLeaseExpiry(nowEpochMs: Long) = database.runtimeSessionDao().nextRecoverableLeaseExpiry(nowEpochMs)
+
     suspend fun processClaimedCommand(commandId: String, ownerId: String, fencingEpoch: Long, nowEpochMs: Long): Boolean = database.withTransaction {
         val command = requireNotNull(database.runtimeCommandInboxDao().find(commandId))
         requireActiveLease(command.sessionId, ownerId, fencingEpoch, nowEpochMs)
@@ -881,9 +883,36 @@ internal class RoomRuntimeStore(private val database: AgentDatabase, private val
         nowEpochMs: Long,
         deleteInput: Boolean,
     ) = database.withTransaction {
+        finishProviderRunInTransaction(
+            runId, targetStatus, eventType, safePayloadJson, attemptStatus,
+            ownerId, fencingEpoch, nowEpochMs, deleteInput,
+        )
+    }
+
+    suspend fun completeProviderRunWithAssistantTurn(runId: String, content: String, ownerId: String, fencingEpoch: Long, nowEpochMs: Long) =
+        database.withTransaction {
+            val run = requireNotNull(database.runtimeRunDao().find(runId))
+            approvals.saveAssistantTurn(run.sessionId, runId, content, nowEpochMs)
+            finishProviderRunInTransaction(
+                runId, RuntimeRunStatus.SUCCEEDED.name, "RunCompleted", "{}", "SUCCEEDED",
+                ownerId, fencingEpoch, nowEpochMs, deleteInput = true,
+            )
+        }
+
+    private suspend fun finishProviderRunInTransaction(
+        runId: String,
+        targetStatus: String,
+        eventType: String,
+        safePayloadJson: String,
+        attemptStatus: String,
+        ownerId: String,
+        fencingEpoch: Long,
+        nowEpochMs: Long,
+        deleteInput: Boolean,
+    ) {
         val run = requireNotNull(database.runtimeRunDao().find(runId))
         requireActiveLease(run.sessionId, ownerId, fencingEpoch, nowEpochMs)
-        if (run.status == targetStatus) return@withTransaction
+        if (run.status == targetStatus) return
         check(run.status == RuntimeRunStatus.INFERENCING.name) { "PROVIDER_RUN_NOT_INFERENCING" }
         val attemptId = requireNotNull(run.activeAttemptId)
         val eventId = "event-provider-$attemptId-terminal-$targetStatus"
@@ -1078,6 +1107,47 @@ internal class RoomRuntimeStore(private val database: AgentDatabase, private val
         fencingEpoch: Long,
         nowEpochMs: Long,
     ) = database.withTransaction {
+        finishObservationRunInTransaction(
+            runId,
+            targetStatus,
+            eventType,
+            safePayloadJson,
+            ownerId,
+            fencingEpoch,
+            nowEpochMs,
+        )
+    }
+
+    suspend fun completeObservationWithAssistantTurn(
+        runId: String,
+        content: String,
+        safePayloadJson: String,
+        ownerId: String,
+        fencingEpoch: Long,
+        nowEpochMs: Long,
+    ) = database.withTransaction {
+        val run = requireNotNull(database.runtimeRunDao().find(runId))
+        approvals.saveAssistantTurn(run.sessionId, runId, content, nowEpochMs)
+        finishObservationRunInTransaction(
+            runId,
+            RuntimeRunStatus.SUCCEEDED,
+            "RunCompleted",
+            safePayloadJson,
+            ownerId,
+            fencingEpoch,
+            nowEpochMs,
+        )
+    }
+
+    private suspend fun finishObservationRunInTransaction(
+        runId: String,
+        targetStatus: RuntimeRunStatus,
+        eventType: String,
+        safePayloadJson: String,
+        ownerId: String,
+        fencingEpoch: Long,
+        nowEpochMs: Long,
+    ) {
         val run = requireNotNull(database.runtimeRunDao().find(runId))
         requireActiveLease(run.sessionId, ownerId, fencingEpoch, nowEpochMs)
         check(run.status == RuntimeRunStatus.OBSERVING.name)
