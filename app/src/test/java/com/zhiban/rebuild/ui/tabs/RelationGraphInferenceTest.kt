@@ -131,6 +131,22 @@ class RelationGraphInferenceTest {
         assertEquals(500, result.flatMap { listOf(it.fromContactId, it.toContactId) }.toSet().size)
     }
 
+    @Test
+    fun `owner centered graph still displays generated contact network without fake self edges`() {
+        val contactEdges = listOf(
+            edge("a", "b", "COLLEAGUE"),
+            edge("b", "c", "PROJECT_PARTNER"),
+        )
+
+        assertEquals(contactEdges, relationshipGraphEdgesForRoot(RelationshipPersonIds.SELF, contactEdges))
+        assertEquals(listOf(contactEdges.first()), relationshipGraphEdgesForRoot("a", contactEdges))
+        assertFalse(
+            relationshipGraphEdgesForRoot(RelationshipPersonIds.SELF, contactEdges).any {
+                it.fromContactId == RelationshipPersonIds.SELF || it.toContactId == RelationshipPersonIds.SELF
+            },
+        )
+    }
+
     private fun contact(id: String, name: String, company: String?, email: String? = null) = ContactEntity(
         contactId = id,
         displayName = name,

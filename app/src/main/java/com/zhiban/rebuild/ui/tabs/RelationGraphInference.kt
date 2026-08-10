@@ -156,6 +156,11 @@ internal fun RelationshipEdgeEntity.inferredEvidenceLabel(): String? = when (sta
     else -> null
 }
 
+internal fun relationshipGraphEdgesForRoot(rootId: String, edges: List<RelationshipEdgeEntity>): List<RelationshipEdgeEntity> {
+    val incident = edges.filter { it.fromContactId == rootId || it.toContactId == rootId }
+    return if (rootId == RelationshipPersonIds.SELF && incident.isEmpty()) edges else incident
+}
+
 private data class NormalizedCompany(val key: String, val displayName: String)
 
 private fun String.toNormalizedCompany(): NormalizedCompany? {

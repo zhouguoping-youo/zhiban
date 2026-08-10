@@ -42,6 +42,25 @@ class ForceRelationshipGraphTest {
     }
 
     @Test
+    fun `model keeps owner as centered focus when relationships only connect contacts`() {
+        val people = mapOf(
+            RelationshipPersonIds.SELF to RelationshipPersonUi(RelationshipPersonIds.SELF, "我", true),
+            "a" to RelationshipPersonUi("a", "联系人甲", false),
+            "b" to RelationshipPersonUi("b", "联系人乙", false),
+        )
+
+        val model = buildForceGraphModel(
+            RelationshipPersonIds.SELF,
+            people,
+            listOf(edge("a-b", "a", "b", "COLLEAGUE", 0.9, false)),
+        )
+
+        assertEquals(setOf(RelationshipPersonIds.SELF, "a", "b"), model.nodes.map { it.id }.toSet())
+        assertEquals(ForceGraphNodeKind.FOCUS, model.nodes.first { it.id == RelationshipPersonIds.SELF }.kind)
+        assertTrue(model.links.none { it.fromId == RelationshipPersonIds.SELF || it.toId == RelationshipPersonIds.SELF })
+    }
+
+    @Test
     fun `simulation combines repulsion spring centering and damping`() {
         val bodies = mutableMapOf(
             "focus" to ForceBody(Offset(40f, 160f)),

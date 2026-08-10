@@ -199,14 +199,17 @@ internal fun RelationshipGraphState(
     val visibleEdges = remember(allValidEdges, rootId) {
         allValidEdges.filter { it.fromContactId == rootId || it.toContactId == rootId }
     }
+    val displayedEdges = remember(rootId, allValidEdges) {
+        relationshipGraphEdgesForRoot(rootId, allValidEdges)
+    }
     val root = peopleById.getValue(rootId)
-    val relatedContactIds = remember(visibleEdges, rootId) {
-        visibleEdges.flatMap { edge -> listOf(edge.fromContactId, edge.toContactId) }
+    val relatedContactIds = remember(displayedEdges, rootId) {
+        displayedEdges.flatMap { edge -> listOf(edge.fromContactId, edge.toContactId) }
             .filter { it != rootId }
             .toSet()
     }
-    val graphNeighborIds = remember(visibleEdges, rootId, peopleById) {
-        visibleEdges
+    val graphNeighborIds = remember(displayedEdges, rootId, peopleById) {
+        displayedEdges
             .flatMap { listOf(it.fromContactId, it.toContactId) }
             .filter { it != rootId }
             .distinct()
@@ -278,7 +281,7 @@ internal fun RelationshipGraphState(
                 color = RelationMuted,
                 style = MaterialTheme.typography.bodySmall,
             )
-        } else if (visibleEdges.isEmpty()) {
+        } else if (displayedEdges.isEmpty()) {
             Spacer(Modifier.height(14.dp))
             Text(
                 if (root.isOwner) {
@@ -289,19 +292,6 @@ internal fun RelationshipGraphState(
                 color = RelationMuted,
                 style = MaterialTheme.typography.bodySmall,
             )
-            if (root.isOwner && allValidEdges.isNotEmpty()) {
-                Spacer(Modifier.height(18.dp))
-                Box(Modifier.fillMaxWidth().height(1.dp).background(RelationLine))
-                Spacer(Modifier.height(14.dp))
-                Text(
-                    "联系人之间的关系",
-                    Modifier.fillMaxWidth(),
-                    color = RelationInk,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                RelationshipRows(allValidEdges.take(12), peopleById, onInspect, onDelete) { rootId = it }
-            }
         } else {
             Spacer(Modifier.height(12.dp))
             Text(
@@ -312,7 +302,7 @@ internal fun RelationshipGraphState(
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(16.dp))
-            if (visibleEdges.isNotEmpty()) {
+            if (displayedEdges.isNotEmpty()) {
                 ForceRelationshipGraphCanvas(
                     rootId = rootId,
                     peopleById = peopleById,
@@ -336,7 +326,7 @@ internal fun RelationshipGraphState(
                     fontWeight = FontWeight.Medium,
                 )
                 Spacer(Modifier.height(6.dp))
-                RelationshipRows(visibleEdges.take(12), peopleById, onInspect, onDelete, onSelectContact = {
+                RelationshipRows(displayedEdges.take(12), peopleById, onInspect, onDelete, onSelectContact = {
                     rootId = it
                 })
                 Spacer(Modifier.height(12.dp))
