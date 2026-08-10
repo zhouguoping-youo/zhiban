@@ -315,7 +315,7 @@ class RuntimeInputProcessorTest {
         assertFalse(events.any { it.eventType == "RunCompleted" || it.eventType == "ProviderToolCallReceived" })
     }
 
-    @Test fun workToolCallRequiresApprovalThenCreatesScheduleExactlyOnce() = runBlocking {
+    @Test fun workToolApprovalSurvivesProcessorRestartThenCreatesScheduleExactlyOnce() = runBlocking {
         val input = """{"schemaVersion":1,"text":"明天下午 3 点开会，提前 10 分钟提醒我","mode":"Work","model":"M2.7","level":"高"}"""
         val staged = RoomTextInputGateway(database, { true }, { now }).stage(input)
         val gateway = RoomRuntimeGateways(database, "test") { now++ }
@@ -365,7 +365,15 @@ class RuntimeInputProcessorTest {
                 payload["proposalId"]!!.jsonPrimitive.content, payload["payloadRef"]!!.jsonPrimitive.content,
             ),
         )
-        assertEquals(KernelCommandProcessor.Outcome.PROCESSED, processor.processNext())
+        val restartedProcessor = KernelCommandProcessor(
+            database,
+            "processor",
+            { true },
+            { now++ },
+            provider = provider,
+            profiles = fixedProfileStore(),
+        )
+        assertEquals(KernelCommandProcessor.Outcome.PROCESSED, restartedProcessor.processNext())
         awaitRunStatus("r-work", "SUCCEEDED")
         val scheduleId = payload["scheduleId"]!!.jsonPrimitive.content
         assertEquals("项目会", database.scheduleDao().findById(scheduleId)?.title)
@@ -387,7 +395,7 @@ class RuntimeInputProcessorTest {
                 payloadRef = change.changeId,
             ),
         )
-        assertEquals(KernelCommandProcessor.Outcome.PROCESSED, processor.processNext())
+        assertEquals(KernelCommandProcessor.Outcome.PROCESSED, restartedProcessor.processNext())
         assertNull(database.scheduleDao().findById(scheduleId))
         assertNull(database.factDao().find("schedule:$scheduleId"))
         assertEquals("UNDONE", database.changeLogDao().find(change.changeId)?.undoState)
@@ -2105,6 +2113,165 @@ class RuntimeInputProcessorTest {
                 it.eventType == "RunFailedRetryable" && it.payloadJson.contains("RUNTIME_INTERRUPTED")
             },
         )
+    }
+
+    @Test fun resumeCommandImmediatelyRelaunchesInterruptedInference() = runBlocking {
+        val staged = RoomTextInputGateway(database, { true }, { now }).stage("resume interrupted inference")
+        val gateway = RoomRuntimeGateways(database, "test") { now++ }
+        gateway.accept(
+            RuntimeUiCommand.Start(
+                "s-resume-now",
+                staged.inputRef,
+                "c-resume-start",
+                "a-resume-start",
+                0,
+                "chat",
+                "r-resume-now",
+            ),
+        )
+        KernelCommandProcessor(database, "app-process", { true }, { now++ }).processNext()
+        val revision = database.runtimeSessionDao().find("s-resume-now")!!.nextSequence - 1
+        gateway.accept(
+            RuntimeUiCommand.RunAction(
+                RuntimeAction.RESUME,
+                "s-resume-now",
+                "r-resume-now",
+                "c-resume-now",
+                "a-resume-now",
+                revision,
+                "chat",
+            ),
+        )
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile) = capability(profile)
+            override fun stream(request: ModelRequest) = flowOf(ModelEvent.Delta(0, "已恢复"), ModelEvent.Final("stop"))
+            override fun cancel(requestId: String) = true
+        }
+        val processor = KernelCommandProcessor(
+            database,
+            "app-process",
+            { true },
+            { now++ },
+            provider = provider,
+            profiles = fixedProfileStore(),
+        )
+
+        assertEquals(KernelCommandProcessor.Outcome.PROCESSED, processor.processNext())
+        awaitRunStatus("r-resume-now", "SUCCEEDED")
+        assertEquals("已恢复", database.runtimeConversationTurnDao().listBySession("s-resume-now", 10).last().content)
+    }
+
+    @Test fun resumeObservationWithoutDurableExecutionFailsRecoverablyInsteadOfSticking() = runBlocking {
+        val staged = RoomTextInputGateway(database, { true }, { now }).stage("resume broken observation")
+        val gateway = RoomRuntimeGateways(database, "test") { now++ }
+        gateway.accept(
+            RuntimeUiCommand.Start(
+                "s-resume-observation",
+                staged.inputRef,
+                "c-resume-observation-start",
+                "a-resume-observation-start",
+                0,
+                "chat",
+                "r-resume-observation",
+            ),
+        )
+        KernelCommandProcessor(database, "app-process", { true }, { now++ }).processNext()
+        database.openHelper.writableDatabase.execSQL(
+            "UPDATE runtime_runs SET status='OBSERVING' WHERE runId='r-resume-observation'",
+        )
+        val revision = database.runtimeSessionDao().find("s-resume-observation")!!.nextSequence - 1
+        gateway.accept(
+            RuntimeUiCommand.RunAction(
+                RuntimeAction.RESUME,
+                "s-resume-observation",
+                "r-resume-observation",
+                "c-resume-observation",
+                "a-resume-observation",
+                revision,
+                "chat",
+            ),
+        )
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile) = capability(profile)
+            override fun stream(request: ModelRequest) = flowOf(ModelEvent.Final("stop"))
+            override fun cancel(requestId: String) = true
+        }
+
+        KernelCommandProcessor(
+            database,
+            "app-process",
+            { true },
+            { now++ },
+            provider = provider,
+            profiles = fixedProfileStore(),
+        ).processNext()
+
+        assertEquals("FAILED_RETRYABLE", database.runtimeRunDao().find("r-resume-observation")?.status)
+        assertTrue(
+            database.runtimeEventDao().listByRunId("r-resume-observation").any {
+                it.eventType == "RunFailedRetryable" && it.payloadJson.contains("RUNTIME_INTERRUPTED")
+            },
+        )
+    }
+
+    @Test fun twentyFiveSequentialLongStreamsLeaveSessionWritableAndEveryRunTerminal() = runBlocking {
+        val prompts = listOf(
+            "Summarize today without tools",
+            "Find a contact without writing",
+            "Inspect calendar conflicts without writing",
+            "Explain CRM next actions without writing",
+            "Use the relationship skill without writing",
+        )
+        val providerCalls = AtomicInteger(0)
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile) = capability(profile)
+            override fun stream(request: ModelRequest) = flow {
+                val call = providerCalls.incrementAndGet()
+                repeat(25) { part -> emit(ModelEvent.Delta(part.toLong(), "[$call:$part]")) }
+                emit(ModelEvent.Final("stop"))
+            }
+            override fun cancel(requestId: String) = true
+        }
+        val gateway = RoomRuntimeGateways(database, "test") { now++ }
+        val processor = KernelCommandProcessor(
+            database,
+            "app-process",
+            { true },
+            { now++ },
+            provider = provider,
+            profiles = fixedProfileStore(),
+        )
+
+        repeat(25) { index ->
+            val sessionId = "s-sequential"
+            val runId = "r-sequential-$index"
+            val input = "${prompts[index % prompts.size]} #$index " + "detail ".repeat(80)
+            val staged = RoomTextInputGateway(database, { true }, { now }).stage(input)
+            val revision = database.runtimeSessionDao().find(sessionId)?.let { it.nextSequence - 1 } ?: 0
+            gateway.accept(
+                RuntimeUiCommand.Start(
+                    sessionId,
+                    staged.inputRef,
+                    "c-sequential-$index",
+                    "a-sequential-$index",
+                    revision,
+                    "chat",
+                    runId,
+                ),
+            )
+            assertEquals(KernelCommandProcessor.Outcome.PROCESSED, processor.processNext())
+            awaitRunStatus(runId, "SUCCEEDED")
+        }
+
+        assertEquals(25, providerCalls.get())
+        assertEquals(25, database.runtimeRunDao().idsBySession("s-sequential").size)
+        assertTrue(database.runtimeRunDao().idsBySession("s-sequential").all { runId ->
+            database.runtimeRunDao().find(runId)?.status == "SUCCEEDED"
+        })
+        assertEquals(0, database.runtimeInputStagingDao().count())
+        val turns = database.runtimeConversationTurnDao().listBySession("s-sequential", 100)
+        assertEquals(25, turns.count { it.role == "user" })
+        assertEquals(25, turns.count { it.role == "assistant" })
     }
 
     @Test fun typedRunActionsUseStateMachineAndIllegalActionFailsClosed() = runBlocking {

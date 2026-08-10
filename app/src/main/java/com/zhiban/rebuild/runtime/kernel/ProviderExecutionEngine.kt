@@ -373,14 +373,15 @@ internal class ProviderExecutionEngine(
     private val recoveryQueue = ArrayDeque<RuntimeRecoveryHandle>()
     private val recoveryQueueMutex = Mutex()
 
-    fun launch(runId: String, sessionId: String, fencingEpoch: Long): Boolean {
+    private fun launchRunJob(runId: String, sessionId: String, fencingEpoch: Long, clearActiveRequest: Boolean = true, block: suspend () -> Unit): Boolean {
         val job = scope.launchGuardedRuntimeJob(
             onFailure = { containEscapedFailure(runId, sessionId, fencingEpoch) },
             onFinally = {
-                activeRequests.remove(runId)
+                if (clearActiveRequest) activeRequests.remove(runId)
                 activeJobs.remove(runId)
             },
-        ) { execute(runId, sessionId, fencingEpoch) }
+            block = block,
+        )
         val previous = activeJobs.putIfAbsent(runId, job)
         if (previous != null) {
             job.cancel()
@@ -388,6 +389,10 @@ internal class ProviderExecutionEngine(
         }
         job.start()
         return true
+    }
+
+    fun launch(runId: String, sessionId: String, fencingEpoch: Long): Boolean = launchRunJob(runId, sessionId, fencingEpoch) {
+        execute(runId, sessionId, fencingEpoch)
     }
 
     private suspend fun finishFailure(runId: String, fencingEpoch: Long, failure: Throwable): Boolean {
@@ -436,31 +441,41 @@ internal class ProviderExecutionEngine(
             return launchApprovedTool(handle.snapshot.run.runId, handle.sessionId, handle.leaseEpoch)
         }
         if (handle.snapshot.run.status == RuntimeRunStatus.OBSERVING.name) {
-            val execution = store.latestToolExecution(handle.snapshot.run.runId) ?: return false
-            val job = scope.launchGuardedRuntimeJob(
-                onFailure = { containEscapedFailure(handle.snapshot.run.runId, handle.sessionId, handle.leaseEpoch) },
-                onFinally = {
-                    activeJobs.remove(handle.snapshot.run.runId)
-                },
-            ) {
-                observeToolResult(
-                    handle.snapshot.run.runId,
-                    handle.sessionId,
-                    handle.leaseEpoch,
-                    execution.toolName,
-                    execution.providerCallId.orEmpty(),
-                    execution.safeResultJson.orEmpty(),
-                )
-            }
-            val previous = activeJobs.putIfAbsent(handle.snapshot.run.runId, job)
-            if (previous != null) {
-                job.cancel()
-                return false
-            }
-            job.start()
-            return true
+            return launchObservation(handle.snapshot.run.runId, handle.sessionId, handle.leaseEpoch)
         }
         return launch(handle.snapshot.run.runId, handle.sessionId, handle.leaseEpoch)
+    }
+
+    suspend fun resume(runId: String, sessionId: String, fencingEpoch: Long): Boolean = when (store.runById(runId)?.status) {
+        RuntimeRunStatus.ASSEMBLING_CONTEXT.name,
+        RuntimeRunStatus.INFERENCING.name,
+        -> launch(runId, sessionId, fencingEpoch)
+
+        RuntimeRunStatus.EXECUTING.name -> launchApprovedTool(runId, sessionId, fencingEpoch)
+
+        RuntimeRunStatus.OBSERVING.name -> launchObservation(runId, sessionId, fencingEpoch)
+
+        RuntimeRunStatus.CANCEL_REQUESTED.name -> cancel(runId, sessionId, fencingEpoch)
+
+        else -> false
+    }
+
+    private suspend fun launchObservation(runId: String, sessionId: String, fencingEpoch: Long): Boolean {
+        val execution = store.latestToolExecution(runId)
+        if (execution == null) {
+            store.failBrokenObservationRecovery(runId, ownerId, fencingEpoch, clock())
+            return true
+        }
+        return launchRunJob(runId, sessionId, fencingEpoch, clearActiveRequest = false) {
+            observeToolResult(
+                runId,
+                sessionId,
+                fencingEpoch,
+                execution.toolName,
+                execution.providerCallId.orEmpty(),
+                execution.safeResultJson.orEmpty(),
+            )
+        }
     }
 
     private suspend fun performRetrieval(
@@ -1099,22 +1114,8 @@ internal class ProviderExecutionEngine(
         }
     }
 
-    fun launchApprovedTool(runId: String, sessionId: String, fencingEpoch: Long): Boolean {
-        val job = scope.launchGuardedRuntimeJob(
-            onFailure = { containEscapedFailure(runId, sessionId, fencingEpoch) },
-            onFinally = {
-                activeRequests.remove(runId)
-                activeJobs.remove(runId)
-            },
-        ) { executeApprovedTool(runId, sessionId, fencingEpoch) }
-        val previous = activeJobs.putIfAbsent(runId, job)
-        if (previous != null) {
-            job.cancel()
-            return false
-        }
-        job.start()
-        return true
-    }
+    fun launchApprovedTool(runId: String, sessionId: String, fencingEpoch: Long): Boolean =
+        launchRunJob(runId, sessionId, fencingEpoch) { executeApprovedTool(runId, sessionId, fencingEpoch) }
 
     private suspend fun containEscapedFailure(runId: String, sessionId: String, fencingEpoch: Long) {
         activeRequests[runId]?.let(provider::cancel)

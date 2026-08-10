@@ -1118,6 +1118,42 @@ internal class RoomRuntimeStore(private val database: AgentDatabase, private val
         )
     }
 
+    suspend fun failBrokenObservationRecovery(runId: String, ownerId: String, fencingEpoch: Long, nowEpochMs: Long) = database.withTransaction {
+        val run = requireNotNull(database.runtimeRunDao().find(runId))
+        requireActiveLease(run.sessionId, ownerId, fencingEpoch, nowEpochMs)
+        check(run.status == RuntimeRunStatus.OBSERVING.name)
+        val payload = "{\"errorCode\":\"RUNTIME_INTERRUPTED\"}"
+        val eventId = "event-observation-$runId-recovery-missing-execution"
+        val event = database.runtimeEventDao().find(eventId) ?: appendEventInTransaction(
+            RuntimeEventDraft(
+                eventId,
+                "RunFailedRetryable",
+                run.sessionId,
+                runId,
+                run.activeAttemptId,
+                run.activeAttemptId,
+                runId,
+                payload,
+                nowEpochMs,
+            ),
+            fencingEpoch,
+        )
+        check(
+            database.runtimeRunDao().transition(
+                runId,
+                RuntimeRunStatus.OBSERVING.name,
+                RuntimeRunStatus.FAILED_RETRYABLE.name,
+                event.sequence,
+                nowEpochMs,
+            ) == 1,
+        )
+        run.activeAttemptId?.let { attemptId ->
+            database.runtimeAttemptDao().listByRunId(runId).firstOrNull {
+                it.attemptId == attemptId && it.status == "ACTIVE"
+            }?.let { check(database.runtimeAttemptDao().finish(attemptId, "FAILED", nowEpochMs) == 1) }
+        }
+    }
+
     suspend fun completeObservationWithAssistantTurn(
         runId: String,
         content: String,

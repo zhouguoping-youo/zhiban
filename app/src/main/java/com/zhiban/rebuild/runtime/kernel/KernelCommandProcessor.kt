@@ -51,6 +51,8 @@ internal class KernelCommandProcessor(
                 providerEngine.launchApprovedTool(runId, command.sessionId, lease.leaseEpoch)
             } else if (command.commandType == "Cancel" && runId != null && providerEngine != null) {
                 providerEngine.cancel(runId, command.sessionId, lease.leaseEpoch)
+            } else if (command.commandType == "Resume" && runId != null && providerEngine != null) {
+                providerEngine.resume(runId, command.sessionId, lease.leaseEpoch)
             }
             Outcome.PROCESSED
         } else {
