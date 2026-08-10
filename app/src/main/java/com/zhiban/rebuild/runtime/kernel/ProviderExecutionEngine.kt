@@ -1485,23 +1485,18 @@ internal class ProviderExecutionEngine(
         toolName: String,
         providerCallId: String,
         safeResultJson: String,
-    ): ReActStreamOutcome {
-        val input = setup.input
-        val queryContext = setup.queryContext
+    ): ReActStreamOutcome = withTimeout(totalTimeoutMs) {
         var retrieval = setup.retrieval
-        val profile = setup.profile
-        val config = setup.config
-        val activatedSkills = setup.activatedSkills
         val attemptId = setup.attemptId
         val runId = ids.runId
         val sessionId = ids.sessionId
         val fencingEpoch = ids.fencingEpoch
-        val capability = provider.probe(profile, attemptId)
+        val capability = provider.probe(setup.profile, attemptId)
         retrieval =
-            if (config.enableLlmRerank &&
-                !config.forceFtsOnly
+            if (setup.config.enableLlmRerank &&
+                !setup.config.forceFtsOnly
             ) {
-                rerankRetrieval(input.text, retrieval, profile, capability, attemptId, runId, sessionId, fencingEpoch, observation = true)
+                rerankRetrieval(setup.input.text, retrieval, setup.profile, capability, attemptId, runId, sessionId, fencingEpoch, observation = true)
             } else {
                 retrieval.copy(degradationPath = (retrieval.degradationPath + "rerank_disabled").distinct())
             }
@@ -1511,51 +1506,49 @@ internal class ProviderExecutionEngine(
             put("result", Json.parseToJsonElement(safeResultJson))
         }.toString()
         val observationTools =
-            (toolAllowlist(activatedSkills) ?: capabilityRouter.canonicalNames()) - store.completedToolNames(runId)
+            (toolAllowlist(setup.activatedSkills) ?: capabilityRouter.canonicalNames()) - store.completedToolNames(runId)
         val probeResult = ObservationProbeResult(capability, retrieval, observation, observationTools)
-        return withTimeout(totalTimeoutMs) {
-            val request = buildObservationRequest(setup, probeResult, toolName, providerCallId)
-            var lastOrdinal = -1L
-            var finalSeen = false
-            val assistantText = StringBuilder()
-            val channel = provider.stream(request).produceIn(this)
-            var terminal: ReActStreamOutcome? = null
-            while (terminal == null) {
-                val event = channel.receiveCatching().getOrNull() ?: break
-                store.claimSession(sessionId, ownerId, clock(), leaseDurationMs)
-                when (event) {
-                    is ModelEvent.Delta -> {
-                        assistantText.append(event.text)
-                        lastOrdinal = maxOf(lastOrdinal, event.ordinal)
-                        appendObservationDeltaEvent(event, attemptId, ids)
+        val request = buildObservationRequest(setup, probeResult, toolName, providerCallId)
+        var lastOrdinal = -1L
+        var finalSeen = false
+        val assistantText = StringBuilder()
+        val channel = provider.stream(request).produceIn(this)
+        var terminal: ReActStreamOutcome? = null
+        while (terminal == null) {
+            val event = channel.receiveCatching().getOrNull() ?: break
+            store.claimSession(sessionId, ownerId, clock(), leaseDurationMs)
+            when (event) {
+                is ModelEvent.Delta -> {
+                    assistantText.append(event.text)
+                    lastOrdinal = maxOf(lastOrdinal, event.ordinal)
+                    appendObservationDeltaEvent(event, attemptId, ids)
+                }
+
+                is ModelEvent.Usage -> appendObservationUsageEvent(event, capability, attemptId, ids)
+
+                is ModelEvent.ToolCall -> terminal = handleObservationToolCall(setup, ids, event)
+
+                is ModelEvent.Final -> {
+                    if (assistantText.isBlank()) {
+                        val fallback = deterministicToolSummary(toolName, safeResultJson)
+                        assistantText.append(fallback)
+                        lastOrdinal += 1
+                        appendObservationFallbackEvent(lastOrdinal, fallback, attemptId, ids)
                     }
-
-                    is ModelEvent.Usage -> appendObservationUsageEvent(event, capability, attemptId, ids)
-
-                    is ModelEvent.ToolCall -> terminal = handleObservationToolCall(setup, ids, event)
-
-                    is ModelEvent.Final -> {
-                        if (assistantText.isBlank()) {
-                            val fallback = deterministicToolSummary(toolName, safeResultJson)
-                            assistantText.append(fallback)
-                            lastOrdinal += 1
-                            appendObservationFallbackEvent(lastOrdinal, fallback, attemptId, ids)
-                        }
-                        finalSeen = true
-                        appendObservationFinalEvent(event, lastOrdinal, attemptId, ids)
-                    }
+                    finalSeen = true
+                    appendObservationFinalEvent(event, lastOrdinal, attemptId, ids)
                 }
             }
-            channel.cancel()
-            when {
-                terminal != null -> terminal
+        }
+        channel.cancel()
+        when {
+            terminal != null -> terminal
 
-                !finalSeen -> throw ProviderFailure("PROVIDER_STREAM_INCOMPLETE", true)
+            !finalSeen -> throw ProviderFailure("PROVIDER_STREAM_INCOMPLETE", true)
 
-                else -> {
-                    store.saveAssistantTurn(sessionId, runId, assistantText.toString(), clock())
-                    ReActStreamOutcome.Streamed
-                }
+            else -> {
+                store.saveAssistantTurn(sessionId, runId, assistantText.toString(), clock())
+                ReActStreamOutcome.Streamed
             }
         }
     }
@@ -1573,6 +1566,11 @@ internal class ProviderExecutionEngine(
         if (handleDeterministicObservation(setup, ids, toolName, safeResultJson)) return true
         val outcome = try {
             consumeObservationStream(setup, ids, toolName, providerCallId, safeResultJson)
+        } catch (_: TimeoutCancellationException) {
+            provider.cancel(setup.attemptId)
+            val run = store.runById(runId)
+            if (run?.status != RuntimeRunStatus.OBSERVING.name) return false
+            return appendDegradedObservation(setup.attemptId, ids, toolName, safeResultJson)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Throwable) {

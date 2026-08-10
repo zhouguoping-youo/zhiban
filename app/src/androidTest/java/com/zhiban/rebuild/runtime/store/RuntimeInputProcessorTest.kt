@@ -1565,6 +1565,59 @@ class RuntimeInputProcessorTest {
         )
     }
 
+    @Test fun stalledToolObservationFallsBackAndUnlocksConversation() = runBlocking {
+        val staged = RoomTextInputGateway(database, { true }, { now }).stage(
+            """{"schemaVersion":1,"text":"生活助理，检查明天下午三点是否冲突","mode":"Work","model":"M2.7"}""",
+        )
+        RoomRuntimeGateways(database, "test") { now++ }
+            .accept(RuntimeUiCommand.Start("s-observe-timeout", staged.inputRef, "c-observe", "a-observe", 0, "chat", "r-observe-timeout"))
+        KernelCommandProcessor(database, "processor", { true }, { now++ }).processNext()
+        val lease = database.runtimeSessionDao().find("s-observe-timeout")!!
+        val streams = AtomicInteger()
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile) = capability(profile)
+            override fun stream(request: ModelRequest) = if (streams.getAndIncrement() == 0) {
+                flowOf(
+                    ModelEvent.ToolCall(
+                        0,
+                        "call-conflicts",
+                        "calendar.schedule.conflicts",
+                        """{"startAtEpochMs":3000000,"durationMinutes":30}""",
+                    ),
+                    ModelEvent.Final("tool_calls"),
+                )
+            } else {
+                flow<ModelEvent> {
+                    emit(ModelEvent.Delta(0, "没有检测到日程冲突。"))
+                    awaitCancellation()
+                }
+            }
+            override fun cancel(requestId: String) = true
+        }
+        val engine = com.zhiban.rebuild.runtime.kernel.ProviderExecutionEngine(
+            database,
+            provider,
+            fixedProfileStore(),
+            "processor",
+            { now++ },
+            config = com.zhiban.rebuild.runtime.kernel.ProviderEngineConfig(totalTimeoutMs = 1_000),
+        )
+
+        val completed = engine.execute("r-observe-timeout", "s-observe-timeout", lease.leaseEpoch)
+        val run = database.runtimeRunDao().find("r-observe-timeout")
+        val events = database.runtimeEventDao().listByRunId("r-observe-timeout")
+        assertTrue(
+            "completed=$completed status=${run?.status} events=${events.map { it.eventType to it.payloadJson }}",
+            completed,
+        )
+        assertEquals("SUCCEEDED", run?.status)
+        assertTrue(
+            events.any {
+                it.eventType == "RunCompleted" && it.payloadJson.contains("tool_observation_fallback")
+            },
+        )
+    }
+
     @Test fun weakNetworkSkipsVectorAndRerankWhileExtremeNetworkFailsBeforeProvider() = runBlocking {
         suspend fun stage(session: String, run: String) {
             val input = RoomTextInputGateway(database, { true }, { now }).stage("你好")
