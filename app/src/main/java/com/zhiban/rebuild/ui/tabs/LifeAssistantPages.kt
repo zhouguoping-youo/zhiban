@@ -303,17 +303,17 @@ private fun LifeDetailLine(label: String, value: String) {
 
 @Composable
 private fun LifeEmptyWorkbench(onOpenRelations: () -> Unit, onAskAgent: (String) -> Unit, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.fillMaxWidth().zhiBanCardSurface().padding(ZhiBanSpacing.Xl),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
-    ) {
-        ZhiBanLeadingIcon(Icons.Outlined.PeopleOutline)
-        Text("从重要的人开始", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-        Text("完善重要日期后，知伴会整理生日和约定", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Button(onClick = onOpenRelations, modifier = Modifier.fillMaxWidth().height(48.dp)) { Text("查看联系人") }
-        TextButton(onClick = { onAskAgent("帮我整理最近需要关心的人和已经答应的事情") }) { Text("问问知伴") }
-    }
+    SceneCapabilityEmptyState(
+        icon = Icons.Outlined.PeopleOutline,
+        title = "从重要的人开始",
+        supportingText = "完善重要日期后，知伴会整理生日和约定",
+        primaryLabel = "查看联系人",
+        onPrimary = onOpenRelations,
+        modifier = modifier,
+        secondaryLabel = "问问知伴",
+        onSecondary = { onAskAgent("帮我整理最近需要关心的人和已经答应的事情") },
+        testTag = "life-empty-workbench",
+    )
 }
 
 @Composable

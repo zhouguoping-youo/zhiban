@@ -1,28 +1,21 @@
 package com.zhiban.rebuild.ui.tabs
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -33,7 +26,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -82,6 +74,7 @@ fun CrmCapabilityPage(
                 ZhiBanTopBar(
                     title = "个人 CRM",
                     onBack = onBack,
+                    subtitle = "联系人、机会与跟进",
                     trailing = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             if (state.isDemo) {
@@ -234,47 +227,16 @@ fun CrmCapabilityPage(
 
 @Composable
 internal fun CrmEmptyWorkbench(onCreateOpportunity: () -> Unit, modifier: Modifier = Modifier) {
-    Column(
-        modifier
-            .fillMaxWidth()
-            .testTag("crm-empty-workbench")
-            .zhiBanCardSurface()
-            .padding(horizontal = ZhiBanSpacing.Lg, vertical = ZhiBanSpacing.Xxl),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
-    ) {
-        Box(
-            Modifier.size(ZhiBanSize.TouchTarget).clip(CircleShape).background(ZhiBanTerracottaSoft),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.Outlined.AutoAwesome,
-                contentDescription = null,
-                tint = ZhiBanTerracotta,
-                modifier = Modifier.size(ZhiBanIconSize.Leading),
-            )
-        }
-        Text(
-            "还没有客户进展",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Text(
-            "从一个机会开始",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        FilledTonalButton(
-            onClick = onCreateOpportunity,
-            modifier = Modifier.defaultMinSize(minHeight = ZhiBanSize.TouchTarget).testTag("crm-empty-create"),
-            colors = ButtonDefaults.filledTonalButtonColors(
-                containerColor = ZhiBanTerracottaSoft,
-                contentColor = ZhiBanTerracotta,
-            ),
-        ) {
-            Text("新建机会", style = MaterialTheme.typography.labelLarge)
-        }
-    }
+    SceneCapabilityEmptyState(
+        icon = Icons.Outlined.AutoAwesome,
+        title = "还没有客户进展",
+        supportingText = "从一个机会开始",
+        primaryLabel = "新建机会",
+        onPrimary = onCreateOpportunity,
+        modifier = modifier,
+        primaryTestTag = "crm-empty-create",
+        testTag = "crm-empty-workbench",
+    )
 }
 
 @Composable

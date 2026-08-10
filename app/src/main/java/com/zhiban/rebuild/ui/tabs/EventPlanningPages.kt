@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.Groups
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.PersonAddAlt
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -47,6 +49,7 @@ import com.zhiban.rebuild.ui.components.ZhiBanSectionTitle
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
 import com.zhiban.rebuild.ui.theme.ZhiBanIconSize
+import com.zhiban.rebuild.ui.theme.ZhiBanSize
 import com.zhiban.rebuild.ui.theme.ZhiBanSpacing
 import com.zhiban.rebuild.ui.theme.ZhiBanTerracottaSoft
 import java.time.Instant
@@ -228,18 +231,34 @@ internal fun EventPlanningWorkbench(
     ZhiBanPage {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = ZhiBanSpacing.Xxl),
-            verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Lg),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = ZhiBanSpacing.Xxxl),
+            verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Section),
         ) {
-            item { ZhiBanTopBar("一起安排", onBack, subtitle = "聚会、探望与出行") }
             item {
-                Button(
-                    onClick = onCreate,
-                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal).fillMaxWidth().height(48.dp),
-                ) { Text("开始安排") }
+                ZhiBanTopBar(
+                    "一起安排",
+                    onBack,
+                    subtitle = "聚会、探望与出行",
+                    trailing = if (state.plans.isNotEmpty()) {
+                        {
+                            IconButton(
+                                onClick = onCreate,
+                                modifier = Modifier.size(ZhiBanSize.TouchTarget),
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Add,
+                                    contentDescription = "新建安排",
+                                    modifier = Modifier.size(ZhiBanIconSize.Action),
+                                )
+                            }
+                        }
+                    } else {
+                        null
+                    },
+                )
             }
             if (state.plans.isEmpty() && !state.isLoading) {
-                item { EventPlanningEmpty(Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal), null) }
+                item { EventPlanningEmpty(Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal), onCreate) }
             } else {
                 state.activePlans.firstOrNull()?.let { spotlight ->
                     item {
@@ -364,17 +383,24 @@ private fun ParticipantRow(participant: EventParticipantUi, onClick: () -> Unit,
 
 @Composable
 private fun EventPlanningEmpty(modifier: Modifier = Modifier, onCreate: (() -> Unit)?) {
-    Column(
-        modifier = modifier.fillMaxWidth().zhiBanCardSurface().padding(ZhiBanSpacing.Xl),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
-    ) {
-        ZhiBanLeadingIcon(Icons.Outlined.Groups)
-        Text("还没有正在安排的事", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-        Text("先确定一件事，再邀请相关的人", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        onCreate?.let {
-            Button(onClick = it, modifier = Modifier.fillMaxWidth().height(48.dp)) { Text("开始安排") }
-        }
+    if (onCreate == null) {
+        SceneCapabilityEmptyState(
+            icon = Icons.Outlined.Groups,
+            title = "还没有正在安排的事",
+            supportingText = "先确定一件事，再邀请相关的人",
+            modifier = modifier,
+            testTag = "event-empty-list",
+        )
+    } else {
+        SceneCapabilityEmptyState(
+            icon = Icons.Outlined.Groups,
+            title = "还没有正在安排的事",
+            supportingText = "先确定一件事，再邀请相关的人",
+            primaryLabel = "开始安排",
+            onPrimary = onCreate,
+            modifier = modifier,
+            testTag = "event-empty-workbench",
+        )
     }
 }
 

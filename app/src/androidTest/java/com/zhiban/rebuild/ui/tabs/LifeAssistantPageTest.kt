@@ -1,6 +1,7 @@
 package com.zhiban.rebuild.ui.tabs
 
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.zhiban.rebuild.ui.theme.ZhiBanTheme
@@ -67,6 +68,7 @@ class LifeAssistantPageTest {
             }
         }
 
+        compose.onNodeWithTag("life-empty-workbench").assertExists()
         compose.onNodeWithText("从重要的人开始").assertExists()
         compose.onNodeWithText("查看联系人").performClick()
         assertEquals(1, opens.get())
