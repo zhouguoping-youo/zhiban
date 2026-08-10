@@ -111,7 +111,6 @@ import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventWithParticipants
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.data.contact.SystemContactCandidate
-import com.zhiban.rebuild.data.contact.SystemContactWriteIntent
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.OutgoingMessageAccessibilityService
 import com.zhiban.rebuild.data.notification.ScheduleInsight
@@ -709,7 +708,14 @@ fun RelationTab(
             },
             onRejectEnrichment = { candidate -> viewModel.rejectContactEnrichment(candidate) },
             onSaveToPhone = {
-                runCatching { context.startActivity(SystemContactWriteIntent.create(contact)) }
+                viewModel.prepareSystemContactWrite(contact) { intent, error ->
+                    when {
+                        error != null -> Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
+
+                        intent != null -> runCatching { context.startActivity(intent) }
+                            .onFailure { Toast.makeText(context, "无法打开手机通讯录", Toast.LENGTH_SHORT).show() }
+                    }
+                }
             },
             onCall = {
                 contact.phone?.takeIf(String::isNotBlank)?.let { phone ->

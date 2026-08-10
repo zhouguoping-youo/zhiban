@@ -1,5 +1,7 @@
 package com.zhiban.rebuild.data.contact
+
 import android.Manifest
+import android.content.ContentUris
 import android.content.Context
 import android.content.pm.PackageManager
 import android.database.Cursor
@@ -27,6 +29,7 @@ data class SystemContactCandidate(
     val addresses: List<SystemContactAddress> = emptyList(),
     val birthday: SystemContactBirthday? = null,
     val note: String? = null,
+    val contactUri: String? = null,
 )
 
 data class SystemContactPlatformIdentity(val platform: String, val handle: String)
@@ -102,7 +105,11 @@ class SystemContactReader @Inject constructor(@ApplicationContext private val co
                         ContactsContract.Data.DISPLAY_NAME,
                     ).orEmpty().trim()
                     val target = rows.getOrPut(sourceId) {
-                        MutableContact(sourceId = sourceId, displayName = fallbackName)
+                        MutableContact(
+                            sourceId = sourceId,
+                            contactId = contactId,
+                            displayName = fallbackName,
+                        )
                     }
                     if (target.displayName.isBlank()) target.displayName = fallbackName
                     applyMimeTypeRow(cursor, target)
@@ -209,6 +216,7 @@ class SystemContactReader @Inject constructor(@ApplicationContext private val co
 
     private data class MutableContact(
         val sourceId: String,
+        val contactId: String?,
         var displayName: String,
         val phones: LinkedHashSet<String> = linkedSetOf(),
         val emails: LinkedHashSet<String> = linkedSetOf(),
@@ -241,6 +249,9 @@ class SystemContactReader @Inject constructor(@ApplicationContext private val co
                 addresses = addresses.toList(),
                 birthday = birthday,
                 note = note,
+                contactUri = contactId?.toLongOrNull()?.let { id ->
+                    ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, id).toString()
+                },
             )
         }
     }

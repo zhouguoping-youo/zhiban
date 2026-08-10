@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.ui.tabs
 
+import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zhiban.rebuild.data.agent.AgentDataRepository
@@ -16,7 +17,9 @@ import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventWithParticipants
 import com.zhiban.rebuild.data.contact.SystemContactCandidate
 import com.zhiban.rebuild.data.contact.SystemContactReader
+import com.zhiban.rebuild.data.contact.SystemContactWriteIntent
 import com.zhiban.rebuild.data.contact.enrichment.CompanyEnrichmentRefresher
+import com.zhiban.rebuild.data.contact.findExistingSystemContact
 import com.zhiban.rebuild.data.contact.normalizeContactPhone
 import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
 import com.zhiban.rebuild.data.notification.MessageCollectionPreferences
@@ -227,6 +230,21 @@ class RelationViewModel @Inject constructor(
                 blankRows = result.blankRows,
                 error = result.errorMessage,
             )
+        }
+    }
+
+    fun prepareSystemContactWrite(contact: ContactEntity, onResult: (Intent?, String?) -> Unit) {
+        viewModelScope.launch {
+            runSuspendCatching {
+                val result = systemContactReader.readAll()
+                check(result.errorMessage == null) { result.errorMessage ?: "无法读取手机通讯录" }
+                SystemContactWriteIntent.create(
+                    contact,
+                    findExistingSystemContact(contact, result.contacts),
+                )
+            }
+                .onSuccess { onResult(it, null) }
+                .onFailure { onResult(null, it.message ?: "暂时无法安全写入手机通讯录") }
         }
     }
 
