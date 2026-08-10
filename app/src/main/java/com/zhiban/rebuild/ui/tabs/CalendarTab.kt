@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -154,6 +155,7 @@ fun CalendarTab(
     var suggestionMessage by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    CalendarMonthBackHandler(monthExpanded) { monthExpanded = false }
     val showFeedback: (String) -> Unit = { message -> scope.launch { snackbarHostState.showSnackbar(message) } }
     LaunchedEffect(focusDateEpochMs) {
         focusDateEpochMs?.let { epochMs ->
@@ -414,6 +416,11 @@ fun CalendarTab(
             containerColor = CalendarSurface,
         )
     }
+}
+
+@Composable
+internal fun CalendarMonthBackHandler(monthExpanded: Boolean, onCollapse: () -> Unit) {
+    BackHandler(enabled = monthExpanded, onBack = onCollapse)
 }
 
 @Composable

@@ -90,16 +90,17 @@ fun CrmCapabilityPage(
                             } else {
                                 TextButton(onClick = viewModel::enterDemo) { Text("查看演示") }
                             }
-                            IconButton(
-                                onClick = { onAskAgent(newCrmOpportunityPrompt()) },
-                                enabled = !state.isDemo,
-                                modifier = Modifier.size(ZhiBanSize.TouchTarget),
-                            ) {
-                                Icon(
-                                    Icons.Outlined.Add,
-                                    contentDescription = if (state.isDemo) "退出演示后新建机会" else "新建机会",
-                                    modifier = Modifier.size(ZhiBanIconSize.Action),
-                                )
+                            if (!state.isDemo && !isWorkbenchEmpty) {
+                                IconButton(
+                                    onClick = { onAskAgent(newCrmOpportunityPrompt()) },
+                                    modifier = Modifier.size(ZhiBanSize.TouchTarget),
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.Add,
+                                        contentDescription = "新建机会",
+                                        modifier = Modifier.size(ZhiBanIconSize.Action),
+                                    )
+                                }
                             }
                         }
                     },

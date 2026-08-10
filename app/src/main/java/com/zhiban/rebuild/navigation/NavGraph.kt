@@ -135,7 +135,7 @@ fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L
                             launchSingleTop = true
                         }
                     },
-                    onNavigateToSettings = { navController.navigate(Profile) { launchSingleTop = true } },
+                    onNavigateToSettings = { navController.navigate(ModelConfig) { launchSingleTop = true } },
                     onManagePlugins = { navController.navigate(Skill) { launchSingleTop = true } },
                 )
             }
@@ -343,6 +343,7 @@ fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L
                     initialDraft = route.draft,
                     initialMode = if (route.workContext) "Work" else "Chat",
                     onManagePlugins = { navController.navigate(Skill) { launchSingleTop = true } },
+                    onNavigateToSettings = { navController.navigate(ModelConfig) { launchSingleTop = true } },
                     onBackToHome = {
                         if (route.returnTarget == "BACK" && navController.popBackStack()) {
                             Unit

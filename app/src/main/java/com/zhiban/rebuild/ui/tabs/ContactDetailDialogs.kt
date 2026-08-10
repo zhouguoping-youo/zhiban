@@ -124,6 +124,7 @@ import com.zhiban.rebuild.ui.components.ZhiBanSearchField
 import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
 import com.zhiban.rebuild.ui.components.ZhiBanTabHorizontalPadding
 import com.zhiban.rebuild.ui.components.ZhiBanTabTopPadding
+import com.zhiban.rebuild.ui.components.ZhiBanTaskDialog
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
 import com.zhiban.rebuild.ui.settings.AutoWriteViewModel
 import com.zhiban.rebuild.ui.theme.DangerRed
@@ -186,10 +187,10 @@ internal fun ContactDetailDialog(
     onCall: () -> Unit,
     onMessage: () -> Unit,
 ) {
-    ZhiBanDialogHost(onDismissRequest = onDismiss) {
+    ZhiBanTaskDialog(onDismissRequest = onDismiss, maxHeight = 720.dp) {
         LazyColumn(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Dialog)).background(RelationSurface),
-            contentPadding = PaddingValues(20.dp),
+            Modifier.fillMaxWidth().heightIn(max = 640.dp),
+            contentPadding = PaddingValues(bottom = ZhiBanSpacing.Lg),
         ) {
             item {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -234,7 +235,7 @@ internal fun ContactDetailDialog(
                 Button(
                     onClick = onEdit,
                     Modifier.fillMaxWidth().height(48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
+                    colors = ButtonDefaults.buttonColors(containerColor = RelationAccent),
                     shape = RoundedCornerShape(ZhiBanRadius.Dialog),
                 ) {
                     Text("编辑基本资料")

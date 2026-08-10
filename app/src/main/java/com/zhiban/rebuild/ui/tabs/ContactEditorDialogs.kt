@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -35,6 +36,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -331,6 +333,16 @@ internal fun ContactEditorDialog(
     var tag by remember(contact?.contactId) { mutableStateOf(contact?.firstKnownTag() ?: "朋友") }
     var note by remember(contact?.contactId) { mutableStateOf(contact?.note.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
+    val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+
+    fun submit() {
+        if (name.isBlank()) {
+            error = "请输入联系人姓名"
+        } else {
+            onSave(contact?.contactId, name, phone, wechat, company, title, tag, note) { error = it }
+        }
+    }
+
     ZhiBanDialogHost(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
@@ -349,24 +361,19 @@ internal fun ContactEditorDialog(
                 contentPadding = PaddingValues(20.dp),
             ) {
                 item {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = onDismiss, modifier = Modifier.size(ZhiBanIconContainer.TouchTarget)) {
-                            Icon(Icons.Rounded.Close, "关闭")
-                        }
-                        Text(
-                            if (contact ==
-                                null
-                            ) {
-                                "添加联系人"
-                            } else {
-                                "编辑联系人"
-                            },
-                            Modifier.weight(1f),
-                            color = RelationInk,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
+                    com.zhiban.rebuild.ui.components.ZhiBanDialogHeader(
+                        title = if (contact == null) "添加联系人" else "编辑联系人",
+                        onDismiss = onDismiss,
+                        trailing = if (imeVisible) {
+                            {
+                                TextButton(onClick = ::submit, enabled = name.isNotBlank()) {
+                                    Text("保存")
+                                }
+                            }
+                        } else {
+                            null
+                        },
+                    )
                     Spacer(Modifier.height(12.dp))
                 }
                 item {
@@ -431,19 +438,16 @@ internal fun ContactEditorDialog(
                         Spacer(Modifier.height(7.dp))
                         Text(it, color = RelationDanger, style = MaterialTheme.typography.bodySmall)
                     }
-                    Spacer(Modifier.height(18.dp))
-                    Button(
-                        onClick = {
-                            if (name.isBlank()) {
-                                error = "请输入联系人姓名"
-                            } else {
-                                onSave(contact?.contactId, name, phone, wechat, company, title, tag, note) { error = it }
-                            }
-                        },
-                        Modifier.fillMaxWidth().height(ZhiBanSize.Control),
-                        colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
-                        shape = RoundedCornerShape(ZhiBanRadius.Card),
-                    ) { Text("保存") }
+                    if (!imeVisible) {
+                        Spacer(Modifier.height(18.dp))
+                        Button(
+                            onClick = ::submit,
+                            Modifier.fillMaxWidth().height(ZhiBanSize.Control),
+                            enabled = name.isNotBlank(),
+                            colors = ButtonDefaults.buttonColors(containerColor = RelationAccent),
+                            shape = RoundedCornerShape(ZhiBanRadius.Card),
+                        ) { Text("保存") }
+                    }
                 }
             }
         }

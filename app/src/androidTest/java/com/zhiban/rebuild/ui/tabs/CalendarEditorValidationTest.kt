@@ -7,7 +7,6 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.Density
 import com.zhiban.rebuild.ui.theme.ZhiBanTheme
@@ -59,6 +58,6 @@ class CalendarEditorValidationTest {
             }
         }
 
-        compose.onNodeWithText("保存").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("保存").assertIsDisplayed()
     }
 }
