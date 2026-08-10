@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -67,45 +68,52 @@ class V2AgentConversationBackend(
         )
         scope.launch {
             var stagedRef: String? = null
-            runSuspendCatching {
-                val runtimeInput = if (mode == "Chat" && model == null && level == null &&
-                    attachments.isEmpty()
-                ) {
-                    normalized
-                } else {
-                    buildJsonObject {
-                        put("schemaVersion", 1)
-                        put("text", normalized)
-                        put("mode", mode)
-                        model?.let { put("model", it) }
-                        level?.let { put("level", it) }
-                        putJsonArray("attachments") {
-                            attachments.forEach { ref ->
-                                add(
-                                    buildJsonObject {
-                                        put("attachmentId", ref.attachmentId)
-                                        put("kind", ref.kind.name)
-                                        put("mimeType", ref.mimeType)
-                                        put("byteLength", ref.byteLength)
-                                        put("sha256Digest", ref.sha256Digest)
-                                        put("contentRef", ref.contentRef)
-                                        put("expiresAtEpochMs", ref.expiresAtEpochMs)
-                                    },
-                                )
-                            }
-                        }
-                    }.toString()
+            try {
+                runSuspendCatching {
+                    withTimeoutOrNull(INPUT_START_TIMEOUT_MS) {
+                        val runtimeInput = encodeRuntimeInput(normalized, mode, model, level, attachments)
+                        textInputGateway.stage(runtimeInput).also { stagedRef = it.inputRef }
+                            .let { controller.start(it.inputRef) }
+                    } ?: throw InputStartTimeoutException()
+                }.onSuccess { receipt ->
+                    if (receipt.status in setOf(CommandReceiptStatus.CONFLICT, CommandReceiptStatus.REJECTED)) {
+                        stagedRef?.let { textInputGateway.discard(it) }
+                        handleNonAcceptedReceipt(receipt.status)
+                    }
+                }.onFailure { failure ->
+                    stagedRef?.let { runSuspendCatching { textInputGateway.discard(it) } }
+                    applyFailure(failure)
                 }
-                textInputGateway.stage(runtimeInput).also { stagedRef = it.inputRef }
-                    .let { controller.start(it.inputRef) }
-            }.onSuccess { receipt ->
-                if (receipt.status in setOf(CommandReceiptStatus.CONFLICT, CommandReceiptStatus.REJECTED)) {
-                    stagedRef?.let { textInputGateway.discard(it) }
-                    handleNonAcceptedReceipt(receipt.status)
-                }
-            }.onFailure(::applyFailure)
-            startInFlight = false
+            } finally {
+                startInFlight = false
+            }
         }
+    }
+
+    private fun encodeRuntimeInput(text: String, mode: String, model: String?, level: String?, attachments: List<AttachmentRef>): String {
+        if (mode == "Chat" && model == null && level == null && attachments.isEmpty()) return text
+        return buildJsonObject {
+            put("schemaVersion", 1)
+            put("text", text)
+            put("mode", mode)
+            model?.let { put("model", it) }
+            level?.let { put("level", it) }
+            putJsonArray("attachments") {
+                attachments.forEach { ref ->
+                    add(
+                        buildJsonObject {
+                            put("attachmentId", ref.attachmentId)
+                            put("kind", ref.kind.name)
+                            put("mimeType", ref.mimeType)
+                            put("byteLength", ref.byteLength)
+                            put("sha256Digest", ref.sha256Digest)
+                            put("contentRef", ref.contentRef)
+                            put("expiresAtEpochMs", ref.expiresAtEpochMs)
+                        },
+                    )
+                }
+            }
+        }.toString()
     }
 
     fun approve() = launchAction { controller.approve() }
@@ -152,12 +160,15 @@ class V2AgentConversationBackend(
         mutableUiState.value = mutableUiState.value.copy(
             stage = AgentConversationStage.FAILED_FINAL,
             assistantMessage = "这次没有完成。",
-            safeMessage = if (failure is IllegalArgumentException) {
-                "当前操作已失效，请刷新后重试。"
-            } else {
-                "暂时无法完成，请稍后重试。"
+            safeMessage = when (failure) {
+                is IllegalArgumentException -> "当前操作已失效，请刷新后重试。"
+                is InputStartTimeoutException -> "提交超时，请检查网络后重试。"
+                else -> "暂时无法完成，请稍后重试。"
             },
             inputEnabled = true,
         )
     }
 }
+
+private class InputStartTimeoutException : IllegalStateException()
+private const val INPUT_START_TIMEOUT_MS = 15_000L

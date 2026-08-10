@@ -31,6 +31,25 @@ import org.junit.Test
 class AgentConversationScreenE2ETest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun executingWithoutPlanAlwaysOffersCancelEscape() {
+        val cancellations = AtomicInteger(0)
+        compose.setContent {
+            ZhiBanTheme {
+                AgentConversationScreen(
+                    state = AgentConversationUiState(
+                        stage = AgentConversationStage.EXECUTING,
+                        canCancel = true,
+                    ),
+                    onCancel = { cancellations.incrementAndGet() },
+                )
+            }
+        }
+
+        compose.onNodeWithText("知伴正在完成操作…").assertIsDisplayed()
+        compose.onNodeWithText("取消").assertIsDisplayed().performClick()
+        assertEquals(1, cancellations.get())
+    }
+
     @Test fun longPressAssistantMessageOnlyShowsUsefulReplyActions() {
         val state = AgentConversationUiState(
             messages = listOf(AgentConversationMessageUi(turnId = "t1", role = "assistant", text = "这是知伴的回答")),

@@ -10,8 +10,10 @@ import com.zhiban.rebuild.runtime.spi.StagedTextInput
 import com.zhiban.rebuild.runtime.spi.TextInputGateway
 import com.zhiban.rebuild.ui.agent.AgentConversationStage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -23,6 +25,26 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class V2AgentConversationBackendTest {
+    @Test
+    fun `staging timeout re-enables input and allows a later send`() = runTest {
+        val runtime = BackendFakeRuntimeUiClient(SessionProjection("s1"))
+        val input = HangingOnceTextInputGateway()
+        val backend = V2AgentConversationBackend(runtime, input, "s1", this) { "id" }
+        backend.initialize()
+        runCurrent()
+
+        backend.plan("第一次")
+        advanceTimeBy(15_001)
+        runCurrent()
+
+        assertTrue(backend.uiState.value.isInputEnabled)
+        assertEquals("提交超时，请检查网络后重试。", backend.uiState.value.safeMessage)
+        backend.plan("第二次")
+        runCurrent()
+        assertEquals(1, runtime.commands.size)
+        backend.close()
+    }
+
     @Test
     fun `plan stages text once then sends only input reference`() = runTest {
         val input = FakeTextInputGateway()
@@ -142,6 +164,20 @@ private class FakeTextInputGateway : TextInputGateway {
     override suspend fun discard(inputRef: String) {
         discardedRefs += inputRef
     }
+}
+
+private class HangingOnceTextInputGateway : TextInputGateway {
+    private var first = true
+
+    override suspend fun stage(rawText: String): StagedTextInput {
+        if (first) {
+            first = false
+            awaitCancellation()
+        }
+        return StagedTextInput("input-ref-2", rawText.length, "digest", Long.MAX_VALUE)
+    }
+
+    override suspend fun discard(inputRef: String) = Unit
 }
 
 private class BackendFakeRuntimeUiClient(initial: SessionProjection) : RuntimeUiClient {

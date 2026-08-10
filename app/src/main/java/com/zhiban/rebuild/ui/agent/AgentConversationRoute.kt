@@ -148,7 +148,7 @@ fun AgentConversationRoute(
             speechRecognizer = null
             recorder?.let { active ->
                 runCatching { active.stop() }
-                active.release()
+                runCatching { active.release() }
             }
             recorder = null
             recordingFile?.delete()
@@ -477,7 +477,7 @@ fun AgentConversationRoute(
         speechRecognizer?.cancel()
         recorder?.let { active ->
             runCatching { active.stop() }
-            active.release()
+            runCatching { active.release() }
         }
         recorder = null
         recordingFile?.delete()

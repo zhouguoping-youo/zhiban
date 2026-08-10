@@ -12,7 +12,10 @@ import java.time.ZoneId
 
 object AgentProjectionUiMapper {
     fun map(projection: SessionProjection): AgentConversationUiState {
-        if (projection.runId == null && projection.lastAppliedSequence == 0L && !projection.readOnly) {
+        if (
+            projection.runId == null && projection.lastAppliedSequence == 0L && !projection.readOnly &&
+            projection.safeFailureCode == null
+        ) {
             return AgentConversationUiState(stage = AgentConversationStage.EMPTY, inputEnabled = true)
         }
         if (projection.readOnly) {

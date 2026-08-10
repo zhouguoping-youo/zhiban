@@ -6,8 +6,12 @@ import com.zhiban.rebuild.runtime.spi.RuntimeUiClient
 import com.zhiban.rebuild.runtime.spi.RuntimeUiCommand
 import com.zhiban.rebuild.runtime.spi.SessionProjection
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,6 +24,7 @@ class AgentRuntimeProjectionController(
     private val scope: CoroutineScope,
     private val idFactory: () -> String = { UUID.randomUUID().toString() },
     private val reducer: AgentSessionReducer = AgentSessionReducer(),
+    private val reconnectDelayMs: Long = PROJECTION_RECONNECT_DELAY_MS,
 ) {
     private val mutableProjection = MutableStateFlow(SessionProjection(sessionId = sessionId))
     val projection: StateFlow<SessionProjection> = mutableProjection.asStateFlow()
@@ -28,20 +33,41 @@ class AgentRuntimeProjectionController(
     fun initialize() {
         if (observation != null) return
         observation = scope.launch {
-            val rawSnapshot = client.getSessionProjection(sessionId)
-            val recoveryNeeded =
-                rawSnapshot.runId != null && rawSnapshot.runStatus !in TERMINAL_STATUSES && !rawSnapshot.readOnly
-            val snapshot = rawSnapshot.copy(
-                recoveryNeeded = recoveryNeeded,
-                allowedActions = allowedActionsFor(rawSnapshot.runStatus, recoveryNeeded) +
-                    if (rawSnapshot.undoAvailable) setOf(RuntimeAction.UNDO) else emptySet(),
-            )
-            mutableProjection.value = snapshot.withResolvedApprovalDetails()
-            client.observeSession(sessionId, snapshot.lastAppliedSequence).collect { event ->
-                mutableProjection.value = reducer.reduce(mutableProjection.value, event).withResolvedApprovalDetails()
+            while (true) {
+                currentCoroutineContext().ensureActive()
+                try {
+                    val snapshot = normalizedSnapshot(client.getSessionProjection(sessionId))
+                    mutableProjection.value = snapshot.withResolvedApprovalDetails()
+                    client.observeSession(sessionId, snapshot.lastAppliedSequence).collect { event ->
+                        mutableProjection.value = reducer.reduce(mutableProjection.value, event)
+                            .withResolvedApprovalDetails()
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Throwable) {
+                    mutableProjection.value = projectionFailureFallback(mutableProjection.value)
+                }
+                delay(reconnectDelayMs)
             }
         }
     }
+
+    private fun normalizedSnapshot(rawSnapshot: SessionProjection): SessionProjection {
+        val recoveryNeeded =
+            rawSnapshot.runId != null && rawSnapshot.runStatus !in TERMINAL_STATUSES && !rawSnapshot.readOnly
+        return rawSnapshot.copy(
+            recoveryNeeded = recoveryNeeded,
+            allowedActions = allowedActionsFor(rawSnapshot.runStatus, recoveryNeeded) +
+                if (rawSnapshot.undoAvailable) setOf(RuntimeAction.UNDO) else emptySet(),
+        )
+    }
+
+    private fun projectionFailureFallback(previous: SessionProjection): SessionProjection = previous.copy(
+        runStatus = com.zhiban.rebuild.runtime.spi.RuntimeRunStatus.FAILED_RETRYABLE,
+        safeFailureCode = PROJECTION_UNAVAILABLE,
+        allowedActions = setOf(RuntimeAction.START),
+        recoveryNeeded = false,
+    )
 
     // The confirmation card's body (e.g. memory content) is redacted from the durable event journal.
     // When a card becomes pending carrying only an opaque candidateId, resolve the body from the
@@ -151,3 +177,6 @@ private val TERMINAL_STATUSES = setOf(
     com.zhiban.rebuild.runtime.spi.RuntimeRunStatus.CANCELLED,
     com.zhiban.rebuild.runtime.spi.RuntimeRunStatus.FAILED_FINAL,
 )
+
+private const val PROJECTION_RECONNECT_DELAY_MS = 1_000L
+private const val PROJECTION_UNAVAILABLE = "PROJECTION_UNAVAILABLE"

@@ -12,6 +12,7 @@ import com.zhiban.rebuild.runtime.spi.SessionProjection
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -20,6 +21,32 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AgentRuntimeProjectionControllerTest {
+    @Test
+    fun `projection snapshot failure becomes retryable and reconnects`() = runTest {
+        val client = FakeRuntimeUiClient(SessionProjection(sessionId = "session-1")).apply {
+            remainingSnapshotFailures = 1
+        }
+        val controller = AgentRuntimeProjectionController(
+            client = client,
+            sessionId = "session-1",
+            surfaceId = "compose",
+            scope = this,
+            idFactory = { "id" },
+            reconnectDelayMs = 10,
+        )
+
+        controller.initialize()
+        runCurrent()
+        assertEquals(RuntimeRunStatus.FAILED_RETRYABLE, controller.projection.value.runStatus)
+        assertEquals("PROJECTION_UNAVAILABLE", controller.projection.value.safeFailureCode)
+
+        advanceTimeBy(11)
+        runCurrent()
+        assertEquals(null, controller.projection.value.safeFailureCode)
+        assertEquals(2, client.snapshotReads)
+        controller.close()
+    }
+
     @Test
     fun `initialize resumes after projection watermark and reduces new events`() = runTest {
         val client = FakeRuntimeUiClient(
@@ -235,13 +262,19 @@ private class FakeRuntimeUiClient(private val initial: SessionProjection) : Runt
     val events = MutableSharedFlow<RuntimeUiEvent>(extraBufferCapacity = 8)
     val stagedContent = mutableMapOf<String, String>()
     var observedAfterSequence: Long? = null
+    var remainingSnapshotFailures = 0
+    var snapshotReads = 0
 
     override suspend fun dispatch(command: RuntimeUiCommand): CommandReceipt {
         commands += command
         return CommandReceipt(CommandReceiptStatus.ACCEPTED, command.commandId, initial.revision)
     }
 
-    override suspend fun getSessionProjection(sessionId: String): SessionProjection = initial
+    override suspend fun getSessionProjection(sessionId: String): SessionProjection {
+        snapshotReads++
+        if (remainingSnapshotFailures-- > 0) error("synthetic snapshot failure")
+        return initial
+    }
 
     override fun observeSession(sessionId: String, afterSequenceExclusive: Long): Flow<RuntimeUiEvent> {
         observedAfterSequence = afterSequenceExclusive

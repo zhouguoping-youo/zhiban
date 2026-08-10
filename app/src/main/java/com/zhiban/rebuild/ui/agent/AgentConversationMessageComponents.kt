@@ -272,6 +272,17 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
                     }
                 }
             }
+            if (state.stage == AgentConversationStage.EXECUTING && !state.showPlan) {
+                item {
+                    Column {
+                        AssistantMessageBubble("知伴正在完成操作…")
+                        Row {
+                            if (state.canCancel) TextButton(onClick = onCancel) { Text("取消") }
+                            if (state.canResume) TextButton(onClick = onResume) { Text("继续") }
+                        }
+                    }
+                }
+            }
             state.assistantMessage?.takeIf { it != latestAssistant }?.let { item { AssistantMessageBubble(it) } }
             if (state.showPlan) {
                 state.plan?.let {

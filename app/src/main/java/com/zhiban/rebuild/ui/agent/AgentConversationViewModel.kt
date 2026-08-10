@@ -17,14 +17,18 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Bundles the conversation/session persistence gateways the ViewModel coordinates. */
 class ConversationPersistence @Inject constructor(
@@ -83,27 +87,29 @@ class AgentConversationViewModel @Inject constructor(
         }
         initialized = true
         viewModelScope.launch {
-            val activeProfile = providerEnvironment.activeProfile()
-            val preset = com.zhiban.rebuild.runtime.provider.TrustedProviderRegistry().preset(
-                activeProfile?.providerId
-                    ?: com.zhiban.rebuild.runtime.provider.ProviderConfigurationManager.DEFAULT_PROVIDER,
-            )
-            // One user-facing automatic model. The runtime selects the trusted vision model
-            // internally whenever an image or PDF is attached.
-            _availableModels.value = listOf(preset.defaultModel)
-            _selectedModel.value = preset.defaultModel
-            // 问问为单一 coworker 模式，恒为 Work；initialMode 入参保留兼容但不再生效。
-            _selectedMode.value = AGENT_RUNTIME_MODE
-            _cloudAsrAvailability.value = voice.cloudAsrGateway.availability()
-            val sessionId = if (initialDraft.isNotBlank()) {
-                UUID.randomUUID().toString()
-            } else {
-                savedStateHandle[ACTIVE_SESSION_ID]
-                    ?: preferencesManager.getActiveRuntimeSessionId()
-                    ?: UUID.randomUUID().toString()
-            }
-            activateSession(sessionId)
-            if (initialDraft.isNotBlank()) v2Backend?.plan(initialDraft, AGENT_RUNTIME_MODE)
+            runSuspendCatching {
+                val activeProfile = providerEnvironment.activeProfile()
+                val preset = com.zhiban.rebuild.runtime.provider.TrustedProviderRegistry().preset(
+                    activeProfile?.providerId
+                        ?: com.zhiban.rebuild.runtime.provider.ProviderConfigurationManager.DEFAULT_PROVIDER,
+                )
+                // One user-facing automatic model. The runtime selects the trusted vision model
+                // internally whenever an image or PDF is attached.
+                _availableModels.value = listOf(preset.defaultModel)
+                _selectedModel.value = preset.defaultModel
+                // 问问为单一 coworker 模式，恒为 Work；initialMode 入参保留兼容但不再生效。
+                _selectedMode.value = AGENT_RUNTIME_MODE
+                _cloudAsrAvailability.value = voice.cloudAsrGateway.availability()
+                val sessionId = if (initialDraft.isNotBlank()) {
+                    UUID.randomUUID().toString()
+                } else {
+                    savedStateHandle[ACTIVE_SESSION_ID]
+                        ?: preferencesManager.getActiveRuntimeSessionId()
+                        ?: UUID.randomUUID().toString()
+                }
+                activateSession(sessionId)
+                if (initialDraft.isNotBlank()) v2Backend?.plan(initialDraft, AGENT_RUNTIME_MODE)
+            }.onFailure { showSubmissionFailure(AgentConversationStage.FAILED_RETRYABLE, "对话初始化失败，请稍后重试。") }
         }
     }
 
@@ -145,20 +151,33 @@ class AgentConversationViewModel @Inject constructor(
                     messages = messages,
                     artifacts = artifacts,
                 )
+            }.retryWhen { _, _ ->
+                showSubmissionFailure(AgentConversationStage.FAILED_RETRYABLE, "会话刷新失败，正在恢复。")
+                kotlinx.coroutines.delay(PROJECTION_RETRY_DELAY_MS)
+                true
             }.collect(_uiState)
         }
     }
 
     fun loadConversationHistory() {
-        viewModelScope.launch { _conversationHistory.value = persistence.historyGateway.list() }
+        viewModelScope.launch {
+            runSuspendCatching { persistence.historyGateway.list() }
+                .onSuccess { _conversationHistory.value = it }
+                .onFailure { showSubmissionFailure(AgentConversationStage.FAILED_RETRYABLE, "会话列表加载失败，请重试。") }
+        }
     }
 
     fun openConversation(sessionId: String) {
-        viewModelScope.launch { activateSession(sessionId) }
+        viewModelScope.launch { activateSessionSafely(sessionId) }
     }
 
     fun newConversation() {
-        viewModelScope.launch { activateSession(UUID.randomUUID().toString()) }
+        viewModelScope.launch { activateSessionSafely(UUID.randomUUID().toString()) }
+    }
+
+    private suspend fun activateSessionSafely(sessionId: String) {
+        runSuspendCatching { activateSession(sessionId) }
+            .onFailure { showSubmissionFailure(AgentConversationStage.FAILED_RETRYABLE, "会话暂时无法打开，请稍后重试。") }
     }
 
     fun confirmPerceptionCandidate(candidate: NotificationCandidateEntity) {
@@ -223,44 +242,67 @@ class AgentConversationViewModel @Inject constructor(
                     }
                     return@launch
                 }
-                val expiresAt = System.currentTimeMillis() + 24 * 60 * 60 * 1_000L
-                try {
-                    attachmentContentRefs.distinct().forEach { contentRef ->
-                        staged += gateways.attachmentStagingGateway.stage(sessionId, contentRef, expiresAt)
-                    }
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (_: Throwable) {
-                    staged.forEach { gateways.attachmentStagingGateway.discard(it.attachmentId) }
-                    _uiState.update {
-                        it.copy(
-                            stage = AgentConversationStage.FAILED_FINAL,
-                            safeMessage = "附件无法安全读取，原内容已保留，请重新选择或重试。",
-                            inputEnabled = true,
-                        )
-                    }
-                    return@launch
-                }
-                if (runSuspendCatching {
-                        staged.forEach { persistence.sessionWorkspace.preserveAttachment(sessionId, it) }
-                    }.isFailure
-                ) {
-                    staged.forEach { gateways.attachmentStagingGateway.discard(it.attachmentId) }
-                    _uiState.update {
-                        it.copy(
-                            stage = AgentConversationStage.FAILED_FINAL,
-                            safeMessage = "附件未能保存到本次对话，原内容已保留，请重试。",
-                            inputEnabled = true,
-                        )
-                    }
-                    return@launch
-                }
+                if (!prepareAttachments(sessionId, attachmentContentRefs, staged)) return@launch
                 onAccepted()
                 v2Backend?.plan(input, AGENT_RUNTIME_MODE, _selectedModel.value, _selectedLevel.value, staged)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                staged.forEach { runSuspendCatching { gateways.attachmentStagingGateway.discard(it.attachmentId) } }
+                _uiState.update {
+                    it.copy(
+                        stage = AgentConversationStage.FAILED_RETRYABLE,
+                        safeMessage = "暂时无法提交，请稍后重试。",
+                        inputEnabled = true,
+                    )
+                }
             } finally {
                 submissionInFlight = false
             }
         }
+    }
+
+    private suspend fun prepareAttachments(
+        sessionId: String,
+        contentRefs: List<String>,
+        staged: MutableList<com.zhiban.rebuild.runtime.input.AttachmentRef>,
+    ): Boolean {
+        val expiresAt = System.currentTimeMillis() + 24 * 60 * 60 * 1_000L
+        try {
+            withTimeout(ATTACHMENT_PREPARATION_TIMEOUT_MS) {
+                contentRefs.distinct().forEach { contentRef ->
+                    staged += gateways.attachmentStagingGateway.stage(sessionId, contentRef, expiresAt)
+                }
+            }
+        } catch (_: TimeoutCancellationException) {
+            discardStagedAttachments(staged)
+            showSubmissionFailure(AgentConversationStage.FAILED_RETRYABLE, "附件读取超时，请重新选择或重试。")
+            return false
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Throwable) {
+            discardStagedAttachments(staged)
+            showSubmissionFailure(AgentConversationStage.FAILED_FINAL, "附件无法安全读取，原内容已保留，请重新选择或重试。")
+            return false
+        }
+        val preserved = withTimeoutOrNull(ATTACHMENT_PRESERVE_TIMEOUT_MS) {
+            runSuspendCatching {
+                staged.forEach { persistence.sessionWorkspace.preserveAttachment(sessionId, it) }
+            }.isSuccess
+        } == true
+        if (!preserved) {
+            discardStagedAttachments(staged)
+            showSubmissionFailure(AgentConversationStage.FAILED_FINAL, "附件未能保存到本次对话，原内容已保留，请重试。")
+        }
+        return preserved
+    }
+
+    private suspend fun discardStagedAttachments(staged: List<com.zhiban.rebuild.runtime.input.AttachmentRef>) {
+        staged.forEach { runSuspendCatching { gateways.attachmentStagingGateway.discard(it.attachmentId) } }
+    }
+
+    private fun showSubmissionFailure(stage: AgentConversationStage, message: String) {
+        _uiState.update { it.copy(stage = stage, safeMessage = message, inputEnabled = true) }
     }
 
     // The user sees one automatic Agent model. Runtime switches to Step 3
@@ -366,5 +408,8 @@ class AgentConversationViewModel @Inject constructor(
         /** Runtime compatibility value. This is not a user-facing mode. */
         const val AGENT_RUNTIME_MODE = "Work"
         private const val ACTIVE_SESSION_ID = "agent.runtimeSessionId"
+        private const val ATTACHMENT_PREPARATION_TIMEOUT_MS = 30_000L
+        private const val ATTACHMENT_PRESERVE_TIMEOUT_MS = 15_000L
+        private const val PROJECTION_RETRY_DELAY_MS = 1_000L
     }
 }
