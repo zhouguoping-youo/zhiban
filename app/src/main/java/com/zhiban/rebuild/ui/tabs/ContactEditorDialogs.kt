@@ -93,7 +93,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -119,6 +118,7 @@ import com.zhiban.rebuild.data.notification.ScheduleInsight
 import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.personalization.UserProfile
+import com.zhiban.rebuild.ui.components.ZhiBanDialogHost
 import com.zhiban.rebuild.ui.components.ZhiBanPrimaryTabHeader
 import com.zhiban.rebuild.ui.components.ZhiBanSearchField
 import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
@@ -156,7 +156,7 @@ internal fun ContactImportDialog(state: ContactImportUiState, onDismiss: () -> U
     var selected by remember(state.contacts) {
         mutableStateOf(state.contacts.map(SystemContactCandidate::sourceId).toSet())
     }
-    Dialog(onDismissRequest = { if (!state.isImporting) onDismiss() }) {
+    ZhiBanDialogHost(onDismissRequest = { if (!state.isImporting) onDismiss() }) {
         Column(
             Modifier
                 .fillMaxWidth()
@@ -301,7 +301,7 @@ internal fun ContactImportDialog(state: ContactImportUiState, onDismiss: () -> U
                         ) {
                             if (state.isImporting) {
                                 CircularProgressIndicator(
-                                    color = Color.White,
+                                    color = MaterialTheme.colorScheme.onPrimary,
                                     strokeWidth = 2.dp,
                                     modifier = Modifier.size(20.dp),
                                 )
@@ -331,7 +331,7 @@ internal fun ContactEditorDialog(
     var tag by remember(contact?.contactId) { mutableStateOf(contact?.firstKnownTag() ?: "朋友") }
     var note by remember(contact?.contactId) { mutableStateOf(contact?.note.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
-    Dialog(
+    ZhiBanDialogHost(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
@@ -405,7 +405,7 @@ internal fun ContactEditorDialog(
                         RelationTags.drop(1).forEach {
                             Text(
                                 it,
-                                color = if (tag == it) Color.White else RelationMuted,
+                                color = if (tag == it) MaterialTheme.colorScheme.onPrimary else RelationMuted,
                                 modifier = Modifier.defaultMinSize(minHeight = 48.dp)
                                     .clip(RoundedCornerShape(24.dp)).background(
                                         if (tag ==

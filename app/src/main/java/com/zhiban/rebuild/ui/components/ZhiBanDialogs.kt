@@ -1,5 +1,7 @@
 package com.zhiban.rebuild.ui.components
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -19,7 +21,9 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ProvideTextStyle
+import androidx.compose.material3.SheetState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -84,6 +88,12 @@ fun ZhiBanAlertDialog(
     )
 }
 
+/** Shared platform host for complex feature dialogs with their own task surface. */
+@Composable
+fun ZhiBanDialogHost(onDismissRequest: () -> Unit, properties: DialogProperties = DialogProperties(), content: @Composable () -> Unit) {
+    Dialog(onDismissRequest = onDismissRequest, properties = properties, content = content)
+}
+
 /**
  * Canonical large task dialog used by editors, imports and detail surfaces.
  * It adapts to compact screens, system bars and the IME without every feature
@@ -125,6 +135,91 @@ fun ZhiBanTaskDialog(
                 )
             }
         }
+    }
+}
+
+/**
+ * Canonical lightweight popover for compact pickers anchored over a page.
+ * Alignment and outer inset describe placement; the visual shell stays global.
+ */
+@Composable
+fun ZhiBanPopoverDialog(
+    onDismissRequest: () -> Unit,
+    alignment: Alignment,
+    modifier: Modifier = Modifier,
+    maxWidth: Dp = 280.dp,
+    properties: DialogProperties = DialogProperties(usePlatformDefaultWidth = false),
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Dialog(onDismissRequest = onDismissRequest, properties = properties) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(onClick = onDismissRequest),
+            contentAlignment = alignment,
+        ) {
+            Surface(
+                modifier = modifier
+                    .fillMaxWidth()
+                    .widthIn(max = maxWidth)
+                    .clickable(enabled = true, onClick = {}),
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(ZhiBanRadius.Dialog),
+                shadowElevation = ZhiBanSpacing.Sm,
+            ) {
+                Column(content = content)
+            }
+        }
+    }
+}
+
+/** Canonical bottom sheet. Features provide content, never their own shell. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+fun ZhiBanBottomSheet(
+    onDismissRequest: () -> Unit,
+    modifier: Modifier = Modifier,
+    sheetState: SheetState? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val handle: @Composable (() -> Unit) = {
+        Box(
+            Modifier
+                .padding(vertical = ZhiBanSpacing.Md)
+                .size(width = 36.dp, height = 4.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    shape = RoundedCornerShape(2.dp),
+                ),
+        )
+    }
+    if (sheetState == null) {
+        ModalBottomSheet(
+            onDismissRequest = onDismissRequest,
+            modifier = modifier,
+            shape = RoundedCornerShape(
+                topStart = ZhiBanRadius.Dialog,
+                topEnd = ZhiBanRadius.Dialog,
+            ),
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 0.dp,
+            dragHandle = handle,
+            content = content,
+        )
+    } else {
+        ModalBottomSheet(
+            onDismissRequest = onDismissRequest,
+            modifier = modifier,
+            sheetState = sheetState,
+            shape = RoundedCornerShape(
+                topStart = ZhiBanRadius.Dialog,
+                topEnd = ZhiBanRadius.Dialog,
+            ),
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 0.dp,
+            dragHandle = handle,
+            content = content,
+        )
     }
 }
 

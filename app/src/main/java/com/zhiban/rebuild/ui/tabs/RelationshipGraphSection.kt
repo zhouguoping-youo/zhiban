@@ -495,7 +495,7 @@ internal fun GraphPersonAvatar(person: RelationshipPersonUi, onClick: () -> Unit
         ) {
             Text(
                 person.displayName.take(1),
-                color = if (person.isOwner) Color.White else RelationInk,
+                color = if (person.isOwner) MaterialTheme.colorScheme.onPrimary else RelationInk,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Medium,
             )
@@ -527,7 +527,7 @@ internal fun GraphCenterNode(person: RelationshipPersonUi) {
     ) {
         Text(
             if (person.isOwner) "我" else person.displayName.take(1),
-            color = if (person.isOwner) Color.White else RelationInk,
+            color = if (person.isOwner) MaterialTheme.colorScheme.onPrimary else RelationInk,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
         )
@@ -564,7 +564,7 @@ internal fun GraphPersonNode(person: RelationshipPersonUi, labelAbove: Boolean =
         ) {
             Text(
                 person.displayName.take(1),
-                color = if (person.isOwner) Color.White else RelationInk,
+                color = if (person.isOwner) MaterialTheme.colorScheme.onPrimary else RelationInk,
                 fontWeight = FontWeight.Medium,
             )
         }

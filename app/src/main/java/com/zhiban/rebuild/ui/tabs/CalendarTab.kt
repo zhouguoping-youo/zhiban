@@ -661,7 +661,7 @@ private fun SystemCalendarImportDialog(state: CalendarAgentViewModel.ImportState
                     shape = RoundedCornerShape(ZhiBanRadius.Card),
                 ) {
                     if (state.isImporting) {
-                        CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                        CircularProgressIndicator(Modifier.size(18.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
                     } else {
                         Text("导入 ${selectedEvents.size} 条日程")
                     }
@@ -718,7 +718,7 @@ private fun WeekStrip(selected: LocalDate, onSelect: (LocalDate) -> Unit) {
                     Text(
                         date.dayOfMonth.toString(),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (active) Color.White else CalendarInk,
+                        color = if (active) MaterialTheme.colorScheme.onPrimary else CalendarInk,
                         fontWeight = if (active || date == LocalDate.now()) FontWeight.SemiBold else FontWeight.Normal,
                     )
                 }
@@ -757,8 +757,8 @@ internal fun MonthGrid(selected: LocalDate, onSelect: (LocalDate) -> Unit) {
                         Text(
                             date.dayOfMonth.toString(),
                             color = when {
-                                date == selected -> Color.White
-                                date.month != selected.month -> Color(0xFFB8B8B8)
+                                date == selected -> MaterialTheme.colorScheme.onPrimary
+                                date.month != selected.month -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
                                 else -> CalendarInk
                             },
                             style = MaterialTheme.typography.bodySmall,

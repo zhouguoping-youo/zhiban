@@ -90,7 +90,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -116,6 +115,7 @@ import com.zhiban.rebuild.data.notification.ScheduleInsight
 import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.personalization.UserProfile
+import com.zhiban.rebuild.ui.components.ZhiBanDialogHost
 import com.zhiban.rebuild.ui.components.ZhiBanPrimaryTabHeader
 import com.zhiban.rebuild.ui.components.ZhiBanSearchField
 import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
@@ -189,7 +189,7 @@ internal fun RelationshipEditorDialog(
             .take(8)
             .toList()
     }
-    Dialog(
+    ZhiBanDialogHost(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
@@ -412,7 +412,7 @@ internal fun RelationshipTypeGrid(relationTypes: List<String>, selectedType: Str
                 ) {
                     Text(
                         relationLabel(value),
-                        color = if (selectedType == value) Color.White else RelationMuted,
+                        color = if (selectedType == value) MaterialTheme.colorScheme.onPrimary else RelationMuted,
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
@@ -445,7 +445,7 @@ internal fun PersonChoiceRow(people: List<RelationshipPersonUi>, selectedId: Str
                 } else {
                     person.displayName
                 },
-                color = if (selectedId == person.personId) Color.White else RelationMuted,
+                color = if (selectedId == person.personId) MaterialTheme.colorScheme.onPrimary else RelationMuted,
                 modifier = Modifier.clip(RoundedCornerShape(16.dp))
                     .background(if (selectedId == person.personId) RelationAccent else RelationSoft)
                     .clickable { onSelect(person.personId) }
@@ -556,7 +556,7 @@ internal fun RelationshipEventEditorDialog(
         "FAMILY_MILESTONE" -> "${subject.displayName}的重要家庭事件"
         else -> "和${subject.displayName}的一段经历"
     }
-    Dialog(onDismissRequest = onDismiss) {
+    ZhiBanDialogHost(onDismissRequest = onDismiss) {
         LazyColumn(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Dialog)).background(RelationSurface),
             contentPadding = PaddingValues(20.dp),
@@ -589,7 +589,7 @@ internal fun RelationshipEventEditorDialog(
                     types.forEach { value ->
                         Text(
                             relationshipEventTypeLabel(value),
-                            color = if (type == value) Color.White else RelationMuted,
+                            color = if (type == value) MaterialTheme.colorScheme.onPrimary else RelationMuted,
                             modifier = Modifier.clip(RoundedCornerShape(16.dp))
                                 .background(if (type == value) RelationAccent else RelationSoft)
                                 .clickable {
@@ -622,7 +622,7 @@ internal fun RelationshipEventEditorDialog(
                     if (type != "INTRODUCTION") {
                         Text(
                             "只有我和TA",
-                            color = if (relatedId.isBlank()) Color.White else RelationMuted,
+                            color = if (relatedId.isBlank()) MaterialTheme.colorScheme.onPrimary else RelationMuted,
                             modifier = Modifier.clip(
                                 RoundedCornerShape(16.dp),
                             ).background(if (relatedId.isBlank()) RelationAccent else RelationSoft)
@@ -637,7 +637,7 @@ internal fun RelationshipEventEditorDialog(
                     others.forEach { contact ->
                         Text(
                             contact.displayName,
-                            color = if (relatedId == contact.contactId) Color.White else RelationMuted,
+                            color = if (relatedId == contact.contactId) MaterialTheme.colorScheme.onPrimary else RelationMuted,
                             modifier = Modifier.clip(RoundedCornerShape(16.dp)).background(
                                 if (relatedId ==
                                     contact.contactId
@@ -741,7 +741,7 @@ internal fun RelationshipEventEditorDialog(
 
 @Composable
 internal fun RelationshipEventDetailDialog(value: RelationshipEventWithParticipants, onDismiss: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
+    ZhiBanDialogHost(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Dialog)).background(RelationSurface).padding(20.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) { Icon(Icons.Rounded.Close, "关闭") }
@@ -817,7 +817,7 @@ internal fun RelationshipEvidenceDialog(
     val to = personNames[edge.toContactId] ?: "未知联系人"
     val relationTypes =
         listOf("FAMILY", "FRIEND", "COLLEAGUE", "CUSTOMER", "SUPPLIER", "TEACHER", "CLASSMATE", "PROJECT_PARTNER", "OTHER")
-    Dialog(onDismissRequest = onDismiss) {
+    ZhiBanDialogHost(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Dialog)).background(RelationSurface).padding(20.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) { Icon(Icons.Rounded.Close, "关闭") }

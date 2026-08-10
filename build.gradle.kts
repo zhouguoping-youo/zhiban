@@ -137,10 +137,46 @@ tasks.register("verifyAgentModuleBoundaries") {
     }
 }
 
+tasks.register("verifyUiConsistency") {
+    group = "verification"
+    description = "Prevents feature pages from bypassing the shared visual system."
+    doLast {
+        val uiRoot = file("app/src/main/java/com/zhiban/rebuild/ui")
+        val violations = mutableListOf<String>()
+        uiRoot.walkTopDown().filter { it.isFile && it.extension == "kt" }.forEach { source ->
+            val relative = source.relativeTo(projectDir).path
+            val text = source.readText()
+            if (!relative.endsWith("ui/components/ZhiBanToggles.kt") && Regex("\\bSwitch\\s*\\(").containsMatchIn(text)) {
+                violations += "$relative uses Switch directly; use ZhiBanSwitch/ZhiBanToggleRow"
+            }
+            if (!relative.endsWith("ui/components/ZhiBanDialogs.kt")) {
+                if (Regex("\\bAlertDialog\\s*\\(").containsMatchIn(text)) {
+                    violations += "$relative uses AlertDialog directly; use ZhiBanAlertDialog"
+                }
+                if (Regex("\\bModalBottomSheet\\s*\\(").containsMatchIn(text)) {
+                    violations += "$relative uses ModalBottomSheet directly; use ZhiBanBottomSheet"
+                }
+                if (Regex("\\bDialog\\s*\\(").containsMatchIn(text)) {
+                    violations += "$relative uses Dialog directly; use ZhiBanDialogHost/ZhiBanTaskDialog/ZhiBanPopoverDialog"
+                }
+            }
+            if (!relative.contains("/ui/theme/") && !relative.contains("/ui/icons/") && Regex("Color\\(0x").containsMatchIn(text)) {
+                violations += "$relative declares a raw color; use a theme semantic role"
+            }
+            if (!relative.endsWith("ui/theme/Type.kt") && !relative.endsWith("ui/components/ZhiBanVisual.kt") && Regex("fontSize\\s*=").containsMatchIn(text)) {
+                violations += "$relative declares a font size; use MaterialTheme.typography"
+            }
+        }
+        check(violations.isEmpty()) {
+            violations.joinToString("\n", prefix = "UI consistency violations:\n")
+        }
+    }
+}
+
 val check = tasks.register("check") {
     group = "verification"
     description = "Runs project checks together with Agent module ownership verification."
-    dependsOn("verifyAgentModuleBoundaries", "verifyNoCommittedSecrets", "qualityReport")
+    dependsOn("verifyAgentModuleBoundaries", "verifyNoCommittedSecrets", "verifyUiConsistency", "qualityReport")
 }
 
 gradle.projectsEvaluated {

@@ -364,7 +364,7 @@ private fun ErrorBanner(message: String) {
 
 @Composable
 private fun ModelRow(option: ModelOption, selected: Boolean, onClick: () -> Unit) {
-    val borderColor = if (selected) ZhiBanTerracotta else Color.White.copy(alpha = 0.86f)
+    val borderColor = if (selected) ZhiBanTerracotta else MaterialTheme.colorScheme.outlineVariant
     val bgColor = if (selected) ZhiBanTerracottaSoft else ZhiBanCard.copy(alpha = 0.6f)
     Row(
         modifier = Modifier
@@ -386,7 +386,7 @@ private fun ModelRow(option: ModelOption, selected: Boolean, onClick: () -> Unit
                 .border(1.5.dp, if (selected) ZhiBanTerracotta else Gray500, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            if (selected) Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(Color.White))
+            if (selected) Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onPrimary))
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -405,7 +405,7 @@ private fun ModelRow(option: ModelOption, selected: Boolean, onClick: () -> Unit
                             .background(ZhiBanTerracotta)
                             .padding(horizontal = 6.dp, vertical = 1.dp),
                     ) {
-                        Text("推荐", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                        Text("推荐", color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }

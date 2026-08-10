@@ -33,7 +33,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -42,6 +41,7 @@ import com.zhiban.rebuild.ui.components.ZhiBanGlassCard
 import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.theme.Gray100
 import com.zhiban.rebuild.ui.theme.Gray500
+import com.zhiban.rebuild.ui.theme.SuccessText
 import com.zhiban.rebuild.ui.theme.ZhiBanCard
 import com.zhiban.rebuild.ui.theme.ZhiBanIconContainer
 import com.zhiban.rebuild.ui.theme.ZhiBanIconSize
@@ -185,7 +185,7 @@ fun HomeTab(modifier: Modifier = Modifier, onOpenAssistantChat: (String) -> Unit
                             ).padding(horizontal = 14.dp, vertical = 8.dp),
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF8EBA8D)))
+                                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(SuccessText))
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     "连接大模型",
@@ -207,7 +207,7 @@ fun HomeTab(modifier: Modifier = Modifier, onOpenAssistantChat: (String) -> Unit
                             Icon(
                                 Icons.Outlined.Mic,
                                 contentDescription = "发送",
-                                tint = Color.White,
+                                tint = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier.size(ZhiBanIconSize.Action),
                             )
                         }

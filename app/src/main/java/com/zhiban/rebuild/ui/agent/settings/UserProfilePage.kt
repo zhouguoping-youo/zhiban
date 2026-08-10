@@ -383,7 +383,7 @@ private fun AvatarCard(avatarBytes: ByteArray?, displayName: String, onPick: () 
                 } else {
                     Text(
                         displayName.take(1).ifBlank { "我" },
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onPrimary,
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -394,7 +394,7 @@ private fun AvatarCard(avatarBytes: ByteArray?, displayName: String, onPick: () 
                         .offset(x = 2.dp, y = 2.dp)
                         .size(22.dp)
                         .clip(CircleShape)
-                        .background(Color.White),
+                        .background(MaterialTheme.colorScheme.surface),
                     contentAlignment = Alignment.Center,
                 ) {
                     Box(
@@ -404,7 +404,7 @@ private fun AvatarCard(avatarBytes: ByteArray?, displayName: String, onPick: () 
                         Icon(
                             Icons.Outlined.Edit,
                             contentDescription = "更换头像",
-                            tint = Color.White,
+                            tint = MaterialTheme.colorScheme.inverseOnSurface,
                             modifier = Modifier.size(11.dp),
                         )
                     }
@@ -521,7 +521,7 @@ private fun OccupationChip(label: String, selected: Boolean, onClick: () -> Unit
             containerColor = MaterialTheme.colorScheme.surface,
             labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
             selectedContainerColor = ZhiBanTerracotta,
-            selectedLabelColor = Color.White,
+            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
         ),
         border = FilterChipDefaults.filterChipBorder(
             enabled = true,

@@ -68,3 +68,21 @@
 - 选中、连接、录音、转写和执行状态需要可被 TalkBack 感知。
 - 至少验证系统字体 100% 和 130%，浅色和深色模式，键盘打开/关闭，权限允许/拒绝，以及无网络状态。
 - 发布前在真实 Android 路由逐屏检查：日历、关系、问问、能力、我的、智能体设置、大模型连接、记忆、工具和所有系统设置页。
+
+## 9. 页面深度与唯一实现
+
+页面深度只改变信息密度，不改变产品外观。新增页面必须复用下列实现：
+
+| 角色 | 唯一实现 |
+| --- | --- |
+| 五个一级页头 | `ZhiBanPrimaryTabHeader` |
+| 二、三、四级页头 | `ZhiBanTopBar` |
+| 短决策弹窗 | `ZhiBanAlertDialog` |
+| 编辑、导入、详情弹窗 | `ZhiBanTaskDialog` 或 `ZhiBanDialogHost` |
+| 紧凑选择浮层 | `ZhiBanPopoverDialog` |
+| 底部抽屉 | `ZhiBanBottomSheet` |
+| 二元开关 | `ZhiBanSwitch` / `ZhiBanToggleRow` |
+| 页面保存 | `ZhiBanSaveButton` |
+| 普通卡片 | `zhiBanCardSurface` |
+
+`verifyUiConsistency` 已接入根 `check`：业务页面不得直接创建 `Dialog`、`AlertDialog`、`ModalBottomSheet`、`Switch`、字号或十六进制颜色。例外必须先进入主题或共享组件，不能在页面本地绕过。

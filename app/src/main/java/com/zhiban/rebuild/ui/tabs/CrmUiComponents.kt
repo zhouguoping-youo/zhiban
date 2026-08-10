@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.zhiban.rebuild.data.crm.CrmOpportunityStage
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
+import com.zhiban.rebuild.ui.theme.FailureText
 import com.zhiban.rebuild.ui.theme.ZhiBanIconSize
 import com.zhiban.rebuild.ui.theme.ZhiBanRadius
 import com.zhiban.rebuild.ui.theme.ZhiBanSize
@@ -99,8 +100,8 @@ private val crmDateTimeFormatter = DateTimeFormatter.ofPattern("M月d日 E HH:mm
 private val crmDateFormatter = DateTimeFormatter.ofPattern("M月d日", Locale.CHINA)
 
 /** Warning tone for overdue follow-ups; readable on both light and dark surfaces. */
-internal val CrmOverdueColor = Color(0xFFB3261E)
-internal val CrmOverdueSoft = Color(0x1AB3261E)
+internal val CrmOverdueColor = FailureText
+internal val CrmOverdueSoft = FailureText.copy(alpha = 0.10f)
 
 internal fun formatCrmDateTime(epochMs: Long?): String = epochMs?.let {
     Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).format(crmDateTimeFormatter)

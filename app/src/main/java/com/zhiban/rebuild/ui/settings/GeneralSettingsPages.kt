@@ -695,7 +695,7 @@ fun AboutZhiBanPage(onBack: () -> Unit) {
             ) {
                 Text(
                     "知",
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
                 )

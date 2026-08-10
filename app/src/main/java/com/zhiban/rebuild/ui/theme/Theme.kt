@@ -61,9 +61,12 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 private val ZhiBanShapes = Shapes(
-    extraSmall = RoundedCornerShape(ZhiBanRadius.ExtraSmall),
+    // Material text fields consume extraSmall; keep every form field on the
+    // same 18 dp product radius even when a page uses Material directly.
+    extraSmall = RoundedCornerShape(ZhiBanRadius.Input),
     small = RoundedCornerShape(ZhiBanRadius.Small),
-    medium = RoundedCornerShape(ZhiBanRadius.Medium),
+    // Cards consume medium in Material 3.
+    medium = RoundedCornerShape(ZhiBanRadius.Card),
     large = RoundedCornerShape(ZhiBanRadius.Card),
     extraLarge = RoundedCornerShape(ZhiBanRadius.Dialog),
 )

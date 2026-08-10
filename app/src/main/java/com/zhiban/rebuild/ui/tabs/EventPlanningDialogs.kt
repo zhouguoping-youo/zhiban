@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -21,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.event.EventResponseStatus
+import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.theme.ZhiBanSpacing
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -40,7 +40,7 @@ internal fun CreateEventPlanDialog(onDismiss: () -> Unit, onCreate: (EventPlanDr
     val time = runCatching { LocalTime.parse(timeText) }.getOrNull()
     val duration = durationText.toIntOrNull()
     val valid = title.isNotBlank() && date != null && time != null && duration in 15..1_440
-    AlertDialog(
+    ZhiBanAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("开始安排") },
         text = {
@@ -89,7 +89,7 @@ internal fun EventContactPicker(contacts: List<ContactEntity>, onDismiss: () -> 
     val visible = remember(contacts, query) {
         contacts.filter { query.isBlank() || it.displayName.contains(query, ignoreCase = true) || it.company.orEmpty().contains(query, ignoreCase = true) }
     }
-    AlertDialog(
+    ZhiBanAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("添加参与人") },
         text = {
@@ -115,7 +115,7 @@ internal fun EventContactPicker(contacts: List<ContactEntity>, onDismiss: () -> 
 
 @Composable
 internal fun ResponseStatusDialog(contactName: String, onDismiss: () -> Unit, onSelect: (String) -> Unit) {
-    AlertDialog(
+    ZhiBanAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(contactName) },
         text = {

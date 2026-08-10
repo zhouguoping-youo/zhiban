@@ -388,29 +388,18 @@ private fun AttachmentPickerSheet(
     onOpenPlugins: () -> Unit,
     onEnableSmart: () -> Unit,
 ) {
-    androidx.compose.ui.window.Dialog(
+    com.zhiban.rebuild.ui.components.ZhiBanPopoverDialog(
         onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+        alignment = Alignment.BottomStart,
+        modifier = Modifier.padding(start = 22.dp, end = 16.dp, bottom = 112.dp),
+        maxWidth = 282.dp,
     ) {
-        Box(Modifier.fillMaxSize().clickable(onClick = onDismiss), contentAlignment = Alignment.BottomStart) {
-            Surface(
-                Modifier
-                    .padding(start = 22.dp, end = 16.dp, bottom = 112.dp)
-                    .widthIn(max = 282.dp)
-                    .fillMaxWidth()
-                    .clickable { },
-                color = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(ZhiBanRadius.Dialog),
-                shadowElevation = 10.dp,
-            ) {
-                Column(Modifier.padding(vertical = 8.dp)) {
-                    PickerMenuRow("相机", Icons.Outlined.CameraAlt) { onCapturePhoto() }
-                    PickerMenuRow("照片", Icons.Outlined.Image) { onPickImage() }
-                    PickerMenuRow("文件", Icons.Outlined.AttachFile) { onPickFile() }
-                    PickerMenuRow("插件", Icons.Outlined.Extension, onClick = onOpenPlugins)
-                    PickerMenuRow("智能", Icons.Outlined.AutoAwesome, selected = true, onClick = onEnableSmart)
-                }
-            }
+        Column(Modifier.padding(vertical = ZhiBanSpacing.Sm)) {
+            PickerMenuRow("相机", Icons.Outlined.CameraAlt) { onCapturePhoto() }
+            PickerMenuRow("照片", Icons.Outlined.Image) { onPickImage() }
+            PickerMenuRow("文件", Icons.Outlined.AttachFile) { onPickFile() }
+            PickerMenuRow("插件", Icons.Outlined.Extension, onClick = onOpenPlugins)
+            PickerMenuRow("智能", Icons.Outlined.AutoAwesome, selected = true, onClick = onEnableSmart)
         }
     }
 }
@@ -454,62 +443,51 @@ internal fun ModelPickerSheet(
     onModelSelect: (String) -> Unit,
     onLevelSelect: (String) -> Unit,
 ) {
-    androidx.compose.ui.window.Dialog(
+    com.zhiban.rebuild.ui.components.ZhiBanPopoverDialog(
         onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+        alignment = Alignment.CenterEnd,
+        modifier = Modifier.padding(horizontal = ZhiBanSpacing.Lg),
+        maxWidth = 258.dp,
     ) {
-        Box(Modifier.fillMaxSize().clickable(onClick = onDismiss), contentAlignment = Alignment.CenterEnd) {
-            Surface(
-                Modifier
-                    .padding(start = 18.dp, end = 18.dp)
-                    .widthIn(max = 258.dp)
-                    .fillMaxWidth()
-                    .clickable { },
-                color = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(ZhiBanRadius.Dialog),
-                shadowElevation = 10.dp,
-            ) {
-                Column(
-                    Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+        Column(
+            Modifier.padding(horizontal = ZhiBanSpacing.Lg, vertical = ZhiBanSpacing.Md),
+            verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Xs),
+        ) {
+            Text(
+                "模型",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = ZhiBanTextPrimary,
+            )
+            models.forEach { model ->
+                Text(
+                    model + if (currentLabel.startsWith(model)) "  ✓" else "",
+                    Modifier.fillMaxWidth().clickable { onModelSelect(model) }.padding(vertical = 12.dp),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (currentLabel.startsWith(model)) ZhiBanTextPrimary else ZhiBanTextSecondary,
+                )
+            }
+            HorizontalDivider(color = Gray500.copy(alpha = .2f))
+            Text(
+                "智能",
+                modifier = Modifier.padding(top = 3.dp),
+                style = MaterialTheme.typography.labelLarge,
+                color = ZhiBanTextSecondary,
+            )
+            levels.forEach { level ->
+                Row(
+                    Modifier.fillMaxWidth().height(ZhiBanSize.TouchTarget).clickable {
+                        onLevelSelect(level)
+                    },
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        "模型",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
+                        level,
+                        Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyLarge,
                         color = ZhiBanTextPrimary,
                     )
-                    models.forEach { model ->
-                        Text(
-                            model + if (currentLabel.startsWith(model)) "  ✓" else "",
-                            Modifier.fillMaxWidth().clickable { onModelSelect(model) }.padding(vertical = 12.dp),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = if (currentLabel.startsWith(model)) ZhiBanTextPrimary else ZhiBanTextSecondary,
-                        )
-                    }
-                    HorizontalDivider(color = Gray500.copy(alpha = .2f))
-                    Text(
-                        "智能",
-                        modifier = Modifier.padding(top = 3.dp),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = ZhiBanTextSecondary,
-                    )
-                    levels.forEach { level ->
-                        Row(
-                            Modifier.fillMaxWidth().height(ZhiBanSize.TouchTarget).clickable {
-                                onLevelSelect(level)
-                            },
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                level,
-                                Modifier.weight(1f),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = ZhiBanTextPrimary,
-                            )
-                            if (currentLabel.endsWith(level)) Text("✓", style = MaterialTheme.typography.titleMedium)
-                        }
-                    }
+                    if (currentLabel.endsWith(level)) Text("✓", style = MaterialTheme.typography.titleMedium)
                 }
             }
         }

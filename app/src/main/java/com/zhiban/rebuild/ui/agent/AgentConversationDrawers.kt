@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
+import com.zhiban.rebuild.ui.components.ZhiBanBottomSheet
 import com.zhiban.rebuild.ui.theme.*
 import kotlin.math.abs
 import kotlin.math.sin
@@ -175,12 +176,8 @@ fun MoreDrawer(
     },
     onNavigateToSettings: () -> Unit,
 ) {
-    ModalBottomSheet(
+    ZhiBanBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(topStart = ZhiBanRadius.Dialog, topEnd = ZhiBanRadius.Dialog),
-        tonalElevation = 0.dp,
-        dragHandle = { BottomSheetDefaults.DragHandle() },
     ) {
         Column(
             modifier = Modifier

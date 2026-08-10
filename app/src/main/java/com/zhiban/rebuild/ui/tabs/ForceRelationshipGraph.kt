@@ -690,20 +690,9 @@ private fun ForceNodeDetailSheet(node: ForceGraphNode, model: ForceGraphModel, o
         .map(ForceGraphLink::confidence)
         .average()
         .takeUnless(Double::isNaN)
-    ModalBottomSheet(
+    com.zhiban.rebuild.ui.components.ZhiBanBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
-        dragHandle = {
-            Box(
-                Modifier
-                    .padding(vertical = ZhiBanSpacing.Sm)
-                    .width(36.dp)
-                    .height(4.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.outlineVariant),
-            )
-        },
     ) {
         Column(
             Modifier

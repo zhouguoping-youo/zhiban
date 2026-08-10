@@ -91,7 +91,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -119,6 +118,7 @@ import com.zhiban.rebuild.data.notification.ScheduleInsight
 import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.personalization.UserProfile
+import com.zhiban.rebuild.ui.components.ZhiBanDialogHost
 import com.zhiban.rebuild.ui.components.ZhiBanPrimaryTabHeader
 import com.zhiban.rebuild.ui.components.ZhiBanSearchField
 import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
@@ -186,7 +186,7 @@ internal fun ContactDetailDialog(
     onCall: () -> Unit,
     onMessage: () -> Unit,
 ) {
-    Dialog(onDismissRequest = onDismiss) {
+    ZhiBanDialogHost(onDismissRequest = onDismiss) {
         LazyColumn(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Dialog)).background(RelationSurface),
             contentPadding = PaddingValues(20.dp),
@@ -574,7 +574,7 @@ internal fun ContactMergeReviewDialog(suggestion: ContactMergeSuggestion, onDism
     }
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    Dialog(onDismissRequest = onDismiss) {
+    ZhiBanDialogHost(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Dialog)).background(RelationSurface).padding(20.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
@@ -616,7 +616,7 @@ internal fun ContactMergeReviewDialog(suggestion: ContactMergeSuggestion, onDism
                     ) {
                         Text(
                             contact.displayName.take(1),
-                            color = if (selected) Color.White else RelationInk,
+                            color = if (selected) MaterialTheme.colorScheme.onPrimary else RelationInk,
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
@@ -678,7 +678,7 @@ internal fun ContactMergeReviewDialog(suggestion: ContactMergeSuggestion, onDism
                 shape = RoundedCornerShape(ZhiBanRadius.Card),
             ) {
                 if (saving) {
-                    CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                    CircularProgressIndicator(Modifier.size(18.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
                 } else {
                     Text("确认合并")
                 }
@@ -723,7 +723,7 @@ internal fun ContactIdentityEditorDialog(
     var value by remember { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    Dialog(onDismissRequest = onDismiss) {
+    ZhiBanDialogHost(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Dialog)).background(RelationSurface).padding(20.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
@@ -790,7 +790,7 @@ internal fun ContactIdentityEditorDialog(
                     ).forEach { (id, label) ->
                         Text(
                             label,
-                            color = if (platform == id) Color.White else RelationMuted,
+                            color = if (platform == id) MaterialTheme.colorScheme.onPrimary else RelationMuted,
                             modifier = Modifier.clip(RoundedCornerShape(16.dp))
                                 .background(if (platform == id) RelationAccent else RelationSoft)
                                 .clickable {
@@ -859,7 +859,7 @@ internal fun ContactIdentityEditorDialog(
                 shape = RoundedCornerShape(ZhiBanRadius.Card),
             ) {
                 if (saving) {
-                    CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                    CircularProgressIndicator(Modifier.size(18.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
                 } else {
                     Text("保存")
                 }
@@ -904,7 +904,7 @@ internal fun ContactFactEditorDialog(contact: ContactEntity, onDismiss: () -> Un
     var text by remember { mutableStateOf("") }
     var type by remember { mutableStateOf("CONTACT_MEMORY") }
     var error by remember { mutableStateOf<String?>(null) }
-    Dialog(onDismissRequest = onDismiss) {
+    ZhiBanDialogHost(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Dialog)).background(RelationSurface).padding(20.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) { Icon(Icons.Rounded.Close, "关闭") }
@@ -929,7 +929,7 @@ internal fun ContactFactEditorDialog(contact: ContactEntity, onDismiss: () -> Un
                 ).forEach { (value, label) ->
                     Text(
                         label,
-                        color = if (type == value) Color.White else RelationMuted,
+                        color = if (type == value) MaterialTheme.colorScheme.onPrimary else RelationMuted,
                         modifier = Modifier.clip(RoundedCornerShape(16.dp))
                             .background(if (type == value) RelationAccent else RelationSoft)
                             .clickable { type = value }.padding(horizontal = 13.dp, vertical = 8.dp),

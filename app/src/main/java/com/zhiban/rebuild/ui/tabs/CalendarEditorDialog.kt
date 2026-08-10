@@ -207,7 +207,7 @@ internal fun ScheduleEditorDialog(
                                         if (minutes != null && !notificationsAllowed) onRequestNotificationPermission()
                                     }
                                     .padding(horizontal = 12.dp, vertical = 8.dp),
-                                color = if (selected) Color.White else CalendarInk,
+                                color = if (selected) MaterialTheme.colorScheme.onPrimary else CalendarInk,
                                 style = MaterialTheme.typography.labelMedium,
                             )
                         }

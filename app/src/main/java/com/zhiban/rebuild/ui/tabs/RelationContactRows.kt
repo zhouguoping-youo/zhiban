@@ -50,7 +50,7 @@ internal fun OwnerContactRow(profile: UserProfile, onClick: () -> Unit) {
         ) {
             Text(
                 displayName.take(1),
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onPrimary,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )

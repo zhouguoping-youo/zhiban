@@ -216,7 +216,7 @@ fun ProfileTab(
                         Text(
                             text = if (hasProfile) identityTitle.first().toString() else "我",
                             style = MaterialTheme.typography.titleLarge,
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onPrimary,
                             fontWeight = FontWeight.Bold,
                         )
                     }

@@ -482,7 +482,7 @@ fun RelationTab(
                                     color = if (tag ==
                                         label
                                     ) {
-                                        Color.White
+                                        MaterialTheme.colorScheme.onPrimary
                                     } else {
                                         RelationMuted
                                     },

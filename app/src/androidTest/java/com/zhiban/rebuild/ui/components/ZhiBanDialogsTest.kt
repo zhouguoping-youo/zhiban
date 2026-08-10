@@ -7,6 +7,10 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import com.zhiban.rebuild.ui.theme.ZhiBanTheme
 import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Assert.assertEquals
@@ -57,5 +61,23 @@ class ZhiBanDialogsTest {
         compose.onNodeWithText("基本资料").assertIsDisplayed()
         compose.onNodeWithContentDescription("关闭").performClick()
         assertEquals(1, closed.get())
+    }
+
+    @Test fun popoverKeepsCompactContentAndDismissActionOperable() {
+        val selected = AtomicInteger()
+        compose.setContent {
+            ZhiBanTheme {
+                ZhiBanPopoverDialog(
+                    onDismissRequest = {},
+                    alignment = Alignment.Center,
+                    modifier = Modifier.padding(20.dp),
+                ) {
+                    TextButton(onClick = { selected.incrementAndGet() }) { Text("标准") }
+                }
+            }
+        }
+
+        compose.onNodeWithText("标准").assertIsDisplayed().performClick()
+        assertEquals(1, selected.get())
     }
 }

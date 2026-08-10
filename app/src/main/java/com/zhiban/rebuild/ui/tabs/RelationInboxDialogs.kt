@@ -90,7 +90,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -117,6 +116,7 @@ import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.personalization.UserProfile
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
+import com.zhiban.rebuild.ui.components.ZhiBanDialogHost
 import com.zhiban.rebuild.ui.components.ZhiBanPrimaryTabHeader
 import com.zhiban.rebuild.ui.components.ZhiBanSearchField
 import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
@@ -289,7 +289,7 @@ internal fun CallNoteDialog(
         )
     }
 
-    Dialog(onDismissRequest = { if (recorder == null && !transcribing) dismissAndDeleteTemporaryAudio() }) {
+    ZhiBanDialogHost(onDismissRequest = { if (recorder == null && !transcribing) dismissAndDeleteTemporaryAudio() }) {
         Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Dialog)).background(RelationSurface).padding(20.dp),
         ) {
@@ -400,7 +400,7 @@ internal fun NotificationCandidateDialog(
 ) {
     var linking by remember { mutableStateOf<NotificationCandidateEntity?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
-    Dialog(onDismissRequest = onDismiss) {
+    ZhiBanDialogHost(onDismissRequest = onDismiss) {
         Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Dialog)).background(RelationSurface).padding(20.dp),
         ) {
