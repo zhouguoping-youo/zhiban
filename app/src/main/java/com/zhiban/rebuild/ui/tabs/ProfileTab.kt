@@ -139,7 +139,7 @@ fun ProfileTab(
         ProfileSettingItem(
             icon = Icons.Outlined.Psychology,
             title = "智能体设置",
-            accessibilityDescription = "大模型、记忆、对话风格和工具",
+            accessibilityDescription = "大模型、记忆、回答偏好和工具",
             statusText = when (providerConfigured) {
                 true -> "已连接"
                 false -> "未连接"

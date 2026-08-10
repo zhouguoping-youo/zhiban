@@ -87,7 +87,6 @@ fun AgentSettingsPage(
     onModel: () -> Unit,
     onTools: () -> Unit,
     onSkills: () -> Unit,
-    onBehavior: () -> Unit,
     onFeedback: () -> Unit,
     onRunHistory: () -> Unit,
     viewModel: AgentSettingsViewModel = hiltViewModel(),
@@ -117,7 +116,7 @@ fun AgentSettingsPage(
                                 if (state.memoryCount == 0) "还没有保存任何记忆" else "已保存 ${state.memoryCount} 条记忆",
                                 onMemory,
                             ),
-                            AgentSettingsEntry(Icons.Outlined.Tune, "对话风格", state.personalizationSummary, onPersonalization),
+                            AgentSettingsEntry(Icons.Outlined.Tune, "回答偏好", state.answerPreferenceSummary, onPersonalization),
                             AgentSettingsEntry(Icons.Outlined.Construction, "工具", "${state.toolCount} 项可用", onTools),
                             AgentSettingsEntry(Icons.Outlined.AutoAwesome, "技能", "${state.skillCount} 项可用", onSkills),
                         ),
@@ -126,7 +125,6 @@ fun AgentSettingsPage(
                 item {
                     AgentSettingsGroup(
                         listOf(
-                            AgentSettingsEntry(Icons.Outlined.Security, "回答方式", "快速、标准或深入", onBehavior),
                             AgentSettingsEntry(Icons.Outlined.RateReview, "回答反馈", "点赞、点踩与改进建议", onFeedback),
                             AgentSettingsEntry(Icons.Outlined.History, "运行记录", "", onRunHistory),
                         ),
@@ -183,7 +181,7 @@ private fun SettingRowContent(icon: ImageVector, title: String, subtitle: String
 }
 
 data class AgentSettingsState(
-    val personalizationSummary: String = "平衡",
+    val answerPreferenceSummary: String = "平衡 · 标准",
     val memoryCount: Int = 0,
     val providerConfigured: Boolean = false,
     val toolCount: Int = 0,
@@ -192,6 +190,7 @@ data class AgentSettingsState(
 
 @HiltViewModel class AgentSettingsViewModel @Inject constructor(
     private val prefs: AgentPersonalizationStore,
+    private val controls: AgentControlStore,
     private val memory: AgentMemorySettingsService,
     private val provider: ProviderEnvironmentManager,
     private val mcp: McpRemoteEnvironment,
@@ -205,7 +204,7 @@ data class AgentSettingsState(
         viewModelScope.launch {
             _state.value =
                 AgentSettingsState(
-                    prefs.load().style.label,
+                    "${prefs.load().style.label} · ${controls.execution().runtimeLevel}",
                     memory.list().size,
                     provider.isConfigured(),
                     RuntimeToolCatalog.production().names().size + mcp.tools().size,
@@ -496,73 +495,10 @@ private fun toolDisplayName(name: String) = when (name) {
     }
 }
 
-data class BehaviorState(val execution: ExecutionPreference = ExecutionPreference.BALANCED)
-
 internal fun executionHint(preference: ExecutionPreference): String = when (preference) {
     ExecutionPreference.FAST -> "简单问答 · 检索更少，响应更快"
     ExecutionPreference.BALANCED -> "日常任务 · 自动平衡速度与信息量"
     ExecutionPreference.DEEP -> "复杂问题 · 检索更多上下文，耗时更长"
-}
-
-@HiltViewModel class AgentBehaviorViewModel @Inject constructor(private val controls: AgentControlStore) : ViewModel() {
-    private val _state = MutableStateFlow(BehaviorState(controls.execution()))
-    val state = _state.asStateFlow()
-    fun select(v: ExecutionPreference) {
-        controls.saveExecution(v)
-        _state.value =
-            BehaviorState(v)
-    }
-}
-
-@Composable fun AgentBehaviorSecurityPage(onBack: () -> Unit, vm: AgentBehaviorViewModel = hiltViewModel()) {
-    val s by vm.state.collectAsStateWithLifecycle()
-    ZhiBanPage {
-        Column(Modifier.fillMaxSize()) {
-            AgentHeader("回答方式", onBack)
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
-                    Column(Modifier.padding(horizontal = 16.dp)) {
-                        ExecutionPreference.entries.forEachIndexed { index, preference ->
-                            if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                            ExecutionPreferenceRow(
-                                preference = preference,
-                                selected = s.execution == preference,
-                                onClick = { vm.select(preference) },
-                            )
-                        }
-                    }
-                }
-                SettingRow(Icons.Outlined.GppGood, "重要操作会先确认", "写入、删除和发送不会静默执行")
-            }
-        }
-    }
-}
-
-@Composable
-private fun ExecutionPreferenceRow(preference: ExecutionPreference, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .defaultMinSize(minHeight = ZhiBanSize.ListRowWithSubtitle)
-            .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                preference.runtimeLevel,
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (selected) ZhiBanTerracotta else MaterialTheme.colorScheme.onSurface,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            )
-            Text(
-                executionHint(preference),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        RadioButton(selected = selected, onClick = onClick)
-    }
 }
 
 data class FeedbackState(

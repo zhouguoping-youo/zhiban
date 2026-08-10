@@ -18,7 +18,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.zhiban.rebuild.ui.agent.AgentConversationRoute
-import com.zhiban.rebuild.ui.agent.settings.AgentBehaviorSecurityPage
 import com.zhiban.rebuild.ui.agent.settings.AgentFeedbackImprovementPage
 import com.zhiban.rebuild.ui.agent.settings.AgentMemoryPage
 import com.zhiban.rebuild.ui.agent.settings.AgentPersonalizationPage
@@ -186,7 +185,6 @@ fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L
                     onModel = { navController.navigate(ModelConfig) },
                     onTools = { navController.navigate(AgentTools) },
                     onSkills = { navController.navigate(AgentSkills) },
-                    onBehavior = { navController.navigate(AgentBehaviorSecurity) },
                     onFeedback = { navController.navigate(AgentFeedbackImprovement) },
                     onRunHistory = { navController.navigate(AgentRunHistory) },
                 )
@@ -196,7 +194,7 @@ fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L
             composable<MemoryConfig> { AgentMemoryPage(onBack = { navController.popBackStack() }) }
             composable<AgentTools> { AgentToolsPage(onBack = { navController.popBackStack() }) }
             composable<AgentSkills> { AgentSkillsPage(onBack = { navController.popBackStack() }) }
-            composable<AgentBehaviorSecurity> { AgentBehaviorSecurityPage(onBack = { navController.popBackStack() }) }
+            composable<AgentBehaviorSecurity> { AgentPersonalizationPage(onBack = { navController.popBackStack() }) }
             composable<AgentFeedbackImprovement> {
                 AgentFeedbackImprovementPage(onBack = { navController.popBackStack() })
             }

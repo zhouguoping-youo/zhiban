@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -495,22 +496,38 @@ private fun memoryIcon(type: String): ImageVector = when (type) {
     else -> Icons.Outlined.Psychology
 }
 
-data class PersonalizationState(val style: ResponseStyle = ResponseStyle.BALANCED, val customInstructions: String = "", val saved: Boolean = false)
+data class PersonalizationState(
+    val style: ResponseStyle = ResponseStyle.BALANCED,
+    val execution: ExecutionPreference = ExecutionPreference.BALANCED,
+    val customInstructions: String = "",
+    val saved: Boolean = false,
+)
 
 @HiltViewModel
-class AgentPersonalizationViewModel @Inject constructor(private val store: AgentPersonalizationStore, private val userProfile: UserProfileStore) :
-    ViewModel() {
+class AgentPersonalizationViewModel @Inject constructor(
+    private val store: AgentPersonalizationStore,
+    private val controls: AgentControlStore,
+    private val userProfile: UserProfileStore,
+) : ViewModel() {
     private val _state = MutableStateFlow(
-        store.load().let { PersonalizationState(it.style, userProfile.profile.value.customInstructions) },
+        store.load().let {
+            PersonalizationState(
+                style = it.style,
+                execution = controls.execution(),
+                customInstructions = userProfile.profile.value.customInstructions,
+            )
+        },
     )
     val state = _state.asStateFlow()
 
     fun style(v: ResponseStyle) = _state.update { it.copy(style = v, saved = false) }
+    fun execution(v: ExecutionPreference) = _state.update { it.copy(execution = v, saved = false) }
     fun customInstructions(v: String) = _state.update { it.copy(customInstructions = v.take(500), saved = false) }
 
     fun save() {
         val s = _state.value
         store.save(Personalization(style = s.style))
+        controls.saveExecution(s.execution)
         if (s.style == ResponseStyle.CUSTOM) {
             userProfile.save(userProfile.profile.value.copy(customInstructions = s.customInstructions))
         }
@@ -523,19 +540,30 @@ fun AgentPersonalizationPage(onBack: () -> Unit, viewModel: AgentPersonalization
     val s by viewModel.state.collectAsStateWithLifecycle()
     ZhiBanPage {
         Column(Modifier.fillMaxSize()) {
-            AgentHeader("对话风格", onBack)
+            AgentHeader("回答偏好", onBack)
             LazyColumn(
-                Modifier.fillMaxSize().padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = ZhiBanSpacing.PageHorizontal)
+                    .testTag("answer_preference_list"),
                 contentPadding = PaddingValues(bottom = ZhiBanSpacing.PageBottom),
                 verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.ContentGap),
             ) {
-                items(ResponseStyle.entries.size) { index ->
-                    val style = ResponseStyle.entries[index]
-                    ResponseStyleCard(
-                        style = style,
-                        selected = s.style == style,
-                        onClick = { viewModel.style(style) },
-                    )
+                item { ZhiBanSectionTitle("表达风格") }
+                item {
+                    ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
+                        Column(Modifier.padding(horizontal = ZhiBanSpacing.Lg)) {
+                            ResponseStyle.entries.forEachIndexed { index, style ->
+                                if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                AnswerPreferenceRow(
+                                    label = style.label,
+                                    hint = style.hint,
+                                    selected = s.style == style,
+                                    onClick = { viewModel.style(style) },
+                                )
+                            }
+                        }
+                    }
                 }
                 if (s.style == ResponseStyle.CUSTOM) {
                     item {
@@ -547,6 +575,22 @@ fun AgentPersonalizationPage(onBack: () -> Unit, viewModel: AgentPersonalization
                             supportingText = { Text("${s.customInstructions.length}/500") },
                             minLines = 3,
                         )
+                    }
+                }
+                item { ZhiBanSectionTitle("思考深度") }
+                item {
+                    ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
+                        Column(Modifier.padding(horizontal = ZhiBanSpacing.Lg)) {
+                            ExecutionPreference.entries.forEachIndexed { index, preference ->
+                                if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                AnswerPreferenceRow(
+                                    label = preference.runtimeLevel,
+                                    hint = executionHint(preference),
+                                    selected = s.execution == preference,
+                                    onClick = { viewModel.execution(preference) },
+                                )
+                            }
+                        }
                     }
                 }
                 item {
@@ -561,40 +605,29 @@ fun AgentPersonalizationPage(onBack: () -> Unit, viewModel: AgentPersonalization
 }
 
 @Composable
-private fun ResponseStyleCard(style: ResponseStyle, selected: Boolean, onClick: () -> Unit) {
-    ZhiBanGlassCard(
-        Modifier.fillMaxWidth().clickable(onClick = onClick),
-        cornerRadius = ZhiBanRadius.Card,
+private fun AnswerPreferenceRow(label: String, hint: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = ZhiBanSize.ListRowWithSubtitle)
+            .clickable(onClick = onClick)
+            .padding(vertical = ZhiBanSpacing.Md),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(
-                horizontal = ZhiBanSpacing.Lg,
-                vertical = ZhiBanSpacing.Md,
-            ),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    style.label,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = if (selected) ZhiBanTerracotta else MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    style.hint,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            if (selected) {
-                Icon(
-                    Icons.Outlined.CheckCircle,
-                    contentDescription = "已选择",
-                    tint = ZhiBanTerracotta,
-                    modifier = Modifier.size(ZhiBanIconSize.Inline),
-                )
-            }
+        Column(Modifier.weight(1f)) {
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (selected) ZhiBanTerracotta else MaterialTheme.colorScheme.onSurface,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            )
+            Text(
+                hint,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
+        RadioButton(selected = selected, onClick = onClick)
     }
 }
 data class AgentToolsState(

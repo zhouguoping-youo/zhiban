@@ -4,11 +4,14 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.isToggleable
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.lifecycle.Lifecycle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.MainActivity
@@ -39,10 +42,9 @@ class AgentSettingsNavigationE2ETest {
         listOf(
             "大模型连接" to "大模型连接",
             "记忆" to "记忆",
-            "对话风格" to "对话风格",
+            "回答偏好" to "回答偏好",
             "工具" to "工具",
             "技能" to "技能",
-            "回答方式" to "回答方式",
             "回答反馈" to "回答反馈",
             "运行记录" to "运行记录",
         ).forEach { (entry, title) ->
@@ -157,11 +159,18 @@ class AgentSettingsNavigationE2ETest {
         compose.waitForIdle()
         compose.onNodeWithContentDescription("我的").performClick()
         compose.onNodeWithText("智能体设置").performClick()
-        compose.onNodeWithText("回答方式").performScrollTo().performClick()
+        compose.onNodeWithText("回答偏好").performScrollTo().performClick()
+
+        compose.onNodeWithText("表达风格").assertIsDisplayed()
+        compose.onNodeWithText("思考深度").assertIsDisplayed()
+        compose.onNodeWithText("对话风格").assertDoesNotExist()
+        compose.onNodeWithText("回答方式").assertDoesNotExist()
 
         compose.onNodeWithText("简单问答 · 检索更少，响应更快").assertIsDisplayed()
         compose.onNodeWithText("日常任务 · 自动平衡速度与信息量").assertIsDisplayed()
         compose.onNodeWithText("复杂问题 · 检索更多上下文，耗时更长").assertIsDisplayed().performClick()
+        compose.onNodeWithTag("answer_preference_list").performScrollToNode(hasText("保存"))
+        compose.onNodeWithText("保存").performClick()
         assert(
             compose.activity.getSharedPreferences("agent_controls", android.content.Context.MODE_PRIVATE)
                 .getString("execution_preference", null) == "DEEP",
