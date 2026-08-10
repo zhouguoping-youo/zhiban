@@ -7,6 +7,20 @@ import androidx.room.Query
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
+data class ContactImportantDateProjection(
+    val dateId: String,
+    val contactId: String,
+    val displayName: String,
+    val kind: String,
+    val year: Int?,
+    val month: Int,
+    val day: Int,
+    val source: String,
+    val evidenceRef: String?,
+    val userConfirmed: Boolean,
+    val updatedAtEpochMs: Long,
+)
+
 @Dao
 interface ContactKnowledgeDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -99,6 +113,19 @@ interface ContactKnowledgeDao {
     ) ORDER BY kind""",
     )
     fun observeImportantDates(contactId: String): Flow<List<ContactImportantDateEntity>>
+
+    @Query(
+        """SELECT date.dateId, canonical.contactId, canonical.displayName, date.kind, date.year,
+           date.month, date.day, date.source, date.evidenceRef, date.userConfirmed, date.updatedAtEpochMs
+           FROM contact_important_dates date
+           INNER JOIN contacts source ON source.contactId = date.contactId
+           LEFT JOIN contact_merge_links link
+             ON link.sourceContactId = source.contactId AND link.undoneAtEpochMs IS NULL
+           INNER JOIN contacts canonical ON canonical.contactId = COALESCE(link.canonicalContactId, source.contactId)
+           WHERE canonical.deletedAtEpochMs IS NULL
+           ORDER BY date.userConfirmed DESC, date.updatedAtEpochMs DESC""",
+    )
+    fun observeAllImportantDates(): Flow<List<ContactImportantDateProjection>>
 
     @Query(
         """SELECT * FROM contact_facets WHERE contactId = :contactId OR contactId IN (

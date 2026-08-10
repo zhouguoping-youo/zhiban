@@ -606,6 +606,7 @@ class AgentDataRepository internal constructor(
         contacts.confirmContactRole(contactId, roleType, skillId, nowEpochMs)
     suspend fun removeContactRole(contactId: String, roleType: String, skillId: String): Boolean = contacts.removeContactRole(contactId, roleType, skillId)
     fun observeContacts(): Flow<List<ContactEntity>> = contacts.observeContacts()
+    fun observeAllContactImportantDates() = contacts.observeAllContactImportantDates()
     fun observeOwnerContactLinks(): Flow<List<OwnerContactLinkEntity>> = contacts.observeOwnerContactLinks()
     suspend fun confirmContactIsOwner(contactId: String, nowEpochMs: Long = System.currentTimeMillis()) = contacts.confirmContactIsOwner(contactId, nowEpochMs)
     suspend fun undoContactIsOwner(contactId: String, nowEpochMs: Long = System.currentTimeMillis()): Boolean =

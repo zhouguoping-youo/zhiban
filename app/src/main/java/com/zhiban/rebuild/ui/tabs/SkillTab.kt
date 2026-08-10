@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.WorkOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -44,7 +46,7 @@ import com.zhiban.rebuild.ui.theme.ZhiBanSpacing
 import com.zhiban.rebuild.ui.theme.ZhiBanTerracotta
 
 @Composable
-fun SkillTab(modifier: Modifier = Modifier, onOpenCrm: () -> Unit = {}, isDataEmpty: Boolean = false) {
+fun SkillTab(modifier: Modifier = Modifier, onOpenCrm: () -> Unit = {}, onOpenLifeAssistant: () -> Unit = {}, isDataEmpty: Boolean = false) {
     if (isDataEmpty) {
         MainTabEmptyPage("skill", modifier)
         return
@@ -52,12 +54,23 @@ fun SkillTab(modifier: Modifier = Modifier, onOpenCrm: () -> Unit = {}, isDataEm
     val salesCrm = BuiltInSkills.all.first {
         it.id == "sales_crm" && it.level == SkillLevel.SCENE
     }
+    val lifeAssistant = BuiltInSkills.all.first {
+        it.id == "personal_life" && it.level == SkillLevel.SCENE
+    }
     val sceneCapabilities = listOf(
         SceneCapability(
             id = salesCrm.id,
             title = salesCrm.displayName,
             description = "联系人、机会与跟进",
+            icon = Icons.Outlined.WorkOutline,
             onClick = onOpenCrm,
+        ),
+        SceneCapability(
+            id = lifeAssistant.id,
+            title = lifeAssistant.displayName,
+            description = "重要的人与事",
+            icon = Icons.Outlined.FavoriteBorder,
+            onClick = onOpenLifeAssistant,
         ),
     )
 
@@ -95,7 +108,7 @@ fun SkillTab(modifier: Modifier = Modifier, onOpenCrm: () -> Unit = {}, isDataEm
     }
 }
 
-private data class SceneCapability(val id: String, val title: String, val description: String, val onClick: () -> Unit)
+private data class SceneCapability(val id: String, val title: String, val description: String, val icon: ImageVector, val onClick: () -> Unit)
 
 @Composable
 private fun SceneCapabilityCard(capability: SceneCapability) {
@@ -115,7 +128,7 @@ private fun SceneCapabilityCard(capability: SceneCapability) {
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ZhiBanLeadingIcon(Icons.Outlined.WorkOutline)
+            ZhiBanLeadingIcon(capability.icon)
             Spacer(Modifier.weight(1f))
             Icon(
                 Icons.AutoMirrored.Outlined.ArrowForward,

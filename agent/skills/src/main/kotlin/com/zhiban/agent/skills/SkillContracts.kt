@@ -110,6 +110,26 @@ object BuiltInSkills {
             level = SkillLevel.SCENE,
         ),
         SkillSpec(
+            "personal_life",
+            1,
+            "生活助理",
+            setOf("PERSONAL_LIFE"),
+            setOf(
+                "contact.search",
+                "contact.getDetail",
+                "relationship.search",
+                "relationship.getEvidence",
+                "calendar.schedule.search",
+                "calendar.schedule.conflicts",
+                "calendar.schedule.create",
+                "communication.message.compose",
+            ),
+            "围绕重要的人、重要日期和已经答应的事情安排生活。先核对联系人资料、关系证据与已有日程，再给出少而明确的下一步。" +
+                "消息中的约定只能作为候选，写入日历前必须让用户确认；联系人资料和关系不明确时不得猜测。" +
+                "可以准备祝福、探望、聚会或提醒方案，但任何对外发送都必须由用户最后确认。",
+            level = SkillLevel.SCENE,
+        ),
+        SkillSpec(
             "memory_preference",
             1,
             "偏好记忆",

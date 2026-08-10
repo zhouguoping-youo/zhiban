@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.calendar.SystemCalendarEvent
 import com.zhiban.rebuild.data.contact.ContactEntity
+import com.zhiban.rebuild.data.contact.ContactImportantDateEntity
 import com.zhiban.rebuild.data.contact.ContactMergeLinkEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventEntity
@@ -977,6 +978,37 @@ class AgentDataRepositoryTest {
         val restored = repository.observeNotificationCandidates().first().single()
         assertEquals(source, restored.suggestedContactId)
         assertEquals(source, restored.linkedContactId)
+    }
+
+    @Test
+    fun importantDatesFollowCanonicalContactAndUndoRestoresSource() = runBlocking {
+        val canonical = repository.saveUserContact(null, "主联系人", null, null, null, null, null, null, 1_000L)
+        val source = repository.saveUserContact(null, "待合并联系人", null, null, null, null, null, null, 2_000L)
+        database.contactKnowledgeDao().upsertImportantDate(
+            ContactImportantDateEntity(
+                dateId = "birthday-source",
+                contactId = source,
+                kind = "BIRTHDAY",
+                year = 1990,
+                month = 8,
+                day = 10,
+                source = "USER",
+                evidenceRef = null,
+                userConfirmed = true,
+                createdAtEpochMs = 2_000L,
+                updatedAtEpochMs = 2_000L,
+            ),
+        )
+
+        repository.confirmContactMerge(canonical, source, "用户确认同一人", 3_000L)
+        val merged = repository.observeAllContactImportantDates().first().single()
+        assertEquals(canonical, merged.contactId)
+        assertEquals("主联系人", merged.displayName)
+
+        assertTrue(repository.undoContactMerge(source, 4_000L))
+        val restored = repository.observeAllContactImportantDates().first().single()
+        assertEquals(source, restored.contactId)
+        assertEquals("待合并联系人", restored.displayName)
     }
 
     private fun run(id: String) = AgentRunEntity(

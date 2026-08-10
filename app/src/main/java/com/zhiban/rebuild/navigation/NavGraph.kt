@@ -46,6 +46,9 @@ import com.zhiban.rebuild.ui.tabs.CrmOpportunityBoardPage
 import com.zhiban.rebuild.ui.tabs.CrmOpportunityDetailPage
 import com.zhiban.rebuild.ui.tabs.CrmOpportunityListPage
 import com.zhiban.rebuild.ui.tabs.HomeTab
+import com.zhiban.rebuild.ui.tabs.LifeAssistantDetailPage
+import com.zhiban.rebuild.ui.tabs.LifeAssistantListPage
+import com.zhiban.rebuild.ui.tabs.LifeAssistantPage
 import com.zhiban.rebuild.ui.tabs.ProfileTab
 import com.zhiban.rebuild.ui.tabs.RelationTab
 import com.zhiban.rebuild.ui.tabs.SkillTab
@@ -153,6 +156,7 @@ fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L
             composable<Skill> {
                 SkillTab(
                     onOpenCrm = { navController.navigate(CrmCapability) },
+                    onOpenLifeAssistant = { navController.navigate(LifeAssistant) },
                 )
             }
             composable<Profile> {
@@ -226,6 +230,36 @@ fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L
                     onOpenOpportunity = { opportunityId ->
                         navController.navigate(CrmOpportunityDetail(opportunityId))
                     },
+                    onAskAgent = { draft ->
+                        navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK", workContext = true))
+                    },
+                )
+            }
+
+            composable<LifeAssistant> {
+                LifeAssistantPage(
+                    onBack = { navController.popBackStack() },
+                    onOpenAll = { navController.navigate(LifeAssistantList) },
+                    onOpenItem = { itemId -> navController.navigate(LifeAssistantDetail(itemId)) },
+                    onOpenRelations = { navController.navigate(Relation) { launchSingleTop = true } },
+                    onAskAgent = { draft ->
+                        navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK", workContext = true))
+                    },
+                )
+            }
+
+            composable<LifeAssistantList> {
+                LifeAssistantListPage(
+                    onBack = { navController.popBackStack() },
+                    onOpenItem = { itemId -> navController.navigate(LifeAssistantDetail(itemId)) },
+                )
+            }
+
+            composable<LifeAssistantDetail> { entry ->
+                val route = entry.toRoute<LifeAssistantDetail>()
+                LifeAssistantDetailPage(
+                    itemId = route.itemId,
+                    onBack = { navController.popBackStack() },
                     onAskAgent = { draft ->
                         navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK", workContext = true))
                     },

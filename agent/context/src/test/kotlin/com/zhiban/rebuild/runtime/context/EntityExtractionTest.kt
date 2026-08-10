@@ -62,6 +62,12 @@ class EntityExtractionTest {
         assertEquals(IntentLabel.CONTACT_CREATE, extractor.extract("把张三加为客户", "Work", now).intentLabel)
     }
 
+    @Test fun recognizesPersonalLifeWithoutStealingOrdinaryCalendarCreation() {
+        assertEquals(IntentLabel.PERSONAL_LIFE, extractor.extract("用生活助理整理重要的人与事", "Work", now).intentLabel)
+        assertEquals(IntentLabel.PERSONAL_LIFE, extractor.extract("帮我做一个生日安排", "Work", now).intentLabel)
+        assertEquals(IntentLabel.CALENDAR_CREATE, extractor.extract("明天下午三点提醒我买礼物", "Work", now).intentLabel)
+    }
+
     @Test fun resolvesEnglishTomorrowAndNormalizesEnglishWallClockInDeviceZone() {
         val result = extractor.extract(
             "Create a calendar event tomorrow at 8 PM, remind me 10 minutes before.",

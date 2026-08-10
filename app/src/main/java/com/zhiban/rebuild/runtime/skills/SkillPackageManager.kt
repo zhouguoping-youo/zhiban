@@ -282,7 +282,7 @@ class SkillPackageVerifier(
         private val TOOL_ID = Regex("[a-zA-Z0-9._/-]{3,160}")
         private val SUPPORTED_INTENTS = setOf(
             "GENERAL_WORK", "CALENDAR_QUERY", "CALENDAR_CREATE", "CONTACT_QUERY", "CONTACT_CREATE",
-            "MEMORY_QUERY", "MEMORY_WRITE", "RELATIONSHIP_QUERY", "RELATIONSHIP_WRITE", "SALES_CRM",
+            "MEMORY_QUERY", "MEMORY_WRITE", "RELATIONSHIP_QUERY", "RELATIONSHIP_WRITE", "SALES_CRM", "PERSONAL_LIFE",
         )
     }
 }

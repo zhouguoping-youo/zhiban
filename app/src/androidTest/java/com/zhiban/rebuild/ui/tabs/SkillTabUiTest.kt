@@ -16,17 +16,23 @@ class SkillTabUiTest {
     val compose = createComposeRule()
 
     @Test
-    fun soleMatureCapabilityIsVisibleAndOpensCrm() {
-        val opened = AtomicInteger()
+    fun sceneCapabilitiesAreVisibleAndOpenTheirDestinations() {
+        val crmOpened = AtomicInteger()
+        val lifeOpened = AtomicInteger()
         compose.setContent {
             ZhiBanTheme {
-                SkillTab(onOpenCrm = { opened.incrementAndGet() })
+                SkillTab(
+                    onOpenCrm = { crmOpened.incrementAndGet() },
+                    onOpenLifeAssistant = { lifeOpened.incrementAndGet() },
+                )
             }
         }
 
         compose.onNodeWithText("能力").assertExists()
         compose.onNodeWithContentDescription("进入个人 CRM").assertHasClickAction().performClick()
+        compose.onNodeWithContentDescription("进入生活助理").assertHasClickAction().performClick()
 
-        assertEquals(1, opened.get())
+        assertEquals(1, crmOpened.get())
+        assertEquals(1, lifeOpened.get())
     }
 }

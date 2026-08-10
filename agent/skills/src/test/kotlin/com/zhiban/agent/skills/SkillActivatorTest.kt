@@ -44,13 +44,24 @@ class SkillActivatorTest {
         assertTrue("communication.message.compose" in activation.single().requiredTools)
     }
 
-    @Test fun onlySalesCrmIsExposedAsABuiltInSceneCapability() {
+    @Test fun sceneCapabilitiesExposeCrmAndPersonalLife() {
         val sceneSkills = BuiltInSkills.all.filter { it.level == SkillLevel.SCENE }
         val systemSkills = BuiltInSkills.all.filter { it.level == SkillLevel.SYSTEM }.map { it.id }.toSet()
 
-        assertEquals(listOf("sales_crm"), sceneSkills.map { it.id })
+        assertEquals(listOf("sales_crm", "personal_life"), sceneSkills.map { it.id })
         assertTrue("contact_relationship" in systemSkills)
         assertTrue("calendar_coordination" in systemSkills)
         assertTrue("memory_preference" in systemSkills)
+    }
+
+    @Test fun personalLifeActivatesWithRelationshipsCalendarAndConfirmedCommunication() {
+        val spec = BuiltInSkills.all.single { it.id == "personal_life" }
+
+        val activation = SkillActivator().activate("PERSONAL_LIFE", "Work", spec.requiredTools).single()
+
+        assertEquals("personal_life", activation.skillId)
+        assertTrue("relationship.getEvidence" in activation.requiredTools)
+        assertTrue("calendar.schedule.create" in activation.requiredTools)
+        assertTrue("communication.message.compose" in activation.requiredTools)
     }
 }
