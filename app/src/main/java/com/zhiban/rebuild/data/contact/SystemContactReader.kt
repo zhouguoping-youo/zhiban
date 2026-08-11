@@ -30,9 +30,36 @@ data class SystemContactCandidate(
     val birthday: SystemContactBirthday? = null,
     val note: String? = null,
     val contactUri: String? = null,
+    val aggregateContactId: Long? = null,
+    val lookupKey: String? = null,
+    val rawContacts: List<SystemRawContactSnapshot> = emptyList(),
+    val organizations: List<SystemContactOrganization> = emptyList(),
 )
 
 data class SystemContactPlatformIdentity(val platform: String, val handle: String)
+
+data class SystemContactOrganization(
+    val company: String?,
+    val title: String?,
+    val department: String?,
+    val jobDescription: String?,
+    val officeLocation: String?,
+)
+
+data class SystemContactDataRowSnapshot(val rowId: Long, val mimeType: String, val value: String?, val isReadOnly: Boolean)
+
+data class SystemRawContactSnapshot(
+    val rawContactId: Long,
+    val aggregateContactId: Long,
+    val lookupKey: String,
+    val accountName: String?,
+    val accountType: String?,
+    val sourceId: String?,
+    val version: Long,
+    val isDirty: Boolean,
+    val isReadOnly: Boolean,
+    val dataRows: List<SystemContactDataRowSnapshot>,
+)
 
 data class SystemContactAddress(val kind: String, val formattedAddress: String)
 
@@ -55,79 +82,109 @@ class SystemContactReader @Inject constructor(@ApplicationContext private val co
             return@withContext SystemContactReadResult(emptyList(), 0, 0, "需要通讯录权限才能读取联系人")
         }
 
-        val rows = linkedMapOf<String, MutableContact>()
-        var rowCount = 0
-        var blankRows = 0
-        val mimeTypes = arrayOf(
-            ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE,
-            ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE,
-            ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE,
-            ContactsContract.CommonDataKinds.Organization.CONTENT_ITEM_TYPE,
-            ContactsContract.CommonDataKinds.Im.CONTENT_ITEM_TYPE,
-            ContactsContract.CommonDataKinds.StructuredPostal.CONTENT_ITEM_TYPE,
-            ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE,
-            ContactsContract.CommonDataKinds.Note.CONTENT_ITEM_TYPE,
-        )
-        val projection = arrayOf(
-            ContactsContract.Data.CONTACT_ID,
-            ContactsContract.Data.LOOKUP_KEY,
-            ContactsContract.Data.MIMETYPE,
-            ContactsContract.Data.DISPLAY_NAME_PRIMARY,
-            ContactsContract.Data.DISPLAY_NAME,
-            ContactsContract.Data.DATA1,
-            ContactsContract.Data.DATA2,
-            ContactsContract.Data.DATA3,
-            ContactsContract.Data.DATA4,
-            ContactsContract.Data.DATA5,
-            ContactsContract.Data.DATA6,
-            ContactsContract.Data.DATA9,
-        )
-
+        val accumulator = ContactReadAccumulator()
         runSuspendCatching {
-            context.contentResolver.query(
-                ContactsContract.Data.CONTENT_URI,
-                projection,
-                "${ContactsContract.Data.MIMETYPE} IN (${mimeTypes.joinToString(",") { "?" }})",
-                mimeTypes,
-                ContactsContract.Data.DISPLAY_NAME_PRIMARY + " COLLATE LOCALIZED ASC",
-            )?.use { cursor ->
-                while (cursor.moveToNext()) {
-                    rowCount++
-                    val contactId = cursor.string(ContactsContract.Data.CONTACT_ID)
-                    val lookupKey = cursor.string(ContactsContract.Data.LOOKUP_KEY)
-                    val sourceId = lookupKey?.takeIf(String::isNotBlank) ?: contactId?.takeIf(String::isNotBlank)
-                    if (sourceId == null) {
-                        blankRows++
-                        continue
-                    }
-                    val fallbackName = cursor.string(
-                        ContactsContract.Data.DISPLAY_NAME_PRIMARY,
-                        ContactsContract.Data.DISPLAY_NAME,
-                    ).orEmpty().trim()
-                    val target = rows.getOrPut(sourceId) {
-                        MutableContact(
-                            sourceId = sourceId,
-                            contactId = contactId,
-                            displayName = fallbackName,
-                        )
-                    }
-                    if (target.displayName.isBlank()) target.displayName = fallbackName
-                    applyMimeTypeRow(cursor, target)
-                }
-            }
+            readContactData(accumulator)
+            hydrateRawContacts(accumulator.rawContacts)
         }.fold(
             onSuccess = {
                 SystemContactReadResult(
-                    contacts = rows.values.mapNotNull(MutableContact::toCandidate)
+                    contacts = accumulator.rows.values.mapNotNull { it.toCandidate(accumulator.rawContacts) }
                         .sortedBy(SystemContactCandidate::displayName),
-                    rowsRead = rowCount,
-                    blankRows = blankRows,
+                    rowsRead = accumulator.rowCount,
+                    blankRows = accumulator.blankRows,
                 )
             },
             onFailure = {
-                SystemContactReadResult(emptyList(), rowCount, blankRows, "手机没有返回可读取的联系人")
+                SystemContactReadResult(
+                    emptyList(),
+                    accumulator.rowCount,
+                    accumulator.blankRows,
+                    "手机没有返回可读取的联系人",
+                )
             },
         )
+    }
+
+    private fun readContactData(accumulator: ContactReadAccumulator) {
+        context.contentResolver.query(
+            ContactsContract.Data.CONTENT_URI,
+            CONTACT_DATA_PROJECTION,
+            "${ContactsContract.Data.MIMETYPE} IN (${SUPPORTED_MIME_TYPES.joinToString(",") { "?" }})",
+            SUPPORTED_MIME_TYPES,
+            ContactsContract.Data.DISPLAY_NAME_PRIMARY + " COLLATE LOCALIZED ASC",
+        )?.use { cursor ->
+            while (cursor.moveToNext()) readContactDataRow(cursor, accumulator)
+        }
+    }
+
+    private fun readContactDataRow(cursor: Cursor, accumulator: ContactReadAccumulator) {
+        accumulator.rowCount++
+        val contactId = cursor.string(ContactsContract.Data.CONTACT_ID)
+        val lookupKey = cursor.string(ContactsContract.Data.LOOKUP_KEY)
+        val sourceId = lookupKey?.takeIf(String::isNotBlank) ?: contactId?.takeIf(String::isNotBlank)
+        if (sourceId == null) {
+            accumulator.blankRows++
+            return
+        }
+        val fallbackName = cursor.string(
+            ContactsContract.Data.DISPLAY_NAME_PRIMARY,
+            ContactsContract.Data.DISPLAY_NAME,
+        ).orEmpty().trim()
+        val target = accumulator.rows.getOrPut(sourceId) {
+            MutableContact(sourceId, contactId, lookupKey, fallbackName)
+        }
+        captureRawContactRow(cursor, target, accumulator.rawContacts)
+        if (target.displayName.isBlank()) target.displayName = fallbackName
+        applyMimeTypeRow(cursor, target)
+    }
+
+    private fun captureRawContactRow(cursor: Cursor, target: MutableContact, rawContacts: MutableMap<Long, MutableRawContact>) {
+        val rawContactId = cursor.long(ContactsContract.Data.RAW_CONTACT_ID) ?: return
+        val aggregateContactId = target.contactId?.toLongOrNull() ?: return
+        val lookupKey = target.lookupKey.orEmpty()
+        target.rawContactIds += rawContactId
+        val raw = rawContacts.getOrPut(rawContactId) {
+            MutableRawContact(rawContactId, aggregateContactId, lookupKey)
+        }
+        val rowId = cursor.long(ContactsContract.Data._ID) ?: return
+        val mimeType = cursor.string(ContactsContract.Data.MIMETYPE).orEmpty()
+        val isReadOnly = cursor.int(ContactsContract.Data.IS_READ_ONLY) == 1
+        raw.isReadOnly = raw.isReadOnly || isReadOnly
+        raw.dataRows += SystemContactDataRowSnapshot(
+            rowId = rowId,
+            mimeType = mimeType,
+            value = cursor.string(ContactsContract.Data.DATA1)?.take(500),
+            isReadOnly = isReadOnly,
+        )
+    }
+
+    private fun hydrateRawContacts(rawContacts: MutableMap<Long, MutableRawContact>) {
+        rawContacts.keys.chunked(RAW_CONTACT_QUERY_CHUNK)
+            .forEach { hydrateRawContactChunk(it, rawContacts) }
+    }
+
+    private fun hydrateRawContactChunk(ids: List<Long>, rawContacts: MutableMap<Long, MutableRawContact>) {
+        val placeholders = ids.joinToString(",") { "?" }
+        context.contentResolver.query(
+            ContactsContract.RawContacts.CONTENT_URI,
+            RAW_CONTACT_PROJECTION,
+            "${ContactsContract.RawContacts._ID} IN ($placeholders)",
+            ids.map(Long::toString).toTypedArray(),
+            null,
+        )?.use { cursor ->
+            while (cursor.moveToNext()) applyRawContactMetadata(cursor, rawContacts)
+        }
+    }
+
+    private fun applyRawContactMetadata(cursor: Cursor, rawContacts: MutableMap<Long, MutableRawContact>) {
+        val id = cursor.long(ContactsContract.RawContacts._ID) ?: return
+        val rawContact = rawContacts[id] ?: return
+        rawContact.accountName = cursor.string(ContactsContract.RawContacts.ACCOUNT_NAME)
+        rawContact.accountType = cursor.string(ContactsContract.RawContacts.ACCOUNT_TYPE)
+        rawContact.sourceId = cursor.string(ContactsContract.RawContacts.SOURCE_ID)
+        rawContact.version = cursor.long(ContactsContract.RawContacts.VERSION) ?: 0L
+        rawContact.isDirty = cursor.int(ContactsContract.RawContacts.DIRTY) == 1
     }
 
     private fun applyMimeTypeRow(cursor: Cursor, target: MutableContact) {
@@ -166,18 +223,21 @@ class SystemContactReader @Inject constructor(@ApplicationContext private val co
             }
 
             ContactsContract.CommonDataKinds.Organization.CONTENT_ITEM_TYPE -> {
-                target.company = cursor.string(ContactsContract.CommonDataKinds.Organization.COMPANY)
-                    ?.trim()?.takeIf(String::isNotEmpty)
-                target.title = cursor.string(ContactsContract.CommonDataKinds.Organization.TITLE)
-                    ?.trim()?.takeIf(String::isNotEmpty)
-                target.department = cursor.string(ContactsContract.CommonDataKinds.Organization.DEPARTMENT)
-                    ?.trim()?.takeIf(String::isNotEmpty)
-                target.jobDescription =
-                    cursor.string(ContactsContract.CommonDataKinds.Organization.JOB_DESCRIPTION)
-                        ?.trim()?.takeIf(String::isNotEmpty)
-                target.officeLocation =
-                    cursor.string(ContactsContract.CommonDataKinds.Organization.OFFICE_LOCATION)
-                        ?.trim()?.takeIf(String::isNotEmpty)
+                val organization = SystemContactOrganization(
+                    company = cursor.clean(ContactsContract.CommonDataKinds.Organization.COMPANY),
+                    title = cursor.clean(ContactsContract.CommonDataKinds.Organization.TITLE),
+                    department = cursor.clean(ContactsContract.CommonDataKinds.Organization.DEPARTMENT),
+                    jobDescription = cursor.clean(ContactsContract.CommonDataKinds.Organization.JOB_DESCRIPTION),
+                    officeLocation = cursor.clean(ContactsContract.CommonDataKinds.Organization.OFFICE_LOCATION),
+                )
+                if (organization.company != null || organization.title != null) {
+                    target.organizations += organization
+                    target.company = organization.company
+                    target.title = organization.title
+                    target.department = organization.department
+                    target.jobDescription = organization.jobDescription
+                    target.officeLocation = organization.officeLocation
+                }
             }
 
             ContactsContract.CommonDataKinds.StructuredPostal.CONTENT_ITEM_TYPE -> {
@@ -217,6 +277,7 @@ class SystemContactReader @Inject constructor(@ApplicationContext private val co
     private data class MutableContact(
         val sourceId: String,
         val contactId: String?,
+        val lookupKey: String?,
         var displayName: String,
         val phones: LinkedHashSet<String> = linkedSetOf(),
         val emails: LinkedHashSet<String> = linkedSetOf(),
@@ -230,8 +291,10 @@ class SystemContactReader @Inject constructor(@ApplicationContext private val co
         val addresses: LinkedHashSet<SystemContactAddress> = linkedSetOf(),
         var birthday: SystemContactBirthday? = null,
         var note: String? = null,
+        val rawContactIds: LinkedHashSet<Long> = linkedSetOf(),
+        val organizations: MutableList<SystemContactOrganization> = mutableListOf(),
     ) {
-        fun toCandidate(): SystemContactCandidate? {
+        fun toCandidate(rawContacts: Map<Long, MutableRawContact>): SystemContactCandidate? {
             val name = displayName.trim().take(100)
             if (name.isBlank()) return null
             return SystemContactCandidate(
@@ -249,11 +312,90 @@ class SystemContactReader @Inject constructor(@ApplicationContext private val co
                 addresses = addresses.toList(),
                 birthday = birthday,
                 note = note,
+                aggregateContactId = contactId?.toLongOrNull(),
+                lookupKey = lookupKey,
+                rawContacts = rawContactIds.mapNotNull(rawContacts::get).map(MutableRawContact::snapshot),
+                organizations = organizations.distinct(),
                 contactUri = contactId?.toLongOrNull()?.let { id ->
                     ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, id).toString()
                 },
             )
         }
+    }
+
+    private data class MutableRawContact(
+        val rawContactId: Long,
+        val aggregateContactId: Long,
+        val lookupKey: String,
+        var accountName: String? = null,
+        var accountType: String? = null,
+        var sourceId: String? = null,
+        var version: Long = 0,
+        var isDirty: Boolean = false,
+        var isReadOnly: Boolean = false,
+        val dataRows: MutableList<SystemContactDataRowSnapshot> = mutableListOf(),
+    ) {
+        fun snapshot() = SystemRawContactSnapshot(
+            rawContactId = rawContactId,
+            aggregateContactId = aggregateContactId,
+            lookupKey = lookupKey,
+            accountName = accountName,
+            accountType = accountType,
+            sourceId = sourceId,
+            version = version,
+            isDirty = isDirty,
+            isReadOnly = isReadOnly,
+            dataRows = dataRows.toList(),
+        )
+    }
+
+    private data class ContactReadAccumulator(
+        val rows: MutableMap<String, MutableContact> = linkedMapOf(),
+        val rawContacts: MutableMap<Long, MutableRawContact> = linkedMapOf(),
+        var rowCount: Int = 0,
+        var blankRows: Int = 0,
+    )
+
+    private companion object {
+        const val RAW_CONTACT_QUERY_CHUNK = 400
+
+        val SUPPORTED_MIME_TYPES = arrayOf(
+            ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE,
+            ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE,
+            ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE,
+            ContactsContract.CommonDataKinds.Organization.CONTENT_ITEM_TYPE,
+            ContactsContract.CommonDataKinds.Im.CONTENT_ITEM_TYPE,
+            ContactsContract.CommonDataKinds.StructuredPostal.CONTENT_ITEM_TYPE,
+            ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE,
+            ContactsContract.CommonDataKinds.Note.CONTENT_ITEM_TYPE,
+        )
+
+        val CONTACT_DATA_PROJECTION = arrayOf(
+            ContactsContract.Data._ID,
+            ContactsContract.Data.RAW_CONTACT_ID,
+            ContactsContract.Data.CONTACT_ID,
+            ContactsContract.Data.LOOKUP_KEY,
+            ContactsContract.Data.IS_READ_ONLY,
+            ContactsContract.Data.MIMETYPE,
+            ContactsContract.Data.DISPLAY_NAME_PRIMARY,
+            ContactsContract.Data.DISPLAY_NAME,
+            ContactsContract.Data.DATA1,
+            ContactsContract.Data.DATA2,
+            ContactsContract.Data.DATA3,
+            ContactsContract.Data.DATA4,
+            ContactsContract.Data.DATA5,
+            ContactsContract.Data.DATA6,
+            ContactsContract.Data.DATA9,
+        )
+
+        val RAW_CONTACT_PROJECTION = arrayOf(
+            ContactsContract.RawContacts._ID,
+            ContactsContract.RawContacts.ACCOUNT_NAME,
+            ContactsContract.RawContacts.ACCOUNT_TYPE,
+            ContactsContract.RawContacts.SOURCE_ID,
+            ContactsContract.RawContacts.VERSION,
+            ContactsContract.RawContacts.DIRTY,
+        )
     }
 }
 
@@ -330,3 +472,15 @@ private fun android.database.Cursor.string(vararg columns: String): String? {
     }
     return null
 }
+
+private fun Cursor.long(column: String): Long? {
+    val index = getColumnIndex(column)
+    return if (index >= 0 && !isNull(index)) getLong(index) else null
+}
+
+private fun Cursor.int(column: String): Int? {
+    val index = getColumnIndex(column)
+    return if (index >= 0 && !isNull(index)) getInt(index) else null
+}
+
+private fun Cursor.clean(column: String): String? = string(column)?.trim()?.takeIf(String::isNotEmpty)

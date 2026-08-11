@@ -14,6 +14,7 @@ import com.zhiban.rebuild.data.contact.RelationshipEventParticipantEntity
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.data.contact.SystemContactCandidate
 import com.zhiban.rebuild.data.contact.SystemContactPlatformIdentity
+import com.zhiban.rebuild.data.contact.SystemRawContactSnapshot
 import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityStage
 import com.zhiban.rebuild.data.crm.CrmRecordStatus
@@ -323,7 +324,23 @@ class AgentDataRepositoryTest {
     fun systemImportStoresObservedClaimsWithoutInventingCurrentOrConfirmedEmployment() = runBlocking {
         repository.importConfirmedSystemContacts(
             contacts = listOf(
-                systemContact("observed", "丁波", "13800138000", company = "旧公司").copy(title = "售前"),
+                systemContact("observed", "丁波", "13800138000", company = "旧公司").copy(
+                    title = "售前",
+                    rawContacts = listOf(
+                        SystemRawContactSnapshot(
+                            rawContactId = 42,
+                            aggregateContactId = 7,
+                            lookupKey = "observed",
+                            accountName = "device",
+                            accountType = "local",
+                            sourceId = null,
+                            version = 3,
+                            isDirty = false,
+                            isReadOnly = false,
+                            dataRows = emptyList(),
+                        ),
+                    ),
+                ),
             ),
             ownerPhone = null,
             ownerWechatId = null,
@@ -342,6 +359,10 @@ class AgentDataRepositoryTest {
         assertEquals("UNKNOWN", employment.currentState)
         assertEquals("OBSERVED", employment.verificationState)
         assertEquals(0.6, employment.confidence, 0.0)
+        val androidLink = database.contactIntelligenceDao().androidLinksForPerson(contact.contactId).single()
+        assertEquals(42, androidLink.rawContactId)
+        assertEquals(3, androidLink.version)
+        assertEquals("IN_SYNC", database.contactIntelligenceDao().findSyncSnapshot(androidLink.linkId)?.syncState)
         assertFalse(
             database.contactKnowledgeDao().observeEmployments(contact.contactId).first().single().userConfirmed,
         )

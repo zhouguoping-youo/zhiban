@@ -1,12 +1,21 @@
 package com.zhiban.rebuild.data.agent
 
+import com.zhiban.rebuild.data.contact.AndroidRawContactLinkEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
+import com.zhiban.rebuild.data.contact.ContactIntelligenceDao
+import com.zhiban.rebuild.data.contact.ContactSyncSnapshotEntity
 import com.zhiban.rebuild.data.contact.IdentityClaimEntity
 import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
 import com.zhiban.rebuild.data.contact.PersonEntity
 import com.zhiban.rebuild.data.contact.SourceIdentityEntity
 import com.zhiban.rebuild.data.contact.SystemContactCandidate
 import com.zhiban.rebuild.data.contact.normalizeContactPhone
+import com.zhiban.rebuild.runtime.tool.sha256
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /** Persists observations without promoting an imported card to user-confirmed truth. */
 internal suspend fun AgentDatabase.upsertObservedSystemContactIntelligence(
@@ -16,40 +25,63 @@ internal suspend fun AgentDatabase.upsertObservedSystemContactIntelligence(
     nowEpochMs: Long,
 ) {
     val dao = contactIntelligenceDao()
+    val observation = SystemContactObservation(candidate, contact, sourceRef, nowEpochMs)
     dao.upsertPerson(contact.toPerson())
     val androidIdentity = candidate.toAndroidSourceIdentity(contact.contactId, sourceRef, nowEpochMs)
-    dao.upsertSourceIdentity(androidIdentity)
+    dao.upsertAndroidIdentity(androidIdentity, nowEpochMs)
     candidate.observedClaims(contact.contactId, androidIdentity.sourceIdentityId, sourceRef, nowEpochMs)
         .forEach { dao.upsertClaim(it) }
-    candidate.company?.trim()?.takeIf(String::isNotEmpty)?.let { company ->
-        dao.upsertEmployment(
+    dao.upsertObservedEmployment(observation)
+    dao.upsertObservedPlatformIdentities(observation)
+    dao.upsertAndroidSyncState(observation)
+}
+
+private suspend fun ContactIntelligenceDao.upsertAndroidIdentity(androidIdentity: SourceIdentityEntity, nowEpochMs: Long) {
+    val existingIdentity = findSourceIdentity(androidIdentity.sourceIdentityId)
+    upsertSourceIdentity(
+        androidIdentity.copy(
+            firstObservedAtEpochMs = existingIdentity?.firstObservedAtEpochMs ?: nowEpochMs,
+        ),
+    )
+}
+
+private suspend fun ContactIntelligenceDao.upsertObservedEmployment(observation: SystemContactObservation) {
+    observation.candidate.company?.trim()?.takeIf(String::isNotEmpty)?.let { company ->
+        upsertEmployment(
             PersonEmploymentEpisodeEntity(
-                episodeId = stableContactKnowledgeId(contact.contactId, "OBSERVED_EMPLOYMENT", sourceRef),
-                personId = contact.contactId,
+                episodeId = stableContactKnowledgeId(
+                    observation.contact.contactId,
+                    "OBSERVED_EMPLOYMENT",
+                    observation.sourceRef,
+                ),
+                personId = observation.contact.contactId,
                 organizationId = stableContactKnowledgeId("organization", "NAME", company.lowercase()),
                 companyNameSnapshot = company,
-                department = candidate.department.cleanObservedValue(),
-                title = candidate.title.cleanObservedValue(),
+                department = observation.candidate.department.cleanObservedValue(),
+                title = observation.candidate.title.cleanObservedValue(),
                 validFromEpochMs = null,
                 validToEpochMs = null,
                 temporalPrecision = "UNKNOWN",
                 currentState = "UNKNOWN",
-                sourceRef = sourceRef,
+                sourceRef = observation.sourceRef,
                 confidence = 0.6,
                 verificationState = "OBSERVED",
                 status = "ACTIVE",
-                recordedAtEpochMs = nowEpochMs,
-                updatedAtEpochMs = nowEpochMs,
+                recordedAtEpochMs = observation.nowEpochMs,
+                updatedAtEpochMs = observation.nowEpochMs,
             ),
         )
     }
-    candidate.platformIdentities.forEach { identity ->
+}
+
+private suspend fun ContactIntelligenceDao.upsertObservedPlatformIdentities(observation: SystemContactObservation) {
+    observation.candidate.platformIdentities.forEach { identity ->
         val normalized = identity.handle.normalizeObservedHandle()
         if (normalized.isNotEmpty()) {
-            dao.upsertSourceIdentity(
+            upsertSourceIdentity(
                 SourceIdentityEntity(
                     sourceIdentityId = stableContactKnowledgeId("source-identity", identity.platform, normalized),
-                    personId = contact.contactId,
+                    personId = observation.contact.contactId,
                     sourceType = identity.platform,
                     accountScope = "ANDROID_CONTACT_CARD",
                     tenantId = null,
@@ -59,14 +91,51 @@ internal suspend fun AgentDatabase.upsertObservedSystemContactIntelligence(
                     conversationScopeId = null,
                     resolutionStatus = "RESOLVED",
                     confidence = 0.7,
-                    sourceRef = sourceRef,
-                    firstObservedAtEpochMs = nowEpochMs,
-                    lastObservedAtEpochMs = nowEpochMs,
+                    sourceRef = observation.sourceRef,
+                    firstObservedAtEpochMs = observation.nowEpochMs,
+                    lastObservedAtEpochMs = observation.nowEpochMs,
                 ),
             )
         }
     }
 }
+
+private suspend fun ContactIntelligenceDao.upsertAndroidSyncState(observation: SystemContactObservation) {
+    observation.candidate.rawContacts.forEach { rawContact ->
+        val linkId = stableContactKnowledgeId("android-raw-contact", rawContact.rawContactId.toString())
+        upsertAndroidRawContactLink(
+            AndroidRawContactLinkEntity(
+                linkId = linkId,
+                personId = observation.contact.contactId,
+                aggregateContactId = rawContact.aggregateContactId,
+                lookupKey = rawContact.lookupKey,
+                rawContactId = rawContact.rawContactId,
+                accountName = rawContact.accountName,
+                accountType = rawContact.accountType,
+                sourceId = rawContact.sourceId,
+                version = rawContact.version,
+                isReadOnly = rawContact.isReadOnly,
+                lastObservedAtEpochMs = observation.nowEpochMs,
+            ),
+        )
+        val baseProjection = observation.candidate.androidProjectionJson(rawContact.rawContactId)
+        upsertSyncSnapshot(
+            ContactSyncSnapshotEntity(
+                snapshotId = stableContactKnowledgeId("android-sync", linkId),
+                linkId = linkId,
+                baseProjectionJson = baseProjection,
+                baseDigest = sha256(baseProjection),
+                desiredProjectionJson = null,
+                desiredDigest = null,
+                syncState = "IN_SYNC",
+                lastVerifiedAtEpochMs = observation.nowEpochMs,
+                updatedAtEpochMs = observation.nowEpochMs,
+            ),
+        )
+    }
+}
+
+private data class SystemContactObservation(val candidate: SystemContactCandidate, val contact: ContactEntity, val sourceRef: String, val nowEpochMs: Long)
 
 private fun ContactEntity.toPerson() = PersonEntity(
     personId = contactId,
@@ -152,3 +221,13 @@ private data class ObservedClaimDraft(val fieldType: String, val displayValue: S
 private fun String?.cleanObservedValue(): String? = this?.trim()?.takeIf(String::isNotEmpty)
 
 private fun String.normalizeObservedHandle(): String = trim().trimStart('@').lowercase().filterNot(Char::isWhitespace)
+
+private fun SystemContactCandidate.androidProjectionJson(rawContactId: Long): String = buildJsonObject {
+    put("rawContactId", rawContactId)
+    put("displayName", displayName)
+    put("phones", JsonArray(phones.distinct().sorted().map(::JsonPrimitive)))
+    put("emails", JsonArray(emails.distinct().sorted().map(::JsonPrimitive)))
+    put("company", company?.let(::JsonPrimitive) ?: JsonNull)
+    put("title", title?.let(::JsonPrimitive) ?: JsonNull)
+    put("note", note?.let(::JsonPrimitive) ?: JsonNull)
+}.toString()
