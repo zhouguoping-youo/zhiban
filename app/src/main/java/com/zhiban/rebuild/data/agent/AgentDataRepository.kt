@@ -14,6 +14,8 @@ import com.zhiban.rebuild.data.contact.ContactMergeLinkEntity
 import com.zhiban.rebuild.data.contact.ContactMethodEntity
 import com.zhiban.rebuild.data.contact.ContactPlatformIdentityEntity
 import com.zhiban.rebuild.data.contact.ContactRoleEntity
+import com.zhiban.rebuild.data.contact.GroupConversationEntity
+import com.zhiban.rebuild.data.contact.GroupMembershipEpisodeEntity
 import com.zhiban.rebuild.data.contact.OrganizationEntity
 import com.zhiban.rebuild.data.contact.OwnerContactLinkEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
@@ -21,6 +23,7 @@ import com.zhiban.rebuild.data.contact.RelationshipEventEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventParticipantEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventWithParticipants
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
+import com.zhiban.rebuild.data.contact.SourceIdentityEntity
 import com.zhiban.rebuild.data.contact.SystemContactCandidate
 import com.zhiban.rebuild.data.contact.normalizeContactPhone
 import com.zhiban.rebuild.data.crm.CrmActionStatus
@@ -137,6 +140,7 @@ class AgentDataRepository internal constructor(
             if (automaticallyProcessed) {
                 enriched = enriched.copy(status = enriched.completionStatus())
             }
+            persistObservedCommunicationIdentity(enriched, nowEpochMs)
             daos.notificationCandidateDao.upsert(enriched)
             // A matched contact may become a CRM lead candidate, but never a formal lead without confirmation.
             enriched.suggestedContactId?.let { matchedContactId ->
@@ -195,6 +199,7 @@ class AgentDataRepository internal constructor(
                 ),
             )
             persistConfirmedPlatformIdentity(candidate, contactId, nowEpochMs)
+            persistObservedCommunicationIdentity(candidate.copy(linkedContactId = contactId), nowEpochMs)
             val updated = candidate.copy(
                 linkedContactId = contactId,
                 status = candidate.completionStatus(linkedContactId = contactId),
@@ -631,6 +636,92 @@ class AgentDataRepository internal constructor(
                 userConfirmed = true,
                 createdAtEpochMs = nowEpochMs,
                 updatedAtEpochMs = nowEpochMs,
+            ),
+        )
+    }
+
+    private suspend fun persistObservedCommunicationIdentity(candidate: NotificationCandidateEntity, nowEpochMs: Long) {
+        if (candidate.platform == "OTHER") return
+        val visibleHandle = candidate.senderName?.trim()?.takeIf(String::isNotBlank)
+            ?: candidate.conversationTitle?.trim()?.takeIf(String::isNotBlank)
+            ?: return
+        val normalizedHandle = if (candidate.platform == "SMS") {
+            normalizeContactPhone(visibleHandle) ?: return
+        } else {
+            normalizeIdentityValue(visibleHandle)
+        }
+        if (normalizedHandle.isBlank()) return
+        val personId = candidate.linkedContactId?.takeIf { daos.contactIntelligenceDao.findPerson(it) != null }
+        val groupScope = candidate.conversationTitle?.takeIf { candidate.isGroupChat }?.let(::normalizeIdentityValue)
+        val sourceIdentityId = stableContactKnowledgeId(
+            "communication-source",
+            candidate.platform,
+            groupScope ?: "DIRECT",
+            normalizedHandle,
+        )
+        val existing = daos.contactIntelligenceDao.findSourceIdentity(sourceIdentityId)
+        daos.contactIntelligenceDao.upsertSourceIdentity(
+            SourceIdentityEntity(
+                sourceIdentityId = sourceIdentityId,
+                personId = personId ?: existing?.personId,
+                sourceType = candidate.platform,
+                accountScope = "DEVICE_OBSERVED",
+                tenantId = null,
+                stableExternalId = normalizedHandle.takeIf { candidate.platform == "SMS" },
+                visibleHandle = visibleHandle,
+                normalizedHandle = normalizedHandle,
+                conversationScopeId = groupScope,
+                resolutionStatus = if (personId != null || existing?.personId != null) "RESOLVED" else "UNRESOLVED",
+                confidence = if (personId != null) {
+                    1.0
+                } else if (candidate.platform == "SMS") {
+                    0.9
+                } else {
+                    0.55
+                },
+                sourceRef = candidate.candidateId,
+                firstObservedAtEpochMs = existing?.firstObservedAtEpochMs ?: nowEpochMs,
+                lastObservedAtEpochMs = nowEpochMs,
+            ),
+        )
+        if (candidate.isGroupChat) {
+            persistObservedGroupMembership(candidate, sourceIdentityId, visibleHandle, nowEpochMs)
+        }
+    }
+
+    private suspend fun persistObservedGroupMembership(
+        candidate: NotificationCandidateEntity,
+        sourceIdentityId: String,
+        visibleHandle: String,
+        nowEpochMs: Long,
+    ) {
+        val title = candidate.conversationTitle?.trim()?.takeIf(String::isNotBlank) ?: return
+        val groupId = stableContactKnowledgeId("observed-group", candidate.platform, normalizeIdentityValue(title))
+        val existing = daos.contactIntelligenceDao.findGroup(groupId)
+        daos.contactIntelligenceDao.upsertGroup(
+            GroupConversationEntity(
+                groupId = groupId,
+                platform = candidate.platform,
+                accountScope = "DEVICE_OBSERVED",
+                stableGroupId = null,
+                displayName = title,
+                sourceRef = candidate.candidateId,
+                firstObservedAtEpochMs = existing?.firstObservedAtEpochMs ?: nowEpochMs,
+                lastObservedAtEpochMs = nowEpochMs,
+            ),
+        )
+        daos.contactIntelligenceDao.upsertGroupMembership(
+            GroupMembershipEpisodeEntity(
+                membershipId = stableContactKnowledgeId("group-member", groupId, sourceIdentityId),
+                groupId = groupId,
+                sourceIdentityId = sourceIdentityId,
+                groupAlias = visibleHandle,
+                validFromEpochMs = null,
+                validToEpochMs = null,
+                status = "ACTIVE",
+                confidence = 0.55,
+                sourceRef = candidate.candidateId,
+                recordedAtEpochMs = nowEpochMs,
             ),
         )
     }

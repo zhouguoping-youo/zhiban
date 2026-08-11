@@ -4,35 +4,42 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ContactIntelligenceDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun upsertPerson(value: PersonEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun upsertSourceIdentity(value: SourceIdentityEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun upsertClaim(value: IdentityClaimEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun upsertEmployment(value: PersonEmploymentEpisodeEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun upsertRelationship(value: RelationshipEpisodeEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun upsertGroup(value: GroupConversationEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Query("SELECT * FROM group_conversations WHERE groupId = :groupId")
+    suspend fun findGroup(groupId: String): GroupConversationEntity?
+
+    @Query("SELECT * FROM group_membership_episodes WHERE groupId = :groupId AND status = 'ACTIVE'")
+    suspend fun membershipsForGroup(groupId: String): List<GroupMembershipEpisodeEntity>
+
+    @Upsert
     suspend fun upsertGroupMembership(value: GroupMembershipEpisodeEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun upsertAndroidRawContactLink(value: AndroidRawContactLinkEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun upsertSyncSnapshot(value: ContactSyncSnapshotEntity)
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
@@ -74,6 +81,34 @@ interface ContactIntelligenceDao {
 
     @Query("SELECT * FROM person_employment_episodes WHERE status = 'ACTIVE' ORDER BY updatedAtEpochMs DESC")
     suspend fun listAllEmployments(): List<PersonEmploymentEpisodeEntity>
+
+    @Query(
+        """SELECT * FROM person_employment_episodes
+           WHERE personId = :personId AND status = 'ACTIVE' AND currentState = 'CURRENT'
+             AND verificationState = 'USER_CONFIRMED'
+           ORDER BY updatedAtEpochMs DESC LIMIT 1""",
+    )
+    suspend fun findCurrentUserEmployment(personId: String): PersonEmploymentEpisodeEntity?
+
+    @Query(
+        """UPDATE person_employment_episodes
+           SET validToEpochMs = :nowEpochMs, currentState = 'PAST', updatedAtEpochMs = :nowEpochMs
+           WHERE personId = :personId AND status = 'ACTIVE' AND currentState = 'CURRENT'
+             AND verificationState = 'USER_CONFIRMED'""",
+    )
+    suspend fun endCurrentUserEmployments(personId: String, nowEpochMs: Long): Int
+
+    @Query(
+        """UPDATE identity_claims SET status = 'SUPERSEDED', validToEpochMs = :nowEpochMs
+           WHERE personId = :personId AND status = 'ACTIVE' AND verificationState = 'USER_CONFIRMED'""",
+    )
+    suspend fun supersedeUserClaims(personId: String, nowEpochMs: Long): Int
+
+    @Query(
+        """UPDATE source_identities SET resolutionStatus = 'SUPERSEDED', lastObservedAtEpochMs = :nowEpochMs
+           WHERE personId = :personId AND sourceRef = 'USER_PROFILE' AND resolutionStatus = 'RESOLVED'""",
+    )
+    suspend fun supersedeUserSourceIdentities(personId: String, nowEpochMs: Long): Int
 
     @Query(
         """SELECT * FROM relationship_episodes

@@ -60,6 +60,7 @@ class AgentDataRepositoryTest {
                 contactDao = database.contactDao(),
                 contactIdentityDao = database.contactIdentityDao(),
                 contactKnowledgeDao = database.contactKnowledgeDao(),
+                contactIntelligenceDao = database.contactIntelligenceDao(),
                 factDao = database.factDao(),
                 changeLogDao = database.changeLogDao(),
             ),
@@ -394,6 +395,44 @@ class AgentDataRepositoryTest {
             setOf("WECHAT", "FEISHU", "WE_COM"),
             database.contactIdentityDao().platformIdentities(contact.contactId).map { it.platform }.toSet(),
         )
+    }
+
+    @Test
+    fun groupMessageCreatesUnresolvedSourceIdentityThenConfirmationResolvesIt() = runBlocking {
+        val now = System.currentTimeMillis()
+        val candidate = NotificationCandidateEntity(
+            candidateId = "group-message",
+            sourceKey = "group-message-key",
+            packageName = "com.tencent.mm",
+            appLabel = "微信",
+            title = "项目群",
+            body = "项目讨论内容第七版",
+            postedAtEpochMs = now,
+            createdAtEpochMs = now,
+            platform = "WECHAT",
+            conversationTitle = "项目群",
+            senderName = "老张",
+            isGroupChat = true,
+        )
+
+        repository.stageNotificationCandidate(candidate)
+
+        val unresolved = database.contactIntelligenceDao().observeUnresolvedIdentities().first().single()
+        assertEquals("老张", unresolved.visibleHandle)
+        assertEquals("WECHAT", unresolved.sourceType)
+        val groupId = stableContactKnowledgeId("observed-group", "WECHAT", "项目群")
+        assertEquals("项目群", database.contactIntelligenceDao().findGroup(groupId)?.displayName)
+        assertEquals(unresolved.sourceIdentityId, database.contactIntelligenceDao().membershipsForGroup(groupId).single().sourceIdentityId)
+
+        val contactId = repository.saveUserContact(
+            null, "张三", null, null, null, null, null, null, nowEpochMs = now + 500,
+        )
+        assertEquals("PENDING", database.notificationCandidateDao().find(candidate.candidateId)?.status)
+        assertTrue(repository.confirmNotificationCandidate(candidate.candidateId, contactId, nowEpochMs = now + 1_000))
+
+        val resolved = database.contactIntelligenceDao().findSourceIdentity(unresolved.sourceIdentityId)
+        assertEquals(contactId, resolved?.personId)
+        assertEquals("RESOLVED", resolved?.resolutionStatus)
     }
 
     @Test

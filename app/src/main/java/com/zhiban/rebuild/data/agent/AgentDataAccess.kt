@@ -3,6 +3,7 @@ package com.zhiban.rebuild.data.agent
 import androidx.room.withTransaction
 import com.zhiban.rebuild.data.contact.ContactDao
 import com.zhiban.rebuild.data.contact.ContactIdentityDao
+import com.zhiban.rebuild.data.contact.ContactIntelligenceDao
 import com.zhiban.rebuild.data.contact.ContactKnowledgeDao
 import com.zhiban.rebuild.data.notification.NotificationCandidateDao
 import com.zhiban.rebuild.runtime.context.FactDao
@@ -19,6 +20,7 @@ internal data class AgentDataDaos(
     val contactDao: ContactDao,
     val contactIdentityDao: ContactIdentityDao,
     val contactKnowledgeDao: ContactKnowledgeDao,
+    val contactIntelligenceDao: ContactIntelligenceDao,
     val factDao: FactDao,
     val changeLogDao: ChangeLogDao,
 )

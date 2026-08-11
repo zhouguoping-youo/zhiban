@@ -133,6 +133,7 @@ object AgentDataModule {
         contactDao = database.contactDao(),
         contactIdentityDao = database.contactIdentityDao(),
         contactKnowledgeDao = database.contactKnowledgeDao(),
+        contactIntelligenceDao = database.contactIntelligenceDao(),
         factDao = database.factDao(),
         changeLogDao = database.changeLogDao(),
     )

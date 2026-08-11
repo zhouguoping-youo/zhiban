@@ -14,14 +14,18 @@ import com.zhiban.rebuild.data.contact.ContactMergeLinkEntity
 import com.zhiban.rebuild.data.contact.ContactMethodEntity
 import com.zhiban.rebuild.data.contact.ContactPlatformIdentityEntity
 import com.zhiban.rebuild.data.contact.ContactRoleEntity
+import com.zhiban.rebuild.data.contact.IdentityClaimEntity
 import com.zhiban.rebuild.data.contact.IdentityResolutionDecision
 import com.zhiban.rebuild.data.contact.OrganizationEntity
 import com.zhiban.rebuild.data.contact.OwnerContactLinkEntity
+import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
+import com.zhiban.rebuild.data.contact.PersonEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventParticipantEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventWithParticipants
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
+import com.zhiban.rebuild.data.contact.SourceIdentityEntity
 import com.zhiban.rebuild.data.contact.SystemContactCandidate
 import com.zhiban.rebuild.data.contact.buildLocalOrganizationSuggestions
 import com.zhiban.rebuild.data.contact.normalizeContactPhone
@@ -262,6 +266,7 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
         val knowledge = database.contactKnowledgeDao()
         replaceUserContactMethods(knowledge, id, value, existing, nowEpochMs)
         upsertUserContactEmployment(knowledge, id, value, existing, nowEpochMs)
+        upsertUserTemporalIntelligence(id, value, existing, nowEpochMs)
         upsertUserContactSceneFacet(knowledge, id, tag, existing, nowEpochMs)
         id
     }
@@ -397,6 +402,120 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
                 ),
             )
         }
+    }
+
+    private suspend fun upsertUserTemporalIntelligence(id: String, value: ContactEntity, existing: ContactEntity?, nowEpochMs: Long) {
+        val intelligence = database.contactIntelligenceDao()
+        intelligence.upsertPerson(
+            PersonEntity(
+                personId = id,
+                canonicalContactId = id,
+                displayName = value.displayName,
+                normalizedName = value.normalizedName,
+                kind = "CONTACT",
+                status = "ACTIVE",
+                createdAtEpochMs = existing?.createdAtEpochMs ?: nowEpochMs,
+                updatedAtEpochMs = nowEpochMs,
+            ),
+        )
+        intelligence.supersedeUserClaims(id, nowEpochMs)
+        intelligence.supersedeUserSourceIdentities(id, nowEpochMs)
+        val values = userIdentityValues(value)
+        values.filter(UserIdentityValue::isAddressableIdentity).forEach { identity ->
+            val sourceIdentityId = identity.sourceIdentityId(id)
+            val previous = intelligence.findSourceIdentity(sourceIdentityId)
+            intelligence.upsertSourceIdentity(identity.toSourceIdentity(id, previous?.firstObservedAtEpochMs ?: nowEpochMs, nowEpochMs))
+        }
+        values.forEach { identity ->
+            intelligence.upsertClaim(identity.toClaim(id, nowEpochMs))
+        }
+        upsertUserTemporalEmployment(intelligence, id, value, existing, nowEpochMs)
+    }
+
+    private suspend fun upsertUserTemporalEmployment(
+        intelligence: com.zhiban.rebuild.data.contact.ContactIntelligenceDao,
+        id: String,
+        value: ContactEntity,
+        existing: ContactEntity?,
+        nowEpochMs: Long,
+    ) {
+        val previous = intelligence.findCurrentUserEmployment(id)
+        if (existing?.company != value.company) intelligence.endCurrentUserEmployments(id, nowEpochMs)
+        value.company?.let { company ->
+            val organizationId = stableContactKnowledgeId("organization", "NAME", company.lowercase())
+            val episodeId = previous?.episodeId.takeIf { existing?.company == company }
+                ?: stableContactKnowledgeId(id, "USER_EMPLOYMENT", "$organizationId:$nowEpochMs")
+            intelligence.upsertEmployment(
+                PersonEmploymentEpisodeEntity(
+                    episodeId = episodeId,
+                    personId = id,
+                    organizationId = organizationId,
+                    companyNameSnapshot = company,
+                    department = null,
+                    title = value.title,
+                    validFromEpochMs = previous?.validFromEpochMs.takeIf { existing?.company == company } ?: nowEpochMs,
+                    validToEpochMs = null,
+                    temporalPrecision = "DAY",
+                    currentState = "CURRENT",
+                    sourceRef = "USER_PROFILE",
+                    confidence = 1.0,
+                    verificationState = "USER_CONFIRMED",
+                    status = "ACTIVE",
+                    recordedAtEpochMs = previous?.recordedAtEpochMs.takeIf { existing?.company == company } ?: nowEpochMs,
+                    updatedAtEpochMs = nowEpochMs,
+                ),
+            )
+        }
+    }
+
+    private fun userIdentityValues(value: ContactEntity): List<UserIdentityValue> = buildList {
+        add(UserIdentityValue("NAME", value.displayName, value.normalizedName))
+        value.phone?.let { phone -> add(UserIdentityValue("PHONE", phone, normalizeContactPhone(phone) ?: phone)) }
+        value.email?.let { email -> add(UserIdentityValue("EMAIL", email, email.trim().lowercase())) }
+        value.wechatId?.let { handle -> add(UserIdentityValue("WECHAT", handle, handle.trim().lowercase())) }
+        value.company?.let { company -> add(UserIdentityValue("COMPANY", company, company.trim().lowercase())) }
+        value.title?.let { title -> add(UserIdentityValue("TITLE", title, title.trim().lowercase())) }
+    }
+
+    private fun UserIdentityValue.sourceIdentityId(personId: String) = stableContactKnowledgeId("user-source", personId, type, normalized)
+
+    private fun UserIdentityValue.toSourceIdentity(personId: String, firstObservedAtEpochMs: Long, nowEpochMs: Long) = SourceIdentityEntity(
+        sourceIdentityId = sourceIdentityId(personId),
+        personId = personId,
+        sourceType = type,
+        accountScope = "USER_CONFIRMED",
+        tenantId = null,
+        stableExternalId = normalized.takeIf { type in ADDRESSABLE_IDENTITY_TYPES },
+        visibleHandle = display,
+        normalizedHandle = normalized,
+        conversationScopeId = null,
+        resolutionStatus = "RESOLVED",
+        confidence = 1.0,
+        sourceRef = "USER_PROFILE",
+        firstObservedAtEpochMs = firstObservedAtEpochMs,
+        lastObservedAtEpochMs = nowEpochMs,
+    )
+
+    private fun UserIdentityValue.toClaim(personId: String, nowEpochMs: Long) = IdentityClaimEntity(
+        claimId = stableContactKnowledgeId("user-claim", personId, type, normalized, nowEpochMs.toString()),
+        personId = personId,
+        fieldType = type,
+        displayValue = display,
+        normalizedValue = normalized,
+        validFromEpochMs = nowEpochMs,
+        validToEpochMs = null,
+        temporalPrecision = "DAY",
+        recordedAtEpochMs = nowEpochMs,
+        sourceIdentityId = sourceIdentityId(personId).takeIf { isAddressableIdentity() },
+        sourceRef = "USER_PROFILE",
+        confidence = 1.0,
+        verificationState = "USER_CONFIRMED",
+        supersedesClaimId = null,
+        status = "ACTIVE",
+    )
+
+    private data class UserIdentityValue(val type: String, val display: String, val normalized: String) {
+        fun isAddressableIdentity(): Boolean = type in ADDRESSABLE_IDENTITY_TYPES
     }
 
     /**
@@ -967,5 +1086,6 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
 
     private companion object {
         const val LOCAL_ENRICHMENT_TTL_MS = 30L * 24 * 60 * 60 * 1_000
+        val ADDRESSABLE_IDENTITY_TYPES = setOf("PHONE", "EMAIL", "WECHAT")
     }
 }
