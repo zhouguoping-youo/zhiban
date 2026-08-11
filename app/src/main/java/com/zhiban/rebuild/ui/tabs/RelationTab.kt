@@ -44,6 +44,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.NotificationsNone
@@ -119,6 +120,7 @@ import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.personalization.UserProfile
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanHeaderIconAction
+import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
 import com.zhiban.rebuild.ui.components.ZhiBanPrimaryTabHeader
 import com.zhiban.rebuild.ui.components.ZhiBanSearchField
 import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
@@ -172,6 +174,7 @@ fun RelationTab(
     onOwnerClick: () -> Unit = {},
     onDiscoverClick: () -> Unit = {},
     onOpenAutoWrites: () -> Unit = {},
+    onOpenContactMaintenance: () -> Unit = {},
     isDataEmpty: Boolean = false,
     viewModel: RelationViewModel = hiltViewModel(),
     autoWriteViewModel: AutoWriteViewModel = hiltViewModel(),
@@ -187,6 +190,7 @@ fun RelationTab(
     val ownerContactLinks by viewModel.ownerContactLinks.collectAsStateWithLifecycle()
     val pendingEnrichment by viewModel.pendingEnrichment.collectAsStateWithLifecycle()
     val temporalEmployments by viewModel.temporalEmployments.collectAsStateWithLifecycle()
+    val maintenanceOverview by viewModel.maintenanceOverview.collectAsStateWithLifecycle()
     val mergeSuggestions by viewModel.mergeSuggestions.collectAsStateWithLifecycle()
     val notificationCandidates by viewModel.notificationCandidates.collectAsStateWithLifecycle()
     val pendingCallNotes by viewModel.pendingCallNotes.collectAsStateWithLifecycle()
@@ -424,6 +428,31 @@ fun RelationTab(
                         }
                     }
                     Spacer(Modifier.height(12.dp))
+                }
+            }
+            if (maintenanceOverview.needsAttentionCount > 0) {
+                item {
+                    Row(
+                        Modifier.fillMaxWidth().zhiBanCardSurface().clickable(onClick = onOpenContactMaintenance)
+                            .padding(ZhiBanSpacing.Lg),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
+                    ) {
+                        ZhiBanLeadingIcon(Icons.Outlined.AutoAwesome, contentDescription = null)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text("联系人维护", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "${maintenanceOverview.needsAttentionCount} 项值得处理",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Icon(
+                            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
             item {

@@ -39,6 +39,7 @@ import com.zhiban.rebuild.ui.settings.PrivacySecurityPage
 import com.zhiban.rebuild.ui.settings.ReportErrorSettingsPage
 import com.zhiban.rebuild.ui.settings.StorageSettingsPage
 import com.zhiban.rebuild.ui.tabs.CalendarTab
+import com.zhiban.rebuild.ui.tabs.ContactMaintenancePage
 import com.zhiban.rebuild.ui.tabs.CrmCapabilityPage
 import com.zhiban.rebuild.ui.tabs.CrmLeadListPage
 import com.zhiban.rebuild.ui.tabs.CrmOpportunityBoardPage
@@ -153,6 +154,7 @@ fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L
                     openCallNoteRequest = callNoteRequest,
                     onOwnerClick = { navController.navigate(ProfileEdit) },
                     onOpenAutoWrites = { navController.navigate(AutoWrites) },
+                    onOpenContactMaintenance = { navController.navigate(ContactMaintenance) },
                 )
             }
             composable<Skill> {
@@ -200,6 +202,16 @@ fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L
             }
             composable<AgentRunHistory> { AgentRunHistoryPage(onBack = { navController.popBackStack() }) }
             composable<AutoWrites> { AutoWritePage(onBack = { navController.popBackStack() }) }
+            composable<ContactMaintenance> {
+                ContactMaintenancePage(
+                    onBack = { navController.popBackStack() },
+                    onAsk = { draft ->
+                        navController.navigate(
+                            AssistantChat(draft = draft, returnTarget = "RELATION", workContext = true),
+                        )
+                    },
+                )
+            }
             composable<LanguageSettings> { LanguageSettingsPage(onBack = { navController.popBackStack() }) }
             composable<NotificationSettings> { NotificationSettingsPage(onBack = { navController.popBackStack() }) }
             composable<PrivacySecurity> {

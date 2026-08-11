@@ -11,6 +11,8 @@ import com.zhiban.rebuild.data.contact.ContactAliasEntity
 import com.zhiban.rebuild.data.contact.ContactEnrichmentCandidateEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.ContactIdentityResolver
+import com.zhiban.rebuild.data.contact.ContactMaintenanceEvaluator
+import com.zhiban.rebuild.data.contact.ContactMaintenanceOverview
 import com.zhiban.rebuild.data.contact.ContactMergeLinkEntity
 import com.zhiban.rebuild.data.contact.ContactPlatformIdentityEntity
 import com.zhiban.rebuild.data.contact.IdentityResolutionDecision
@@ -102,6 +104,27 @@ class RelationViewModel @Inject constructor(
         buildMergeSuggestions(contacts, aliases, identities, links)
     }.flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val maintenanceOverview: StateFlow<ContactMaintenanceOverview> = combine(
+        contacts,
+        temporalEmployments,
+        platformIdentities,
+        mergeSuggestions,
+        pendingEnrichment,
+    ) { contacts, employments, identities, mergeReviews, enrichmentReviews ->
+        ContactMaintenanceEvaluator.evaluate(
+            contacts = contacts,
+            employments = employments,
+            platformIdentities = identities,
+            duplicateReviewCount = mergeReviews.size,
+            enrichmentReviewCount = enrichmentReviews.size,
+            nowEpochMs = System.currentTimeMillis(),
+        )
+    }.flowOn(Dispatchers.Default)
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            ContactMaintenanceOverview(emptyList(), 0, 0),
+        )
     private val mutableImportState = MutableStateFlow(ContactImportUiState())
     val importState = mutableImportState.asStateFlow()
     val notificationCandidates: StateFlow<List<NotificationCandidateEntity>> =

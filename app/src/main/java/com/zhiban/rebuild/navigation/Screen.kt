@@ -68,6 +68,8 @@ import kotlinx.serialization.Serializable
 
 @Serializable data object AutoWrites
 
+@Serializable data object ContactMaintenance
+
 @Serializable data object AboutZhiBan
 
 @Serializable data object NotificationSettings
