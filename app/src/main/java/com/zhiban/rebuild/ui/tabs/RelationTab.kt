@@ -186,6 +186,7 @@ fun RelationTab(
     val rawContacts by viewModel.rawContacts.collectAsStateWithLifecycle()
     val ownerContactLinks by viewModel.ownerContactLinks.collectAsStateWithLifecycle()
     val pendingEnrichment by viewModel.pendingEnrichment.collectAsStateWithLifecycle()
+    val temporalEmployments by viewModel.temporalEmployments.collectAsStateWithLifecycle()
     val mergeSuggestions by viewModel.mergeSuggestions.collectAsStateWithLifecycle()
     val notificationCandidates by viewModel.notificationCandidates.collectAsStateWithLifecycle()
     val pendingCallNotes by viewModel.pendingCallNotes.collectAsStateWithLifecycle()
@@ -277,8 +278,13 @@ fun RelationTab(
         val ownerSourceIds = ownerContactLinks.mapTo(hashSetOf()) { it.contactId }
         rawContacts.filter { it.contactId in ownerSourceIds }
     }
-    val graphRelationships = remember(contacts, ownerContactSources, relationships) {
-        withInferredCompanyRelationships(contacts, ownerContactSources, relationships)
+    val graphRelationships = remember(contacts, ownerContactSources, relationships, temporalEmployments) {
+        withInferredCompanyRelationships(
+            contacts,
+            ownerContactSources,
+            relationships,
+            temporalEmployments,
+        )
     }
     val inferredRelationshipCount = remember(graphRelationships) {
         graphRelationships.count(RelationshipEdgeEntity::isInferredEvidenceRelationship)

@@ -1,6 +1,7 @@
 package com.zhiban.rebuild.ui.tabs
 
 import com.zhiban.rebuild.data.contact.ContactEntity
+import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import org.junit.Assert.assertEquals
@@ -11,14 +12,16 @@ import org.junit.Test
 class RelationGraphInferenceTest {
     @Test
     fun `same explicit company automatically links two contacts as inferred colleagues`() {
+        val contacts = listOf(
+            contact("li", "李应啸", "西安知伴科技有限公司"),
+            contact("ding", "丁波", "西安知伴科技有限公司"),
+            contact("other", "其他人", "另一家公司"),
+        )
         val result = withInferredCompanyRelationships(
-            contacts = listOf(
-                contact("li", "李应啸", "西安知伴科技有限公司"),
-                contact("ding", "丁波", "西安知伴科技有限公司"),
-                contact("other", "其他人", "另一家公司"),
-            ),
+            contacts = contacts,
             ownerContactSources = emptyList(),
             savedEdges = emptyList(),
+            employmentEpisodes = employmentsFor(contacts),
         )
 
         assertEquals(1, result.size)
@@ -32,13 +35,16 @@ class RelationGraphInferenceTest {
     fun `owner contact card participates as self and saved colleague edge is not duplicated`() {
         val savedSelfToLi = edge(RelationshipPersonIds.SELF, "li", "COLLEAGUE")
 
+        val contacts = listOf(
+            contact("li", "李应啸", "西安知伴科技有限公司"),
+            contact("ding", "丁波", "西安知伴科技有限公司"),
+        )
+        val owner = contact("zhou", "周国平", "西安知伴科技有限公司")
         val result = withInferredCompanyRelationships(
-            contacts = listOf(
-                contact("li", "李应啸", "西安知伴科技有限公司"),
-                contact("ding", "丁波", "西安知伴科技有限公司"),
-            ),
-            ownerContactSources = listOf(contact("zhou", "周国平", "西安知伴科技有限公司")),
+            contacts = contacts,
+            ownerContactSources = listOf(owner),
             savedEdges = listOf(savedSelfToLi),
+            employmentEpisodes = employmentsFor(contacts + owner),
         )
 
         assertEquals(2, result.size)
@@ -54,13 +60,15 @@ class RelationGraphInferenceTest {
 
     @Test
     fun `company comparison ignores whitespace and latin letter case`() {
+        val contacts = listOf(
+            contact("a", "A", "Open AI China"),
+            contact("b", "B", " openai china "),
+        )
         val result = withInferredCompanyRelationships(
-            contacts = listOf(
-                contact("a", "A", "Open AI China"),
-                contact("b", "B", " openai china "),
-            ),
+            contacts = contacts,
             ownerContactSources = emptyList(),
             savedEdges = emptyList(),
+            employmentEpisodes = employmentsFor(contacts),
         )
 
         assertEquals(1, result.size)
@@ -68,15 +76,17 @@ class RelationGraphInferenceTest {
 
     @Test
     fun `different or generic short company values do not create a relationship`() {
+        val contacts = listOf(
+            contact("a", "A", "公司"),
+            contact("b", "B", "公司"),
+            contact("c", "C", "甲方科技有限公司"),
+            contact("d", "D", "乙方科技有限公司"),
+        )
         val result = withInferredCompanyRelationships(
-            contacts = listOf(
-                contact("a", "A", "公司"),
-                contact("b", "B", "公司"),
-                contact("c", "C", "甲方科技有限公司"),
-                contact("d", "D", "乙方科技有限公司"),
-            ),
+            contacts = contacts,
             ownerContactSources = emptyList(),
             savedEdges = emptyList(),
+            employmentEpisodes = employmentsFor(contacts),
         )
 
         assertTrue(result.isEmpty())
@@ -107,6 +117,7 @@ class RelationGraphInferenceTest {
             contacts = listOf(li, contact("ding", "丁波", "西安知伴科技有限公司")),
             ownerContactSources = emptyList(),
             savedEdges = emptyList(),
+            employmentEpisodes = employmentsFor(listOf(li, contact("ding", "丁波", "西安知伴科技有限公司"))),
         )
 
         assertTrue(contactMatchesRelationCategory(li, "工作", inferred))
@@ -125,6 +136,7 @@ class RelationGraphInferenceTest {
             contacts = contacts,
             ownerContactSources = emptyList(),
             savedEdges = emptyList(),
+            employmentEpisodes = employmentsFor(contacts),
         )
 
         assertEquals(499, result.size)
@@ -145,6 +157,29 @@ class RelationGraphInferenceTest {
                 it.fromContactId == RelationshipPersonIds.SELF || it.toContactId == RelationshipPersonIds.SELF
             },
         )
+    }
+
+    @Test
+    fun `non-overlapping employment periods do not infer colleagues`() {
+        val contacts = listOf(contact("old", "前员工", "知伴科技有限公司"), contact("new", "现员工", "知伴科技有限公司"))
+        val episodes = listOf(
+            employment("old", "知伴科技有限公司", 1_000L, 2_000L),
+            employment("new", "知伴科技有限公司", 3_000L, null),
+        )
+
+        val result = withInferredCompanyRelationships(contacts, emptyList(), emptyList(), episodes)
+
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun `unknown employment time is labelled for verification instead of claimed current`() {
+        val contacts = listOf(contact("a", "甲", "知伴科技有限公司"), contact("b", "乙", "知伴科技有限公司"))
+
+        val result = withInferredCompanyRelationships(contacts, emptyList(), emptyList(), employmentsFor(contacts))
+
+        assertEquals(INFERRED_COMPANY_UNKNOWN_TIME_STATUS, result.single().status)
+        assertEquals("同公司 · 时间待核实", result.single().inferredEvidenceLabel())
     }
 
     private fun contact(id: String, name: String, company: String?, email: String? = null) = ContactEntity(
@@ -182,4 +217,27 @@ class RelationGraphInferenceTest {
     )
 
     private fun unorderedPair(edge: RelationshipEdgeEntity) = setOf(edge.fromContactId, edge.toContactId)
+
+    private fun employmentsFor(contacts: List<ContactEntity>) = contacts.mapNotNull { contact ->
+        contact.company?.let { employment(contact.contactId, it, null, null) }
+    }
+
+    private fun employment(personId: String, company: String, from: Long?, to: Long?) = PersonEmploymentEpisodeEntity(
+        episodeId = "employment-$personId-$company",
+        personId = personId,
+        organizationId = null,
+        companyNameSnapshot = company,
+        department = null,
+        title = null,
+        validFromEpochMs = from,
+        validToEpochMs = to,
+        temporalPrecision = if (from == null && to == null) "UNKNOWN" else "DAY",
+        currentState = if (to == null) "UNKNOWN" else "ENDED",
+        sourceRef = "test",
+        confidence = 0.8,
+        verificationState = "OBSERVED",
+        status = "ACTIVE",
+        recordedAtEpochMs = 1L,
+        updatedAtEpochMs = 1L,
+    )
 }

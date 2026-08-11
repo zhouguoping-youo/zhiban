@@ -15,6 +15,7 @@ import com.zhiban.rebuild.data.contact.ContactMergeLinkEntity
 import com.zhiban.rebuild.data.contact.ContactPlatformIdentityEntity
 import com.zhiban.rebuild.data.contact.IdentityResolutionDecision
 import com.zhiban.rebuild.data.contact.OwnerContactLinkEntity
+import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventWithParticipants
 import com.zhiban.rebuild.data.contact.SystemContactCandidate
@@ -88,6 +89,9 @@ class RelationViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val pendingEnrichment: StateFlow<List<ContactEnrichmentCandidateEntity>> =
         repository.observeAllPendingContactEnrichment()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val temporalEmployments: StateFlow<List<PersonEmploymentEpisodeEntity>> =
+        repository.observeAllTemporalEmployments()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val mergeSuggestions: StateFlow<List<ContactMergeSuggestion>> = combine(
         repository.observeRawContacts(),
