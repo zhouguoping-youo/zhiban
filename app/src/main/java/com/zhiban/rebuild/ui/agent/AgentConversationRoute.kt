@@ -40,7 +40,6 @@ import androidx.navigation.compose.rememberNavController
 import com.zhiban.rebuild.navigation.Calendar
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrResult
-import com.zhiban.rebuild.runtime.input.asr.RealtimeVoiceState
 import java.io.File
 import java.util.Locale
 import java.util.UUID
@@ -70,7 +69,6 @@ fun AgentConversationRoute(
     var pendingPermissionAction by remember { mutableStateOf<CaptureAction?>(null) }
     var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
     var recordingFile by remember { mutableStateOf<File?>(null) }
-    var pendingRealtimePermission by remember { mutableStateOf(false) }
     var speechRecognizer by remember { mutableStateOf<SpeechRecognizer?>(null) }
     var textToSpeech by remember { mutableStateOf<TextToSpeech?>(null) }
     val coroutineScope = rememberCoroutineScope()
@@ -257,8 +255,6 @@ fun AgentConversationRoute(
         photoCapture.launch(uri)
     }
     val cloudAsrAvailability by viewModel.cloudAsrAvailability.collectAsState()
-    val realtimeVoiceState by viewModel.realtimeVoiceState.collectAsState()
-
     fun startSystemRecognition() {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -441,39 +437,17 @@ fun AgentConversationRoute(
             CaptureAction.AUDIO -> multimodal.copy(microphonePermission = permissionState)
             null -> multimodal
         }
-        if (granted && pendingRealtimePermission) {
-            pendingRealtimePermission = false
-            viewModel.startRealtimeVoice()
-        } else {
-            pendingRealtimePermission = false
-            if (granted) {
-                when (action) {
-                    CaptureAction.PHOTO -> startPhotoCapture()
-                    CaptureAction.AUDIO -> startRecording()
-                    null -> Unit
-                }
+        if (granted) {
+            when (action) {
+                CaptureAction.PHOTO -> startPhotoCapture()
+                CaptureAction.AUDIO -> startRecording()
+                null -> Unit
             }
         }
     }
 
-    fun requestRealtimeVoice() {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
-            PackageManager.PERMISSION_GRANTED
-        ) {
-            viewModel.startRealtimeVoice()
-        } else {
-            pendingRealtimePermission = true
-            pendingPermissionAction = CaptureAction.AUDIO
-            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-        }
-    }
-
-    // Stops any in-flight voice capture and clears the transcription status strip. Realtime voice
-    // failures leave the controller Idle with a Failed UI state, so this must also reset the strip —
-    // otherwise a failed realtime attempt shows a "删除录音" action for a recording that does not
-    // exist and never dismisses, leaving the voice button looking dead.
+    // Stops any in-flight voice capture and clears the transcription status strip.
     fun dismissVoiceFeedback() {
-        viewModel.cancelRealtimeVoice()
         speechRecognizer?.cancel()
         recorder?.let { active ->
             runCatching { active.stop() }
@@ -484,59 +458,6 @@ fun AgentConversationRoute(
         recordingFile = null
         voiceInputLevel = 0f
         multimodal = multimodal.copy(transcription = TranscriptionUiState())
-    }
-
-    DisposableEffect(Unit) { onDispose { viewModel.cancelRealtimeVoice() } }
-    LaunchedEffect(realtimeVoiceState) {
-        voiceInputLevel = (realtimeVoiceState as? RealtimeVoiceState.Recording)?.inputLevel ?: 0f
-        multimodal = multimodal.copy(
-            transcription = when (val voice = realtimeVoiceState) {
-                RealtimeVoiceState.Idle -> if (
-                    multimodal.transcription.phase in setOf(
-                        TranscriptionPhase.RECORDING,
-                        TranscriptionPhase.UPLOADING,
-                        TranscriptionPhase.TRANSCRIBING,
-                    )
-                ) {
-                    TranscriptionUiState()
-                } else {
-                    multimodal.transcription
-                }
-
-                RealtimeVoiceState.Connecting -> TranscriptionUiState(TranscriptionPhase.UPLOADING)
-
-                is RealtimeVoiceState.Recording -> {
-                    voice.completedExchange?.let { completed ->
-                        viewModel.showRealtimeExchange(
-                            completed.exchangeId,
-                            completed.transcript,
-                            completed.replyText,
-                        )
-                    }
-                    TranscriptionUiState(
-                        TranscriptionPhase.RECORDING,
-                        partialText = voice.partialText,
-                    )
-                }
-
-                is RealtimeVoiceState.Responding -> TranscriptionUiState(
-                    TranscriptionPhase.TRANSCRIBING,
-                    partialText = voice.transcript,
-                )
-
-                is RealtimeVoiceState.Completed -> {
-                    viewModel.showRealtimeExchange(voice.exchangeId, voice.transcript, voice.replyText)
-                    TranscriptionUiState(TranscriptionPhase.FINAL, finalText = voice.transcript)
-                }
-
-                is RealtimeVoiceState.Failed -> TranscriptionUiState(
-                    phase = TranscriptionPhase.FAILED,
-                    safeMessage = voice.safeMessage,
-                    // Realtime retry re-opens the live session (no retained file), so it is safe to offer.
-                    retryable = true,
-                )
-            },
-        )
     }
 
     fun requestOrRun(action: CaptureAction) {
@@ -643,34 +564,17 @@ fun AgentConversationRoute(
         // Do not offer unsupported types that would only fail after selection.
         onPickFile = { filePicker.launch(arrayOf("application/pdf")) },
         onToggleRecording = {
-            when (realtimeVoiceState) {
-                is RealtimeVoiceState.Recording -> viewModel.cancelRealtimeVoice()
-
-                RealtimeVoiceState.Connecting, is RealtimeVoiceState.Responding -> viewModel.cancelRealtimeVoice()
-
-                else -> if (multimodal.transcription.phase ==
-                    TranscriptionPhase.RECORDING
-                ) {
-                    stopRecording()
-                } else {
-                    requestOrRun(CaptureAction.AUDIO)
-                }
-            }
-        },
-        onStartRealtimeVoice = {
-            when (realtimeVoiceState) {
-                is RealtimeVoiceState.Recording -> viewModel.cancelRealtimeVoice()
-                RealtimeVoiceState.Connecting, is RealtimeVoiceState.Responding -> viewModel.cancelRealtimeVoice()
-                else -> requestRealtimeVoice()
+            if (multimodal.transcription.phase == TranscriptionPhase.RECORDING) {
+                stopRecording()
+            } else {
+                requestOrRun(CaptureAction.AUDIO)
             }
         },
         onVoiceCancel = { dismissVoiceFeedback() },
         onVoiceRetry = {
-            // Realtime voice has no retained recording: retry re-opens the live session.
-            // Mic (batch) transcription retries the retained file.
             recordingFile?.let(::transcribeRecordedAudio) ?: run {
                 dismissVoiceFeedback()
-                requestRealtimeVoice()
+                requestOrRun(CaptureAction.AUDIO)
             }
         },
         // Slice 1 (#t41): mic permission flow — when banner shows

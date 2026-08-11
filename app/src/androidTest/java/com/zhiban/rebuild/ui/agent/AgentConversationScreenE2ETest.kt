@@ -111,6 +111,22 @@ class AgentConversationScreenE2ETest {
         assertEquals("file", picked.get())
     }
 
+    @Test fun emptyInputOffersOneVoiceToTextActionUsingTheWorkingRecordingPath() {
+        val recordings = AtomicInteger(0)
+        compose.setContent {
+            ZhiBanTheme {
+                AgentConversationScreen(
+                    state = AgentConversationUiState(),
+                    onToggleRecording = { recordings.incrementAndGet() },
+                )
+            }
+        }
+
+        compose.onNodeWithContentDescription("语音转文字").assertIsDisplayed().performClick()
+        assertEquals(1, recordings.get())
+        compose.onAllNodesWithContentDescription("开始录音").assertCountEquals(0)
+    }
+
     @Test fun emptyConversationSuggestionsRunTheSelectedTask() {
         val selected = AtomicReference<String>()
         compose.setContent {

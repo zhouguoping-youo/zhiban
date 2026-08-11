@@ -108,7 +108,6 @@ fun AgentConversationScreen(
     onAttachmentAction: (String, AttachmentAction) -> Unit = { _, _ -> },
     onVoiceCancel: () -> Unit = {},
     onVoiceRetry: () -> Unit = {},
-    onStartRealtimeVoice: () -> Unit = {},
     // Slice 1 (#t41): mic permission flow — when banner shows PERMANENTLY_DENIED,
     // route user to OS app-details page (AppSettingsOpener).
     onOpenAppSettings: () -> Unit = {},
@@ -233,10 +232,8 @@ fun AgentConversationScreen(
             MessageInput(
                 value = inputText, enabled = state.isInputEnabled, onValueChange = onInputChange, onSend = onSend,
                 attachmentPrompt = attachmentPrompt(multimodalState.attachments),
-                isRecording = multimodalState.transcription.phase == TranscriptionPhase.RECORDING,
                 onPickImage = onPickImage, onCapturePhoto = onCapturePhoto,
                 onPickFile = onPickFile, onToggleRecording = onToggleRecording,
-                onStartRealtimeVoice = onStartRealtimeVoice,
                 inlineModelLabel = inlineModelLabel,
                 onModelLabelClick = {
                     modelPickerOpen = true

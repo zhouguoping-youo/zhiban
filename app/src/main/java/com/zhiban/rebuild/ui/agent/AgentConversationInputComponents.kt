@@ -36,7 +36,6 @@ import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.IosShare
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Menu
-import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -80,12 +79,10 @@ internal fun shouldAutoScrollToLatest(totalItems: Int, lastVisibleIndex: Int): B
     onValueChange: (String) -> Unit,
     onSend: (String) -> Unit,
     attachmentPrompt: String? = null,
-    isRecording: Boolean = false,
     onPickImage: () -> Unit = {},
     onCapturePhoto: () -> Unit = {},
     onPickFile: () -> Unit = {},
     onToggleRecording: () -> Unit = {},
-    onStartRealtimeVoice: () -> Unit = {},
     // Per architect 695: inline model label between text input and mic
     // that opens a single-section popup (models + levels).
     inlineModelLabel: String = "M2.7 智能/高",
@@ -106,52 +103,11 @@ internal fun shouldAutoScrollToLatest(totalItems: Int, lastVisibleIndex: Int): B
             keyboardController?.show()
         }
     }
-    val micControl: @Composable () -> Unit = {
-        Box(
-            Modifier.size(ZhiBanSize.TouchTarget).clip(CircleShape).clickable(enabled = enabled) {
-                onToggleRecording()
-            },
-            contentAlignment = Alignment.Center,
-        ) {
-            if (isRecording) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    Box(
-                        Modifier.size(
-                            width = 3.dp,
-                            height = 8.dp,
-                        ).background(ZhiBanTerracotta, RoundedCornerShape(2.dp)),
-                    )
-                    Box(
-                        Modifier.size(
-                            width = 3.dp,
-                            height = 14.dp,
-                        ).background(ZhiBanTerracotta, RoundedCornerShape(2.dp)),
-                    )
-                    Box(
-                        Modifier.size(
-                            width = 3.dp,
-                            height = 10.dp,
-                        ).background(ZhiBanTerracotta, RoundedCornerShape(2.dp)),
-                    )
-                }
-            } else {
-                Icon(
-                    imageVector = Icons.Outlined.Mic,
-                    contentDescription = "开始录音",
-                    tint = ZhiBanTextPrimary,
-                    modifier = Modifier.size(ZhiBanIconSize.Action),
-                )
-            }
-        }
-    }
     val primaryAction: @Composable () -> Unit = {
         Box(
             modifier = Modifier
                 .size(ZhiBanSize.TouchTarget)
-                .semantics { contentDescription = if (canSend) "发送" else "语音输入" }
+                .semantics { contentDescription = if (canSend) "发送" else "语音转文字" }
                 .clip(CircleShape)
                 .clickable(enabled = enabled) {
                     if (canSend) {
@@ -160,7 +116,7 @@ internal fun shouldAutoScrollToLatest(totalItems: Int, lastVisibleIndex: Int): B
                         focusManager.clearFocus(force = true)
                         keyboardController?.hide()
                     } else {
-                        onStartRealtimeVoice()
+                        onToggleRecording()
                     }
                 },
             contentAlignment = Alignment.Center,
@@ -308,8 +264,6 @@ internal fun shouldAutoScrollToLatest(totalItems: Int, lastVisibleIndex: Int): B
                             style = MaterialTheme.typography.labelLarge,
                             maxLines = 1,
                         )
-                        micControl()
-                        Spacer(Modifier.width(ZhiBanSpacing.Sm))
                         primaryAction()
                     }
                 }
@@ -322,7 +276,6 @@ internal fun shouldAutoScrollToLatest(totalItems: Int, lastVisibleIndex: Int): B
                     attachmentControl()
                     collapsedInput()
                     if (!useCompactControls) modelControl()
-                    micControl()
                     primaryAction()
                 }
             }
