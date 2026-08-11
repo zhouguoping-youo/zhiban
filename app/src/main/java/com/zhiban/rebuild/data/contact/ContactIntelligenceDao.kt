@@ -117,6 +117,14 @@ interface ContactIntelligenceDao {
     )
     fun observeRelationships(personId: String): Flow<List<RelationshipEpisodeEntity>>
 
+    @Query(
+        """UPDATE relationship_episodes SET validToEpochMs = :nowEpochMs, updatedAtEpochMs = :nowEpochMs
+           WHERE status = 'ACTIVE' AND validToEpochMs IS NULL AND verificationState = 'USER_CONFIRMED'
+             AND ((fromPersonId = :fromPersonId AND toPersonId = :toPersonId)
+               OR (fromPersonId = :toPersonId AND toPersonId = :fromPersonId))""",
+    )
+    suspend fun closeOpenUserRelationships(fromPersonId: String, toPersonId: String, nowEpochMs: Long): Int
+
     @Query("SELECT * FROM android_raw_contact_links WHERE personId = :personId ORDER BY lastObservedAtEpochMs DESC")
     suspend fun androidLinksForPerson(personId: String): List<AndroidRawContactLinkEntity>
 

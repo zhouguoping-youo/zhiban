@@ -595,10 +595,11 @@ class AgentDataRepositoryTest {
             null, "周国平", null, null, null, null, null, null, nowEpochMs = 1_000L,
         )
 
-        repository.saveConfirmedRelationship(
+        val edgeId = repository.saveConfirmedRelationship(
             RelationshipPersonIds.SELF,
             contactId,
             "FRIEND",
+            temporalState = "CURRENT",
             nowEpochMs = 2_000L,
         )
 
@@ -606,6 +607,20 @@ class AgentDataRepositoryTest {
         assertEquals(RelationshipPersonIds.SELF, edge.fromContactId)
         assertEquals(contactId, edge.toContactId)
         assertEquals(1, database.contactDao().countActive())
+        val episode = database.contactIntelligenceDao().observeRelationships(contactId).first().single()
+        assertEquals("FRIEND", episode.relationshipType)
+        assertNull(episode.validToEpochMs)
+        assertEquals("USER_CONFIRMED", episode.verificationState)
+
+        assertTrue(repository.updateConfirmedRelationship(edgeId, "COLLEAGUE", nowEpochMs = 3_000L))
+        val afterUpdate = database.contactIntelligenceDao().observeRelationships(contactId).first()
+        assertEquals(2, afterUpdate.size)
+        assertEquals(3_000L, afterUpdate.single { it.relationshipType == "FRIEND" }.validToEpochMs)
+        assertNull(afterUpdate.single { it.relationshipType == "COLLEAGUE" }.validToEpochMs)
+
+        assertTrue(repository.deleteConfirmedRelationship(edgeId, nowEpochMs = 4_000L))
+        val closed = database.contactIntelligenceDao().observeRelationships(contactId).first()
+        assertEquals(4_000L, closed.single { it.relationshipType == "COLLEAGUE" }.validToEpochMs)
     }
 
     @Test

@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.AlternateEmail
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.LinkOff
@@ -33,6 +34,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zhiban.rebuild.data.contact.ContactMaintenanceIssue
 import com.zhiban.rebuild.data.contact.ContactMaintenanceItem
+import com.zhiban.rebuild.data.contact.SourceIdentityEntity
 import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
 import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
@@ -43,6 +45,7 @@ import com.zhiban.rebuild.ui.theme.ZhiBanSpacing
 fun ContactMaintenancePage(onBack: () -> Unit, onAsk: (String) -> Unit, viewModel: RelationViewModel = hiltViewModel()) {
     val overview by viewModel.maintenanceOverview.collectAsStateWithLifecycle()
     val suggestions by viewModel.mergeSuggestions.collectAsStateWithLifecycle()
+    val unresolvedIdentities by viewModel.unresolvedSourceIdentities.collectAsStateWithLifecycle()
     var selectedMerge by remember { mutableStateOf<ContactMergeSuggestion?>(null) }
     ZhiBanPage {
         LazyColumn(
@@ -51,7 +54,7 @@ fun ContactMaintenancePage(onBack: () -> Unit, onAsk: (String) -> Unit, viewMode
             verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
         ) {
             item { ZhiBanTopBar(title = "联系人维护", onBack = onBack) }
-            if (overview.needsAttentionCount == 0) {
+            if (overview.needsAttentionCount == 0 && unresolvedIdentities.isEmpty()) {
                 item {
                     Text(
                         "联系人资料已整理",
@@ -79,6 +82,14 @@ fun ContactMaintenancePage(onBack: () -> Unit, onAsk: (String) -> Unit, viewMode
                                 title = "资料待核实",
                                 detail = "${overview.enrichmentReviewCount} 条建议",
                                 onClick = { onAsk("查看联系人资料待核实项，只使用已有证据。能确认的给出依据，不能确认的帮我生成询问文案；对外发送前让我确认。") },
+                            )
+                        }
+                        if (unresolvedIdentities.isNotEmpty()) {
+                            MaintenanceActionRow(
+                                icon = Icons.Outlined.AlternateEmail,
+                                title = "社交身份待关联",
+                                detail = "${unresolvedIdentities.size} 个账号或群昵称",
+                                onClick = { onAsk(unresolvedIdentityPrompt(unresolvedIdentities.first())) },
                             )
                         }
                     }
@@ -151,5 +162,8 @@ private fun verificationPrompt(item: ContactMaintenanceItem, issue: ContactMaint
     }
     return "请帮我为联系人“${item.contact.displayName}”$task。先检查本地已有证据；无法确认时生成一条简短、自然的询问文案。不要猜测，对外发送前让我最后确认。"
 }
+
+private fun unresolvedIdentityPrompt(identity: SourceIdentityEntity): String = "请核实${identity.sourceType}里显示为“${identity.visibleHandle}”的身份属于谁。" +
+    "先检查本地联系人和已有证据；证据不足时只问我一个最关键的问题，不能仅凭同名自动合并。"
 
 private const val MAX_VISIBLE_ITEMS = 100

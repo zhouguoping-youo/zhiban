@@ -15,7 +15,9 @@ import com.zhiban.rebuild.data.contact.ContactPlatformIdentityEntity
 import com.zhiban.rebuild.data.contact.ContactRoleEntity
 import com.zhiban.rebuild.data.contact.OrganizationEntity
 import com.zhiban.rebuild.data.contact.OwnerContactLinkEntity
+import com.zhiban.rebuild.data.contact.PersonEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
+import com.zhiban.rebuild.data.contact.RelationshipEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventParticipantEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventWithParticipants
@@ -69,9 +71,11 @@ internal class RelationshipAgentDataRepository(private val database: AgentDataba
         fromContactId: String,
         toContactId: String,
         relationType: String,
+        temporalState: String = "CURRENT",
         nowEpochMs: Long = System.currentTimeMillis(),
-    ): String {
+    ): String = database.withTransaction {
         require(fromContactId != toContactId) { "请选择两个不同的联系人" }
+        require(temporalState in setOf("CURRENT", "PAST", "UNKNOWN")) { "关系时间状态无效" }
         require(
             relationType in setOf(
                 "FAMILY", "FRIEND", "COLLEAGUE", "CUSTOMER", "SUPPLIER",
@@ -104,31 +108,90 @@ internal class RelationshipAgentDataRepository(private val database: AgentDataba
                 updatedAtEpochMs = nowEpochMs,
             ),
         )
-        return id
+        writeTemporalRelationship(id, fromContactId, toContactId, relationType, temporalState, nowEpochMs)
+        id
     }
 
-    suspend fun deleteConfirmedRelationship(edgeId: String): Boolean = database.relationshipEdgeDao().deleteConfirmed(edgeId) == 1
-
-    suspend fun updateConfirmedRelationship(edgeId: String, relationType: String, nowEpochMs: Long = System.currentTimeMillis()): Boolean {
-        require(
-            relationType in setOf(
-                "FAMILY", "FRIEND", "COLLEAGUE", "CUSTOMER", "SUPPLIER",
-                "TEACHER", "CLASSMATE", "PROJECT_PARTNER", "OTHER",
-            ),
-        ) { "关系类型无效" }
-        val current = database.relationshipEdgeDao().find(edgeId) ?: return false
-        require(current.userConfirmed) { "只有你确认的关系可以修改" }
-        database.relationshipEdgeDao().upsert(
-            current.copy(
-                relationType = relationType,
-                evidenceDigest = "USER_CONFIRMED",
+    private suspend fun writeTemporalRelationship(
+        edgeId: String,
+        fromContactId: String,
+        toContactId: String,
+        relationType: String,
+        temporalState: String,
+        nowEpochMs: Long,
+    ) {
+        ensureTemporalPerson(fromContactId, nowEpochMs)
+        ensureTemporalPerson(toContactId, nowEpochMs)
+        database.contactIntelligenceDao().upsertRelationship(
+            RelationshipEpisodeEntity(
+                episodeId = stableContactKnowledgeId("user-relationship", edgeId, temporalState, nowEpochMs.toString()),
+                fromPersonId = fromContactId,
+                toPersonId = toContactId,
+                relationshipType = relationType,
+                direction = "BIDIRECTIONAL",
+                validFromEpochMs = null,
+                validToEpochMs = nowEpochMs.takeIf { temporalState == "PAST" },
+                temporalPrecision = if (temporalState == "UNKNOWN") "UNKNOWN" else "OPEN",
                 evidenceRefsJson = "[\"USER_PROFILE\"]",
                 confidence = 1.0,
+                verificationState = "USER_CONFIRMED",
+                status = "ACTIVE",
+                recordedAtEpochMs = nowEpochMs,
                 updatedAtEpochMs = nowEpochMs,
             ),
         )
-        return true
     }
+
+    private suspend fun ensureTemporalPerson(contactId: String, nowEpochMs: Long) {
+        val intelligence = database.contactIntelligenceDao()
+        if (intelligence.findPerson(contactId) != null) return
+        val contact = contactId.takeUnless { it == RelationshipPersonIds.SELF }?.let { database.contactDao().findById(it) }
+        intelligence.upsertPerson(
+            PersonEntity(
+                personId = contactId,
+                canonicalContactId = contact?.contactId,
+                displayName = contact?.displayName ?: "我",
+                normalizedName = contact?.normalizedName ?: "self",
+                kind = if (contact == null) "USER" else "CONTACT",
+                status = "ACTIVE",
+                createdAtEpochMs = contact?.createdAtEpochMs ?: nowEpochMs,
+                updatedAtEpochMs = nowEpochMs,
+            ),
+        )
+    }
+
+    suspend fun deleteConfirmedRelationship(edgeId: String, nowEpochMs: Long = System.currentTimeMillis()): Boolean = database.withTransaction {
+        val current = database.relationshipEdgeDao().find(edgeId) ?: return@withTransaction false
+        val deleted = database.relationshipEdgeDao().deleteConfirmed(edgeId) == 1
+        if (deleted) {
+            database.contactIntelligenceDao().closeOpenUserRelationships(current.fromContactId, current.toContactId, nowEpochMs)
+        }
+        deleted
+    }
+
+    suspend fun updateConfirmedRelationship(edgeId: String, relationType: String, nowEpochMs: Long = System.currentTimeMillis()): Boolean =
+        database.withTransaction {
+            require(
+                relationType in setOf(
+                    "FAMILY", "FRIEND", "COLLEAGUE", "CUSTOMER", "SUPPLIER",
+                    "TEACHER", "CLASSMATE", "PROJECT_PARTNER", "OTHER",
+                ),
+            ) { "关系类型无效" }
+            val current = database.relationshipEdgeDao().find(edgeId) ?: return@withTransaction false
+            require(current.userConfirmed) { "只有你确认的关系可以修改" }
+            database.relationshipEdgeDao().upsert(
+                current.copy(
+                    relationType = relationType,
+                    evidenceDigest = "USER_CONFIRMED",
+                    evidenceRefsJson = "[\"USER_PROFILE\"]",
+                    confidence = 1.0,
+                    updatedAtEpochMs = nowEpochMs,
+                ),
+            )
+            database.contactIntelligenceDao().closeOpenUserRelationships(current.fromContactId, current.toContactId, nowEpochMs)
+            writeTemporalRelationship(edgeId, current.fromContactId, current.toContactId, relationType, "CURRENT", nowEpochMs)
+            true
+        }
 
     fun observeRelationshipEvents(): Flow<List<RelationshipEventWithParticipants>> = combine(
         database.relationshipEventDao().observeActive(),

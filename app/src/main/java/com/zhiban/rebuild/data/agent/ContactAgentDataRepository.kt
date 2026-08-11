@@ -1041,6 +1041,7 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
     fun observeContactImportantDates(contactId: String) = database.contactKnowledgeDao().observeImportantDates(contactId)
     fun observeAllContactImportantDates() = database.contactKnowledgeDao().observeAllImportantDates()
     fun observeAllTemporalEmployments() = database.contactIntelligenceDao().observeAllEmployments()
+    fun observeUnresolvedSourceIdentities() = database.contactIntelligenceDao().observeUnresolvedIdentities()
     fun observeContactFacets(contactId: String) = database.contactKnowledgeDao().observeFacets(contactId)
     fun observePendingContactEnrichment(contactId: String) = database.contactKnowledgeDao().observePendingEnrichment(contactId)
     fun observeAllPendingContactEnrichment(nowEpochMs: Long = System.currentTimeMillis()) =

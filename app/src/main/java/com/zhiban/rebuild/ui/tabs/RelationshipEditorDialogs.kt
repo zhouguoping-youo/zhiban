@@ -153,7 +153,7 @@ internal fun RelationshipEditorDialog(
     owner: UserProfile,
     contacts: List<ContactEntity>,
     onDismiss: () -> Unit,
-    onSave: (String, String, String, (String?) -> Unit) -> Unit,
+    onSave: (String, String, String, String, (String?) -> Unit) -> Unit,
 ) {
     val people = buildList {
         add(RelationshipPersonUi(RelationshipPersonIds.SELF, owner.displayNameOrMe(), true))
@@ -165,6 +165,7 @@ internal fun RelationshipEditorDialog(
     var toQuery by remember { mutableStateOf("") }
     var chooseContactAsSource by remember { mutableStateOf(false) }
     var type by remember { mutableStateOf("") }
+    var temporalState by remember { mutableStateOf("CURRENT") }
     var error by remember { mutableStateOf<String?>(null) }
     val relationTypes =
         listOf("COLLEAGUE", "FAMILY", "FRIEND", "CUSTOMER", "SUPPLIER", "TEACHER", "CLASSMATE", "PROJECT_PARTNER", "OTHER")
@@ -336,6 +337,22 @@ internal fun RelationshipEditorDialog(
                         type = selectedType
                         error = null
                     }
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        "这段关系",
+                        color = RelationInk,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("CURRENT" to "现在", "PAST" to "以前", "UNKNOWN" to "时间不确定").forEach { (value, label) ->
+                            FilterChip(
+                                selected = temporalState == value,
+                                onClick = { temporalState = value },
+                                label = { Text(label) },
+                            )
+                        }
+                    }
                 }
                 error?.let {
                     Spacer(Modifier.height(8.dp))
@@ -352,7 +369,7 @@ internal fun RelationshipEditorDialog(
                         } else if (type.isBlank()) {
                             error = "请选择关系类型"
                         } else {
-                            onSave(fromId, toId, type) { error = it }
+                            onSave(fromId, toId, type, temporalState) { error = it }
                         }
                     },
                     Modifier.fillMaxWidth().height(ZhiBanSize.Control),

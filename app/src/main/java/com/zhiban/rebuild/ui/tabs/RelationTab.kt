@@ -193,6 +193,7 @@ fun RelationTab(
     val pendingEnrichment by viewModel.pendingEnrichment.collectAsStateWithLifecycle()
     val temporalEmployments by viewModel.temporalEmployments.collectAsStateWithLifecycle()
     val maintenanceOverview by viewModel.maintenanceOverview.collectAsStateWithLifecycle()
+    val unresolvedSourceIdentities by viewModel.unresolvedSourceIdentities.collectAsStateWithLifecycle()
     val mergeSuggestions by viewModel.mergeSuggestions.collectAsStateWithLifecycle()
     val notificationCandidates by viewModel.notificationCandidates.collectAsStateWithLifecycle()
     val pendingCallNotes by viewModel.pendingCallNotes.collectAsStateWithLifecycle()
@@ -447,7 +448,8 @@ fun RelationTab(
                     Spacer(Modifier.height(12.dp))
                 }
             }
-            if (maintenanceOverview.needsAttentionCount > 0) {
+            val maintenanceCount = maintenanceOverview.needsAttentionCount + unresolvedSourceIdentities.size
+            if (maintenanceCount > 0) {
                 item {
                     Row(
                         Modifier.fillMaxWidth().zhiBanCardSurface().clickable(onClick = onOpenContactMaintenance)
@@ -459,7 +461,7 @@ fun RelationTab(
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text("联系人维护", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                             Text(
-                                "${maintenanceOverview.needsAttentionCount} 项值得处理",
+                                "$maintenanceCount 项值得处理",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -1051,8 +1053,8 @@ fun RelationTab(
             owner = ownerProfile,
             contacts = contacts,
             onDismiss = { showRelationEditor = false },
-            onSave = { from, to, type, result ->
-                viewModel.saveRelationship(from, to, type) { error ->
+            onSave = { from, to, type, temporalState, result ->
+                viewModel.saveRelationship(from, to, type, temporalState) { error ->
                     result(error)
                     if (error == null) {
                         showRelationEditor = false

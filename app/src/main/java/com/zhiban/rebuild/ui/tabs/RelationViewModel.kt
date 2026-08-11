@@ -22,6 +22,7 @@ import com.zhiban.rebuild.data.contact.OwnerContactLinkEntity
 import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventWithParticipants
+import com.zhiban.rebuild.data.contact.SourceIdentityEntity
 import com.zhiban.rebuild.data.contact.SystemContactCandidate
 import com.zhiban.rebuild.data.contact.SystemContactReader
 import com.zhiban.rebuild.data.contact.enrichment.CompanyEnrichmentRefresher
@@ -95,6 +96,9 @@ class RelationViewModel @Inject constructor(
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val temporalEmployments: StateFlow<List<PersonEmploymentEpisodeEntity>> =
         repository.observeAllTemporalEmployments()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val unresolvedSourceIdentities: StateFlow<List<SourceIdentityEntity>> =
+        repository.observeUnresolvedSourceIdentities()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val mergeSuggestions: StateFlow<List<ContactMergeSuggestion>> = combine(
         repository.observeRawContacts(),
@@ -367,9 +371,9 @@ class RelationViewModel @Inject constructor(
         viewModelScope.launch { repository.undoContactIsOwner(contactId) }
     }
 
-    fun saveRelationship(fromId: String, toId: String, type: String, onResult: (String?) -> Unit) {
+    fun saveRelationship(fromId: String, toId: String, type: String, temporalState: String, onResult: (String?) -> Unit) {
         viewModelScope.launch {
-            runSuspendCatching { repository.saveConfirmedRelationship(fromId, toId, type) }
+            runSuspendCatching { repository.saveConfirmedRelationship(fromId, toId, type, temporalState) }
                 .onSuccess { onResult(null) }
                 .onFailure { onResult(it.message ?: "保存关系失败") }
         }

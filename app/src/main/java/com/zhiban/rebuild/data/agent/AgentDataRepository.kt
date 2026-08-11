@@ -807,6 +807,7 @@ class AgentDataRepository internal constructor(
     fun observeContacts(): Flow<List<ContactEntity>> = contacts.observeContacts()
     fun observeAllContactImportantDates() = contacts.observeAllContactImportantDates()
     fun observeAllTemporalEmployments() = contacts.observeAllTemporalEmployments()
+    fun observeUnresolvedSourceIdentities() = contacts.observeUnresolvedSourceIdentities()
     fun observeOwnerContactLinks(): Flow<List<OwnerContactLinkEntity>> = contacts.observeOwnerContactLinks()
     suspend fun confirmContactIsOwner(contactId: String, nowEpochMs: Long = System.currentTimeMillis()) = contacts.confirmContactIsOwner(contactId, nowEpochMs)
     suspend fun undoContactIsOwner(contactId: String, nowEpochMs: Long = System.currentTimeMillis()): Boolean =
@@ -868,9 +869,11 @@ class AgentDataRepository internal constructor(
         fromContactId: String,
         toContactId: String,
         relationType: String,
+        temporalState: String = "CURRENT",
         nowEpochMs: Long = System.currentTimeMillis(),
-    ): String = relationships.saveConfirmedRelationship(fromContactId, toContactId, relationType, nowEpochMs)
-    suspend fun deleteConfirmedRelationship(edgeId: String): Boolean = relationships.deleteConfirmedRelationship(edgeId)
+    ): String = relationships.saveConfirmedRelationship(fromContactId, toContactId, relationType, temporalState, nowEpochMs)
+    suspend fun deleteConfirmedRelationship(edgeId: String, nowEpochMs: Long = System.currentTimeMillis()): Boolean =
+        relationships.deleteConfirmedRelationship(edgeId, nowEpochMs)
     suspend fun updateConfirmedRelationship(edgeId: String, relationType: String, nowEpochMs: Long = System.currentTimeMillis()): Boolean =
         relationships.updateConfirmedRelationship(edgeId, relationType, nowEpochMs)
     fun observeRelationshipEvents(): Flow<List<RelationshipEventWithParticipants>> = relationships.observeRelationshipEvents()
