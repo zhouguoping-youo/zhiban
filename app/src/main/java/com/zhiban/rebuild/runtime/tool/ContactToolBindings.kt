@@ -122,8 +122,10 @@ internal class ContactMaintenanceToolBinding(
             nowEpochMs = context.nowEpochMs,
         )
         val items = overview.items.filter { item -> item.issues.isNotEmpty() && (issue == null || issue in item.issues) }.take(limit)
+        val unresolvedIdentities = if (issue == null) intelligence.listUnresolvedIdentities(limit) else emptyList()
         val result = buildJsonObject {
             put("count", items.size)
+            put("unresolvedIdentityCount", unresolvedIdentities.size)
             put(
                 "items",
                 buildJsonArray {
@@ -139,6 +141,23 @@ internal class ContactMaintenanceToolBinding(
                                         item.issues.sortedBy(ContactMaintenanceIssue::name).forEach { add(JsonPrimitive(it.name)) }
                                     },
                                 )
+                            },
+                        )
+                    }
+                },
+            )
+            put(
+                "unresolvedIdentities",
+                buildJsonArray {
+                    unresolvedIdentities.forEach { identity ->
+                        add(
+                            buildJsonObject {
+                                put("sourceIdentityId", identity.sourceIdentityId)
+                                put("platform", identity.sourceType)
+                                put("visibleHandle", identity.visibleHandle)
+                                identity.conversationScopeId?.let { put("conversationScope", it) }
+                                put("confidence", identity.confidence)
+                                put("instruction", "只根据更多证据核实归属，不得凭同名合并")
                             },
                         )
                     }

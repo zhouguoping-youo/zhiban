@@ -57,6 +57,13 @@ interface ContactIntelligenceDao {
     @Query("SELECT * FROM source_identities WHERE personId IS NULL AND resolutionStatus IN ('UNRESOLVED', 'CANDIDATE') ORDER BY lastObservedAtEpochMs DESC")
     fun observeUnresolvedIdentities(): Flow<List<SourceIdentityEntity>>
 
+    @Query(
+        """SELECT * FROM source_identities
+           WHERE personId IS NULL AND resolutionStatus IN ('UNRESOLVED', 'CANDIDATE')
+           ORDER BY lastObservedAtEpochMs DESC LIMIT :limit""",
+    )
+    suspend fun listUnresolvedIdentities(limit: Int): List<SourceIdentityEntity>
+
     @Query("SELECT * FROM source_identities WHERE sourceIdentityId = :sourceIdentityId")
     suspend fun findSourceIdentity(sourceIdentityId: String): SourceIdentityEntity?
 

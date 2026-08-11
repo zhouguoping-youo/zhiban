@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.contact.ContactEntity
+import com.zhiban.rebuild.data.contact.SourceIdentityEntity
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
@@ -22,6 +23,24 @@ class ContactMaintenanceToolBindingTest {
         val database = Room.inMemoryDatabaseBuilder(context, AgentDatabase::class.java).build()
         try {
             database.contactDao().insert(contact())
+            database.contactIntelligenceDao().upsertSourceIdentity(
+                SourceIdentityEntity(
+                    sourceIdentityId = "wechat-group-laozhang",
+                    personId = null,
+                    sourceType = "WECHAT",
+                    accountScope = "DEVICE_OBSERVED",
+                    tenantId = null,
+                    stableExternalId = null,
+                    visibleHandle = "老张",
+                    normalizedHandle = "老张",
+                    conversationScopeId = "项目群",
+                    resolutionStatus = "UNRESOLVED",
+                    confidence = 0.55,
+                    sourceRef = "notification-1",
+                    firstObservedAtEpochMs = NOW - 1_000,
+                    lastObservedAtEpochMs = NOW,
+                ),
+            )
             val binding = ContactMaintenanceToolBinding(
                 RuntimeToolCatalog.production().requireRegistered("contact.maintenance.list"),
                 database.contactDao(),
@@ -30,7 +49,7 @@ class ContactMaintenanceToolBindingTest {
             )
 
             val result = binding.executeReadOnly(
-                RuntimeToolCallRequest("call-1", "contact.maintenance.list", "{\"issue\":\"NO_REACHABLE_METHOD\"}"),
+                RuntimeToolCallRequest("call-1", "contact.maintenance.list", "{}"),
                 RuntimeToolRouteContext("run", "session", "attempt", "owner", 1, 1, NOW),
             )
             val json = Json.parseToJsonElement(result.safeResultJson).jsonObject
@@ -38,6 +57,11 @@ class ContactMaintenanceToolBindingTest {
 
             assertEquals("待核实联系人", item.getValue("displayName").jsonPrimitive.content)
             assertEquals("1", json.getValue("count").jsonPrimitive.content)
+            assertEquals("1", json.getValue("unresolvedIdentityCount").jsonPrimitive.content)
+            assertEquals(
+                "老张",
+                json.getValue("unresolvedIdentities").jsonArray.single().jsonObject.getValue("visibleHandle").jsonPrimitive.content,
+            )
             assertEquals(null, item["phone"])
         } finally {
             database.close()
