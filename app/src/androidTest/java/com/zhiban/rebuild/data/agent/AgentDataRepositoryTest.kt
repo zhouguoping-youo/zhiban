@@ -32,6 +32,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -316,6 +317,34 @@ class AgentDataRepositoryTest {
         assertEquals(1, second.updated)
         assertEquals(1, database.contactDao().countActive())
         assertEquals("未来科技", database.contactDao().findBySource("SYSTEM_CONTACT:lookup-1")?.company)
+    }
+
+    @Test
+    fun systemImportStoresObservedClaimsWithoutInventingCurrentOrConfirmedEmployment() = runBlocking {
+        repository.importConfirmedSystemContacts(
+            contacts = listOf(
+                systemContact("observed", "丁波", "13800138000", company = "旧公司").copy(title = "售前"),
+            ),
+            ownerPhone = null,
+            ownerWechatId = null,
+            ownerName = null,
+            nowEpochMs = 1_000L,
+        )
+
+        val contact = database.contactDao().findBySource("SYSTEM_CONTACT:observed")!!
+        val person = database.contactIntelligenceDao().findPersonByContactId(contact.contactId)
+        val claims = database.contactIntelligenceDao().observeClaims(contact.contactId).first()
+        val employment = database.contactIntelligenceDao().observeEmployments(contact.contactId).first().single()
+
+        assertEquals(contact.contactId, person?.personId)
+        assertEquals(setOf("NAME", "PHONE", "COMPANY", "TITLE"), claims.map { it.fieldType }.toSet())
+        assertTrue(claims.all { it.verificationState == "OBSERVED" })
+        assertEquals("UNKNOWN", employment.currentState)
+        assertEquals("OBSERVED", employment.verificationState)
+        assertEquals(0.6, employment.confidence, 0.0)
+        assertFalse(
+            database.contactKnowledgeDao().observeEmployments(contact.contactId).first().single().userConfirmed,
+        )
     }
 
     @Test

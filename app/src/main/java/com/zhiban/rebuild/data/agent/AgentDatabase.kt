@@ -7,6 +7,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.zhiban.rebuild.data.calllog.CallLogDao
 import com.zhiban.rebuild.data.calllog.CallNoteEntity
 import com.zhiban.rebuild.data.calllog.CallRecordEntity
+import com.zhiban.rebuild.data.contact.AndroidRawContactLinkEntity
 import com.zhiban.rebuild.data.contact.ContactAddressEntity
 import com.zhiban.rebuild.data.contact.ContactAliasEntity
 import com.zhiban.rebuild.data.contact.ContactDao
@@ -16,18 +17,27 @@ import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.ContactFacetEntity
 import com.zhiban.rebuild.data.contact.ContactIdentityDao
 import com.zhiban.rebuild.data.contact.ContactImportantDateEntity
+import com.zhiban.rebuild.data.contact.ContactIntelligenceDao
 import com.zhiban.rebuild.data.contact.ContactKnowledgeDao
 import com.zhiban.rebuild.data.contact.ContactMergeLinkEntity
 import com.zhiban.rebuild.data.contact.ContactMethodEntity
 import com.zhiban.rebuild.data.contact.ContactPlatformIdentityEntity
 import com.zhiban.rebuild.data.contact.ContactRoleEntity
+import com.zhiban.rebuild.data.contact.ContactSyncSnapshotEntity
+import com.zhiban.rebuild.data.contact.GroupConversationEntity
+import com.zhiban.rebuild.data.contact.GroupMembershipEpisodeEntity
+import com.zhiban.rebuild.data.contact.IdentityClaimEntity
 import com.zhiban.rebuild.data.contact.OrganizationEntity
 import com.zhiban.rebuild.data.contact.OwnerContactLinkEntity
+import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
+import com.zhiban.rebuild.data.contact.PersonEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeDao
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
+import com.zhiban.rebuild.data.contact.RelationshipEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventDao
 import com.zhiban.rebuild.data.contact.RelationshipEventEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventParticipantEntity
+import com.zhiban.rebuild.data.contact.SourceIdentityEntity
 import com.zhiban.rebuild.data.contact.StagedContactCandidateDao
 import com.zhiban.rebuild.data.contact.StagedContactCandidateEntity
 import com.zhiban.rebuild.data.contact.normalizeContactPhone
@@ -78,6 +88,10 @@ const val AGENT_DATABASE_FILE_NAME = "zhiban-agent.db"
         ResourceLeaseEntity::class, SessionLeaseEntity::class,
         ContactEntity::class, ContactRoleEntity::class,
         ContactAliasEntity::class, ContactPlatformIdentityEntity::class, ContactMergeLinkEntity::class,
+        PersonEntity::class, SourceIdentityEntity::class, IdentityClaimEntity::class,
+        PersonEmploymentEpisodeEntity::class, RelationshipEpisodeEntity::class,
+        GroupConversationEntity::class, GroupMembershipEpisodeEntity::class,
+        AndroidRawContactLinkEntity::class, ContactSyncSnapshotEntity::class,
         ChangeLogEntity::class, AutoWriteReceiptEntity::class,
         StagedContactCandidateEntity::class,
         FactEntity::class,
@@ -108,7 +122,7 @@ const val AGENT_DATABASE_FILE_NAME = "zhiban-agent.db"
         EventPlanEntity::class,
         EventPlanParticipantEntity::class,
     ],
-    version = 35,
+    version = 36,
     exportSchema = true,
 )
 internal abstract class AgentDatabase : RoomDatabase() {
@@ -133,6 +147,7 @@ internal abstract class AgentDatabase : RoomDatabase() {
     internal abstract fun planDao(): PlanDao
     abstract fun contactDao(): ContactDao
     abstract fun contactIdentityDao(): ContactIdentityDao
+    abstract fun contactIntelligenceDao(): ContactIntelligenceDao
     abstract fun changeLogDao(): ChangeLogDao
     abstract fun stagedContactCandidateDao(): StagedContactCandidateDao
     internal abstract fun factDao(): FactDao
@@ -1462,6 +1477,392 @@ internal abstract class AgentDatabase : RoomDatabase() {
                         "ON `event_plan_participants` (`responseStatus`)",
                 )
             }
+        }
+
+        val MIGRATION_35_36 = object : Migration(35, 36) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                createContactIntelligenceTables(db)
+                downgradeUnverifiedSystemContactFacts(db)
+                backfillPeopleAndSourceIdentities(db)
+                backfillIdentityClaims(db)
+                backfillTemporalEpisodes(db)
+            }
+        }
+
+        private fun createContactIntelligenceTables(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS `persons` (
+                    `personId` TEXT NOT NULL,
+                    `canonicalContactId` TEXT,
+                    `displayName` TEXT NOT NULL,
+                    `normalizedName` TEXT NOT NULL,
+                    `kind` TEXT NOT NULL,
+                    `status` TEXT NOT NULL,
+                    `createdAtEpochMs` INTEGER NOT NULL,
+                    `updatedAtEpochMs` INTEGER NOT NULL,
+                    PRIMARY KEY(`personId`),
+                    FOREIGN KEY(`canonicalContactId`) REFERENCES `contacts`(`contactId`)
+                        ON UPDATE NO ACTION ON DELETE SET NULL
+                )""",
+            )
+            createIndices(
+                db,
+                "persons",
+                "canonicalContactId" to true,
+                "kind" to false,
+                "status" to false,
+            )
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS `source_identities` (
+                    `sourceIdentityId` TEXT NOT NULL,
+                    `personId` TEXT,
+                    `sourceType` TEXT NOT NULL,
+                    `accountScope` TEXT NOT NULL,
+                    `tenantId` TEXT,
+                    `stableExternalId` TEXT,
+                    `visibleHandle` TEXT NOT NULL,
+                    `normalizedHandle` TEXT NOT NULL,
+                    `conversationScopeId` TEXT,
+                    `resolutionStatus` TEXT NOT NULL,
+                    `confidence` REAL NOT NULL,
+                    `sourceRef` TEXT,
+                    `firstObservedAtEpochMs` INTEGER NOT NULL,
+                    `lastObservedAtEpochMs` INTEGER NOT NULL,
+                    PRIMARY KEY(`sourceIdentityId`),
+                    FOREIGN KEY(`personId`) REFERENCES `persons`(`personId`)
+                        ON UPDATE NO ACTION ON DELETE SET NULL
+                )""",
+            )
+            createIndices(
+                db,
+                "source_identities",
+                "personId" to false,
+                "sourceType,accountScope,stableExternalId" to false,
+                "sourceType,conversationScopeId,normalizedHandle" to false,
+                "resolutionStatus" to false,
+                "lastObservedAtEpochMs" to false,
+            )
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS `identity_claims` (
+                    `claimId` TEXT NOT NULL,
+                    `personId` TEXT NOT NULL,
+                    `fieldType` TEXT NOT NULL,
+                    `displayValue` TEXT NOT NULL,
+                    `normalizedValue` TEXT NOT NULL,
+                    `validFromEpochMs` INTEGER,
+                    `validToEpochMs` INTEGER,
+                    `temporalPrecision` TEXT NOT NULL,
+                    `recordedAtEpochMs` INTEGER NOT NULL,
+                    `sourceIdentityId` TEXT,
+                    `sourceRef` TEXT,
+                    `confidence` REAL NOT NULL,
+                    `verificationState` TEXT NOT NULL,
+                    `supersedesClaimId` TEXT,
+                    `status` TEXT NOT NULL,
+                    PRIMARY KEY(`claimId`),
+                    FOREIGN KEY(`personId`) REFERENCES `persons`(`personId`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE,
+                    FOREIGN KEY(`sourceIdentityId`) REFERENCES `source_identities`(`sourceIdentityId`)
+                        ON UPDATE NO ACTION ON DELETE SET NULL
+                )""",
+            )
+            createIndices(
+                db,
+                "identity_claims",
+                "personId" to false,
+                "sourceIdentityId" to false,
+                "personId,fieldType,status" to false,
+                "fieldType,normalizedValue" to false,
+                "verificationState" to false,
+                "validToEpochMs" to false,
+            )
+            createEmploymentEpisodeTable(db)
+            createRelationshipEpisodeTable(db)
+            createGroupTables(db)
+            createAndroidSyncTables(db)
+        }
+
+        private fun createEmploymentEpisodeTable(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS `person_employment_episodes` (
+                    `episodeId` TEXT NOT NULL,
+                    `personId` TEXT NOT NULL,
+                    `organizationId` TEXT,
+                    `companyNameSnapshot` TEXT NOT NULL,
+                    `department` TEXT,
+                    `title` TEXT,
+                    `validFromEpochMs` INTEGER,
+                    `validToEpochMs` INTEGER,
+                    `temporalPrecision` TEXT NOT NULL,
+                    `currentState` TEXT NOT NULL,
+                    `sourceRef` TEXT,
+                    `confidence` REAL NOT NULL,
+                    `verificationState` TEXT NOT NULL,
+                    `status` TEXT NOT NULL,
+                    `recordedAtEpochMs` INTEGER NOT NULL,
+                    `updatedAtEpochMs` INTEGER NOT NULL,
+                    PRIMARY KEY(`episodeId`),
+                    FOREIGN KEY(`personId`) REFERENCES `persons`(`personId`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE,
+                    FOREIGN KEY(`organizationId`) REFERENCES `organizations`(`organizationId`)
+                        ON UPDATE NO ACTION ON DELETE SET NULL
+                )""",
+            )
+            createIndices(
+                db,
+                "person_employment_episodes",
+                "personId" to false,
+                "organizationId" to false,
+                "validFromEpochMs" to false,
+                "validToEpochMs" to false,
+                "status" to false,
+            )
+        }
+
+        private fun createRelationshipEpisodeTable(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS `relationship_episodes` (
+                    `episodeId` TEXT NOT NULL,
+                    `fromPersonId` TEXT NOT NULL,
+                    `toPersonId` TEXT NOT NULL,
+                    `relationshipType` TEXT NOT NULL,
+                    `direction` TEXT NOT NULL,
+                    `validFromEpochMs` INTEGER,
+                    `validToEpochMs` INTEGER,
+                    `temporalPrecision` TEXT NOT NULL,
+                    `evidenceRefsJson` TEXT NOT NULL,
+                    `confidence` REAL NOT NULL,
+                    `verificationState` TEXT NOT NULL,
+                    `status` TEXT NOT NULL,
+                    `recordedAtEpochMs` INTEGER NOT NULL,
+                    `updatedAtEpochMs` INTEGER NOT NULL,
+                    PRIMARY KEY(`episodeId`),
+                    FOREIGN KEY(`fromPersonId`) REFERENCES `persons`(`personId`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE,
+                    FOREIGN KEY(`toPersonId`) REFERENCES `persons`(`personId`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )""",
+            )
+            createIndices(
+                db,
+                "relationship_episodes",
+                "fromPersonId" to false,
+                "toPersonId" to false,
+                "relationshipType" to false,
+                "validFromEpochMs" to false,
+                "validToEpochMs" to false,
+                "status" to false,
+            )
+        }
+
+        private fun createGroupTables(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS `group_conversations` (
+                    `groupId` TEXT NOT NULL,
+                    `platform` TEXT NOT NULL,
+                    `accountScope` TEXT NOT NULL,
+                    `stableGroupId` TEXT,
+                    `displayName` TEXT NOT NULL,
+                    `sourceRef` TEXT,
+                    `firstObservedAtEpochMs` INTEGER NOT NULL,
+                    `lastObservedAtEpochMs` INTEGER NOT NULL,
+                    PRIMARY KEY(`groupId`)
+                )""",
+            )
+            createIndices(
+                db,
+                "group_conversations",
+                "platform,accountScope,stableGroupId" to false,
+                "lastObservedAtEpochMs" to false,
+            )
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS `group_membership_episodes` (
+                    `membershipId` TEXT NOT NULL,
+                    `groupId` TEXT NOT NULL,
+                    `sourceIdentityId` TEXT NOT NULL,
+                    `groupAlias` TEXT,
+                    `validFromEpochMs` INTEGER,
+                    `validToEpochMs` INTEGER,
+                    `status` TEXT NOT NULL,
+                    `confidence` REAL NOT NULL,
+                    `sourceRef` TEXT,
+                    `recordedAtEpochMs` INTEGER NOT NULL,
+                    PRIMARY KEY(`membershipId`),
+                    FOREIGN KEY(`groupId`) REFERENCES `group_conversations`(`groupId`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE,
+                    FOREIGN KEY(`sourceIdentityId`) REFERENCES `source_identities`(`sourceIdentityId`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )""",
+            )
+            createIndices(
+                db,
+                "group_membership_episodes",
+                "groupId" to false,
+                "sourceIdentityId" to false,
+                "validToEpochMs" to false,
+                "status" to false,
+            )
+        }
+
+        private fun createAndroidSyncTables(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS `android_raw_contact_links` (
+                    `linkId` TEXT NOT NULL,
+                    `personId` TEXT NOT NULL,
+                    `aggregateContactId` INTEGER NOT NULL,
+                    `lookupKey` TEXT NOT NULL,
+                    `rawContactId` INTEGER NOT NULL,
+                    `accountName` TEXT,
+                    `accountType` TEXT,
+                    `sourceId` TEXT,
+                    `version` INTEGER NOT NULL,
+                    `isReadOnly` INTEGER NOT NULL,
+                    `lastObservedAtEpochMs` INTEGER NOT NULL,
+                    PRIMARY KEY(`linkId`),
+                    FOREIGN KEY(`personId`) REFERENCES `persons`(`personId`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )""",
+            )
+            createIndices(
+                db,
+                "android_raw_contact_links",
+                "personId" to false,
+                "aggregateContactId" to false,
+                "lookupKey" to false,
+                "rawContactId" to true,
+                "accountType,accountName" to false,
+            )
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS `contact_sync_snapshots` (
+                    `snapshotId` TEXT NOT NULL,
+                    `linkId` TEXT NOT NULL,
+                    `baseProjectionJson` TEXT NOT NULL,
+                    `baseDigest` TEXT NOT NULL,
+                    `desiredProjectionJson` TEXT,
+                    `desiredDigest` TEXT,
+                    `syncState` TEXT NOT NULL,
+                    `lastVerifiedAtEpochMs` INTEGER,
+                    `updatedAtEpochMs` INTEGER NOT NULL,
+                    PRIMARY KEY(`snapshotId`),
+                    FOREIGN KEY(`linkId`) REFERENCES `android_raw_contact_links`(`linkId`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )""",
+            )
+            createIndices(
+                db,
+                "contact_sync_snapshots",
+                "linkId" to true,
+                "syncState" to false,
+                "updatedAtEpochMs" to false,
+            )
+        }
+
+        private fun createIndices(db: SupportSQLiteDatabase, table: String, vararg columns: Pair<String, Boolean>) {
+            columns.forEach { (columnList, unique) ->
+                val indexColumns = columnList.split(',')
+                val indexName = "index_${table}_${indexColumns.joinToString("_")}"
+                val sqlColumns = indexColumns.joinToString(", ") { "`$it`" }
+                db.execSQL("CREATE ${if (unique) "UNIQUE " else ""}INDEX IF NOT EXISTS `$indexName` ON `$table` ($sqlColumns)")
+            }
+        }
+
+        private fun downgradeUnverifiedSystemContactFacts(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "UPDATE contact_employments SET isCurrent = 0, userConfirmed = 0, confidence = MIN(confidence, 0.6) " +
+                    "WHERE source = 'SYSTEM_CONTACT'",
+            )
+            db.execSQL("UPDATE organizations SET userConfirmed = 0 WHERE source = 'SYSTEM_CONTACT'")
+            db.execSQL("UPDATE contact_methods SET userConfirmed = 0 WHERE source = 'SYSTEM_CONTACT'")
+            db.execSQL("UPDATE contact_addresses SET userConfirmed = 0 WHERE source = 'SYSTEM_CONTACT'")
+            db.execSQL("UPDATE contact_important_dates SET userConfirmed = 0 WHERE source = 'SYSTEM_CONTACT'")
+            db.execSQL("UPDATE contact_platform_identities SET userConfirmed = 0 WHERE source = 'SYSTEM_CONTACT'")
+        }
+
+        private fun backfillPeopleAndSourceIdentities(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """INSERT OR IGNORE INTO persons (
+                    personId, canonicalContactId, displayName, normalizedName, kind, status,
+                    createdAtEpochMs, updatedAtEpochMs
+                ) SELECT contactId, contactId, displayName, normalizedName, 'CONTACT',
+                    CASE WHEN deletedAtEpochMs IS NULL THEN 'ACTIVE' ELSE 'DELETED' END,
+                    createdAtEpochMs, updatedAtEpochMs FROM contacts""",
+            )
+            db.execSQL(
+                """INSERT OR IGNORE INTO persons VALUES (
+                    'user:self', NULL, '我', '我', 'OWNER', 'ACTIVE', 0, 0
+                )""",
+            )
+            db.execSQL(
+                """INSERT OR IGNORE INTO source_identities (
+                    sourceIdentityId, personId, sourceType, accountScope, tenantId,
+                    stableExternalId, visibleHandle, normalizedHandle, conversationScopeId,
+                    resolutionStatus, confidence, sourceRef, firstObservedAtEpochMs, lastObservedAtEpochMs
+                ) SELECT 'contact:' || contactId, contactId, source, 'LOCAL', NULL,
+                    NULL, displayName, normalizedName, NULL, 'RESOLVED',
+                    CASE WHEN source = 'USER' THEN 1.0 ELSE 0.7 END,
+                    source, createdAtEpochMs, updatedAtEpochMs FROM contacts""",
+            )
+            db.execSQL(
+                """INSERT OR IGNORE INTO source_identities (
+                    sourceIdentityId, personId, sourceType, accountScope, tenantId,
+                    stableExternalId, visibleHandle, normalizedHandle, conversationScopeId,
+                    resolutionStatus, confidence, sourceRef, firstObservedAtEpochMs, lastObservedAtEpochMs
+                ) SELECT 'platform:' || identityId, contactId, platform, 'LOCAL', NULL,
+                    platformUserId, handle, normalizedHandle, NULL, 'RESOLVED',
+                    CASE WHEN userConfirmed = 1 THEN 1.0 ELSE 0.7 END,
+                    source, createdAtEpochMs, updatedAtEpochMs FROM contact_platform_identities""",
+            )
+        }
+
+        private fun backfillIdentityClaims(db: SupportSQLiteDatabase) {
+            insertContactClaim(db, "NAME", "displayName", "normalizedName")
+            insertContactClaim(db, "PHONE", "phone", "phone")
+            insertContactClaim(db, "EMAIL", "email", "email")
+            insertContactClaim(db, "COMPANY", "company", "company")
+            insertContactClaim(db, "TITLE", "title", "title")
+        }
+
+        private fun insertContactClaim(db: SupportSQLiteDatabase, fieldType: String, displayColumn: String, normalizedColumn: String) {
+            db.execSQL(
+                """INSERT OR IGNORE INTO identity_claims (
+                    claimId, personId, fieldType, displayValue, normalizedValue,
+                    validFromEpochMs, validToEpochMs, temporalPrecision, recordedAtEpochMs,
+                    sourceIdentityId, sourceRef, confidence, verificationState, supersedesClaimId, status
+                ) SELECT 'migration:${fieldType.lowercase()}:' || contactId, contactId, '$fieldType',
+                    $displayColumn, lower($normalizedColumn), NULL, NULL, 'UNKNOWN', updatedAtEpochMs,
+                    'contact:' || contactId, source,
+                    CASE WHEN source = 'USER' THEN 1.0 ELSE 0.6 END,
+                    CASE WHEN source = 'USER' THEN 'USER_CONFIRMED' ELSE 'OBSERVED' END,
+                    NULL, 'ACTIVE' FROM contacts WHERE $displayColumn IS NOT NULL AND trim($displayColumn) != ''""",
+            )
+        }
+
+        private fun backfillTemporalEpisodes(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """INSERT OR IGNORE INTO person_employment_episodes (
+                    episodeId, personId, organizationId, companyNameSnapshot, department, title,
+                    validFromEpochMs, validToEpochMs, temporalPrecision, currentState, sourceRef,
+                    confidence, verificationState, status, recordedAtEpochMs, updatedAtEpochMs
+                ) SELECT employmentId, contactId, organizationId, companyNameSnapshot, department, title,
+                    NULL, NULL, 'UNKNOWN',
+                    CASE WHEN isCurrent = 1 AND userConfirmed = 1 THEN 'CURRENT_CONFIRMED' ELSE 'UNKNOWN' END,
+                    evidenceRef, confidence,
+                    CASE WHEN userConfirmed = 1 THEN 'USER_CONFIRMED' ELSE 'OBSERVED' END,
+                    'ACTIVE', createdAtEpochMs, updatedAtEpochMs FROM contact_employments""",
+            )
+            db.execSQL(
+                """INSERT OR IGNORE INTO relationship_episodes (
+                    episodeId, fromPersonId, toPersonId, relationshipType, direction,
+                    validFromEpochMs, validToEpochMs, temporalPrecision, evidenceRefsJson,
+                    confidence, verificationState, status, recordedAtEpochMs, updatedAtEpochMs
+                ) SELECT edgeId, fromContactId, toContactId, relationType, 'BIDIRECTIONAL',
+                    NULL, NULL, 'UNKNOWN', evidenceRefsJson, confidence,
+                    CASE WHEN userConfirmed = 1 THEN 'USER_CONFIRMED' ELSE 'INFERRED' END,
+                    CASE WHEN status = 'DELETED' THEN 'DELETED' ELSE 'ACTIVE' END,
+                    createdAtEpochMs, updatedAtEpochMs FROM relationship_edges
+                    WHERE EXISTS (SELECT 1 FROM persons WHERE personId = fromContactId)
+                      AND EXISTS (SELECT 1 FROM persons WHERE personId = toContactId)""",
+            )
         }
 
         val CALLBACK = object : Callback() {
