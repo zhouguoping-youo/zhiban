@@ -45,9 +45,11 @@ internal class ChangeUndoCoordinator(private val database: AgentDatabase) {
             deleted && FactIndex(database).delete("contact:${change.targetId}")
         }
 
-        "relationship.createCandidate" -> database.relationshipEdgeDao().deleteConfirmed(change.targetId) == 1
+        "relationship.createCandidate" -> undoRelationshipCandidate(change, nowEpochMs)
 
         ContactProfileDomainWriter.TOOL_NAME -> restoreContactProfile(change, nowEpochMs)
+
+        ContactIdentityResolutionDomainWriter.TOOL_NAME -> undoSourceIdentityResolution(change, nowEpochMs)
 
         "calendar.schedule.create" -> {
             val deleted = database.scheduleDao().deleteById(change.targetId) == 1
@@ -77,6 +79,44 @@ internal class ChangeUndoCoordinator(private val database: AgentDatabase) {
         AutoWriteToolNames.CRM_SUGGESTION_ACCEPT_LEAD -> undoAcceptedSuggestionLead(change, nowEpochMs)
 
         else -> false
+    }
+
+    private suspend fun undoRelationshipCandidate(change: ChangeLogEntity, nowEpochMs: Long): Boolean {
+        val edge = database.relationshipEdgeDao().find(change.targetId) ?: return false
+        if (database.relationshipEdgeDao().deleteConfirmed(change.targetId) != 1) return false
+        database.contactIntelligenceDao().closeOpenUserRelationships(
+            edge.fromContactId,
+            edge.toContactId,
+            edge.relationType,
+            nowEpochMs,
+        )
+        return true
+    }
+
+    private suspend fun undoSourceIdentityResolution(change: ChangeLogEntity, nowEpochMs: Long): Boolean {
+        val inverse = parseInverse(change.inversePayloadJson) ?: return false
+        val sourceIdentityId = inverse["sourceIdentityId"]?.jsonPrimitive?.content ?: return false
+        val contactId = inverse["contactId"]?.jsonPrimitive?.content ?: return false
+        val previousStatus = inverse["previousStatus"]?.jsonPrimitive?.content ?: return false
+        val previousConfidence = inverse["previousConfidence"]?.jsonPrimitive?.content?.toDoubleOrNull() ?: return false
+        val current = database.contactIntelligenceDao().findSourceIdentity(sourceIdentityId) ?: return false
+        if (current.personId != contactId || current.resolutionStatus != "RESOLVED") return false
+        if (sourceIdentityResolutionDigest(sourceIdentityId, contactId, current.confidence) != change.afterDigest) return false
+        if (
+            database.contactIntelligenceDao().restoreSourceIdentityResolution(
+                sourceIdentityId,
+                contactId,
+                previousStatus,
+                previousConfidence,
+                nowEpochMs,
+            ) != 1
+        ) {
+            return false
+        }
+        inverse["deletePlatformIdentityId"]?.jsonPrimitive?.content?.let { identityId ->
+            database.contactIdentityDao().deleteConfirmedPlatformIdentity(identityId)
+        }
+        return true
     }
 
     private suspend fun undoInteractionSummary(change: ChangeLogEntity): Boolean {

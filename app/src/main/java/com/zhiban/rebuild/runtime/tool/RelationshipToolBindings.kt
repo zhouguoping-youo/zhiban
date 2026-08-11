@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.runtime.tool
 
+import com.zhiban.rebuild.data.contact.ContactIntelligenceDao
 import com.zhiban.rebuild.data.contact.RelationshipEdgeDao
 import com.zhiban.rebuild.data.contact.RelationshipEventDao
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
@@ -19,6 +20,7 @@ internal class RelationshipSearchToolBinding(
     override val spec: RuntimeToolSpec,
     private val relationships: RelationshipEdgeDao,
     private val events: RelationshipEventDao? = null,
+    private val intelligence: ContactIntelligenceDao? = null,
 ) : RuntimeToolBinding {
     override suspend fun requestApproval(request: RuntimeToolCallRequest, context: RuntimeToolRouteContext) =
         throw ToolPolicyRejectedException("relationship.search is read-only")
@@ -52,6 +54,7 @@ internal class RelationshipSearchToolBinding(
         )
             .associateBy { it.contactId }
         val relatedEvents = events?.listForContact(canonicalRoot, limit).orEmpty()
+        val relationshipHistory = intelligence?.listRelationships(canonicalRoot, limit).orEmpty()
         val canonicalParticipantIds = relatedEvents.flatMap { value -> value.participants.mapNotNull { it.contactId } }
             .distinct()
             .associateWith { contactId -> relationships.resolveCanonicalContactId(contactId) }
@@ -61,6 +64,33 @@ internal class RelationshipSearchToolBinding(
             put("count", edges.size)
             put("edges", edgesJsonArray(edges, contacts))
             put("events", eventsJsonArray(relatedEvents, canonicalParticipantIds))
+            put(
+                "timeline",
+                buildJsonArray {
+                    relationshipHistory.forEach { episode ->
+                        add(
+                            buildJsonObject {
+                                put("episodeId", episode.episodeId)
+                                put("fromPersonId", episode.fromPersonId)
+                                put("toPersonId", episode.toPersonId)
+                                put("relationType", episode.relationshipType)
+                                put(
+                                    "temporalState",
+                                    when {
+                                        episode.validToEpochMs != null -> "PAST"
+                                        episode.temporalPrecision == "UNKNOWN" -> "UNKNOWN"
+                                        else -> "CURRENT"
+                                    },
+                                )
+                                episode.validFromEpochMs?.let { put("validFromEpochMs", it) }
+                                episode.validToEpochMs?.let { put("validToEpochMs", it) }
+                                put("confidence", episode.confidence)
+                                put("verificationState", episode.verificationState)
+                            },
+                        )
+                    }
+                },
+            )
         }.toString()
         return RoutedToolResult(spec.name, request.providerCallId, safe)
     }
@@ -148,7 +178,7 @@ internal class RelationshipCreateCandidateToolBinding(
     override suspend fun requestApproval(request: RuntimeToolCallRequest, context: RuntimeToolRouteContext): Boolean {
         val args = parseToolArgs(
             request.argumentsJson,
-            setOf("fromContactId", "toContactId", "relationType", "evidenceSummary", "confidence", "skillId"),
+            setOf("fromContactId", "toContactId", "relationType", "temporalState", "evidenceSummary", "confidence", "skillId"),
         ) { throw IllegalArgumentException("INVALID_TOOL_ARGUMENTS") }
         fun required(name: String, max: Int) = args[name]?.jsonPrimitive?.content?.trim()
             ?.takeIf { it.isNotBlank() && it.length <= max } ?: throw IllegalArgumentException("INVALID_TOOL_ARGUMENTS")
@@ -157,6 +187,8 @@ internal class RelationshipCreateCandidateToolBinding(
         require(from != to) { "INVALID_TOOL_ARGUMENTS" }
         val relation = required("relationType", 40)
         require(relation in ALLOWED_RELATIONS) { "INVALID_TOOL_ARGUMENTS" }
+        val temporalState = args["temporalState"]?.jsonPrimitive?.content ?: "CURRENT"
+        require(temporalState in ALLOWED_TEMPORAL_STATES) { "INVALID_TOOL_ARGUMENTS" }
         val evidence = required("evidenceSummary", 1_000)
         val confidence = args["confidence"]?.jsonPrimitive?.content?.toDoubleOrNull() ?: 0.7
         require(confidence in 0.0..1.0) { "INVALID_TOOL_ARGUMENTS" }
@@ -167,6 +199,7 @@ internal class RelationshipCreateCandidateToolBinding(
                 put("fromContactId", from)
                 put("toContactId", to)
                 put("relationType", relation)
+                put("temporalState", temporalState)
                 put("evidenceDigest", sha256(evidence))
                 put("confidence", confidence)
                 skillId?.let { put("skillId", it) }
@@ -190,6 +223,7 @@ internal class RelationshipCreateCandidateToolBinding(
             edgeId = "edge-${sha256("${context.runId}:${request.providerCallId}:$digest").take(24)}",
             fromContactId = from, toContactId = to, relationType = relation,
             evidenceDigest = sha256(evidence), confidence = confidence, skillId = skillId,
+            temporalState = temporalState,
         )
         return store.requestRelationshipApproval(
             call,
@@ -210,6 +244,7 @@ internal class RelationshipCreateCandidateToolBinding(
             required("revision").toLong(), required("canonicalInputDigest"), required("idempotencyKey"),
             required("edgeId"), required("fromContactId"), required("toContactId"), required("relationType"),
             required("evidenceDigest"), required("confidence").toDouble(), value["skillId"]?.jsonPrimitive?.content,
+            required("temporalState"),
         )
         val result = writer.execute(
             context,
@@ -222,6 +257,7 @@ internal class RelationshipCreateCandidateToolBinding(
     private companion object {
         val ALLOWED_RELATIONS =
             setOf("FAMILY", "FRIEND", "COLLEAGUE", "CUSTOMER", "SUPPLIER", "TEACHER", "CLASSMATE", "PROJECT_PARTNER", "OTHER")
+        val ALLOWED_TEMPORAL_STATES = setOf("CURRENT", "PAST", "UNKNOWN")
     }
 }
 

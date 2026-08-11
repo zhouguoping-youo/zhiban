@@ -156,6 +156,7 @@ internal fun RelationshipGraphState(
     owner: UserProfile,
     contacts: List<ContactEntity>,
     edges: List<RelationshipEdgeEntity>,
+    historicalEdges: List<RelationshipEdgeEntity> = emptyList(),
     events: List<RelationshipEventWithParticipants>,
     canAddRelationship: Boolean,
     activeFilter: String?,
@@ -189,9 +190,11 @@ internal fun RelationshipGraphState(
         }
     }
     var rootId by remember(contacts, owner.name) { mutableStateOf(RelationshipPersonIds.SELF) }
+    var showHistory by remember { mutableStateOf(false) }
     if (rootId !in peopleById) rootId = RelationshipPersonIds.SELF
-    val allValidEdges = remember(edges, peopleById) {
-        edges.filter { it.fromContactId in peopleById && it.toContactId in peopleById }
+    val selectedEdges = if (showHistory) historicalEdges else edges
+    val allValidEdges = remember(selectedEdges, peopleById) {
+        selectedEdges.filter { it.fromContactId in peopleById && it.toContactId in peopleById }
     }
     val inferredEdgesCount = remember(allValidEdges) {
         allValidEdges.count(RelationshipEdgeEntity::isInferredEvidenceRelationship)
@@ -270,6 +273,22 @@ internal fun RelationshipGraphState(
                 Text("添加关系", color = if (canAddRelationship) RelationInk else RelationMuted)
             }
         }
+        Spacer(Modifier.height(10.dp))
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            FilterChip(
+                selected = !showHistory,
+                onClick = { showHistory = false },
+                label = { Text("现在") },
+            )
+            FilterChip(
+                selected = showHistory,
+                onClick = { showHistory = true },
+                label = { Text("以前 ${historicalEdges.size}") },
+            )
+        }
         if (contacts.isEmpty()) {
             Spacer(Modifier.height(16.dp))
             Text(
@@ -285,7 +304,7 @@ internal fun RelationshipGraphState(
             Spacer(Modifier.height(14.dp))
             Text(
                 if (root.isOwner) {
-                    "还没有确认你与联系人的关系"
+                    if (showHistory) "还没有保存过往关系" else "还没有确认你与联系人的关系"
                 } else {
                     "这个人还没有已确认的关联联系人"
                 },
@@ -340,7 +359,7 @@ internal fun RelationshipGraphState(
             if (inferredEdgesCount > 0) {
                 "实线为已确认关系；虚线为资料证据推测"
             } else {
-                "只展示已保存、已确认且能追溯来源的关系"
+                if (showHistory) "过往关系保留在时间线中，不会混入当前关系图" else "只展示已保存、已确认且能追溯来源的关系"
             },
             color = RelationMuted,
             style = MaterialTheme.typography.labelSmall,
@@ -404,12 +423,13 @@ internal fun RelationshipGraphCard(
     onSelectContact: (String) -> Unit,
 ) {
     val inferredFromEvidence = edge.isInferredEvidenceRelationship()
+    val historical = edge.status == "HISTORICAL"
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(ZhiBanRadius.Medium))
             .background(RelationSoft)
-            .clickable(enabled = !inferredFromEvidence) { onInspect(edge) }
+            .clickable(enabled = !inferredFromEvidence && !historical) { onInspect(edge) }
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -425,7 +445,9 @@ internal fun RelationshipGraphCard(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (inferredFromEvidence) {
+            if (historical) {
+                Text("以前", color = RelationMuted, style = MaterialTheme.typography.labelSmall)
+            } else if (inferredFromEvidence) {
                 Text(edge.inferredEvidenceLabel().orEmpty(), color = RelationMuted, style = MaterialTheme.typography.labelSmall)
             } else if (!edge.userConfirmed) {
                 Text("待确认", color = RelationMuted, style = MaterialTheme.typography.labelSmall)
@@ -445,6 +467,7 @@ internal fun RelationshipGraphCard(
             )
             Text(
                 when {
+                    historical -> "已保留在关系时间线"
                     inferredFromEvidence -> "由联系人资料证据自动关联"
                     edge.userConfirmed -> "可点击查看"
                     else -> "待你确认"
@@ -453,7 +476,7 @@ internal fun RelationshipGraphCard(
                 style = MaterialTheme.typography.labelSmall,
             )
         }
-        if (!inferredFromEvidence) {
+        if (!inferredFromEvidence && !historical) {
             IconButton(
                 onClick = { onDelete(edge) },
                 modifier = Modifier.size(ZhiBanSize.TouchTarget),

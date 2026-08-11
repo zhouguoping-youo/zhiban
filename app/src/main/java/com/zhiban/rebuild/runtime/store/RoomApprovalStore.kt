@@ -18,6 +18,7 @@ import com.zhiban.rebuild.runtime.context.StagedMemoryCandidateEntity
 import com.zhiban.rebuild.runtime.governance.ChangeLogEntity
 import com.zhiban.rebuild.runtime.governance.ChangeUndoCoordinator
 import com.zhiban.rebuild.runtime.governance.ContactCreateCandidateCall
+import com.zhiban.rebuild.runtime.governance.ContactIdentityResolutionCall
 import com.zhiban.rebuild.runtime.governance.RelationshipCandidateCall
 import com.zhiban.rebuild.runtime.kernel.RuntimeSignal
 import com.zhiban.rebuild.runtime.kernel.RuntimeStateMachine
@@ -292,6 +293,48 @@ internal class RoomApprovalStore(
         )
     }
 
+    suspend fun requestContactIdentityResolutionApproval(
+        call: ContactIdentityResolutionCall,
+        visibleHandle: String,
+        platform: String,
+        contactName: String,
+        sessionId: String,
+        runId: String,
+        attemptId: String,
+        ownerId: String,
+        fencingEpoch: Long,
+        nowEpochMs: Long,
+    ): Boolean = database.withTransaction {
+        val payload = buildJsonObject {
+            put("toolName", "contact.identity.resolve")
+            put("providerCallId", call.providerCallId)
+            put("logicalStepId", call.logicalStepId)
+            put("proposalId", call.proposalId)
+            put("payloadRef", call.payloadRef)
+            put("revision", call.revision)
+            put("canonicalInputDigest", call.canonicalInputDigest)
+            put("idempotencyKey", call.idempotencyKey)
+            put("sourceIdentityId", call.sourceIdentityId)
+            put("contactId", call.contactId)
+            put("evidenceDigest", call.evidenceDigest)
+            put("confidence", call.confidence)
+            put("previousStatus", call.previousStatus)
+            put("previousConfidence", call.previousConfidence)
+            put("title", "关联社交身份")
+            put("message", "$platform · ${visibleHandle.take(80)}\n关联到：${contactName.take(80)}")
+        }.toString()
+        requestToolApprovalInTransaction(
+            payload,
+            call.providerCallId,
+            sessionId,
+            runId,
+            attemptId,
+            ownerId,
+            fencingEpoch,
+            nowEpochMs,
+        )
+    }
+
     suspend fun requestRelationshipApproval(
         call: RelationshipCandidateCall,
         sessionId: String,
@@ -316,8 +359,12 @@ internal class RoomApprovalStore(
             put("relationType", call.relationType)
             put("evidenceDigest", call.evidenceDigest)
             put("confidence", call.confidence)
+            put("temporalState", call.temporalState)
             call.skillId?.let { put("skillId", it) }
-            put("title", "确认联系人关系：${call.relationType}")
+            put(
+                "title",
+                "确认${if (call.temporalState == "PAST") "过往" else "当前"}联系人关系：${call.relationType}",
+            )
         }.toString()
         requestToolApprovalInTransaction(
             payload,

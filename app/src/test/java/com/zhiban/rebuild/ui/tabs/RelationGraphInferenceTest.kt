@@ -3,6 +3,7 @@ package com.zhiban.rebuild.ui.tabs
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
+import com.zhiban.rebuild.data.contact.RelationshipEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -182,6 +183,20 @@ class RelationGraphInferenceTest {
         assertEquals("同公司 · 时间待核实", result.single().inferredEvidenceLabel())
     }
 
+    @Test
+    fun `only closed temporal episodes enter historical graph layer`() {
+        val history = historicalRelationshipEdges(
+            listOf(
+                relationshipEpisode("past", "FRIEND", 200L),
+                relationshipEpisode("current", "COLLEAGUE", null),
+            ),
+        )
+
+        assertEquals(1, history.size)
+        assertEquals("HISTORICAL", history.single().status)
+        assertEquals("FRIEND", history.single().relationType)
+    }
+
     private fun contact(id: String, name: String, company: String?, email: String? = null) = ContactEntity(
         contactId = id,
         displayName = name,
@@ -239,5 +254,22 @@ class RelationGraphInferenceTest {
         status = "ACTIVE",
         recordedAtEpochMs = 1L,
         updatedAtEpochMs = 1L,
+    )
+
+    private fun relationshipEpisode(id: String, type: String, validTo: Long?) = RelationshipEpisodeEntity(
+        episodeId = id,
+        fromPersonId = RelationshipPersonIds.SELF,
+        toPersonId = "contact",
+        relationshipType = type,
+        direction = "BIDIRECTIONAL",
+        validFromEpochMs = 1L,
+        validToEpochMs = validTo,
+        temporalPrecision = "DAY",
+        evidenceRefsJson = "[]",
+        confidence = 1.0,
+        verificationState = "USER_CONFIRMED",
+        status = "ACTIVE",
+        recordedAtEpochMs = 1L,
+        updatedAtEpochMs = validTo ?: 1L,
     )
 }

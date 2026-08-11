@@ -10,9 +10,11 @@ import com.zhiban.agent.mcp.McpTransport
 import com.zhiban.rebuild.R
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.ScheduleEntity
+import com.zhiban.rebuild.data.agent.TemporalRelationshipWriter
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.ContactRoleEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
+import com.zhiban.rebuild.data.contact.SourceIdentityEntity
 import com.zhiban.rebuild.runtime.config.FeedbackPolicy
 import com.zhiban.rebuild.runtime.config.MemoryPolicy
 import com.zhiban.rebuild.runtime.context.FactIndex
@@ -755,6 +757,17 @@ class RuntimeInputProcessorTest {
                 "rel-edge", "rel-a", "rel-b", "FRIEND", "rel-digest", "[\"private-evidence\"]", .95, true, null, "ACTIVE", now, now,
             ),
         )
+        val historicalEpisode = TemporalRelationshipWriter(database).replaceEpisode(
+            episodeKey = "rel-past-colleague",
+            fromPersonId = "rel-a",
+            toPersonId = "rel-b",
+            relationshipType = "COLLEAGUE",
+            temporalState = "PAST",
+            evidenceRefsJson = "[\"private-history-evidence\"]",
+            confidence = 0.9,
+            verificationState = "USER_CONFIRMED",
+            nowEpochMs = now,
+        )
         val staged = RoomTextInputGateway(database, { true }, { now }).stage(
             """{"schemaVersion":1,"text":"查询张三的关系","mode":"Work","model":"M2.7"}""",
         )
@@ -793,7 +806,10 @@ class RuntimeInputProcessorTest {
         val execution = database.runtimeToolExecutionDao().listByRunId("r-rel").single()
         assertEquals("relationship.search", execution.toolName)
         assertTrue(execution.safeResultJson!!.contains("rel-digest"))
+        assertTrue(execution.safeResultJson!!.contains(historicalEpisode.episodeId))
+        assertTrue(execution.safeResultJson!!.contains("\"temporalState\":\"PAST\""))
         assertFalse(execution.safeResultJson!!.contains("private-evidence"))
+        assertFalse(execution.safeResultJson!!.contains("private-history-evidence"))
         assertEquals(2, requests.size)
         val trace = com.zhiban.rebuild.runtime.observability.AgentTraceService(database).recent().first {
             it.runId ==
@@ -1029,6 +1045,7 @@ class RuntimeInputProcessorTest {
         assertTrue(edge.userConfirmed)
         assertEquals("FRIEND", edge.relationType)
         assertFalse(edge.evidenceRefsJson.contains(privateEvidence))
+        assertNull(database.contactIntelligenceDao().listRelationships("rel-write-a", 10).single().validToEpochMs)
         val execution = database.runtimeToolExecutionDao().listByRunId("r-rel-write").single()
         assertFalse(execution.safeResultJson!!.contains(privateEvidence))
         val change = database.changeLogDao().listByRun("r-rel-write").single()
@@ -1047,6 +1064,110 @@ class RuntimeInputProcessorTest {
         )
         assertEquals(KernelCommandProcessor.Outcome.PROCESSED, processor.processNext())
         assertNull(database.relationshipEdgeDao().find(edgeId))
+        assertNotNull(database.contactIntelligenceDao().listRelationships("rel-write-a", 10).single().validToEpochMs)
+        assertEquals("UNDONE", database.changeLogDao().find(change.changeId)?.undoState)
+    }
+
+    @Test fun unresolvedSocialIdentityRequiresConfirmationThenCanBeUndone() = runBlocking {
+        database.contactDao().insert(
+            ContactEntity(
+                "identity-contact", "张三", "张三", null, null, null, null, null,
+                "[]", "[]", null, null, "USER", null, now, now,
+            ),
+        )
+        database.contactIntelligenceDao().upsertSourceIdentity(
+            SourceIdentityEntity(
+                sourceIdentityId = "wechat-project-old-zhang",
+                personId = null,
+                sourceType = "WECHAT",
+                accountScope = "DEVICE_OBSERVED",
+                tenantId = null,
+                stableExternalId = null,
+                visibleHandle = "项目群里的老张",
+                normalizedHandle = "项目群里的老张",
+                conversationScopeId = "项目群",
+                resolutionStatus = "UNRESOLVED",
+                confidence = 0.55,
+                sourceRef = "notification-identity",
+                firstObservedAtEpochMs = now,
+                lastObservedAtEpochMs = now,
+            ),
+        )
+        val input = RoomTextInputGateway(database, { true }, { now }).stage(
+            """{"schemaVersion":1,"text":"项目群里的老张就是张三","mode":"Work","model":"M2.7","level":"高"}""",
+        )
+        val gateway = RoomRuntimeGateways(database, "test") { now++ }
+        gateway.accept(
+            RuntimeUiCommand.Start(
+                "s-identity-resolve",
+                input.inputRef,
+                "c-identity-resolve",
+                "a-identity-resolve",
+                0,
+                "chat",
+                "r-identity-resolve",
+            ),
+        )
+        val privateEvidence = "用户明确确认项目群里的老张就是张三"
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile) = capability(profile)
+            override fun stream(request: ModelRequest) = if (request.messages.any { it.content.contains("identity_resolved") }) {
+                flowOf(ModelEvent.Delta(0, "身份已关联，可撤销。"), ModelEvent.Final("stop"))
+            } else {
+                flowOf(
+                    ModelEvent.ToolCall(
+                        0,
+                        "call-identity-resolve",
+                        "contact.identity.resolve",
+                        """{"sourceIdentityId":"wechat-project-old-zhang","contactId":"identity-contact","evidenceSummary":"$privateEvidence","confidence":0.95}""",
+                    ),
+                    ModelEvent.Final("tool_calls"),
+                )
+            }
+            override fun cancel(requestId: String) = true
+        }
+        val processor = KernelCommandProcessor(database, "processor", { true }, { now++ }, provider = provider, profiles = fixedProfileStore())
+
+        processor.processNext()
+        awaitRunStatus("r-identity-resolve", "AWAITING_CONFIRMATION")
+        val approval = database.runtimeEventDao().latestByType("r-identity-resolve", "ApprovalRequested")!!
+        assertFalse(approval.payloadJson.contains(privateEvidence))
+        val payload = Json.parseToJsonElement(approval.payloadJson).jsonObject
+        val revision = database.runtimeSessionDao().find("s-identity-resolve")!!.nextSequence - 1
+        gateway.accept(
+            RuntimeUiCommand.RunAction(
+                RuntimeAction.APPROVE, "s-identity-resolve", "r-identity-resolve", "approve-identity",
+                "approve-identity-action", revision, "chat",
+                payload["proposalId"]!!.jsonPrimitive.content,
+                payload["payloadRef"]!!.jsonPrimitive.content,
+            ),
+        )
+        processor.processNext()
+        awaitRunStatus("r-identity-resolve", "SUCCEEDED")
+
+        val resolved = database.contactIntelligenceDao().findSourceIdentity("wechat-project-old-zhang")!!
+        assertEquals("identity-contact", resolved.personId)
+        assertEquals("RESOLVED", resolved.resolutionStatus)
+        assertTrue(database.contactIdentityDao().listPlatformIdentities().any { it.contactId == "identity-contact" })
+        val change = database.changeLogDao().listByRun("r-identity-resolve").single()
+        val undoRevision = database.runtimeSessionDao().find("s-identity-resolve")!!.nextSequence - 1
+        gateway.accept(
+            RuntimeUiCommand.RunAction(
+                RuntimeAction.UNDO,
+                "s-identity-resolve",
+                "r-identity-resolve",
+                "undo-identity",
+                "undo-identity-action",
+                undoRevision,
+                "chat",
+                payloadRef = change.changeId,
+            ),
+        )
+        assertEquals(KernelCommandProcessor.Outcome.PROCESSED, processor.processNext())
+        val restored = database.contactIntelligenceDao().findSourceIdentity("wechat-project-old-zhang")!!
+        assertNull(restored.personId)
+        assertEquals("UNRESOLVED", restored.resolutionStatus)
+        assertFalse(database.contactIdentityDao().listPlatformIdentities().any { it.contactId == "identity-contact" })
         assertEquals("UNDONE", database.changeLogDao().find(change.changeId)?.undoState)
     }
 

@@ -21,6 +21,7 @@ import com.zhiban.rebuild.data.contact.IdentityResolutionDecision
 import com.zhiban.rebuild.data.contact.OwnerContactLinkEntity
 import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
+import com.zhiban.rebuild.data.contact.RelationshipEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventWithParticipants
 import com.zhiban.rebuild.data.contact.SourceIdentityEntity
 import com.zhiban.rebuild.data.contact.SystemContactCandidate
@@ -80,6 +81,8 @@ class RelationViewModel @Inject constructor(
     val rawContacts: StateFlow<List<ContactEntity>> = repository.observeRawContacts()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val relationships: StateFlow<List<RelationshipEdgeEntity>> = repository.observeRelationships()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val temporalRelationships: StateFlow<List<RelationshipEpisodeEntity>> = repository.observeTemporalRelationships()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val relationshipEvents: StateFlow<List<RelationshipEventWithParticipants>> = repository.observeRelationshipEvents()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())

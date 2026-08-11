@@ -2,6 +2,7 @@ package com.zhiban.rebuild.runtime.governance
 
 import androidx.room.withTransaction
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.agent.TemporalRelationshipWriter
 import com.zhiban.rebuild.data.agent.ToolAuditEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
@@ -36,10 +37,13 @@ data class RelationshipCandidateCall(
     val evidenceDigest: String,
     val confidence: Double,
     val skillId: String?,
+    val temporalState: String,
 )
 
 /** Sole writer for Agent-proposed relationship edges. Raw evidence never enters runtime events. */
 internal class RelationshipDomainWriter(private val database: AgentDatabase) {
+    private val temporalRelationships = TemporalRelationshipWriter(database)
+
     suspend fun execute(context: ConfirmedToolExecutionContext, call: RelationshipCandidateCall, confirmation: ToolConfirmation): SafeToolResult =
         database.withTransaction {
             require(call.proposalId == confirmation.proposalId && call.payloadRef == confirmation.payloadRef)
@@ -68,8 +72,20 @@ internal class RelationshipDomainWriter(private val database: AgentDatabase) {
                 RelationshipEdgeEntity(
                     call.edgeId, call.fromContactId, call.toContactId, call.relationType,
                     call.evidenceDigest, "[\"runtime:${context.runId}\"]", call.confidence,
-                    true, call.skillId, "ACTIVE", context.nowEpochMs, context.nowEpochMs,
+                    true, call.skillId, if (call.temporalState == "PAST") "HISTORICAL" else "ACTIVE",
+                    context.nowEpochMs, context.nowEpochMs,
                 ),
+            )
+            temporalRelationships.replaceEpisode(
+                episodeKey = call.edgeId,
+                fromPersonId = call.fromContactId,
+                toPersonId = call.toContactId,
+                relationshipType = call.relationType,
+                temporalState = call.temporalState,
+                evidenceRefsJson = "[\"runtime:${context.runId}\"]",
+                confidence = call.confidence,
+                verificationState = "USER_CONFIRMED",
+                nowEpochMs = context.nowEpochMs,
             )
             finalizeRelationshipWrite(context, call, attemptId, run.sessionId, session.nextSequence)
         }
@@ -96,6 +112,7 @@ internal class RelationshipDomainWriter(private val database: AgentDatabase) {
             put("relationType", call.relationType)
             put("evidenceDigest", call.evidenceDigest)
             put("confidence", call.confidence)
+            put("temporalState", call.temporalState)
             put("userConfirmed", true)
             put("changeId", changeId)
             put("undoAvailable", true)

@@ -67,6 +67,30 @@ interface ContactIntelligenceDao {
     @Query("SELECT * FROM source_identities WHERE sourceIdentityId = :sourceIdentityId")
     suspend fun findSourceIdentity(sourceIdentityId: String): SourceIdentityEntity?
 
+    @Query(
+        """UPDATE source_identities
+           SET personId = :personId, resolutionStatus = 'RESOLVED', confidence = :confidence,
+               lastObservedAtEpochMs = :nowEpochMs
+           WHERE sourceIdentityId = :sourceIdentityId AND personId IS NULL
+             AND resolutionStatus IN ('UNRESOLVED', 'CANDIDATE')""",
+    )
+    suspend fun resolveSourceIdentity(sourceIdentityId: String, personId: String, confidence: Double, nowEpochMs: Long): Int
+
+    @Query(
+        """UPDATE source_identities
+           SET personId = NULL, resolutionStatus = :previousStatus, confidence = :previousConfidence,
+               lastObservedAtEpochMs = :nowEpochMs
+           WHERE sourceIdentityId = :sourceIdentityId AND personId = :expectedPersonId
+             AND resolutionStatus = 'RESOLVED'""",
+    )
+    suspend fun restoreSourceIdentityResolution(
+        sourceIdentityId: String,
+        expectedPersonId: String,
+        previousStatus: String,
+        previousConfidence: Double,
+        nowEpochMs: Long,
+    ): Int
+
     @Query("SELECT * FROM source_identities WHERE personId = :personId ORDER BY lastObservedAtEpochMs DESC")
     suspend fun identitiesForPerson(personId: String): List<SourceIdentityEntity>
 
@@ -125,12 +149,27 @@ interface ContactIntelligenceDao {
     fun observeRelationships(personId: String): Flow<List<RelationshipEpisodeEntity>>
 
     @Query(
+        """SELECT * FROM relationship_episodes
+           WHERE status = 'ACTIVE'
+           ORDER BY COALESCE(validToEpochMs, updatedAtEpochMs) DESC""",
+    )
+    fun observeAllRelationships(): Flow<List<RelationshipEpisodeEntity>>
+
+    @Query(
+        """SELECT * FROM relationship_episodes
+           WHERE status = 'ACTIVE' AND (fromPersonId = :personId OR toPersonId = :personId)
+           ORDER BY COALESCE(validToEpochMs, updatedAtEpochMs) DESC LIMIT :limit""",
+    )
+    suspend fun listRelationships(personId: String, limit: Int): List<RelationshipEpisodeEntity>
+
+    @Query(
         """UPDATE relationship_episodes SET validToEpochMs = :nowEpochMs, updatedAtEpochMs = :nowEpochMs
            WHERE status = 'ACTIVE' AND validToEpochMs IS NULL AND verificationState = 'USER_CONFIRMED'
+             AND relationshipType = :relationshipType
              AND ((fromPersonId = :fromPersonId AND toPersonId = :toPersonId)
                OR (fromPersonId = :toPersonId AND toPersonId = :fromPersonId))""",
     )
-    suspend fun closeOpenUserRelationships(fromPersonId: String, toPersonId: String, nowEpochMs: Long): Int
+    suspend fun closeOpenUserRelationships(fromPersonId: String, toPersonId: String, relationshipType: String, nowEpochMs: Long): Int
 
     @Query("SELECT * FROM android_raw_contact_links WHERE personId = :personId ORDER BY lastObservedAtEpochMs DESC")
     suspend fun androidLinksForPerson(personId: String): List<AndroidRawContactLinkEntity>

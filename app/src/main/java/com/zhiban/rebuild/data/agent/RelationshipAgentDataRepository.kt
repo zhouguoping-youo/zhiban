@@ -15,7 +15,6 @@ import com.zhiban.rebuild.data.contact.ContactPlatformIdentityEntity
 import com.zhiban.rebuild.data.contact.ContactRoleEntity
 import com.zhiban.rebuild.data.contact.OrganizationEntity
 import com.zhiban.rebuild.data.contact.OwnerContactLinkEntity
-import com.zhiban.rebuild.data.contact.PersonEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventEntity
@@ -65,7 +64,11 @@ import kotlinx.serialization.json.buildJsonArray
 import org.json.JSONObject
 
 internal class RelationshipAgentDataRepository(private val database: AgentDatabase) {
+    private val temporalRelationships = TemporalRelationshipWriter(database)
+
     fun observeRelationships(): Flow<List<RelationshipEdgeEntity>> = database.relationshipEdgeDao().observeActive()
+
+    fun observeTemporalRelationships(): Flow<List<RelationshipEpisodeEntity>> = database.contactIntelligenceDao().observeAllRelationships()
 
     suspend fun saveConfirmedRelationship(
         fromContactId: String,
@@ -108,63 +111,30 @@ internal class RelationshipAgentDataRepository(private val database: AgentDataba
                 updatedAtEpochMs = nowEpochMs,
             ),
         )
-        writeTemporalRelationship(id, fromContactId, toContactId, relationType, temporalState, nowEpochMs)
+        temporalRelationships.replaceEpisode(
+            episodeKey = id,
+            fromPersonId = fromContactId,
+            toPersonId = toContactId,
+            relationshipType = relationType,
+            temporalState = temporalState,
+            evidenceRefsJson = "[\"USER_PROFILE\"]",
+            confidence = 1.0,
+            verificationState = "USER_CONFIRMED",
+            nowEpochMs = nowEpochMs,
+        )
         id
-    }
-
-    private suspend fun writeTemporalRelationship(
-        edgeId: String,
-        fromContactId: String,
-        toContactId: String,
-        relationType: String,
-        temporalState: String,
-        nowEpochMs: Long,
-    ) {
-        ensureTemporalPerson(fromContactId, nowEpochMs)
-        ensureTemporalPerson(toContactId, nowEpochMs)
-        database.contactIntelligenceDao().upsertRelationship(
-            RelationshipEpisodeEntity(
-                episodeId = stableContactKnowledgeId("user-relationship", edgeId, temporalState, nowEpochMs.toString()),
-                fromPersonId = fromContactId,
-                toPersonId = toContactId,
-                relationshipType = relationType,
-                direction = "BIDIRECTIONAL",
-                validFromEpochMs = null,
-                validToEpochMs = nowEpochMs.takeIf { temporalState == "PAST" },
-                temporalPrecision = if (temporalState == "UNKNOWN") "UNKNOWN" else "OPEN",
-                evidenceRefsJson = "[\"USER_PROFILE\"]",
-                confidence = 1.0,
-                verificationState = "USER_CONFIRMED",
-                status = "ACTIVE",
-                recordedAtEpochMs = nowEpochMs,
-                updatedAtEpochMs = nowEpochMs,
-            ),
-        )
-    }
-
-    private suspend fun ensureTemporalPerson(contactId: String, nowEpochMs: Long) {
-        val intelligence = database.contactIntelligenceDao()
-        if (intelligence.findPerson(contactId) != null) return
-        val contact = contactId.takeUnless { it == RelationshipPersonIds.SELF }?.let { database.contactDao().findById(it) }
-        intelligence.upsertPerson(
-            PersonEntity(
-                personId = contactId,
-                canonicalContactId = contact?.contactId,
-                displayName = contact?.displayName ?: "我",
-                normalizedName = contact?.normalizedName ?: "self",
-                kind = if (contact == null) "USER" else "CONTACT",
-                status = "ACTIVE",
-                createdAtEpochMs = contact?.createdAtEpochMs ?: nowEpochMs,
-                updatedAtEpochMs = nowEpochMs,
-            ),
-        )
     }
 
     suspend fun deleteConfirmedRelationship(edgeId: String, nowEpochMs: Long = System.currentTimeMillis()): Boolean = database.withTransaction {
         val current = database.relationshipEdgeDao().find(edgeId) ?: return@withTransaction false
         val deleted = database.relationshipEdgeDao().deleteConfirmed(edgeId) == 1
         if (deleted) {
-            database.contactIntelligenceDao().closeOpenUserRelationships(current.fromContactId, current.toContactId, nowEpochMs)
+            database.contactIntelligenceDao().closeOpenUserRelationships(
+                current.fromContactId,
+                current.toContactId,
+                current.relationType,
+                nowEpochMs,
+            )
         }
         deleted
     }
@@ -188,8 +158,23 @@ internal class RelationshipAgentDataRepository(private val database: AgentDataba
                     updatedAtEpochMs = nowEpochMs,
                 ),
             )
-            database.contactIntelligenceDao().closeOpenUserRelationships(current.fromContactId, current.toContactId, nowEpochMs)
-            writeTemporalRelationship(edgeId, current.fromContactId, current.toContactId, relationType, "CURRENT", nowEpochMs)
+            database.contactIntelligenceDao().closeOpenUserRelationships(
+                current.fromContactId,
+                current.toContactId,
+                current.relationType,
+                nowEpochMs,
+            )
+            temporalRelationships.replaceEpisode(
+                episodeKey = edgeId,
+                fromPersonId = current.fromContactId,
+                toPersonId = current.toContactId,
+                relationshipType = relationType,
+                temporalState = "CURRENT",
+                evidenceRefsJson = "[\"USER_PROFILE\"]",
+                confidence = 1.0,
+                verificationState = "USER_CONFIRMED",
+                nowEpochMs = nowEpochMs,
+            )
             true
         }
 

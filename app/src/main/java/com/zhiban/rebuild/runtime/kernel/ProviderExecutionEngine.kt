@@ -26,6 +26,7 @@ import com.zhiban.rebuild.runtime.context.withDegradations
 import com.zhiban.rebuild.runtime.governance.AutoWritePresentationRegistry
 import com.zhiban.rebuild.runtime.governance.ChangeUndoCoordinator
 import com.zhiban.rebuild.runtime.governance.ContactDomainWriter
+import com.zhiban.rebuild.runtime.governance.ContactIdentityResolutionDomainWriter
 import com.zhiban.rebuild.runtime.governance.RelationshipDomainWriter
 import com.zhiban.rebuild.runtime.memory.RoomMemoryGate
 import com.zhiban.rebuild.runtime.network.NetworkQuality
@@ -58,6 +59,7 @@ import com.zhiban.rebuild.runtime.tool.ConfirmedToolExecutionContext
 import com.zhiban.rebuild.runtime.tool.ContactCreateCandidateToolBinding
 import com.zhiban.rebuild.runtime.tool.ContactDetailToolBinding
 import com.zhiban.rebuild.runtime.tool.ContactEnrichmentSuggestToolBinding
+import com.zhiban.rebuild.runtime.tool.ContactIdentityResolutionToolBinding
 import com.zhiban.rebuild.runtime.tool.ContactMaintenanceToolBinding
 import com.zhiban.rebuild.runtime.tool.ContactProfileUpdateCandidateToolBinding
 import com.zhiban.rebuild.runtime.tool.ContactSearchToolBinding
@@ -250,6 +252,13 @@ internal class ProviderExecutionEngine(
                 database.contactIdentityDao(),
                 database.contactIntelligenceDao(),
             ),
+            ContactIdentityResolutionToolBinding(
+                toolCatalog.requireRegistered("contact.identity.resolve"),
+                database.contactDao(),
+                database.contactIntelligenceDao(),
+                store,
+                ContactIdentityResolutionDomainWriter(database),
+            ),
             ContactTagToolBinding(
                 toolCatalog.requireRegistered(ContactTagToolBinding.TOOL_NAME),
                 store,
@@ -277,6 +286,7 @@ internal class ProviderExecutionEngine(
                 toolCatalog.requireRegistered("relationship.search"),
                 database.relationshipEdgeDao(),
                 database.relationshipEventDao(),
+                database.contactIntelligenceDao(),
             ),
             RelationshipCreateCandidateToolBinding(
                 toolCatalog.requireRegistered("relationship.createCandidate"),

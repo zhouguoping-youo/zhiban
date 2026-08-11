@@ -607,6 +607,30 @@ internal class RoomRuntimeStore(private val database: AgentDatabase, private val
         nowEpochMs: Long,
     ): Boolean = approvals.requestContactProfileApproval(call, stagedPayloadJson, displayName, sessionId, runId, attemptId, ownerId, fencingEpoch, nowEpochMs)
 
+    suspend fun requestContactIdentityResolutionApproval(
+        call: com.zhiban.rebuild.runtime.governance.ContactIdentityResolutionCall,
+        visibleHandle: String,
+        platform: String,
+        contactName: String,
+        sessionId: String,
+        runId: String,
+        attemptId: String,
+        ownerId: String,
+        fencingEpoch: Long,
+        nowEpochMs: Long,
+    ): Boolean = approvals.requestContactIdentityResolutionApproval(
+        call,
+        visibleHandle,
+        platform,
+        contactName,
+        sessionId,
+        runId,
+        attemptId,
+        ownerId,
+        fencingEpoch,
+        nowEpochMs,
+    )
+
     suspend fun requestRelationshipApproval(
         call: RelationshipCandidateCall,
         sessionId: String,

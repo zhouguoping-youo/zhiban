@@ -3,6 +3,7 @@ package com.zhiban.rebuild.ui.tabs
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
+import com.zhiban.rebuild.data.contact.RelationshipEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.data.contact.corporateEmailDomain
 
@@ -205,6 +206,29 @@ internal fun RelationshipEdgeEntity.inferredEvidenceLabel(): String? = when (sta
     INFERRED_EMAIL_DOMAIN_RELATIONSHIP_STATUS -> "企业邮箱推测"
     else -> null
 }
+
+/** Projects closed temporal episodes into a read-only graph layer. */
+internal fun historicalRelationshipEdges(episodes: List<RelationshipEpisodeEntity>): List<RelationshipEdgeEntity> = episodes.asSequence()
+    .filter { it.status == "ACTIVE" && it.validToEpochMs != null }
+    .sortedByDescending { it.validToEpochMs }
+    .map { episode ->
+        RelationshipEdgeEntity(
+            edgeId = "history:${episode.episodeId}",
+            fromContactId = episode.fromPersonId,
+            toContactId = episode.toPersonId,
+            relationType = episode.relationshipType,
+            evidenceDigest = "TEMPORAL_HISTORY",
+            evidenceRefsJson = episode.evidenceRefsJson,
+            confidence = episode.confidence,
+            userConfirmed = episode.verificationState == "USER_CONFIRMED",
+            skillId = null,
+            status = "HISTORICAL",
+            createdAtEpochMs = episode.recordedAtEpochMs,
+            updatedAtEpochMs = episode.updatedAtEpochMs,
+        )
+    }
+    .distinctBy(RelationshipEdgeEntity::edgeId)
+    .toList()
 
 internal fun relationshipGraphEdgesForRoot(rootId: String, edges: List<RelationshipEdgeEntity>): List<RelationshipEdgeEntity> {
     val incident = edges.filter { it.fromContactId == rootId || it.toContactId == rootId }

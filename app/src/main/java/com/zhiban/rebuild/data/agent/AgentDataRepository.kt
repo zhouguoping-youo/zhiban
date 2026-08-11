@@ -19,6 +19,7 @@ import com.zhiban.rebuild.data.contact.GroupMembershipEpisodeEntity
 import com.zhiban.rebuild.data.contact.OrganizationEntity
 import com.zhiban.rebuild.data.contact.OwnerContactLinkEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
+import com.zhiban.rebuild.data.contact.RelationshipEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventParticipantEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventWithParticipants
@@ -865,6 +866,7 @@ class AgentDataRepository internal constructor(
     suspend fun applyContactEnrichmentCandidate(candidate: ContactEnrichmentCandidateEntity): Boolean = contacts.applyContactEnrichmentCandidate(candidate)
 
     fun observeRelationships(): Flow<List<RelationshipEdgeEntity>> = relationships.observeRelationships()
+    fun observeTemporalRelationships(): Flow<List<RelationshipEpisodeEntity>> = relationships.observeTemporalRelationships()
     suspend fun saveConfirmedRelationship(
         fromContactId: String,
         toContactId: String,

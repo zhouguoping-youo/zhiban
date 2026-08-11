@@ -187,6 +187,7 @@ fun RelationTab(
     }
     val contacts by viewModel.contacts.collectAsStateWithLifecycle()
     val relationships by viewModel.relationships.collectAsStateWithLifecycle()
+    val temporalRelationships by viewModel.temporalRelationships.collectAsStateWithLifecycle()
     val relationshipEvents by viewModel.relationshipEvents.collectAsStateWithLifecycle()
     val rawContacts by viewModel.rawContacts.collectAsStateWithLifecycle()
     val ownerContactLinks by viewModel.ownerContactLinks.collectAsStateWithLifecycle()
@@ -307,6 +308,9 @@ fun RelationTab(
             relationships,
             temporalEmployments,
         )
+    }
+    val historyRelationships = remember(temporalRelationships) {
+        historicalRelationshipEdges(temporalRelationships)
     }
     val inferredRelationshipCount = remember(graphRelationships) {
         graphRelationships.count(RelationshipEdgeEntity::isInferredEvidenceRelationship)
@@ -679,6 +683,7 @@ fun RelationTab(
                         owner = ownerProfile,
                         contacts = visible,
                         edges = graphRelationships,
+                        historicalEdges = historyRelationships,
                         events = relationshipEvents,
                         canAddRelationship = contacts.isNotEmpty(),
                         activeFilter = tag.takeUnless { it == "全部" } ?: query.takeIf(String::isNotBlank),

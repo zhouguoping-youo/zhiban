@@ -6,6 +6,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -51,6 +52,53 @@ class ContactTemporalWriteTest {
             assertEquals(200L, employments.single { it.currentState == "PAST" }.validToEpochMs)
             assertEquals(1, database.contactIntelligenceDao().matchingClaims("COMPANY", "乙公司").size)
             assertEquals(0, database.contactIntelligenceDao().matchingClaims("COMPANY", "甲公司").size)
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
+    fun endingOneRelationshipTypeKeepsOtherTypeCurrent() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val database = Room.inMemoryDatabaseBuilder(context, AgentDatabase::class.java).build()
+        try {
+            val contacts = ContactAgentDataRepository(database)
+            val relationships = RelationshipAgentDataRepository(database)
+            val contactId = contacts.saveUserContact(
+                contactId = null,
+                displayName = "旧同事",
+                phone = "13800138000",
+                wechatId = null,
+                company = null,
+                title = null,
+                tag = null,
+                note = null,
+                nowEpochMs = 10,
+            )
+            val friendEdge = relationships.saveConfirmedRelationship(
+                com.zhiban.rebuild.data.contact.RelationshipPersonIds.SELF,
+                contactId,
+                "FRIEND",
+                "CURRENT",
+                100,
+            )
+            relationships.saveConfirmedRelationship(
+                com.zhiban.rebuild.data.contact.RelationshipPersonIds.SELF,
+                contactId,
+                "COLLEAGUE",
+                "CURRENT",
+                200,
+            )
+
+            relationships.deleteConfirmedRelationship(friendEdge, 300)
+
+            val episodes = database.contactIntelligenceDao().listRelationships(
+                com.zhiban.rebuild.data.contact.RelationshipPersonIds.SELF,
+                20,
+            )
+            assertEquals(2, episodes.size)
+            assertEquals(300L, episodes.single { it.relationshipType == "FRIEND" }.validToEpochMs)
+            assertNull(episodes.single { it.relationshipType == "COLLEAGUE" }.validToEpochMs)
         } finally {
             database.close()
         }

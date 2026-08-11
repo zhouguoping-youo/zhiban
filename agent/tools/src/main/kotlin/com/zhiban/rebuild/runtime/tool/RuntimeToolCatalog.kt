@@ -121,6 +121,13 @@ class RuntimeToolCatalog(val specs: Map<String, RuntimeToolSpec>) {
                     8,
                 ),
                 RuntimeToolSpec(
+                    "contact.identity.resolve",
+                    1,
+                    RuntimeToolRisk.WRITE_CONFIRMATION_REQUIRED,
+                    """{"type":"function","function":{"name":"contact.identity.resolve","description":"将维护台中的一个未识别社交账号或群昵称关联到已存在联系人。必须先搜索联系人并核对证据，再让用户确认；绝不能仅凭同名关联。","parameters":{"type":"object","additionalProperties":false,"required":["sourceIdentityId","contactId","evidenceSummary","confidence"],"properties":{"sourceIdentityId":{"type":"string"},"contactId":{"type":"string"},"evidenceSummary":{"type":"string"},"confidence":{"type":"number","minimum":0,"maximum":1}}}}}""",
+                    4,
+                ),
+                RuntimeToolSpec(
                     "contact.createCandidate",
                     1,
                     RuntimeToolRisk.WRITE_CONFIRMATION_REQUIRED,
@@ -152,14 +159,14 @@ class RuntimeToolCatalog(val specs: Map<String, RuntimeToolSpec>) {
                     "relationship.search",
                     1,
                     RuntimeToolRisk.READ_ONLY,
-                    """{"type":"function","function":{"name":"relationship.search","description":"从一个知伴联系人出发查询最多两层、带证据状态的关系图","parameters":{"type":"object","additionalProperties":false,"required":["contactId"],"properties":{"contactId":{"type":"string"},"maxDepth":{"type":"integer","minimum":1,"maximum":2},"limit":{"type":"integer","minimum":1,"maximum":50}}}}}""",
+                    """{"type":"function","function":{"name":"relationship.search","description":"从一个知伴联系人出发查询最多两层、带证据状态的当前关系图和关系时间线","parameters":{"type":"object","additionalProperties":false,"required":["contactId"],"properties":{"contactId":{"type":"string"},"maxDepth":{"type":"integer","minimum":1,"maximum":2},"limit":{"type":"integer","minimum":1,"maximum":50}}}}}""",
                     8,
                 ),
                 RuntimeToolSpec(
                     "relationship.createCandidate",
                     1,
                     RuntimeToolRisk.WRITE_CONFIRMATION_REQUIRED,
-                    """{"type":"function","function":{"name":"relationship.createCandidate","description":"提出一条联系人关系候选，必须经用户确认后才写入关系图","parameters":{"type":"object","additionalProperties":false,"required":["fromContactId","toContactId","relationType","evidenceSummary"],"properties":{"fromContactId":{"type":"string"},"toContactId":{"type":"string"},"relationType":{"type":"string","enum":["FAMILY","FRIEND","COLLEAGUE","CUSTOMER","SUPPLIER","TEACHER","CLASSMATE","PROJECT_PARTNER","OTHER"]},"evidenceSummary":{"type":"string"},"confidence":{"type":"number","minimum":0,"maximum":1},"skillId":{"type":"string"}}}}}""",
+                    """{"type":"function","function":{"name":"relationship.createCandidate","description":"提出一条带时间状态的联系人关系候选，必须经用户确认后才写入关系图；当前、过往和时间不确定不能混为一谈","parameters":{"type":"object","additionalProperties":false,"required":["fromContactId","toContactId","relationType","temporalState","evidenceSummary"],"properties":{"fromContactId":{"type":"string"},"toContactId":{"type":"string"},"relationType":{"type":"string","enum":["FAMILY","FRIEND","COLLEAGUE","CUSTOMER","SUPPLIER","TEACHER","CLASSMATE","PROJECT_PARTNER","OTHER"]},"temporalState":{"type":"string","enum":["CURRENT","PAST","UNKNOWN"]},"evidenceSummary":{"type":"string"},"confidence":{"type":"number","minimum":0,"maximum":1},"skillId":{"type":"string"}}}}}""",
                     4,
                 ),
                 RuntimeToolSpec(

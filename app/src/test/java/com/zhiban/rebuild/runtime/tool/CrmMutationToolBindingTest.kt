@@ -6,8 +6,8 @@ import com.zhiban.rebuild.data.crm.CrmDao
 import com.zhiban.rebuild.data.crm.CrmLeadEntity
 import com.zhiban.rebuild.data.crm.CrmNextActionEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
-import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
 import com.zhiban.rebuild.runtime.provider.ProviderFailure
+import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -53,9 +53,9 @@ class CrmMutationToolBindingTest {
     }
 
     @Test
-    fun `production catalog exposes twenty eight tools including all CRM writes and contact tag`() {
+    fun `production catalog exposes thirty tools including CRM writes contact tag and identity resolution`() {
         val catalog = RuntimeToolCatalog.production()
-        assertEquals(29, catalog.names().size)
+        assertEquals(30, catalog.names().size)
         assertTrue(catalog.names().containsAll(CrmMutationToolBinding.TOOL_NAMES))
         assertTrue(ContactTagToolBinding.TOOL_NAME in catalog.names())
     }
