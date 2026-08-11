@@ -60,6 +60,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
@@ -308,38 +309,59 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
             if (state.stage == AgentConversationStage.SUCCEEDED) {
                 item {
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        if (state.canUndo) {
-                            ReplyVectorAction(Icons.AutoMirrored.Outlined.Undo, "撤销刚才的更改", onClick = onUndo)
-                        }
-                        ReplyAction(ReplyGlyph.COPY, "复制", onClick = onCopyAssistant)
-                        if (feedbackEnabled) {
+                        val copyIndex = if (state.canUndo) 1 else 0
+                        val speakIndex = copyIndex + 1 + if (feedbackEnabled) 2 else 0
+                        val compactActionCount = speakIndex + 1
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (state.canUndo) {
+                                ReplyVectorAction(
+                                    Icons.AutoMirrored.Outlined.Undo,
+                                    "撤销刚才的更改",
+                                    compactReplyIconOffset(0, compactActionCount),
+                                    onUndo,
+                                )
+                            }
                             ReplyAction(
-                                glyph = ReplyGlyph.POSITIVE,
-                                label = "有帮助",
-                                selected = feedbackSelection == true,
-                                enabled = feedbackSelection == null,
-                            ) {
-                                if (feedbackSelection == null) {
-                                    feedbackSelection = true
-                                    onPositiveFeedback()
+                                ReplyGlyph.COPY,
+                                "复制",
+                                iconOffset = compactReplyIconOffset(copyIndex, compactActionCount),
+                                onClick = onCopyAssistant,
+                            )
+                            if (feedbackEnabled) {
+                                ReplyAction(
+                                    glyph = ReplyGlyph.POSITIVE,
+                                    label = "有帮助",
+                                    state = feedbackActionState(feedbackSelection, positive = true),
+                                    iconOffset = compactReplyIconOffset(copyIndex + 1, compactActionCount),
+                                ) {
+                                    if (feedbackSelection == null) {
+                                        feedbackSelection = true
+                                        onPositiveFeedback()
+                                    }
+                                }
+                                ReplyAction(
+                                    glyph = ReplyGlyph.NEGATIVE,
+                                    label = "需改进",
+                                    state = feedbackActionState(feedbackSelection, positive = false),
+                                    iconOffset = compactReplyIconOffset(copyIndex + 2, compactActionCount),
+                                ) {
+                                    if (feedbackSelection == null) {
+                                        feedbackSelection = false
+                                        onNegativeFeedback()
+                                    }
                                 }
                             }
                             ReplyAction(
-                                glyph = ReplyGlyph.NEGATIVE,
-                                label = "需改进",
-                                selected = feedbackSelection == false,
-                                enabled = feedbackSelection == null,
-                            ) {
-                                if (feedbackSelection == null) {
-                                    feedbackSelection = false
-                                    onNegativeFeedback()
-                                }
-                            }
+                                ReplyGlyph.SPEAK,
+                                "朗读",
+                                iconOffset = compactReplyIconOffset(speakIndex, compactActionCount),
+                                onClick = onReadAssistant,
+                            )
                         }
-                        ReplyAction(ReplyGlyph.SPEAK, "朗读", onClick = onReadAssistant)
+                        Spacer(Modifier.weight(1f))
                         ReplyAction(ReplyGlyph.SHARE, "分享", onClick = onShareAssistant)
                     }
                 }
@@ -401,29 +423,39 @@ private fun GeneratedArtifactsCard(artifacts: List<AgentArtifactUi>) {
     }
 }
 
+private enum class ReplyActionState { DEFAULT, SELECTED, DISABLED }
+
+private fun feedbackActionState(selection: Boolean?, positive: Boolean): ReplyActionState = when {
+    selection == null -> ReplyActionState.DEFAULT
+    selection == positive -> ReplyActionState.SELECTED
+    else -> ReplyActionState.DISABLED
+}
+
+private fun compactReplyIconOffset(index: Int, count: Int): Dp = (((count - 1) - (2 * index)) * 3).dp
+
 @Composable
-private fun ReplyAction(glyph: ReplyGlyph, label: String, selected: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
+private fun ReplyAction(glyph: ReplyGlyph, label: String, state: ReplyActionState = ReplyActionState.DEFAULT, iconOffset: Dp = 0.dp, onClick: () -> Unit) {
     IconButton(
         onClick = onClick,
-        enabled = enabled || selected,
+        enabled = state != ReplyActionState.DISABLED,
         modifier = Modifier.size(ZhiBanIconContainer.TouchTarget),
     ) {
         val tint = when {
-            selected -> AgentAccent
-            enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .82f)
+            state == ReplyActionState.SELECTED -> AgentAccent
+            state == ReplyActionState.DEFAULT -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .82f)
             else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .30f)
         }
         ZhiBanReplyIcon(
             glyph = glyph,
             label = label,
             color = tint,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.offset(x = iconOffset).size(ZhiBanIconSize.Action),
         )
     }
 }
 
 @Composable
-private fun ReplyVectorAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+private fun ReplyVectorAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, iconOffset: Dp = 0.dp, onClick: () -> Unit) {
     IconButton(
         onClick = onClick,
         modifier = Modifier.size(ZhiBanIconContainer.TouchTarget),
@@ -432,7 +464,7 @@ private fun ReplyVectorAction(icon: androidx.compose.ui.graphics.vector.ImageVec
             imageVector = icon,
             contentDescription = label,
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .82f),
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.offset(x = iconOffset).size(ZhiBanIconSize.Action),
         )
     }
 }

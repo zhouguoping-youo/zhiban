@@ -50,7 +50,7 @@ class AgentConversationScreenE2ETest {
         assertEquals(1, cancellations.get())
     }
 
-    @Test fun longPressAssistantMessageDoesNotDuplicateInlineReplyActions() {
+    @Test fun completedReplyActionsAreCompactWithoutDuplicateLongPressMenu() {
         val state = AgentConversationUiState(
             stage = AgentConversationStage.SUCCEEDED,
             messages = listOf(AgentConversationMessageUi(turnId = "t1", role = "assistant", text = "这是知伴的回答")),
@@ -65,6 +65,11 @@ class AgentConversationScreenE2ETest {
 
         compose.onNodeWithContentDescription("复制").assertIsDisplayed()
         compose.onNodeWithContentDescription("分享").assertIsDisplayed()
+        val copyCenter = compose.onNodeWithContentDescription("复制").fetchSemanticsNode().boundsInRoot.center.x
+        val positiveCenter = compose.onNodeWithContentDescription("有帮助").fetchSemanticsNode().boundsInRoot.center.x
+        val speakCenter = compose.onNodeWithContentDescription("朗读").fetchSemanticsNode().boundsInRoot.center.x
+        val shareCenter = compose.onNodeWithContentDescription("分享").fetchSemanticsNode().boundsInRoot.center.x
+        assertTrue(shareCenter - speakCenter > (positiveCenter - copyCenter) * 2)
         compose.onNodeWithText("这是知伴的回答").performTouchInput { longClick() }
         assertTrue(compose.onAllNodesWithText("复制").fetchSemanticsNodes().isEmpty())
         assertTrue(compose.onAllNodesWithText("分享").fetchSemanticsNodes().isEmpty())
