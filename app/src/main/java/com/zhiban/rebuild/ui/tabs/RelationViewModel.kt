@@ -10,8 +10,10 @@ import com.zhiban.rebuild.data.calllog.CallRecordEntity
 import com.zhiban.rebuild.data.contact.ContactAliasEntity
 import com.zhiban.rebuild.data.contact.ContactEnrichmentCandidateEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
+import com.zhiban.rebuild.data.contact.ContactIdentityResolver
 import com.zhiban.rebuild.data.contact.ContactMergeLinkEntity
 import com.zhiban.rebuild.data.contact.ContactPlatformIdentityEntity
+import com.zhiban.rebuild.data.contact.IdentityResolutionDecision
 import com.zhiban.rebuild.data.contact.OwnerContactLinkEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventWithParticipants
@@ -454,95 +456,9 @@ internal fun buildMergeSuggestions(
 ): List<ContactMergeSuggestion> {
     val mergedSources = links.mapTo(hashSetOf(), ContactMergeLinkEntity::sourceContactId)
     val active = contacts.filterNot { it.contactId in mergedSources }
-    val contactsById = active.associateBy(ContactEntity::contactId)
-    val suggestions = linkedMapOf<String, ContactMergeSuggestion>()
-
-    fun addPair(first: ContactEntity, second: ContactEntity, reason: String, confidence: Double) {
-        if (first.contactId == second.contactId) return
-        val ordered = if (first.contactId < second.contactId) first to second else second to first
-        val key = "${ordered.first.contactId}\u001f${ordered.second.contactId}"
-        val previous = suggestions[key]
-        if (previous == null || confidence > previous.confidence) {
-            suggestions[key] = ContactMergeSuggestion(ordered.first, ordered.second, reason, confidence)
-        }
-    }
-
-    fun addGroups(groups: Collection<List<ContactEntity>>, reason: String, confidence: Double) {
-        groups.forEach { group ->
-            for (firstIndex in 0 until group.lastIndex) {
-                for (secondIndex in firstIndex + 1 until group.size) {
-                    addPair(group[firstIndex], group[secondIndex], reason, confidence)
-                }
-            }
-        }
-    }
-
-    addGroups(
-        active.mapNotNull { contact -> normalizeContactPhone(contact.phone)?.let { it to contact } }
-            .groupBy({ it.first }, { it.second }).values,
-        "手机号相同",
-        1.0,
-    )
-    addGroups(
-        active.mapNotNull { contact ->
-            contact.email?.trim()?.lowercase()?.takeIf(String::isNotBlank)?.let {
-                it to
-                    contact
-            }
-        }
-            .groupBy({ it.first }, { it.second }).values,
-        "邮箱相同",
-        1.0,
-    )
-    addGroups(
-        active.mapNotNull { contact ->
-            contact.wechatId?.trim()?.lowercase()?.takeIf(String::isNotBlank)?.let {
-                it to
-                    contact
-            }
-        }
-            .groupBy({ it.first }, { it.second }).values,
-        "微信号相同",
-        1.0,
-    )
-    addGroups(
-        identities.mapNotNull { identity ->
-            contactsById[identity.contactId]?.let { "${identity.platform}\u001f${identity.normalizedHandle}" to it }
-        }.groupBy({ it.first }, { it.second }).values,
-        "社交账号相同",
-        1.0,
-    )
-
-    val contactsByName = active.groupBy(ContactEntity::normalizedName)
-    aliases.forEach { alias ->
-        val aliasOwner = contactsById[alias.contactId] ?: return@forEach
-        contactsByName[alias.normalizedAlias].orEmpty().forEach { namedContact ->
-            addPair(aliasOwner, namedContact, "常用称呼与姓名吻合", 0.9)
-        }
-    }
-    addGroups(
-        active.mapNotNull { contact ->
-            contact.company?.trim()?.lowercase()?.takeIf(String::isNotBlank)
-                ?.let { "${contact.normalizedName}\u001f$it" to contact }
-        }.groupBy({ it.first }, { it.second }).values,
-        "姓名和公司相同",
-        0.82,
-    )
-    // 同名 + 一方是 agent 据对话先建的占位（source = AGENT_CANDIDATE，通常只有名字）：随后从手机
-    // 通讯录导入了同一个真人。纯同名会把同名的不同人误凑，所以用"一方是 agent 占位"约束提高精度——
-    // 关键是不只看"无联系方式"：一个真实的、但恰好没存手机号/邮箱的导入联系人不是占位，把两个这样的
-    // 同名真人凑成一对就是误合并。低置信，用户确认后才合并。手机通讯录导入不去重（只按手机号/微信/
-    // 来源），这条建议是兜底，让这类重复可被发现并合并。
-    fun ContactEntity.isAgentStub() = source == "AGENT_CANDIDATE"
-    addGroups(
-        active.filter { it.normalizedName.isNotBlank() }
-            .groupBy(ContactEntity::normalizedName)
-            .values
-            .filter { group -> group.size > 1 && group.any { it.isAgentStub() } },
-        "同名且一方是待确认联系人",
-        0.6,
-    )
-    return suggestions.values.sortedByDescending(ContactMergeSuggestion::confidence)
+    return ContactIdentityResolver.resolve(active, aliases, identities)
+        .filter { it.decision == IdentityResolutionDecision.REVIEW }
+        .map { ContactMergeSuggestion(it.first, it.second, it.reason, it.confidence) }
 }
 
 internal fun sameNormalizedPhone(first: String?, second: String?): Boolean {

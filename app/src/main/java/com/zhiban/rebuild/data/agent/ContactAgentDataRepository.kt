@@ -8,11 +8,13 @@ import com.zhiban.rebuild.data.contact.ContactEmploymentEntity
 import com.zhiban.rebuild.data.contact.ContactEnrichmentCandidateEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.ContactFacetEntity
+import com.zhiban.rebuild.data.contact.ContactIdentityResolver
 import com.zhiban.rebuild.data.contact.ContactImportantDateEntity
 import com.zhiban.rebuild.data.contact.ContactMergeLinkEntity
 import com.zhiban.rebuild.data.contact.ContactMethodEntity
 import com.zhiban.rebuild.data.contact.ContactPlatformIdentityEntity
 import com.zhiban.rebuild.data.contact.ContactRoleEntity
+import com.zhiban.rebuild.data.contact.IdentityResolutionDecision
 import com.zhiban.rebuild.data.contact.OrganizationEntity
 import com.zhiban.rebuild.data.contact.OwnerContactLinkEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
@@ -51,6 +53,7 @@ import com.zhiban.rebuild.runtime.governance.canonicalChangeDigest
 import com.zhiban.rebuild.runtime.governance.insertVisibleAutoWrite
 import com.zhiban.rebuild.runtime.tool.RuntimeToolRisk
 import com.zhiban.rebuild.runtime.tool.RuntimeToolSpec
+import com.zhiban.rebuild.runtime.tool.changeIdFor
 import com.zhiban.rebuild.runtime.tool.sha256
 import java.nio.charset.StandardCharsets
 import java.time.Instant
@@ -730,7 +733,62 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
                 )
             }
         }
+        applyDeterministicIdentityLinks(contacts, nowEpochMs)
         stageLocalOrganizationSuggestions(nowEpochMs)
+    }
+
+    private suspend fun applyDeterministicIdentityLinks(contacts: List<ContactEntity>, nowEpochMs: Long) {
+        val identityDao = database.contactIdentityDao()
+        ContactIdentityResolver.resolve(
+            contacts = contacts,
+            aliases = identityDao.listAliases(),
+            platformIdentities = identityDao.listPlatformIdentities(),
+        ).filter { it.decision == IdentityResolutionDecision.AUTO_LINK }
+            .forEach { resolution ->
+                val (canonical, source) = chooseCanonicalContact(resolution.first, resolution.second)
+                if (identityDao.activeMergeLink(canonical.contactId) != null ||
+                    identityDao.activeMergeLink(source.contactId) != null ||
+                    identityDao.hasActiveSources(source.contactId) ||
+                    identityDao.mergeHistory(source.contactId) != null
+                ) {
+                    return@forEach
+                }
+                val link = ContactMergeLinkEntity(
+                    sourceContactId = source.contactId,
+                    canonicalContactId = canonical.contactId,
+                    reason = resolution.reason,
+                    userConfirmed = false,
+                    createdAtEpochMs = nowEpochMs,
+                    undoneAtEpochMs = null,
+                )
+                val idempotencyKey = sha256("identity-link:${source.contactId}:${canonical.contactId}")
+                if (database.changeLogDao().findByIdempotencyKey(idempotencyKey) != null) return@forEach
+                identityDao.upsertMergeLink(link)
+                database.insertVisibleAutoWrite(
+                    AutoWriteAuditDraft(
+                        changeId = changeIdFor(idempotencyKey),
+                        runtimeRunId = null,
+                        toolName = AutoWriteToolNames.CONTACT_IDENTITY_AUTO_LINK,
+                        idempotencyKey = idempotencyKey,
+                        targetDomain = "CONTACT_MERGE",
+                        targetId = source.contactId,
+                        operation = "LINK",
+                        afterDigest = sha256("${link.sourceContactId}:${link.canonicalContactId}:${link.createdAtEpochMs}"),
+                        inversePayloadJson = buildJsonObject {
+                            put("sourceContactId", JsonPrimitive(source.contactId))
+                            put("canonicalContactId", JsonPrimitive(canonical.contactId))
+                        }.toString(),
+                        originType = "SYSTEM_PERCEPTION",
+                        subjectContactId = canonical.contactId,
+                        sourceType = "IDENTITY_RESOLVER",
+                        sourceRef = resolution.reason,
+                        confidence = resolution.confidence,
+                        presentationType = "CONTACT_IDENTITY_LINK",
+                        correctionRoute = "RELATION",
+                        createdAtEpochMs = nowEpochMs,
+                    ),
+                )
+            }
     }
 
     private suspend fun upsertSystemContactOrganization(
@@ -879,6 +937,24 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
 
     suspend fun applyContactEnrichmentCandidate(candidate: ContactEnrichmentCandidateEntity, nowEpochMs: Long = System.currentTimeMillis()): Boolean =
         enrichmentWriter.apply(candidate.candidateId, nowEpochMs)
+
+    private fun chooseCanonicalContact(first: ContactEntity, second: ContactEntity): Pair<ContactEntity, ContactEntity> {
+        val ordered = listOf(first, second).sortedWith(
+            compareByDescending<ContactEntity> { it.canonicalPreferenceScore() }
+                .thenBy(ContactEntity::createdAtEpochMs)
+                .thenBy(ContactEntity::contactId),
+        )
+        return ordered.first() to ordered.last()
+    }
+
+    private fun ContactEntity.canonicalPreferenceScore(): Int {
+        val sourceScore = when {
+            source == "USER" -> 20
+            source.startsWith("SYSTEM_CONTACT") -> 10
+            else -> 0
+        }
+        return sourceScore + listOf(phone, email, wechatId, company, title, note, avatarUri).count { !it.isNullOrBlank() }
+    }
 
     private fun String?.cleanContactField(): String? = this?.trim()?.takeIf(String::isNotEmpty)
     private fun normalizeContactMethodHandle(raw: String): String = raw

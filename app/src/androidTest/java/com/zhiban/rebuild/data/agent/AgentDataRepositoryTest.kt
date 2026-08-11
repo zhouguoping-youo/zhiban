@@ -453,6 +453,29 @@ class AgentDataRepositoryTest {
     }
 
     @Test
+    fun deterministicIdentityLinkIsVisibleReversibleAndNotReappliedAfterUndo() = runBlocking {
+        val first = testContact("duplicate-a", "丁波", "13800138000", "ding@example.com", 1_000L)
+        val second = testContact("duplicate-b", "老丁", "138-0013-8000", "DING@example.com", 2_000L)
+        database.contactDao().insert(first)
+        database.contactDao().insert(second)
+
+        repository.refreshLocalContactIntelligence()
+
+        val link = database.contactIdentityDao().observeActiveMergeLinks().first().single()
+        assertFalse(link.userConfirmed)
+        assertEquals("duplicate-a", link.canonicalContactId)
+        val receipt = AutoWriteRepository(database, context).observeReceipts().first().single {
+            it.presentationType == "CONTACT_IDENTITY_LINK"
+        }
+        assertTrue(AutoWriteRepository(database, context).undo(receipt.changeId, 3_000L))
+        assertNull(database.contactIdentityDao().activeMergeLink(link.sourceContactId))
+
+        repository.refreshLocalContactIntelligence()
+
+        assertTrue(database.contactIdentityDao().observeActiveMergeLinks().first().isEmpty())
+    }
+
+    @Test
     fun systemContactMatchingOwnerPhoneIsNeverImported() = runBlocking {
         val result = repository.importConfirmedSystemContacts(
             listOf(systemContact("self", "老周", "+86 138-0013-8000")),
@@ -1191,6 +1214,25 @@ class AgentDataRepositoryTest {
         content = "content",
         sourceRunId = runId,
         createdAtEpochMs = 1_000L,
+    )
+
+    private fun testContact(id: String, name: String, phone: String, email: String, createdAtEpochMs: Long) = ContactEntity(
+        contactId = id,
+        displayName = name,
+        normalizedName = name.lowercase(),
+        phone = phone,
+        email = email,
+        wechatId = null,
+        company = null,
+        title = null,
+        aliasesJson = "[]",
+        tagsJson = "[]",
+        note = null,
+        avatarUri = null,
+        source = "SYSTEM_CONTACT:test-$id",
+        deletedAtEpochMs = null,
+        createdAtEpochMs = createdAtEpochMs,
+        updatedAtEpochMs = createdAtEpochMs,
     )
 
     private fun systemContact(

@@ -218,6 +218,9 @@ interface ContactIdentityDao {
     )
     fun observeAliases(): Flow<List<ContactAliasEntity>>
 
+    @Query("SELECT * FROM contact_aliases ORDER BY createdAtEpochMs DESC")
+    suspend fun listAliases(): List<ContactAliasEntity>
+
     @Query(
         """SELECT i.identityId, COALESCE(m.canonicalContactId, i.contactId) AS contactId,
         i.platform, i.handle, i.normalizedHandle, i.platformUserId, i.source,
@@ -229,6 +232,9 @@ interface ContactIdentityDao {
         ORDER BY i.updatedAtEpochMs DESC""",
     )
     fun observePlatformIdentities(): Flow<List<ContactPlatformIdentityEntity>>
+
+    @Query("SELECT * FROM contact_platform_identities ORDER BY updatedAtEpochMs DESC")
+    suspend fun listPlatformIdentities(): List<ContactPlatformIdentityEntity>
 
     @Query(
         """SELECT * FROM contact_aliases WHERE contactId = :contactId OR contactId IN (
@@ -300,6 +306,9 @@ interface ContactIdentityDao {
     @Query("SELECT * FROM contact_merge_links WHERE sourceContactId = :sourceContactId AND undoneAtEpochMs IS NULL")
     suspend fun activeMergeLink(sourceContactId: String): ContactMergeLinkEntity?
 
+    @Query("SELECT * FROM contact_merge_links WHERE sourceContactId = :sourceContactId")
+    suspend fun mergeHistory(sourceContactId: String): ContactMergeLinkEntity?
+
     @Query("SELECT COUNT(*) FROM contact_merge_links WHERE canonicalContactId = :contactId AND undoneAtEpochMs IS NULL")
     suspend fun countActiveSources(contactId: String): Int
 
@@ -313,6 +322,13 @@ interface ContactIdentityDao {
              AND EXISTS (SELECT 1 FROM contacts canonical WHERE canonical.contactId = contact_merge_links.canonicalContactId AND canonical.deletedAtEpochMs IS NULL)""",
     )
     suspend fun undoConfirmedMerge(sourceContactId: String, nowEpochMs: Long): Int
+
+    @Query(
+        """UPDATE contact_merge_links SET undoneAtEpochMs = :nowEpochMs
+           WHERE sourceContactId = :sourceContactId AND canonicalContactId = :canonicalContactId
+             AND undoneAtEpochMs IS NULL AND userConfirmed = 0""",
+    )
+    suspend fun undoAutomaticMerge(sourceContactId: String, canonicalContactId: String, nowEpochMs: Long): Int
 }
 
 @Dao

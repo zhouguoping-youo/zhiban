@@ -62,6 +62,8 @@ internal class ChangeUndoCoordinator(private val database: AgentDatabase) {
 
         AutoWriteToolNames.CONTACT_TAG_ADD -> undoContactTag(change, nowEpochMs)
 
+        AutoWriteToolNames.CONTACT_IDENTITY_AUTO_LINK -> undoAutomaticIdentityLink(change, nowEpochMs)
+
         AutoWriteToolNames.SCHEDULE_CREATE -> undoAutomaticSchedule(change)
 
         AutoWriteToolNames.CRM_LEAD_CANDIDATE -> undoCrmLeadCandidate(change)
@@ -99,6 +101,14 @@ internal class ChangeUndoCoordinator(private val database: AgentDatabase) {
             updatedAtEpochMs = nowEpochMs,
         )
         return database.contactDao().update(updated) == 1
+    }
+
+    private suspend fun undoAutomaticIdentityLink(change: ChangeLogEntity, nowEpochMs: Long): Boolean {
+        val inverse = parseInverse(change.inversePayloadJson) ?: return false
+        val sourceId = inverse["sourceContactId"]?.jsonPrimitive?.content ?: return false
+        val canonicalId = inverse["canonicalContactId"]?.jsonPrimitive?.content ?: return false
+        if (sourceId != change.targetId) return false
+        return database.contactIdentityDao().undoAutomaticMerge(sourceId, canonicalId, nowEpochMs) == 1
     }
 
     private suspend fun undoAutomaticSchedule(change: ChangeLogEntity): Boolean {
