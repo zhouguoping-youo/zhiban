@@ -1,14 +1,12 @@
 package com.zhiban.rebuild.ui.tabs
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
@@ -41,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.zhiban.rebuild.data.agent.ScheduleProjection
+import com.zhiban.rebuild.ui.components.ZhiBanChip
 import com.zhiban.rebuild.ui.theme.DateFormats
 import com.zhiban.rebuild.ui.theme.ZhiBanIconSize
 import com.zhiban.rebuild.ui.theme.ZhiBanRadius
@@ -203,18 +202,14 @@ internal fun ScheduleEditorDialog(
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             row.forEach { (minutes, label) ->
                                 val selected = reminderMinutes == minutes
-                                Text(
-                                    label,
-                                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                                        .clip(RoundedCornerShape(ZhiBanRadius.Dialog))
-                                        .background(if (selected) CalendarAccent else CalendarSoft)
-                                        .clickable {
-                                            reminderMinutes = minutes
-                                            if (minutes != null && !notificationsAllowed) onRequestNotificationPermission()
-                                        }
-                                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                                    color = if (selected) MaterialTheme.colorScheme.onPrimary else CalendarInk,
-                                    style = MaterialTheme.typography.labelMedium,
+                                ZhiBanChip(
+                                    text = label,
+                                    selected = selected,
+                                    color = CalendarAccent,
+                                    onClick = {
+                                        reminderMinutes = minutes
+                                        if (minutes != null && !notificationsAllowed) onRequestNotificationPermission()
+                                    },
                                 )
                             }
                         }

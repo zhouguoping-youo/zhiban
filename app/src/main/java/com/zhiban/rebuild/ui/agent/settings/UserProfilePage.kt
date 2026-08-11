@@ -34,6 +34,7 @@ import androidx.lifecycle.viewModelScope
 import com.zhiban.rebuild.runtime.personalization.UserProfile
 import com.zhiban.rebuild.runtime.personalization.UserProfileStore
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
+import com.zhiban.rebuild.ui.components.ZhiBanChip
 import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.components.ZhiBanSaveButton
 import com.zhiban.rebuild.ui.components.ZhiBanSaveState
@@ -512,23 +513,10 @@ private fun PlatformPickerDialog(onSelect: (String) -> Unit, onDismiss: () -> Un
 
 @Composable
 private fun OccupationChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    FilterChip(
+    ZhiBanChip(
+        text = label,
         selected = selected,
         onClick = onClick,
-        label = { Text(label) },
-        shape = RoundedCornerShape(ZhiBanRadius.Full),
-        colors = FilterChipDefaults.filterChipColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-            labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            selectedContainerColor = ZhiBanTerracotta,
-            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-        ),
-        border = FilterChipDefaults.filterChipBorder(
-            enabled = true,
-            selected = selected,
-            borderColor = MaterialTheme.colorScheme.outlineVariant,
-            selectedBorderColor = ZhiBanTerracotta,
-        ),
     )
 }
 

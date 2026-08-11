@@ -63,7 +63,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -91,6 +90,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -120,8 +120,11 @@ import com.zhiban.rebuild.data.notification.ScheduleInsight
 import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.personalization.UserProfile
+import com.zhiban.rebuild.ui.components.ZhiBanChip
 import com.zhiban.rebuild.ui.components.ZhiBanDialogHost
 import com.zhiban.rebuild.ui.components.ZhiBanPrimaryTabHeader
+import com.zhiban.rebuild.ui.components.ZhiBanSaveButton
+import com.zhiban.rebuild.ui.components.ZhiBanSaveState
 import com.zhiban.rebuild.ui.components.ZhiBanSearchField
 import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
 import com.zhiban.rebuild.ui.components.ZhiBanTabHorizontalPadding
@@ -409,22 +412,13 @@ internal fun ContactEditorDialog(
                         horizontalArrangement = Arrangement.spacedBy(7.dp),
                         verticalArrangement = Arrangement.spacedBy(7.dp),
                     ) {
-                        RelationTags.drop(1).forEach {
-                            Text(
-                                it,
-                                color = if (tag == it) MaterialTheme.colorScheme.onPrimary else RelationMuted,
-                                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                                    .clip(RoundedCornerShape(ZhiBanRadius.Dialog)).background(
-                                        if (tag ==
-                                            it
-                                        ) {
-                                            RelationAccent
-                                        } else {
-                                            RelationSoft
-                                        },
-                                    )
-                                    .clickable { tag = it }.padding(horizontal = 13.dp, vertical = 8.dp),
-                                style = MaterialTheme.typography.labelMedium,
+                        RelationTags.drop(1).forEach { label ->
+                            ZhiBanChip(
+                                text = label,
+                                selected = tag == label,
+                                modifier = Modifier.testTag("contact-relation-chip-$label"),
+                                color = RelationAccent,
+                                onClick = { tag = label },
                             )
                         }
                     }
@@ -440,13 +434,12 @@ internal fun ContactEditorDialog(
                     }
                     if (!imeVisible) {
                         Spacer(Modifier.height(18.dp))
-                        Button(
+                        ZhiBanSaveButton(
+                            state = ZhiBanSaveState.IDLE,
                             onClick = ::submit,
-                            Modifier.fillMaxWidth().height(ZhiBanSize.Control),
+                            modifier = Modifier.fillMaxWidth(),
                             enabled = name.isNotBlank(),
-                            colors = ButtonDefaults.buttonColors(containerColor = RelationAccent),
-                            shape = RoundedCornerShape(ZhiBanRadius.Card),
-                        ) { Text("保存") }
+                        )
                     }
                 }
             }

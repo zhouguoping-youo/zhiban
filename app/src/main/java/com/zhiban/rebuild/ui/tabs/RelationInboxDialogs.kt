@@ -60,7 +60,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -118,6 +117,7 @@ import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.personalization.UserProfile
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
+import com.zhiban.rebuild.ui.components.ZhiBanChip
 import com.zhiban.rebuild.ui.components.ZhiBanDialogHost
 import com.zhiban.rebuild.ui.components.ZhiBanPrimaryTabHeader
 import com.zhiban.rebuild.ui.components.ZhiBanSearchField
@@ -462,10 +462,11 @@ internal fun NotificationCandidateDialog(
                         "WEWORK" to "企业微信",
                         "DINGTALK" to "钉钉",
                     ).forEach { (platform, label) ->
-                        FilterChip(
+                        ZhiBanChip(
+                            text = label,
                             selected = platform in enabledPlatforms,
+                            color = RelationAccent,
                             onClick = { onPlatformEnabled(platform, platform !in enabledPlatforms) },
-                            label = { Text(label) },
                         )
                     }
                 }

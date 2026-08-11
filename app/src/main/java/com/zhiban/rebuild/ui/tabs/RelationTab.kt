@@ -58,7 +58,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -121,10 +120,12 @@ import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.personalization.UserProfile
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
+import com.zhiban.rebuild.ui.components.ZhiBanChip
 import com.zhiban.rebuild.ui.components.ZhiBanHeaderIconAction
 import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
 import com.zhiban.rebuild.ui.components.ZhiBanPrimaryTabHeader
 import com.zhiban.rebuild.ui.components.ZhiBanSearchField
+import com.zhiban.rebuild.ui.components.ZhiBanSegmentedControl
 import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
 import com.zhiban.rebuild.ui.components.ZhiBanTabHorizontalPadding
 import com.zhiban.rebuild.ui.components.ZhiBanTabTopPadding
@@ -456,34 +457,12 @@ fun RelationTab(
                 Spacer(Modifier.height(14.dp))
             }
             item {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(ZhiBanSize.Control)
-                        .clip(RoundedCornerShape(ZhiBanRadius.Full))
-                        .background(RelationSoft),
-                ) {
-                    listOf("联系人" to "list", "关系图" to "graph").forEach { (label, value) ->
-                        Box(
-                            Modifier.weight(1f).fillMaxHeight().clickable { mode = value },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Box(
-                                Modifier.fillMaxSize().padding(ZhiBanSpacing.Xs)
-                                    .clip(RoundedCornerShape(ZhiBanRadius.Full))
-                                    .background(if (mode == value) RelationSurface else Color.Transparent),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    label,
-                                    color = if (mode == value) RelationInk else RelationMuted,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Medium,
-                                )
-                            }
-                        }
-                    }
-                }
+                ZhiBanSegmentedControl(
+                    options = listOf("联系人", "关系图"),
+                    selectedIndex = if (mode == "list") 0 else 1,
+                    onSelected = { mode = if (it == 0) "list" else "graph" },
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 Spacer(Modifier.height(14.dp))
             }
             item {
@@ -492,30 +471,13 @@ fun RelationTab(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     RelationTags.forEach { label ->
-                        Box(
-                            Modifier.weight(1f).defaultMinSize(minHeight = ZhiBanSize.TouchTarget)
-                                .clickable { tag = label },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Box(
-                                Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Full))
-                                    .background(if (tag == label) RelationAccent else RelationSoft)
-                                    .padding(vertical = 8.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    label,
-                                    color = if (tag ==
-                                        label
-                                    ) {
-                                        MaterialTheme.colorScheme.onPrimary
-                                    } else {
-                                        RelationMuted
-                                    },
-                                    style = MaterialTheme.typography.labelMedium,
-                                )
-                            }
-                        }
+                        ZhiBanChip(
+                            text = label,
+                            selected = tag == label,
+                            modifier = Modifier.weight(1f),
+                            color = RelationAccent,
+                            onClick = { tag = label },
+                        )
                     }
                 }
                 Spacer(Modifier.height(18.dp))

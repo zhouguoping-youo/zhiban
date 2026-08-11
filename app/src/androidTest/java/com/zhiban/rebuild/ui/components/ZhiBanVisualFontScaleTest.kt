@@ -5,10 +5,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.zhiban.rebuild.ui.theme.ZhiBanTheme
@@ -95,5 +97,24 @@ class ZhiBanVisualFontScaleTest {
         }
 
         compose.onNodeWithText("已保存").assertIsDisplayed()
+    }
+
+    @Test
+    fun segmentedControlExposesOneClearSelectedState() {
+        compose.setContent {
+            ZhiBanTheme {
+                val selected = androidx.compose.runtime.remember {
+                    androidx.compose.runtime.mutableIntStateOf(0)
+                }
+                ZhiBanSegmentedControl(
+                    options = listOf("联系人", "关系图"),
+                    selectedIndex = selected.intValue,
+                    onSelected = { selected.intValue = it },
+                )
+            }
+        }
+
+        compose.onNodeWithText("联系人").assertIsSelected()
+        compose.onNodeWithText("关系图").performClick().assertIsSelected()
     }
 }

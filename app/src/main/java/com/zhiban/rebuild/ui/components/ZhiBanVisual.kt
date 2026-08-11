@@ -44,12 +44,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
@@ -59,7 +63,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zhiban.rebuild.ui.theme.Gray200
 import com.zhiban.rebuild.ui.theme.Gray500
-import com.zhiban.rebuild.ui.theme.Gray600
 import com.zhiban.rebuild.ui.theme.ZhiBanCard
 import com.zhiban.rebuild.ui.theme.ZhiBanIconContainer
 import com.zhiban.rebuild.ui.theme.ZhiBanIconSize
@@ -403,57 +406,62 @@ fun ZhiBanSectionTitle(title: String, modifier: Modifier = Modifier, action: Str
 }
 
 @Composable
-fun ZhiBanChip(text: String, selected: Boolean, modifier: Modifier = Modifier, color: Color = ZhiBanTerracotta, onClick: () -> Unit) {
+fun ZhiBanChip(text: String, selected: Boolean, modifier: Modifier = Modifier, color: Color = ZhiBanTerracotta, enabled: Boolean = true, onClick: () -> Unit) {
     Box(
         modifier = modifier
-            .defaultMinSize(minHeight = ZhiBanSize.TouchTarget)
-            .clip(RoundedCornerShape(ZhiBanRadius.Full))
-            .background(if (selected) color else MaterialTheme.colorScheme.surface)
-            .border(
-                1.dp,
-                if (selected) color else MaterialTheme.colorScheme.outlineVariant,
-                RoundedCornerShape(ZhiBanRadius.Full),
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = ZhiBanSpacing.Lg, vertical = ZhiBanSpacing.Sm),
+            .defaultMinSize(minWidth = ZhiBanSize.TouchTarget, minHeight = ZhiBanSize.TouchTarget)
+            .alpha(if (enabled) 1f else 0.48f)
+            .semantics { this.selected = selected }
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text,
-            style = MaterialTheme.typography.labelMedium,
-            color = if (selected) Color.White else Gray600,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-        )
+        Box(
+            modifier = Modifier
+                .height(36.dp)
+                .clip(RoundedCornerShape(ZhiBanRadius.Full))
+                .background(if (selected) color else MaterialTheme.colorScheme.surfaceVariant)
+                .padding(horizontal = ZhiBanSpacing.Lg),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text,
+                style = MaterialTheme.typography.labelMedium,
+                color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
 @Composable
 fun ZhiBanSegmentedControl(options: List<String>, selectedIndex: Int, onSelected: (Int) -> Unit, modifier: Modifier = Modifier) {
     Row(
-        modifier = modifier.clip(
-            RoundedCornerShape(ZhiBanRadius.Full),
-        ).background(MaterialTheme.colorScheme.primaryContainer).padding(ZhiBanSpacing.Xs),
+        modifier = modifier
+            .defaultMinSize(minHeight = ZhiBanSize.Control)
+            .clip(RoundedCornerShape(ZhiBanRadius.Full))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(ZhiBanSpacing.Xs),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         options.forEachIndexed { index, option ->
             val sel = index == selectedIndex
             Box(
-                modifier = Modifier.weight(
-                    1f,
-                ).defaultMinSize(
-                    minHeight = 40.dp,
-                ).clip(
-                    RoundedCornerShape(ZhiBanRadius.Full),
-                ).background(if (sel) MaterialTheme.colorScheme.primary else Color.Transparent).clickable {
-                    onSelected(index)
-                }.padding(vertical = ZhiBanSpacing.Sm),
+                modifier = Modifier
+                    .weight(1f)
+                    .defaultMinSize(minHeight = 44.dp)
+                    .clip(RoundedCornerShape(ZhiBanRadius.Full))
+                    .background(if (sel) MaterialTheme.colorScheme.surface else Color.Transparent)
+                    .semantics { selected = sel }
+                    .clickable(role = Role.Button) { onSelected(index) },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     option,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (sel) Color.White else Gray500,
-                    fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Medium,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (sel) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Medium,
                 )
             }
         }

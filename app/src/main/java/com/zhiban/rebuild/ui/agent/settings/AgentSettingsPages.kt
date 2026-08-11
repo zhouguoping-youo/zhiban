@@ -57,6 +57,7 @@ import com.zhiban.rebuild.runtime.provider.ProviderEnvironmentManager
 import com.zhiban.rebuild.runtime.runSuspendCatching
 import com.zhiban.rebuild.runtime.tool.RuntimeToolCatalog
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
+import com.zhiban.rebuild.ui.components.ZhiBanChip
 import com.zhiban.rebuild.ui.components.ZhiBanGlassCard
 import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
 import com.zhiban.rebuild.ui.components.ZhiBanPage
@@ -692,10 +693,11 @@ data class AgentRunHistoryState(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 RunHistoryFilter.entries.forEach { filter ->
-                                    FilterChip(
+                                    ZhiBanChip(
+                                        text = filter.label,
                                         selected = s.filter == filter,
+                                        modifier = Modifier.weight(1f),
                                         onClick = { vm.selectFilter(filter) },
-                                        label = { Text(filter.label) },
                                     )
                                 }
                             }

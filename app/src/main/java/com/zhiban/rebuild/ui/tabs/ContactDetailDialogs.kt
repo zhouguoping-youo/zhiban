@@ -60,7 +60,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -120,9 +119,11 @@ import com.zhiban.rebuild.data.notification.ScheduleInsight
 import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.personalization.UserProfile
+import com.zhiban.rebuild.ui.components.ZhiBanChip
 import com.zhiban.rebuild.ui.components.ZhiBanDialogHost
 import com.zhiban.rebuild.ui.components.ZhiBanPrimaryTabHeader
 import com.zhiban.rebuild.ui.components.ZhiBanSearchField
+import com.zhiban.rebuild.ui.components.ZhiBanSegmentedControl
 import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
 import com.zhiban.rebuild.ui.components.ZhiBanTabHorizontalPadding
 import com.zhiban.rebuild.ui.components.ZhiBanTabTopPadding
@@ -820,33 +821,16 @@ internal fun ContactIdentityEditorDialog(
                 }
             }
             Spacer(Modifier.height(16.dp))
-            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Input)).background(RelationSoft).padding(4.dp)) {
-                listOf("常用称呼" to "ALIAS", "社交账号" to "PLATFORM").forEach { (label, itemMode) ->
-                    Box(
-                        Modifier.weight(1f).clip(RoundedCornerShape(ZhiBanRadius.Card))
-                            .background(if (mode == itemMode) RelationSurface else Color.Transparent)
-                            .clickable {
-                                mode = itemMode
-                                value = ""
-                                error = null
-                            }
-                            .padding(vertical = 9.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            label,
-                            color = if (mode ==
-                                itemMode
-                            ) {
-                                RelationInk
-                            } else {
-                                RelationMuted
-                            },
-                            fontWeight = FontWeight.Medium,
-                        )
-                    }
-                }
-            }
+            ZhiBanSegmentedControl(
+                options = listOf("常用称呼", "社交账号"),
+                selectedIndex = if (mode == "ALIAS") 0 else 1,
+                onSelected = { index ->
+                    mode = if (index == 0) "ALIAS" else "PLATFORM"
+                    value = ""
+                    error = null
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
             if (mode == "PLATFORM") {
                 Spacer(Modifier.height(14.dp))
                 Row(
@@ -864,17 +848,14 @@ internal fun ContactIdentityEditorDialog(
                         "WEIBO" to "微博",
                         "OTHER" to "其他",
                     ).forEach { (id, label) ->
-                        Text(
-                            label,
-                            color = if (platform == id) MaterialTheme.colorScheme.onPrimary else RelationMuted,
-                            modifier = Modifier.clip(RoundedCornerShape(ZhiBanRadius.Card))
-                                .background(if (platform == id) RelationAccent else RelationSoft)
-                                .clickable {
-                                    platform = id
-                                    error = null
-                                }
-                                .padding(horizontal = 13.dp, vertical = 8.dp),
-                            style = MaterialTheme.typography.labelMedium,
+                        ZhiBanChip(
+                            text = label,
+                            selected = platform == id,
+                            color = RelationAccent,
+                            onClick = {
+                                platform = id
+                                error = null
+                            },
                         )
                     }
                 }
@@ -1003,13 +984,11 @@ internal fun ContactFactEditorDialog(contact: ContactEntity, onDismiss: () -> Un
                     "COMMUNICATION_PREFERENCE" to "沟通偏好",
                     "CURRENT_MATTER" to "当前事项",
                 ).forEach { (value, label) ->
-                    Text(
-                        label,
-                        color = if (type == value) MaterialTheme.colorScheme.onPrimary else RelationMuted,
-                        modifier = Modifier.clip(RoundedCornerShape(ZhiBanRadius.Card))
-                            .background(if (type == value) RelationAccent else RelationSoft)
-                            .clickable { type = value }.padding(horizontal = 13.dp, vertical = 8.dp),
-                        style = MaterialTheme.typography.labelMedium,
+                    ZhiBanChip(
+                        text = label,
+                        selected = type == value,
+                        color = RelationAccent,
+                        onClick = { type = value },
                     )
                 }
             }

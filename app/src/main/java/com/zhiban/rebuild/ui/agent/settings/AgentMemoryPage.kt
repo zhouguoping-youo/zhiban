@@ -52,6 +52,7 @@ import com.zhiban.rebuild.runtime.provider.ProviderEnvironmentManager
 import com.zhiban.rebuild.runtime.runSuspendCatching
 import com.zhiban.rebuild.runtime.tool.RuntimeToolCatalog
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
+import com.zhiban.rebuild.ui.components.ZhiBanChip
 import com.zhiban.rebuild.ui.components.ZhiBanGlassCard
 import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
 import com.zhiban.rebuild.ui.components.ZhiBanPage
@@ -375,18 +376,13 @@ fun AgentMemoryPage(onBack: () -> Unit, viewModel: AgentMemoryViewModel = hiltVi
                 types.chunked(2).forEach { row ->
                     Row(horizontalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm)) {
                         row.forEach { entry ->
-                            FilterChip(
-                                type == entry.first,
-                                {
+                            ZhiBanChip(
+                                text = entry.second,
+                                selected = type == entry.first,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
                                     type = entry.first
                                 },
-                                {
-                                    Text(entry.second)
-                                },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                    selectedLabelColor = MaterialTheme.colorScheme.primary,
-                                ),
                             )
                         }
                     }
@@ -448,18 +444,13 @@ private fun EditMemoryDialog(memory: AgentMemoryItem, busy: Boolean, onDismiss: 
                 types.chunked(2).forEach { row ->
                     Row(horizontalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm)) {
                         row.forEach { entry ->
-                            FilterChip(
-                                type == entry.first,
-                                {
+                            ZhiBanChip(
+                                text = entry.second,
+                                selected = type == entry.first,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
                                     type = entry.first
                                 },
-                                {
-                                    Text(entry.second)
-                                },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                    selectedLabelColor = MaterialTheme.colorScheme.primary,
-                                ),
                             )
                         }
                     }

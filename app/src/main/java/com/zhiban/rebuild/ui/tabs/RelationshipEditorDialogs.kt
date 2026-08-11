@@ -58,7 +58,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -116,9 +115,11 @@ import com.zhiban.rebuild.data.notification.ScheduleInsight
 import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.personalization.UserProfile
+import com.zhiban.rebuild.ui.components.ZhiBanChip
 import com.zhiban.rebuild.ui.components.ZhiBanDialogHost
 import com.zhiban.rebuild.ui.components.ZhiBanPrimaryTabHeader
 import com.zhiban.rebuild.ui.components.ZhiBanSearchField
+import com.zhiban.rebuild.ui.components.ZhiBanSegmentedControl
 import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
 import com.zhiban.rebuild.ui.components.ZhiBanTabHorizontalPadding
 import com.zhiban.rebuild.ui.components.ZhiBanTabTopPadding
@@ -245,35 +246,24 @@ internal fun RelationshipEditorDialog(
                         style = MaterialTheme.typography.labelSmall,
                     )
                     Spacer(Modifier.height(8.dp))
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(ZhiBanRadius.Medium))
-                            .background(RelationSoft)
-                            .padding(4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        RelationshipSourceOption(
-                            label = "我与联系人",
-                            selected = !chooseContactAsSource,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            chooseContactAsSource = false
-                            fromId = RelationshipPersonIds.SELF
-                            fromQuery = ""
-                            if (toId == RelationshipPersonIds.SELF) toId = ""
-                            error = null
-                        }
-                        RelationshipSourceOption(
-                            label = "两位联系人",
-                            selected = chooseContactAsSource,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            chooseContactAsSource = true
-                            fromId = ""
-                            error = null
-                        }
-                    }
+                    ZhiBanSegmentedControl(
+                        options = listOf("我与联系人", "两位联系人"),
+                        selectedIndex = if (chooseContactAsSource) 1 else 0,
+                        onSelected = { index ->
+                            if (index == 0) {
+                                chooseContactAsSource = false
+                                fromId = RelationshipPersonIds.SELF
+                                fromQuery = ""
+                                if (toId == RelationshipPersonIds.SELF) toId = ""
+                                error = null
+                            } else {
+                                chooseContactAsSource = true
+                                fromId = ""
+                                error = null
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     if (chooseContactAsSource) {
                         Spacer(Modifier.height(12.dp))
                         OutlinedTextField(
@@ -355,10 +345,11 @@ internal fun RelationshipEditorDialog(
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf("CURRENT" to "当前", "PAST" to "已结束", "UNKNOWN" to "时间不确定").forEach { (value, label) ->
-                            FilterChip(
+                            ZhiBanChip(
+                                text = label,
                                 selected = temporalState == value,
+                                color = RelationAccent,
                                 onClick = { temporalState = value },
-                                label = { Text(label) },
                             )
                         }
                     }
@@ -401,25 +392,6 @@ internal fun RelationshipEditorDialog(
 }
 
 @Composable
-internal fun RelationshipSourceOption(label: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Box(
-        modifier
-            .height(ZhiBanSize.Control)
-            .clip(RoundedCornerShape(ZhiBanRadius.Small))
-            .background(if (selected) RelationSurface else Color.Transparent)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            label,
-            color = if (selected) RelationInk else RelationMuted,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-        )
-    }
-}
-
-@Composable
 internal fun PersonChoiceRow(people: List<RelationshipPersonUi>, selectedId: String, onSelect: (String) -> Unit) {
     Row(
         Modifier
@@ -429,20 +401,18 @@ internal fun PersonChoiceRow(people: List<RelationshipPersonUi>, selectedId: Str
         horizontalArrangement = Arrangement.spacedBy(7.dp),
     ) {
         people.forEach { person ->
-            Text(
-                if (person.isOwner && person.displayName != "我") {
-                    "我（${person.displayName}）"
-                } else if (person.isOwner) {
-                    "我"
-                } else {
-                    person.displayName
-                },
-                color = if (selectedId == person.personId) MaterialTheme.colorScheme.onPrimary else RelationMuted,
-                modifier = Modifier.clip(RoundedCornerShape(ZhiBanRadius.Card))
-                    .background(if (selectedId == person.personId) RelationAccent else RelationSoft)
-                    .clickable { onSelect(person.personId) }
-                    .padding(horizontal = 13.dp, vertical = 8.dp),
-                style = MaterialTheme.typography.labelMedium,
+            val label = if (person.isOwner && person.displayName != "我") {
+                "我（${person.displayName}）"
+            } else if (person.isOwner) {
+                "我"
+            } else {
+                person.displayName
+            }
+            ZhiBanChip(
+                text = label,
+                selected = selectedId == person.personId,
+                color = RelationAccent,
+                onClick = { onSelect(person.personId) },
             )
         }
     }
@@ -695,20 +665,17 @@ internal fun RelationshipEventEditorDialog(
                     horizontalArrangement = Arrangement.spacedBy(7.dp),
                 ) {
                     types.forEach { value ->
-                        Text(
-                            relationshipEventTypeLabel(value),
-                            color = if (type == value) MaterialTheme.colorScheme.onPrimary else RelationMuted,
-                            modifier = Modifier.clip(RoundedCornerShape(ZhiBanRadius.Card))
-                                .background(if (type == value) RelationAccent else RelationSoft)
-                                .clickable {
-                                    type = value
-                                    relatedId = ""
-                                    relatedQuery = ""
-                                    title = ""
-                                    error = null
-                                }
-                                .padding(horizontal = 13.dp, vertical = 8.dp),
-                            style = MaterialTheme.typography.labelMedium,
+                        ZhiBanChip(
+                            text = relationshipEventTypeLabel(value),
+                            selected = type == value,
+                            color = RelationAccent,
+                            onClick = {
+                                type = value
+                                relatedId = ""
+                                relatedQuery = ""
+                                title = ""
+                                error = null
+                            },
                         )
                     }
                 }

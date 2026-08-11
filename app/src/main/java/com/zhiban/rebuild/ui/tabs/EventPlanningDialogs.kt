@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -21,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.event.EventResponseStatus
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
+import com.zhiban.rebuild.ui.components.ZhiBanChip
 import com.zhiban.rebuild.ui.theme.ZhiBanSpacing
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -125,7 +125,12 @@ internal fun ResponseStatusDialog(contactName: String, onDismiss: () -> Unit, on
                     EventResponseStatus.MAYBE to "待定",
                     EventResponseStatus.DECLINED to "不参加",
                 ).forEach { (status, label) ->
-                    FilterChip(selected = false, onClick = { onSelect(status) }, label = { Text(label) })
+                    ZhiBanChip(
+                        text = label,
+                        selected = false,
+                        modifier = Modifier.weight(1f),
+                        onClick = { onSelect(status) },
+                    )
                 }
             }
         },
