@@ -58,6 +58,7 @@ import com.zhiban.rebuild.runtime.tool.ConfirmedToolExecutionContext
 import com.zhiban.rebuild.runtime.tool.ContactCreateCandidateToolBinding
 import com.zhiban.rebuild.runtime.tool.ContactDetailToolBinding
 import com.zhiban.rebuild.runtime.tool.ContactEnrichmentSuggestToolBinding
+import com.zhiban.rebuild.runtime.tool.ContactMaintenanceToolBinding
 import com.zhiban.rebuild.runtime.tool.ContactProfileUpdateCandidateToolBinding
 import com.zhiban.rebuild.runtime.tool.ContactSearchToolBinding
 import com.zhiban.rebuild.runtime.tool.ContactTagDomainWriter
@@ -243,6 +244,12 @@ internal class ProviderExecutionEngine(
             MemoryDeleteToolBinding(toolCatalog.requireRegistered("memory.delete"), store),
             ContactSearchToolBinding(toolCatalog.requireRegistered("contact.search"), database.contactDao()),
             ContactDetailToolBinding(toolCatalog.requireRegistered("contact.getDetail"), database.contactDao()),
+            ContactMaintenanceToolBinding(
+                toolCatalog.requireRegistered("contact.maintenance.list"),
+                database.contactDao(),
+                database.contactIdentityDao(),
+                database.contactIntelligenceDao(),
+            ),
             ContactTagToolBinding(
                 toolCatalog.requireRegistered(ContactTagToolBinding.TOOL_NAME),
                 store,

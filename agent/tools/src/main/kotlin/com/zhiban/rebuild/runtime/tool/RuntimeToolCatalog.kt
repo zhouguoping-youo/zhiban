@@ -114,6 +114,13 @@ class RuntimeToolCatalog(val specs: Map<String, RuntimeToolSpec>) {
                     8,
                 ),
                 RuntimeToolSpec(
+                    "contact.maintenance.list",
+                    1,
+                    RuntimeToolRisk.READ_ONLY,
+                    """{"type":"function","function":{"name":"contact.maintenance.list","description":"读取联系人库中需要维护的档案：缺少联系方式、经历时间不明或资料陈旧。用于主动提出核实问题，不得臆测答案。","parameters":{"type":"object","additionalProperties":false,"properties":{"issue":{"type":"string","enum":["NO_REACHABLE_METHOD","EMPLOYMENT_TIME_UNKNOWN","STALE_PROFILE"]},"limit":{"type":"integer","minimum":1,"maximum":50}}}}}""",
+                    8,
+                ),
+                RuntimeToolSpec(
                     "contact.createCandidate",
                     1,
                     RuntimeToolRisk.WRITE_CONFIRMATION_REQUIRED,

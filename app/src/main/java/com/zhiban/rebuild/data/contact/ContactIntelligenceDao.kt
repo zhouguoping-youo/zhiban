@@ -72,6 +72,9 @@ interface ContactIntelligenceDao {
     @Query("SELECT * FROM person_employment_episodes WHERE status = 'ACTIVE' ORDER BY updatedAtEpochMs DESC")
     fun observeAllEmployments(): Flow<List<PersonEmploymentEpisodeEntity>>
 
+    @Query("SELECT * FROM person_employment_episodes WHERE status = 'ACTIVE' ORDER BY updatedAtEpochMs DESC")
+    suspend fun listAllEmployments(): List<PersonEmploymentEpisodeEntity>
+
     @Query(
         """SELECT * FROM relationship_episodes
            WHERE status = 'ACTIVE' AND (fromPersonId = :personId OR toPersonId = :personId)

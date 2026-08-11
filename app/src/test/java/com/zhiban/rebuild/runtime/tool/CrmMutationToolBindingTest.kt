@@ -55,7 +55,7 @@ class CrmMutationToolBindingTest {
     @Test
     fun `production catalog exposes twenty eight tools including all CRM writes and contact tag`() {
         val catalog = RuntimeToolCatalog.production()
-        assertEquals(28, catalog.names().size)
+        assertEquals(29, catalog.names().size)
         assertTrue(catalog.names().containsAll(CrmMutationToolBinding.TOOL_NAMES))
         assertTrue(ContactTagToolBinding.TOOL_NAME in catalog.names())
     }

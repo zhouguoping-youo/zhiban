@@ -1,8 +1,13 @@
 package com.zhiban.rebuild.runtime.tool
 
 import com.zhiban.rebuild.data.contact.ContactDao
+import com.zhiban.rebuild.data.contact.ContactIdentityDao
+import com.zhiban.rebuild.data.contact.ContactIntelligenceDao
+import com.zhiban.rebuild.data.contact.ContactMaintenanceEvaluator
+import com.zhiban.rebuild.data.contact.ContactMaintenanceIssue
 import java.text.Normalizer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -89,6 +94,58 @@ internal class ContactDetailToolBinding(override val spec: RuntimeToolSpec, priv
             }
         }
         return RoutedToolResult(spec.name, request.providerCallId, safe.toString())
+    }
+}
+
+internal class ContactMaintenanceToolBinding(
+    override val spec: RuntimeToolSpec,
+    private val contacts: ContactDao,
+    private val identities: ContactIdentityDao,
+    private val intelligence: ContactIntelligenceDao,
+) : RuntimeToolBinding {
+    override suspend fun requestApproval(request: RuntimeToolCallRequest, context: RuntimeToolRouteContext) =
+        throw ToolPolicyRejectedException("contact.maintenance.list is read-only")
+
+    override suspend fun executeReadOnly(request: RuntimeToolCallRequest, context: RuntimeToolRouteContext): RoutedToolResult {
+        val args = parseContactArgs(request.argumentsJson)
+        val issue = args["issue"]?.jsonPrimitive?.content?.let { value ->
+            runCatching { ContactMaintenanceIssue.valueOf(value) }.getOrNull()
+                ?: throw IllegalArgumentException("INVALID_TOOL_ARGUMENTS")
+        }
+        val limit = (args["limit"]?.jsonPrimitive?.content?.toIntOrNull() ?: 20).coerceIn(1, 50)
+        val overview = ContactMaintenanceEvaluator.evaluate(
+            contacts = contacts.listActiveForIntelligence(),
+            employments = intelligence.listAllEmployments(),
+            platformIdentities = identities.listPlatformIdentities(),
+            duplicateReviewCount = 0,
+            enrichmentReviewCount = 0,
+            nowEpochMs = context.nowEpochMs,
+        )
+        val items = overview.items.filter { item -> item.issues.isNotEmpty() && (issue == null || issue in item.issues) }.take(limit)
+        val result = buildJsonObject {
+            put("count", items.size)
+            put(
+                "items",
+                buildJsonArray {
+                    items.forEach { item ->
+                        add(
+                            buildJsonObject {
+                                put("contactId", item.contact.contactId)
+                                put("displayName", item.contact.displayName)
+                                put("qualityScore", item.quality.score)
+                                put(
+                                    "issues",
+                                    buildJsonArray {
+                                        item.issues.sortedBy(ContactMaintenanceIssue::name).forEach { add(JsonPrimitive(it.name)) }
+                                    },
+                                )
+                            },
+                        )
+                    }
+                },
+            )
+        }
+        return RoutedToolResult(spec.name, request.providerCallId, result.toString())
     }
 }
 

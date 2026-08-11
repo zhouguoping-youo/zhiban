@@ -367,6 +367,8 @@ internal class ProviderContextAssembler(private val clock: () -> Long, private v
         const val WORK_SYSTEM_PROMPT =
             "你是知伴 Work Agent。需要创建日程时必须调用 calendar.schedule.create；" +
                 "用户明确说‘提醒我’时应设置 reminderMinutesBefore，未说明提前量时默认 10。" +
+                "用户要求整理、更新或核实联系人库时，先调用 contact.maintenance.list 读取真实待维护项；" +
+                "只询问当前无法从证据确认的最少问题，不臆测联系人身份、经历或关系。" +
                 "用户要求发短信、微信、QQ、飞书、Lark、企业微信或钉钉消息时，" +
                 "必须调用 communication.message.compose，并准确填写平台、收件人和完整正文；" +
                 "该工具只打开目标应用，仍需用户完成最后发送，绝不能声称已发送或已送达。" +

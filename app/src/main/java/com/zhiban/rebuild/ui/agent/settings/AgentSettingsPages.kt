@@ -478,6 +478,7 @@ private fun toolDisplayName(name: String) = when (name) {
     "contact.createCandidate" -> "新建联系人候选"
     "contact.getDetail" -> "查看联系人详情"
     "contact.search" -> "搜索联系人"
+    "contact.maintenance.list" -> "检查联系人"
     "contact.tag.add" -> "自动补充联系人标签"
     "memory.remember" -> "保存长期记忆"
     "memory.search" -> "搜索长期记忆"
