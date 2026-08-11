@@ -18,6 +18,7 @@ import com.zhiban.rebuild.data.contact.GroupConversationEntity
 import com.zhiban.rebuild.data.contact.GroupMembershipEpisodeEntity
 import com.zhiban.rebuild.data.contact.OrganizationEntity
 import com.zhiban.rebuild.data.contact.OwnerContactLinkEntity
+import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventEntity
@@ -811,6 +812,8 @@ class AgentDataRepository internal constructor(
     fun observeAllTemporalEmployments() = contacts.observeAllTemporalEmployments()
     fun observeUnresolvedSourceIdentities() = contacts.observeUnresolvedSourceIdentities()
     fun observeOwnerContactLinks(): Flow<List<OwnerContactLinkEntity>> = contacts.observeOwnerContactLinks()
+    suspend fun saveOwnerCurrentEmployment(company: String, title: String?, nowEpochMs: Long = System.currentTimeMillis()): PersonEmploymentEpisodeEntity =
+        contacts.saveOwnerCurrentEmployment(company, title, nowEpochMs)
     suspend fun confirmContactIsOwner(contactId: String, nowEpochMs: Long = System.currentTimeMillis()) = contacts.confirmContactIsOwner(contactId, nowEpochMs)
     suspend fun undoContactIsOwner(contactId: String, nowEpochMs: Long = System.currentTimeMillis()): Boolean =
         contacts.undoContactIsOwner(contactId, nowEpochMs)

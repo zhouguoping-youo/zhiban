@@ -109,6 +109,7 @@ import com.zhiban.rebuild.data.contact.ContactAliasEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.ContactMergeLinkEntity
 import com.zhiban.rebuild.data.contact.ContactPlatformIdentityEntity
+import com.zhiban.rebuild.data.contact.OwnerContactLinkEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventWithParticipants
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
@@ -210,6 +211,7 @@ fun RelationTab(
     var deleting by remember { mutableStateOf<ContactEntity?>(null) }
     var markingAsOwner by remember { mutableStateOf<ContactEntity?>(null) }
     var showRelationEditor by remember { mutableStateOf(false) }
+    var showOwnerEmploymentEditor by remember { mutableStateOf(false) }
     var deletingEdge by remember { mutableStateOf<RelationshipEdgeEntity?>(null) }
     var selectedEdge by remember { mutableStateOf<RelationshipEdgeEntity?>(null) }
     var addFactFor by remember { mutableStateOf<ContactEntity?>(null) }
@@ -306,6 +308,20 @@ fun RelationTab(
             relationships,
             temporalEmployments,
         )
+    }
+    val ownerEmploymentPersonIds = remember(ownerContactLinks) {
+        ownerContactLinks.mapTo(hashSetOf(), OwnerContactLinkEntity::contactId) + RelationshipPersonIds.SELF
+    }
+    val ownerEmployments = remember(temporalEmployments, ownerEmploymentPersonIds) {
+        temporalEmployments.filter { it.personId in ownerEmploymentPersonIds }
+    }
+    val currentOwnerEmployment = remember(ownerEmployments) {
+        ownerEmployments.firstOrNull {
+            it.currentState == "CURRENT" && it.verificationState == "USER_CONFIRMED"
+        }
+    }
+    val ownerEmploymentHistoryCount = remember(ownerEmployments) {
+        ownerEmployments.count { it.currentState == "PAST" || it.validToEpochMs != null }
     }
     val historyRelationships = remember(temporalRelationships) {
         historicalRelationshipEdges(temporalRelationships)
@@ -584,13 +600,15 @@ fun RelationTab(
                         contacts = visible,
                         edges = graphRelationships,
                         historicalEdges = historyRelationships,
+                        currentOwnerEmployment = currentOwnerEmployment,
+                        ownerEmploymentHistoryCount = ownerEmploymentHistoryCount,
                         events = relationshipEvents,
                         canAddRelationship = contacts.isNotEmpty(),
                         activeFilter = tag.takeUnless { it == "全部" } ?: query.takeIf(String::isNotBlank),
                         onAdd = { showRelationEditor = true },
                         onInspect = { selectedEdge = it },
                         onInspectEvent = { selectedEvent = it },
-                        onDelete = { deletingEdge = it },
+                        onEditOwnerEmployment = { showOwnerEmploymentEditor = true },
                     )
                 }
             }
@@ -949,6 +967,21 @@ fun RelationTab(
                     if (error == null) {
                         showRelationEditor = false
                         showFeedback("关系已保存")
+                    }
+                }
+            },
+        )
+    }
+    if (showOwnerEmploymentEditor) {
+        OwnerEmploymentEditorDialog(
+            current = currentOwnerEmployment,
+            onDismiss = { showOwnerEmploymentEditor = false },
+            onSave = { company, title, result ->
+                viewModel.saveOwnerCurrentEmployment(company, title) { error ->
+                    result(error)
+                    if (error == null) {
+                        showOwnerEmploymentEditor = false
+                        showFeedback("当前工作已更新，关系图正在重新整理")
                     }
                 }
             },

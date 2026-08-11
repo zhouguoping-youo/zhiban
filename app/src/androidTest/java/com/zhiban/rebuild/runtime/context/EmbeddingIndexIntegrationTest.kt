@@ -5,6 +5,8 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.agent.ContactAgentDataRepository
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -80,6 +82,50 @@ class EmbeddingIndexIntegrationTest {
         assertEquals(null, index.search("OKR").degradation)
         assertEquals(1, database.embeddingVectorDao().active("provider-a", "embed-v1", 8, now, 10).size)
         assertEquals(1, database.embeddingVectorDao().active("provider-b", "embed-v2", 8, now, 10).size)
+    }
+
+    @Test fun confirmedOwnerEmploymentIsAlwaysAvailableToAgentContext() = runBlocking {
+        ContactAgentDataRepository(database).saveOwnerCurrentEmployment("知伴科技有限公司", "产品负责人", now)
+        assertEquals(
+            1,
+            database.contactIntelligenceDao().listConfirmedOwnerEmployments(
+                com.zhiban.rebuild.data.contact.RelationshipPersonIds.SELF,
+            ).size,
+        )
+        val pipeline = RoomContextRetrievalPipeline(database, clock = { now }, pathTimeoutMs = 5_000)
+        val context = QueryContext(IntentLabel.GENERAL_WORK, .8, emptyList(), null, emptyList())
+
+        val result = pipeline.retrieve(
+            inputText = "帮我整理今天的工作",
+            queryContext = context,
+            includeMemory = false,
+            allowRemoteVector = false,
+        )
+
+        val employment = result.items.singleOrNull { it.candidate.sourceKind == "owner_employment" }?.candidate
+            ?: error("owner employment missing: structured=${result.structuredCandidateCount}, degradation=${result.degradationPath}, items=${result.items}")
+        assertTrue(employment.summary.contains("知伴科技有限公司"))
+        assertTrue(employment.summary.contains("产品负责人"))
+        assertEquals(Sensitivity.PERSONAL, employment.sensitivity)
+    }
+
+    @Test fun ownerEmploymentContextIncludesCurrentAndPastCompanies() = runBlocking {
+        val contacts = ContactAgentDataRepository(database)
+        contacts.saveOwnerCurrentEmployment("上一家公司", "销售", now++)
+        contacts.saveOwnerCurrentEmployment("现在的公司", "负责人", now++)
+        val pipeline = RoomContextRetrievalPipeline(database, clock = { now }, pathTimeoutMs = 5_000)
+
+        val result = pipeline.retrieve(
+            inputText = "哪些人是我的现同事和前同事",
+            queryContext = QueryContext(IntentLabel.CONTACT_QUERY, .9, emptyList(), null, emptyList()),
+            includeMemory = false,
+            allowRemoteVector = false,
+        )
+
+        val summaries = result.items.filter { it.candidate.sourceKind == "owner_employment" }
+            .map { it.candidate.summary }
+        assertTrue(summaries.any { it.contains("当前任职") && it.contains("现在的公司") })
+        assertTrue(summaries.any { it.contains("过往任职") && it.contains("上一家公司") })
     }
 
     @Test fun sensitiveFactsAreNeverOfferedToEmbeddingGatewayOrCountedAsPending() = runTest {

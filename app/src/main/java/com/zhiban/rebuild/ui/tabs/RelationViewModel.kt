@@ -375,6 +375,14 @@ class RelationViewModel @Inject constructor(
         viewModelScope.launch { repository.undoContactIsOwner(contactId) }
     }
 
+    fun saveOwnerCurrentEmployment(company: String, title: String?, onResult: (String?) -> Unit) {
+        viewModelScope.launch {
+            runSuspendCatching { repository.saveOwnerCurrentEmployment(company, title) }
+                .onSuccess { onResult(null) }
+                .onFailure { onResult(it.message ?: "保存当前工作失败") }
+        }
+    }
+
     fun saveRelationship(fromId: String, toId: String, type: String, temporalState: String, onResult: (String?) -> Unit) {
         viewModelScope.launch {
             runSuspendCatching { repository.saveConfirmedRelationship(fromId, toId, type, temporalState) }

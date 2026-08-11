@@ -4,6 +4,7 @@ import com.zhiban.agent.memory.MemoryQuery
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.ScheduleProjection
 import com.zhiban.rebuild.data.contact.ContactSearchProjection
+import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.data.notification.MessageCollectionPreferences
 import com.zhiban.rebuild.runtime.memory.RoomMemoryGate
 import kotlin.math.ceil
@@ -111,6 +112,33 @@ internal class RoomContextRetrievalPipeline(
     }
 
     private suspend fun structuredCandidates(context: QueryContext): List<RetrievalCandidate> {
+        val ownerEmployments = database.contactIntelligenceDao().listConfirmedOwnerEmployments(RelationshipPersonIds.SELF)
+            .asSequence()
+            .distinctBy { employment ->
+                listOf(
+                    employment.companyNameSnapshot.trim().lowercase(),
+                    employment.currentState,
+                    employment.validFromEpochMs,
+                    employment.validToEpochMs,
+                )
+            }
+            .take(MAX_OWNER_EMPLOYMENTS)
+            .map { employment ->
+                RetrievalCandidate(
+                    id = "owner-employment:${employment.episodeId}",
+                    sourceKind = "owner_employment",
+                    sourceRef = employment.episodeId,
+                    summary = buildString {
+                        append(if (employment.currentState == "CURRENT") "用户本人当前任职" else "用户本人过往任职")
+                        append("：公司=").append(employment.companyNameSnapshot)
+                        employment.title?.takeIf(String::isNotBlank)?.let { append("，职位=").append(it) }
+                    },
+                    entityRefs = listOf(RelationshipPersonIds.SELF),
+                    timestampEpochMs = employment.updatedAtEpochMs,
+                    sensitivity = Sensitivity.PERSONAL,
+                )
+            }
+            .toList()
         val contacts = context.entities.mapNotNull { it.linkedId }.distinct().mapNotNull { id ->
             database.contactDao().findById(id)?.let { contact ->
                 RetrievalCandidate(
@@ -130,7 +158,7 @@ internal class RoomContextRetrievalPipeline(
                 50,
             ).map(::scheduleCandidate)
         }.orEmpty()
-        return contacts + schedules
+        return ownerEmployments + contacts + schedules
     }
 
     private suspend fun contactCandidates(context: QueryContext, query: String): List<RetrievalCandidate> {
@@ -297,5 +325,6 @@ internal class RoomContextRetrievalPipeline(
     private companion object {
         const val STRUCTURED_TIMEOUT_MS = 30L
         const val MAX_CONTEXT_ITEMS = 15
+        const val MAX_OWNER_EMPLOYMENTS = 8
     }
 }

@@ -13,6 +13,59 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class ContactTemporalWriteTest {
     @Test
+    fun ownerCurrentEmploymentChangePreservesPreviousCompanyAsHistory() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val database = Room.inMemoryDatabaseBuilder(context, AgentDatabase::class.java).build()
+        try {
+            val repository = ContactAgentDataRepository(database)
+
+            repository.saveOwnerCurrentEmployment("甲公司", "销售", 100)
+            repository.saveOwnerCurrentEmployment("乙公司", "负责人", 200)
+
+            val employments = database.contactIntelligenceDao().listAllEmployments()
+                .filter { it.personId == com.zhiban.rebuild.data.contact.RelationshipPersonIds.SELF }
+            assertEquals(2, employments.size)
+            assertEquals("乙公司", employments.single { it.currentState == "CURRENT" }.companyNameSnapshot)
+            assertEquals("负责人", employments.single { it.currentState == "CURRENT" }.title)
+            assertEquals(200L, employments.single { it.currentState == "PAST" }.validToEpochMs)
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
+    fun ownerEmploymentEditorClosesCurrentWorkStoredOnLinkedOwnerContact() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val database = Room.inMemoryDatabaseBuilder(context, AgentDatabase::class.java).build()
+        try {
+            val repository = ContactAgentDataRepository(database)
+            val ownerContactId = repository.saveUserContact(
+                contactId = null,
+                displayName = "用户本人",
+                phone = null,
+                wechatId = null,
+                company = "旧公司",
+                title = "销售",
+                tag = null,
+                note = null,
+                nowEpochMs = 100,
+            )
+            repository.confirmContactIsOwner(ownerContactId, 110)
+
+            repository.saveOwnerCurrentEmployment("新公司", "负责人", 200)
+
+            val employments = database.contactIntelligenceDao().listAllEmployments()
+            assertEquals("PAST", employments.single { it.personId == ownerContactId }.currentState)
+            assertEquals(200L, employments.single { it.personId == ownerContactId }.validToEpochMs)
+            val current = employments.single { it.currentState == "CURRENT" }
+            assertEquals(com.zhiban.rebuild.data.contact.RelationshipPersonIds.SELF, current.personId)
+            assertEquals("新公司", current.companyNameSnapshot)
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
     fun userContactCreateAndCompanyChangeStayInTemporalIdentityModel() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val database = Room.inMemoryDatabaseBuilder(context, AgentDatabase::class.java).build()

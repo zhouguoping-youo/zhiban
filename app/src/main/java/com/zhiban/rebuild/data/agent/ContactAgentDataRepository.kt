@@ -111,6 +111,71 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
 
     fun observeOwnerContactLinks(): Flow<List<OwnerContactLinkEntity>> = database.contactKnowledgeDao().observeActiveOwnerContactLinks()
 
+    suspend fun saveOwnerCurrentEmployment(company: String, title: String?, nowEpochMs: Long = System.currentTimeMillis()): PersonEmploymentEpisodeEntity =
+        database.withTransaction {
+            val normalizedCompany = company.trim().replace(Regex("\\s+"), " ")
+            require(normalizedCompany.isNotBlank()) { "公司名称不能为空" }
+            val normalizedTitle = title?.trim()?.takeIf(String::isNotBlank)
+            val intelligence = database.contactIntelligenceDao()
+            val ownerPersonIds = database.contactKnowledgeDao().listActiveOwnerContactLinks()
+                .mapTo(linkedSetOf()) { it.contactId }
+                .apply { add(RelationshipPersonIds.SELF) }
+            val currentEmployments = ownerPersonIds.mapNotNull { intelligence.findCurrentUserEmployment(it) }
+            val current = currentEmployments.maxByOrNull { it.updatedAtEpochMs }
+            if (intelligence.findPerson(RelationshipPersonIds.SELF) == null) {
+                intelligence.upsertPerson(
+                    PersonEntity(
+                        personId = RelationshipPersonIds.SELF,
+                        canonicalContactId = null,
+                        displayName = "我",
+                        normalizedName = "我",
+                        kind = "SELF",
+                        status = "ACTIVE",
+                        createdAtEpochMs = nowEpochMs,
+                        updatedAtEpochMs = nowEpochMs,
+                    ),
+                )
+            }
+            val sameCompany = current?.companyNameSnapshot
+                ?.trim()
+                ?.replace(Regex("\\s+"), " ")
+                ?.equals(normalizedCompany, ignoreCase = true) == true
+            if (current != null && sameCompany) {
+                ownerPersonIds.forEach { intelligence.endCurrentUserEmployments(it, nowEpochMs) }
+                return@withTransaction current.copy(
+                    title = normalizedTitle,
+                    validToEpochMs = null,
+                    currentState = "CURRENT",
+                    updatedAtEpochMs = nowEpochMs,
+                ).also { intelligence.upsertEmployment(it) }
+            }
+            if (currentEmployments.isNotEmpty()) {
+                ownerPersonIds.forEach { intelligence.endCurrentUserEmployments(it, nowEpochMs) }
+            }
+            PersonEmploymentEpisodeEntity(
+                episodeId = stableContactKnowledgeId(
+                    RelationshipPersonIds.SELF,
+                    "USER_EMPLOYMENT",
+                    "$normalizedCompany:$nowEpochMs",
+                ),
+                personId = RelationshipPersonIds.SELF,
+                organizationId = null,
+                companyNameSnapshot = normalizedCompany,
+                department = null,
+                title = normalizedTitle,
+                validFromEpochMs = null,
+                validToEpochMs = null,
+                temporalPrecision = "UNKNOWN",
+                currentState = "CURRENT",
+                sourceRef = "USER_PROFILE",
+                confidence = 1.0,
+                verificationState = "USER_CONFIRMED",
+                status = "ACTIVE",
+                recordedAtEpochMs = nowEpochMs,
+                updatedAtEpochMs = nowEpochMs,
+            ).also { intelligence.upsertEmployment(it) }
+        }
+
     suspend fun confirmContactIsOwner(contactId: String, nowEpochMs: Long = System.currentTimeMillis()) {
         require(database.contactDao().findById(contactId) != null) { "联系人不存在" }
         database.contactKnowledgeDao().upsertOwnerContactLink(

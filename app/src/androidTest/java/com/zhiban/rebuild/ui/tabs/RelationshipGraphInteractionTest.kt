@@ -1,9 +1,11 @@
 package com.zhiban.rebuild.ui.tabs
 
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.runtime.personalization.UserProfile
@@ -33,7 +35,7 @@ class RelationshipGraphInteractionTest {
     }
 
     @Test
-    fun ownerCenteredGraphRendersWhenGeneratedEdgesOnlyConnectContacts() {
+    fun unrelatedContactNetworkIsClearlySeparatedFromOwner() {
         compose.setContent {
             ZhiBanTheme {
                 RelationshipGraphState(
@@ -46,14 +48,43 @@ class RelationshipGraphInteractionTest {
                     onAdd = {},
                     onInspect = {},
                     onInspectEvent = {},
-                    onDelete = {},
                 )
             }
         }
 
         compose.onNodeWithText("我的关系图").assertExists()
-        compose.onNodeWithText("关系网络").assertExists()
+        compose.onNodeWithText("还不知道你现在在哪工作").assertExists()
+        compose.onNodeWithText("联系人之间的关系").assertExists()
+        compose.onNodeWithText("这些关系已有资料证据，但尚未与“我”建立可靠关联").assertExists()
         compose.onNodeWithContentDescription("重置关系图视图").assertExists()
+    }
+
+    @Test
+    fun ownerEmploymentEditorCollectsCanonicalCompanyBeforeSaving() {
+        var savedCompany = ""
+        var savedTitle: String? = null
+        compose.setContent {
+            ZhiBanTheme {
+                OwnerEmploymentEditorDialog(
+                    current = null,
+                    onDismiss = {},
+                    onSave = { company, title, result ->
+                        savedCompany = company
+                        savedTitle = title
+                        result(null)
+                    },
+                )
+            }
+        }
+
+        compose.onNodeWithTag("owner-employment-company").performTextInput("知伴科技有限公司")
+        compose.onNodeWithTag("owner-employment-title").performTextInput("产品负责人")
+        compose.onNodeWithTag("owner-employment-save").performClick()
+
+        compose.runOnIdle {
+            assertEquals("知伴科技有限公司", savedCompany)
+            assertEquals("产品负责人", savedTitle)
+        }
     }
 
     private fun contact(id: String, name: String) = ContactEntity(

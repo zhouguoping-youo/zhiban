@@ -127,6 +127,16 @@ interface ContactIntelligenceDao {
 
     @Query(
         """SELECT * FROM person_employment_episodes
+           WHERE (personId = :selfPersonId OR personId IN (
+               SELECT contactId FROM owner_contact_links
+               WHERE userConfirmed = 1 AND undoneAtEpochMs IS NULL
+           )) AND status = 'ACTIVE' AND verificationState = 'USER_CONFIRMED'
+           ORDER BY CASE WHEN currentState = 'CURRENT' THEN 0 ELSE 1 END, updatedAtEpochMs DESC""",
+    )
+    suspend fun listConfirmedOwnerEmployments(selfPersonId: String): List<PersonEmploymentEpisodeEntity>
+
+    @Query(
+        """SELECT * FROM person_employment_episodes
            WHERE personId = :personId AND status = 'ACTIVE' AND currentState = 'CURRENT'
              AND verificationState = 'USER_CONFIRMED'
            ORDER BY updatedAtEpochMs DESC LIMIT 1""",

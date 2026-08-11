@@ -145,19 +145,65 @@ class RelationGraphInferenceTest {
     }
 
     @Test
-    fun `owner centered graph still displays generated contact network without fake self edges`() {
+    fun `owner graph does not pretend unrelated contact edges are connected to self`() {
         val contactEdges = listOf(
             edge("a", "b", "COLLEAGUE"),
             edge("b", "c", "PROJECT_PARTNER"),
         )
 
-        assertEquals(contactEdges, relationshipGraphEdgesForRoot(RelationshipPersonIds.SELF, contactEdges))
+        assertTrue(relationshipGraphEdgesForRoot(RelationshipPersonIds.SELF, contactEdges).isEmpty())
         assertEquals(listOf(contactEdges.first()), relationshipGraphEdgesForRoot("a", contactEdges))
-        assertFalse(
-            relationshipGraphEdgesForRoot(RelationshipPersonIds.SELF, contactEdges).any {
-                it.fromContactId == RelationshipPersonIds.SELF || it.toContactId == RelationshipPersonIds.SELF
-            },
+    }
+
+    @Test
+    fun `confirmed owner employment anchors matching contact to self`() {
+        val contact = contact("colleague", "同事甲", "知伴科技有限公司")
+        val result = withInferredCompanyRelationships(
+            contacts = listOf(contact),
+            ownerContactSources = emptyList(),
+            savedEdges = emptyList(),
+            employmentEpisodes = listOf(
+                employment(RelationshipPersonIds.SELF, "知伴科技有限公司", null, null, currentState = "CURRENT"),
+                employment(contact.contactId, "知伴科技有限公司", null, null),
+            ),
         )
+
+        assertEquals(1, result.size)
+        assertEquals(setOf(RelationshipPersonIds.SELF, contact.contactId), unorderedPair(result.single()))
+        assertEquals("同公司", result.single().displayRelationLabel())
+    }
+
+    @Test
+    fun `overlapping past employments are labelled former colleagues`() {
+        val result = withInferredCompanyRelationships(
+            contacts = listOf(contact("past", "前同事", "知伴科技有限公司")),
+            ownerContactSources = emptyList(),
+            savedEdges = emptyList(),
+            employmentEpisodes = listOf(
+                employment(RelationshipPersonIds.SELF, "知伴科技有限公司", 1_000L, 3_000L, currentState = "PAST"),
+                employment("past", "知伴科技有限公司", 2_000L, 4_000L, currentState = "PAST"),
+            ),
+        )
+
+        assertEquals(INFERRED_HISTORICAL_COMPANY_RELATIONSHIP_STATUS, result.single().status)
+        assertEquals("前同事", result.single().displayRelationLabel())
+    }
+
+    @Test
+    fun `past company without complete dates is shown as possible former colleague`() {
+        val result = withInferredCompanyRelationships(
+            contacts = listOf(contact("past", "旧公司联系人", "知伴科技有限公司")),
+            ownerContactSources = emptyList(),
+            savedEdges = emptyList(),
+            employmentEpisodes = listOf(
+                employment(RelationshipPersonIds.SELF, "知伴科技有限公司", null, 3_000L, currentState = "PAST"),
+                employment("past", "知伴科技有限公司", null, null),
+            ),
+        )
+
+        assertEquals(INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME_STATUS, result.single().status)
+        assertEquals("可能是前同事", result.single().displayRelationLabel())
+        assertEquals("曾在同公司 · 时间待核实", result.single().inferredEvidenceLabel())
     }
 
     @Test
@@ -270,24 +316,25 @@ class RelationGraphInferenceTest {
         contact.company?.let { employment(contact.contactId, it, null, null) }
     }
 
-    private fun employment(personId: String, company: String, from: Long?, to: Long?) = PersonEmploymentEpisodeEntity(
-        episodeId = "employment-$personId-$company",
-        personId = personId,
-        organizationId = null,
-        companyNameSnapshot = company,
-        department = null,
-        title = null,
-        validFromEpochMs = from,
-        validToEpochMs = to,
-        temporalPrecision = if (from == null && to == null) "UNKNOWN" else "DAY",
-        currentState = if (to == null) "UNKNOWN" else "ENDED",
-        sourceRef = "test",
-        confidence = 0.8,
-        verificationState = "OBSERVED",
-        status = "ACTIVE",
-        recordedAtEpochMs = 1L,
-        updatedAtEpochMs = 1L,
-    )
+    private fun employment(personId: String, company: String, from: Long?, to: Long?, currentState: String = if (to == null) "UNKNOWN" else "ENDED") =
+        PersonEmploymentEpisodeEntity(
+            episodeId = "employment-$personId-$company",
+            personId = personId,
+            organizationId = null,
+            companyNameSnapshot = company,
+            department = null,
+            title = null,
+            validFromEpochMs = from,
+            validToEpochMs = to,
+            temporalPrecision = if (from == null && to == null) "UNKNOWN" else "DAY",
+            currentState = currentState,
+            sourceRef = "test",
+            confidence = 0.8,
+            verificationState = "OBSERVED",
+            status = "ACTIVE",
+            recordedAtEpochMs = 1L,
+            updatedAtEpochMs = 1L,
+        )
 
     private fun relationshipEpisode(id: String, type: String, validTo: Long?) = RelationshipEpisodeEntity(
         episodeId = id,

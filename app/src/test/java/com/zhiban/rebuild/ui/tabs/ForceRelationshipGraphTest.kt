@@ -66,7 +66,7 @@ class ForceRelationshipGraphTest {
             "focus" to ForceBody(Offset(40f, 160f)),
             "other" to ForceBody(Offset(560f, 160f)),
         )
-        val link = ForceGraphLink("focus", "other", "COLLEAGUE", 1f, false)
+        val link = ForceGraphLink("focus", "other", "COLLEAGUE", "同事", 1f, false)
 
         advanceForceSimulation(
             bodies = bodies,

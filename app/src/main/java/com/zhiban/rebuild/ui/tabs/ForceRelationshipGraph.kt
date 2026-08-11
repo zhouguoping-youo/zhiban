@@ -106,6 +106,7 @@ internal data class ForceGraphLink(
     val fromId: String,
     val toId: String,
     val relationType: String,
+    val displayLabel: String,
     val confidence: Float,
     val isInferred: Boolean,
     val isHistorical: Boolean = false,
@@ -153,9 +154,10 @@ internal fun buildForceGraphModel(rootId: String, peopleById: Map<String, Relati
             fromId = edge.fromContactId,
             toId = edge.toContactId,
             relationType = edge.relationType,
+            displayLabel = edge.displayRelationLabel(),
             confidence = edge.confidence.toFloat().coerceIn(0f, 1f),
             isInferred = !edge.userConfirmed,
-            isHistorical = edge.status == "HISTORICAL",
+            isHistorical = edge.isHistoricalRelationship(),
             evidenceLabel = sharedCompany ?: edge.evidenceDigest
                 .takeIf { edge.isInferredEvidenceRelationship() }
                 ?.substringAfter('：', missingDelimiterValue = edge.evidenceDigest),
@@ -486,7 +488,7 @@ internal fun ForceRelationshipGraphCanvas(
                                 else -> null
                             },
                         )
-                        val relationshipText = graphRelationLabel(link.relationType, link.isHistorical)
+                        val relationshipText = link.displayLabel
                         if (relationshipText.isNotBlank()) {
                             val center = (from + to) / 2f
                             val labelWidth = max(50.dp.toPx(), (relationshipText.length * 13 + 16).dp.toPx())
@@ -668,7 +670,7 @@ internal fun ForceRelationshipGraphCanvas(
 private fun ForceGraphLegend(colors: RelationshipGraphColors) {
     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md)) {
-            ForceLegendItem("我 / 当前焦点", colors.focusNode, Modifier.weight(1f))
+            ForceLegendItem("当前焦点", colors.focusNode, Modifier.weight(1f))
             ForceLegendItem("联系人", colors.contactNode, Modifier.weight(1f))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md)) {
@@ -827,7 +829,7 @@ private fun nodeContentColor(kind: ForceGraphNodeKind, colors: RelationshipGraph
 }
 
 private fun nodeKindLabel(kind: ForceGraphNodeKind): String = when (kind) {
-    ForceGraphNodeKind.FOCUS -> "我 / 当前焦点"
+    ForceGraphNodeKind.FOCUS -> "当前焦点"
     ForceGraphNodeKind.CONTACT -> "联系人"
     ForceGraphNodeKind.WORK -> "工作关系"
 }

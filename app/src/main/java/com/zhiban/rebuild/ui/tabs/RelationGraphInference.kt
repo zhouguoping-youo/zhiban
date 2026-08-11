@@ -10,6 +10,8 @@ import com.zhiban.rebuild.relationship.RelationshipGroup
 import com.zhiban.rebuild.relationship.RelationshipTaxonomy
 
 internal const val INFERRED_COMPANY_RELATIONSHIP_STATUS = "INFERRED_COMPANY"
+internal const val INFERRED_HISTORICAL_COMPANY_RELATIONSHIP_STATUS = "INFERRED_HISTORICAL_COMPANY"
+internal const val INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME_STATUS = "INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME"
 internal const val INFERRED_COMPANY_UNKNOWN_TIME_STATUS = "INFERRED_COMPANY_UNKNOWN_TIME"
 internal const val INFERRED_EMAIL_DOMAIN_RELATIONSHIP_STATUS = "INFERRED_EMAIL_DOMAIN"
 
@@ -52,7 +54,12 @@ private fun employmentEvidenceByPerson(episodes: List<PersonEmploymentEpisodeEnt
         .mapNotNull { episode ->
             val company = episode.companyNameSnapshot.toNormalizedCompany() ?: return@mapNotNull null
             val personId = if (episode.personId in ownerContactIds) RelationshipPersonIds.SELF else episode.personId
-            personId to EmploymentEvidence(company, episode.validFromEpochMs, episode.validToEpochMs)
+            personId to EmploymentEvidence(
+                company,
+                episode.validFromEpochMs,
+                episode.validToEpochMs,
+                episode.currentState,
+            )
         }.groupBy({ it.first }, { it.second })
 
 private fun inferTemporalCompanyPairs(evidenceByPerson: Map<String, List<EmploymentEvidence>>, blockedPairs: Set<String>): List<RelationshipEdgeEntity> =
@@ -95,10 +102,25 @@ private fun inferTemporalCompanyPairs(evidenceByPerson: Map<String, List<Employm
 private fun temporalMatch(first: List<EmploymentEvidence>, second: List<EmploymentEvidence>): TemporalCompanyMatch? {
     val allPairs = first.flatMap { a -> second.map { b -> a to b } }
     val knownPairs = allPairs.filter { (a, b) -> a.hasKnownInterval && b.hasKnownInterval }
-    if (knownPairs.any { (a, b) -> a.overlaps(b) }) {
+    val overlapping = knownPairs.firstOrNull { (a, b) -> a.overlaps(b) }
+    if (overlapping != null) {
+        if (overlapping.first.currentState == "PAST" || overlapping.second.currentState == "PAST") {
+            return TemporalCompanyMatch(
+                INFERRED_HISTORICAL_COMPANY_RELATIONSHIP_STATUS,
+                "曾在同公司任职",
+                0.9,
+            )
+        }
         return TemporalCompanyMatch(INFERRED_COMPANY_RELATIONSHIP_STATUS, "任职时间重叠", 0.9)
     }
     if (allPairs.isNotEmpty() && allPairs.size == knownPairs.size) return null
+    if (allPairs.any { (a, b) -> a.currentState == "PAST" || b.currentState == "PAST" }) {
+        return TemporalCompanyMatch(
+            INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME_STATUS,
+            "曾在同公司 · 时间待核实",
+            0.7,
+        )
+    }
     return TemporalCompanyMatch(INFERRED_COMPANY_UNKNOWN_TIME_STATUS, "同公司，时间待核实", 0.65)
 }
 
@@ -206,17 +228,23 @@ internal fun contactMatchesRelationCategory(contact: ContactEntity, category: St
     return relationTypes.any(acceptedTypes::contains)
 }
 
-internal fun RelationshipEdgeEntity.isInferredCompanyRelationship(): Boolean =
-    status == INFERRED_COMPANY_RELATIONSHIP_STATUS || status == INFERRED_COMPANY_UNKNOWN_TIME_STATUS
+internal fun RelationshipEdgeEntity.isInferredCompanyRelationship(): Boolean = status == INFERRED_COMPANY_RELATIONSHIP_STATUS ||
+    status == INFERRED_HISTORICAL_COMPANY_RELATIONSHIP_STATUS ||
+    status == INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME_STATUS ||
+    status == INFERRED_COMPANY_UNKNOWN_TIME_STATUS
 
 internal fun RelationshipEdgeEntity.isInferredEvidenceRelationship(): Boolean = status in setOf(
     INFERRED_COMPANY_RELATIONSHIP_STATUS,
+    INFERRED_HISTORICAL_COMPANY_RELATIONSHIP_STATUS,
+    INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME_STATUS,
     INFERRED_COMPANY_UNKNOWN_TIME_STATUS,
     INFERRED_EMAIL_DOMAIN_RELATIONSHIP_STATUS,
 )
 
 internal fun RelationshipEdgeEntity.inferredEvidenceLabel(): String? = when (status) {
     INFERRED_COMPANY_RELATIONSHIP_STATUS -> "同公司推测"
+    INFERRED_HISTORICAL_COMPANY_RELATIONSHIP_STATUS -> "曾在同公司任职"
+    INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME_STATUS -> "曾在同公司 · 时间待核实"
     INFERRED_COMPANY_UNKNOWN_TIME_STATUS -> "同公司 · 时间待核实"
     INFERRED_EMAIL_DOMAIN_RELATIONSHIP_STATUS -> "企业邮箱推测"
     else -> null
@@ -257,14 +285,13 @@ internal fun mergeCurrentAndHistoricalRelationships(
     return current + historical.filterNot { relationshipIdentityKey(it) in currentKeys }
 }
 
-internal fun relationshipGraphEdgesForRoot(rootId: String, edges: List<RelationshipEdgeEntity>): List<RelationshipEdgeEntity> {
-    val incident = edges.filter { it.fromContactId == rootId || it.toContactId == rootId }
-    return if (rootId == RelationshipPersonIds.SELF && incident.isEmpty()) edges else incident
+internal fun relationshipGraphEdgesForRoot(rootId: String, edges: List<RelationshipEdgeEntity>): List<RelationshipEdgeEntity> = edges.filter {
+    it.fromContactId == rootId || it.toContactId == rootId
 }
 
 private data class NormalizedCompany(val key: String, val displayName: String)
 
-private data class EmploymentEvidence(val company: NormalizedCompany, val validFromEpochMs: Long?, val validToEpochMs: Long?) {
+private data class EmploymentEvidence(val company: NormalizedCompany, val validFromEpochMs: Long?, val validToEpochMs: Long?, val currentState: String) {
     val hasKnownInterval: Boolean get() = validFromEpochMs != null || validToEpochMs != null
 
     fun overlaps(other: EmploymentEvidence): Boolean {
@@ -272,6 +299,17 @@ private data class EmploymentEvidence(val company: NormalizedCompany, val validF
         val end = minOf(validToEpochMs ?: Long.MAX_VALUE, other.validToEpochMs ?: Long.MAX_VALUE)
         return start <= end
     }
+}
+
+internal fun RelationshipEdgeEntity.isHistoricalRelationship(): Boolean = status == "HISTORICAL" ||
+    status == INFERRED_HISTORICAL_COMPANY_RELATIONSHIP_STATUS ||
+    status == INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME_STATUS
+
+internal fun RelationshipEdgeEntity.displayRelationLabel(): String = when (status) {
+    INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME_STATUS -> "可能是前同事"
+    INFERRED_COMPANY_UNKNOWN_TIME_STATUS -> "同公司"
+    INFERRED_EMAIL_DOMAIN_RELATIONSHIP_STATUS -> "同企业域"
+    else -> relationLabel(relationType, isHistorical = isHistoricalRelationship())
 }
 
 private data class TemporalCompanyMatch(val status: String, val label: String, val confidence: Double)

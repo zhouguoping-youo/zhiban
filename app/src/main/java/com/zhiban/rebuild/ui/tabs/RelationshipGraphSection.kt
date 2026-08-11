@@ -107,6 +107,7 @@ import com.zhiban.rebuild.data.contact.ContactAliasEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.ContactMergeLinkEntity
 import com.zhiban.rebuild.data.contact.ContactPlatformIdentityEntity
+import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventWithParticipants
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
@@ -156,13 +157,15 @@ internal fun RelationshipGraphState(
     contacts: List<ContactEntity>,
     edges: List<RelationshipEdgeEntity>,
     historicalEdges: List<RelationshipEdgeEntity> = emptyList(),
+    currentOwnerEmployment: PersonEmploymentEpisodeEntity? = null,
+    ownerEmploymentHistoryCount: Int = 0,
     events: List<RelationshipEventWithParticipants>,
     canAddRelationship: Boolean,
     activeFilter: String?,
     onAdd: () -> Unit,
     onInspect: (RelationshipEdgeEntity) -> Unit,
     onInspectEvent: (RelationshipEventWithParticipants) -> Unit,
-    onDelete: (RelationshipEdgeEntity) -> Unit,
+    onEditOwnerEmployment: () -> Unit = {},
 ) {
     val peopleById = remember(owner, contacts) {
         buildMap {
@@ -204,29 +207,55 @@ internal fun RelationshipGraphState(
         relationshipGraphEdgesForRoot(rootId, allValidEdges)
     }
     val root = peopleById.getValue(rootId)
+    val unanchoredContactEdges = remember(root.isOwner, displayedEdges, allValidEdges) {
+        if (root.isOwner && displayedEdges.isEmpty()) {
+            allValidEdges.filter {
+                it.fromContactId != RelationshipPersonIds.SELF && it.toContactId != RelationshipPersonIds.SELF
+            }
+        } else {
+            emptyList()
+        }
+    }
+    val graphEdges = displayedEdges.ifEmpty { unanchoredContactEdges }
+    val graphRootId = remember(rootId, graphEdges, unanchoredContactEdges) {
+        if (unanchoredContactEdges.isEmpty()) {
+            rootId
+        } else {
+            graphEdges.flatMap { listOf(it.fromContactId, it.toContactId) }
+                .groupingBy { it }
+                .eachCount()
+                .maxByOrNull { it.value }
+                ?.key ?: rootId
+        }
+    }
     val relatedContactIds = remember(displayedEdges, rootId) {
         displayedEdges.flatMap { edge -> listOf(edge.fromContactId, edge.toContactId) }
             .filter { it != rootId }
             .toSet()
     }
-    val graphNeighborIds = remember(displayedEdges, rootId, peopleById) {
-        displayedEdges
+    val graphRelatedIds = remember(graphEdges, graphRootId) {
+        graphEdges.flatMap { listOf(it.fromContactId, it.toContactId) }
+            .filter { it != graphRootId }
+            .toSet()
+    }
+    val graphNeighborIds = remember(graphEdges, graphRootId, peopleById) {
+        graphEdges
             .flatMap { listOf(it.fromContactId, it.toContactId) }
-            .filter { it != rootId }
+            .filter { it != graphRootId }
             .distinct()
             .sortedBy { peopleById[it]?.displayName.orEmpty() }
             .take(24)
     }
-    val graphNodeIds = remember(graphNeighborIds, rootId) { graphNeighborIds.toSet() + rootId }
-    val visibleEdgesForGraph = remember(allValidEdges, graphNodeIds) {
-        allValidEdges
+    val graphNodeIds = remember(graphNeighborIds, graphRootId) { graphNeighborIds.toSet() + graphRootId }
+    val visibleEdgesForGraph = remember(graphEdges, graphNodeIds) {
+        graphEdges
             .filter { it.fromContactId in graphNodeIds && it.toContactId in graphNodeIds }
             .distinctBy { edge ->
                 val ordered = listOf(edge.fromContactId, edge.toContactId).sorted()
                 "${ordered[0]}::${ordered[1]}::${edge.relationType}"
             }
     }
-    val hiddenGraphNodesCount = (relatedContactIds.size - graphNeighborIds.size).coerceAtLeast(0)
+    val hiddenGraphNodesCount = (graphRelatedIds.size - graphNeighborIds.size).coerceAtLeast(0)
     val relatedEvents = remember(root, events, relatedContactIds, rootId) {
         if (root.isOwner) {
             events.filter { event ->
@@ -271,6 +300,14 @@ internal fun RelationshipGraphState(
                 Text("添加关系", color = if (canAddRelationship) RelationInk else RelationMuted)
             }
         }
+        if (root.isOwner) {
+            Spacer(Modifier.height(ZhiBanSpacing.Md))
+            OwnerEmploymentAnchor(
+                current = currentOwnerEmployment,
+                pastCount = ownerEmploymentHistoryCount,
+                onEdit = onEditOwnerEmployment,
+            )
+        }
         if (contacts.isEmpty()) {
             Spacer(Modifier.height(16.dp))
             Text(
@@ -282,11 +319,11 @@ internal fun RelationshipGraphState(
                 color = RelationMuted,
                 style = MaterialTheme.typography.bodySmall,
             )
-        } else if (displayedEdges.isEmpty()) {
+        } else if (displayedEdges.isEmpty() && unanchoredContactEdges.isEmpty()) {
             Spacer(Modifier.height(14.dp))
             Text(
                 if (root.isOwner) {
-                    "还没有确认你与联系人的关系"
+                    "还没有可追溯的“我与联系人”关系"
                 } else {
                     "这个人还没有已确认的关联联系人"
                 },
@@ -296,16 +333,24 @@ internal fun RelationshipGraphState(
         } else {
             Spacer(Modifier.height(12.dp))
             Text(
-                "关系网络",
+                if (unanchoredContactEdges.isEmpty()) "关系图谱" else "联系人之间的关系",
                 Modifier.fillMaxWidth(),
                 color = RelationInk,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
             )
+            if (unanchoredContactEdges.isNotEmpty()) {
+                Text(
+                    "这些关系已有资料证据，但尚未与“我”建立可靠关联",
+                    Modifier.fillMaxWidth(),
+                    color = RelationMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
             Spacer(Modifier.height(16.dp))
-            if (displayedEdges.isNotEmpty()) {
+            if (graphEdges.isNotEmpty()) {
                 ForceRelationshipGraphCanvas(
-                    rootId = rootId,
+                    rootId = graphRootId,
                     peopleById = peopleById,
                     edges = visibleEdgesForGraph,
                     onSelectContact = { rootId = it },
@@ -320,14 +365,14 @@ internal fun RelationshipGraphState(
                     Spacer(Modifier.height(8.dp))
                 }
                 Text(
-                    "关系清单",
+                    if (unanchoredContactEdges.isEmpty()) "与我相关" else "联系人之间",
                     Modifier.fillMaxWidth(),
                     color = RelationInk,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Medium,
                 )
                 Spacer(Modifier.height(6.dp))
-                RelationshipRows(displayedEdges.take(12), peopleById, onInspect, onDelete, onSelectContact = {
+                RelationshipRows(graphEdges.take(12), peopleById, onInspect, onSelectContact = {
                     rootId = it
                 })
                 Spacer(Modifier.height(12.dp))
@@ -369,27 +414,18 @@ internal fun RelationshipRows(
     edges: List<RelationshipEdgeEntity>,
     peopleById: Map<String, RelationshipPersonUi>,
     onInspect: (RelationshipEdgeEntity) -> Unit,
-    onDelete: (RelationshipEdgeEntity) -> Unit,
     onSelectContact: (String) -> Unit,
 ) {
-    edges.forEachIndexed { index, edge ->
-        val from = peopleById.getValue(edge.fromContactId)
-        val to = peopleById.getValue(edge.toContactId)
-        RelationshipGraphCard(
-            edge = edge,
-            from = from,
-            to = to,
-            onInspect = onInspect,
-            onDelete = onDelete,
-            onSelectContact = onSelectContact,
-        )
-        if (index != edges.lastIndex) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .padding(horizontal = 10.dp)
-                    .background(RelationLine),
+    Column(verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm)) {
+        edges.forEach { edge ->
+            val from = peopleById.getValue(edge.fromContactId)
+            val to = peopleById.getValue(edge.toContactId)
+            RelationshipGraphCard(
+                edge = edge,
+                from = from,
+                to = to,
+                onInspect = onInspect,
+                onSelectContact = onSelectContact,
             )
         }
     }
@@ -401,75 +437,92 @@ internal fun RelationshipGraphCard(
     from: RelationshipPersonUi,
     to: RelationshipPersonUi,
     onInspect: (RelationshipEdgeEntity) -> Unit,
-    onDelete: (RelationshipEdgeEntity) -> Unit,
     onSelectContact: (String) -> Unit,
 ) {
     val inferredFromEvidence = edge.isInferredEvidenceRelationship()
-    val historical = edge.status == "HISTORICAL"
+    val historical = edge.isHistoricalRelationship()
+    val relation = edge.displayRelationLabel()
+    val other = when {
+        from.isOwner -> to
+        to.isOwner -> from
+        else -> null
+    }
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(ZhiBanRadius.Medium))
             .background(RelationSoft)
-            .clickable(enabled = !inferredFromEvidence && !historical) { onInspect(edge) }
-            .padding(12.dp),
+            .clickable(enabled = !inferredFromEvidence) { onInspect(edge) }
+            .padding(horizontal = ZhiBanSpacing.Md, vertical = ZhiBanSpacing.Sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        GraphPersonAvatar(from) { onSelectContact(from.personId) }
-        Spacer(Modifier.width(6.dp))
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(horizontal = 6.dp)) {
-            Text("↔", color = RelationInk, style = MaterialTheme.typography.labelSmall)
-            Text(
-                relationLabel(edge.relationType, isHistorical = historical),
-                color = RelationInk,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (inferredFromEvidence) {
-                Text(edge.inferredEvidenceLabel().orEmpty(), color = RelationMuted, style = MaterialTheme.typography.labelSmall)
-            } else if (!edge.userConfirmed) {
-                Text("待确认", color = RelationMuted, style = MaterialTheme.typography.labelSmall)
-            }
-        }
-        Spacer(Modifier.width(6.dp))
-        GraphPersonAvatar(to) { onSelectContact(to.personId) }
-        Spacer(Modifier.width(10.dp))
+        RelationshipPairAvatar(from, to, onSelectContact)
+        Spacer(Modifier.width(ZhiBanSpacing.Md))
         Column(Modifier.weight(1f)) {
             Text(
-                if (from.displayName == to.displayName) to.displayName else "${from.displayName} · ${to.displayName}",
+                other?.displayName ?: "${from.displayName} 与 ${to.displayName}",
                 color = RelationInk,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Medium,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 when {
-                    historical -> "已保留在关系时间线"
-                    inferredFromEvidence -> "由联系人资料证据自动关联"
-                    edge.userConfirmed -> "可点击查看"
-                    else -> "待你确认"
+                    inferredFromEvidence -> edge.evidenceDigest.ifBlank { edge.inferredEvidenceLabel().orEmpty() }
+                    historical -> "历史关系 · 已保留在时间线"
+                    edge.userConfirmed -> "已确认 · 点击查看依据"
+                    else -> "待确认 · 点击查看依据"
                 },
                 color = RelationMuted,
                 style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
-        if (!inferredFromEvidence && !historical) {
-            IconButton(
-                onClick = { onDelete(edge) },
-                modifier = Modifier.size(ZhiBanSize.TouchTarget),
-                enabled = edge.userConfirmed,
-            ) {
-                Icon(
-                    Icons.Rounded.DeleteOutline,
-                    "删除${from.displayName}和${to.displayName}的关系",
-                    tint = RelationMuted,
-                    modifier = Modifier.size(ZhiBanIconSize.Inline),
-                )
-            }
+        Spacer(Modifier.width(ZhiBanSpacing.Sm))
+        Box(
+            Modifier.clip(RoundedCornerShape(ZhiBanRadius.Full))
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(horizontal = ZhiBanSpacing.Md, vertical = ZhiBanSpacing.Xs),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                relation,
+                color = if (historical) RelationMuted else RelationInk,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+            )
         }
+    }
+}
+
+@Composable
+private fun RelationshipPairAvatar(from: RelationshipPersonUi, to: RelationshipPersonUi, onSelectContact: (String) -> Unit) {
+    Box(Modifier.width(56.dp).height(40.dp)) {
+        RelationshipMiniAvatar(from, Modifier.align(Alignment.CenterStart)) { onSelectContact(from.personId) }
+        RelationshipMiniAvatar(to, Modifier.align(Alignment.CenterEnd)) { onSelectContact(to.personId) }
+    }
+}
+
+@Composable
+private fun RelationshipMiniAvatar(person: RelationshipPersonUi, modifier: Modifier, onClick: () -> Unit) {
+    Box(
+        modifier
+            .size(34.dp)
+            .clip(CircleShape)
+            .background(if (person.isOwner) RelationAccent else MaterialTheme.colorScheme.surface)
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = "查看${person.displayName}" },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            person.displayName.take(1),
+            color = if (person.isOwner) Color.White else RelationInk,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 
