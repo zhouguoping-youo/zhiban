@@ -72,6 +72,21 @@ class ContactIdentityResolverTest {
         assertTrue(result.contradictions >= 2)
     }
 
+    @Test
+    fun largeAddressBookUsesEvidenceIndexesInsteadOfComparingEveryPair() {
+        val contacts = (0 until 10_000).map { index ->
+            contact("contact-$index", "联系人$index", phone = "139${index.toString().padStart(8, '0')}")
+        } + listOf(
+            contact("duplicate-a", "甲", phone = "13800138000", email = "same@example.com"),
+            contact("duplicate-b", "乙", phone = "138-0013-8000", email = "SAME@example.com"),
+        )
+
+        val result = ContactIdentityResolver.resolve(contacts, emptyList(), emptyList())
+
+        assertEquals(1, result.size)
+        assertEquals(IdentityResolutionDecision.AUTO_LINK, result.single().decision)
+    }
+
     private fun contact(id: String, name: String, phone: String? = null, email: String? = null, company: String? = null) = ContactEntity(
         contactId = id,
         displayName = name,

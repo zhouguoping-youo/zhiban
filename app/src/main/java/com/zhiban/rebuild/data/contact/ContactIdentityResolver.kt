@@ -19,12 +19,44 @@ object ContactIdentityResolver {
         platformIdentities.forEach { identity ->
             identity.toEvidenceKey()?.let { profiles[identity.contactId]?.platforms?.add(it) }
         }
-        return profiles.values.toList().pairwise().mapNotNull { (first, second) ->
-            resolvePair(first, second)
+        return buildCandidatePairs(profiles, aliases).mapNotNull { pair ->
+            resolvePair(profiles.getValue(pair.first), profiles.getValue(pair.second))
         }.sortedWith(
             compareByDescending<ContactIdentityResolution> { it.decision.priority }
                 .thenByDescending { it.confidence },
         ).toList()
+    }
+
+    private fun buildCandidatePairs(profiles: Map<String, MutableIdentityProfile>, aliases: List<ContactAliasEntity>): Set<IdentityPair> = buildSet {
+        fun <T> addIndexed(values: (MutableIdentityProfile) -> Set<T>) {
+            profiles.values.flatMap { profile -> values(profile).map { it to profile.contact.contactId } }
+                .groupBy({ it.first }, { it.second }).values
+                .filter { it.size in 2..MAX_PAIRABLE_GROUP_SIZE }
+                .forEach { ids -> ids.forEachPair { first, second -> add(IdentityPair.of(first, second)) } }
+        }
+        addIndexed(MutableIdentityProfile::phones)
+        addIndexed(MutableIdentityProfile::emails)
+        addIndexed(MutableIdentityProfile::wechatIds)
+        addIndexed(MutableIdentityProfile::platforms)
+        addIndexed { profile ->
+            val name = profile.contact.normalizedName
+            val company = profile.contact.company.normalizedText()
+            if (name.isBlank() || company == null) emptySet() else setOf("$name\u001f$company")
+        }
+        profiles.values.groupBy { it.contact.normalizedName }.values
+            .filter { group -> group.size in 2..MAX_PAIRABLE_GROUP_SIZE && group.any { it.contact.isAgentStub() } }
+            .forEach { group ->
+                group.map { it.contact.contactId }
+                    .forEachPair { first, second -> add(IdentityPair.of(first, second)) }
+            }
+        val contactsByName = profiles.values.groupBy { it.contact.normalizedName }
+        aliases.filter(ContactAliasEntity::userConfirmed).forEach { alias ->
+            contactsByName[alias.normalizedAlias].orEmpty().forEach { named ->
+                if (alias.contactId != named.contact.contactId) {
+                    add(IdentityPair.of(alias.contactId, named.contact.contactId))
+                }
+            }
+        }
     }
 
     private fun resolvePair(first: MutableIdentityProfile, second: MutableIdentityProfile): ContactIdentityResolution? {
@@ -64,6 +96,8 @@ object ContactIdentityResolver {
             contradictions = contradictions,
         )
     }
+
+    private const val MAX_PAIRABLE_GROUP_SIZE = 20
 }
 
 enum class IdentityResolutionDecision(internal val priority: Int) {
@@ -82,6 +116,12 @@ data class ContactIdentityResolution(
 )
 
 private data class PlatformEvidenceKey(val platform: String, val value: String, val stable: Boolean)
+
+private data class IdentityPair(val first: String, val second: String) {
+    companion object {
+        fun of(first: String, second: String) = if (first < second) IdentityPair(first, second) else IdentityPair(second, first)
+    }
+}
 
 private data class MutableIdentityProfile(
     val contact: ContactEntity,
@@ -135,8 +175,8 @@ private fun String?.normalizedHandle(): String? = this?.trim()?.trimStart('@')?.
 
 private fun String?.normalizedText(): String? = this?.trim()?.lowercase()?.takeIf(String::isNotEmpty)
 
-private fun <T> List<T>.pairwise(): Sequence<Pair<T, T>> = sequence {
+private inline fun <T> List<T>.forEachPair(block: (T, T) -> Unit) {
     for (firstIndex in 0 until lastIndex) {
-        for (secondIndex in firstIndex + 1 until size) yield(this@pairwise[firstIndex] to this@pairwise[secondIndex])
+        for (secondIndex in firstIndex + 1 until size) block(this[firstIndex], this[secondIndex])
     }
 }
