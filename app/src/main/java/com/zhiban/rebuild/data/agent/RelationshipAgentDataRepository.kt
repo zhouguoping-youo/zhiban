@@ -103,7 +103,7 @@ internal class RelationshipAgentDataRepository(private val database: AgentDataba
                 confidence = 1.0,
                 userConfirmed = true,
                 skillId = null,
-                status = "ACTIVE",
+                status = if (temporalState == "PAST") "HISTORICAL" else "ACTIVE",
                 createdAtEpochMs = nowEpochMs,
                 updatedAtEpochMs = nowEpochMs,
             ),

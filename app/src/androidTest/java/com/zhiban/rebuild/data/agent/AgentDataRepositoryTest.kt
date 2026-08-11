@@ -624,6 +624,26 @@ class AgentDataRepositoryTest {
     }
 
     @Test
+    fun pastRelationshipStaysInHistoryButNotCurrentGraph() = runBlocking {
+        val contactId = repository.saveUserContact(
+            null, "旧同事", null, null, null, null, null, null, nowEpochMs = 1_000L,
+        )
+
+        repository.saveConfirmedRelationship(
+            RelationshipPersonIds.SELF,
+            contactId,
+            "COLLEAGUE",
+            temporalState = "PAST",
+            nowEpochMs = 2_000L,
+        )
+
+        assertTrue(repository.observeRelationships().first().isEmpty())
+        val history = database.contactIntelligenceDao().observeRelationships(contactId).first().single()
+        assertEquals("COLLEAGUE", history.relationshipType)
+        assertEquals(2_000L, history.validToEpochMs)
+    }
+
+    @Test
     fun confirmedAliasesAndPlatformIdentitiesAreStructuredAndRemovable() = runBlocking {
         val contactId = repository.saveUserContact(
             contactId = null,
