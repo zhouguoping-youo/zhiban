@@ -278,8 +278,15 @@ internal class RoomApprovalStore(
             put("candidateId", call.candidateId)
             put("contactId", call.contactId)
             put("confidence", call.confidence)
-            put("title", "完善联系人档案：${displayName.take(40)}")
-            put("message", preview)
+            put(
+                "title",
+                if (call.contactId == com.zhiban.rebuild.data.contact.RelationshipPersonIds.SELF) {
+                    "确认本人当前任职"
+                } else {
+                    "完善联系人档案：${displayName.take(40)}"
+                },
+            )
+            put("details", preview)
         }.toString()
         requestToolApprovalInTransaction(
             payload,
@@ -321,7 +328,7 @@ internal class RoomApprovalStore(
             put("previousStatus", call.previousStatus)
             put("previousConfidence", call.previousConfidence)
             put("title", "关联社交身份")
-            put("message", "$platform · ${visibleHandle.take(80)}\n关联到：${contactName.take(80)}")
+            put("details", "$platform · ${visibleHandle.take(80)}\n关联到：${contactName.take(80)}")
         }.toString()
         requestToolApprovalInTransaction(
             payload,

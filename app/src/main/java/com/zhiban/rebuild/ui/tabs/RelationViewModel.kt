@@ -323,6 +323,7 @@ class RelationViewModel @Inject constructor(
                     resultMessage = buildString {
                         append("已导入 ${summary.imported} 位联系人")
                         if (summary.updated > 0) append("（其中 ${summary.updated} 位已更新）")
+                        if (summary.automaticallyMerged > 0) append("，自动整理 ${summary.automaticallyMerged} 组重复资料")
                         if (summary.skippedSelf > 0) append("；已跳过你的本人资料")
                         if (summary.skippedInvalid > 0) append("；${summary.skippedInvalid} 条资料不完整")
                     },

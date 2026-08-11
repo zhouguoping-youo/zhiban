@@ -14,6 +14,7 @@ import com.zhiban.rebuild.data.agent.TemporalRelationshipWriter
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.ContactRoleEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
+import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.data.contact.SourceIdentityEntity
 import com.zhiban.rebuild.runtime.config.FeedbackPolicy
 import com.zhiban.rebuild.runtime.config.MemoryPolicy
@@ -970,6 +971,97 @@ class RuntimeInputProcessorTest {
                 database.runtimeEventDao().latestByType("r-contact-write", "ChangeUndone")!!.payloadJson,
             ).jsonObject["changeId"]!!.jsonPrimitive.content,
         )
+    }
+
+    @Test fun ownerCurrentEmploymentRequiresConfirmationPersistsAndCanUndo() = runBlocking {
+        val staged = RoomTextInputGateway(database, { true }, { now }).stage(
+            """{"schemaVersion":1,"text":"我目前在平凯星辰（北京）科技有限公司工作","mode":"Work","model":"M2.7","level":"高"}""",
+        )
+        val gateway = RoomRuntimeGateways(database, "test") { now++ }
+        gateway.accept(
+            RuntimeUiCommand.Start(
+                "s-owner-employment",
+                staged.inputRef,
+                "c-owner-employment",
+                "a-owner-employment",
+                0,
+                "chat",
+                "r-owner-employment",
+            ),
+        )
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile) = capability(profile)
+            override fun stream(request: ModelRequest): kotlinx.coroutines.flow.Flow<ModelEvent> =
+                if (request.messages.any { it.content.contains("employmentAdded") }) {
+                    flowOf(ModelEvent.Delta(0, "本人任职已保存。"), ModelEvent.Final("stop"))
+                } else {
+                    flowOf(
+                        ModelEvent.ToolCall(
+                            0,
+                            "call-owner-employment",
+                            "contact.profile.proposeUpdate",
+                            """{"contactId":"user:self","company":"平凯星辰（北京）科技有限公司","evidenceSummary":"用户在当前会话明确提供","confidence":1.0}""",
+                        ),
+                        ModelEvent.Final("tool_calls"),
+                    )
+                }
+            override fun cancel(requestId: String) = true
+        }
+        val processor = KernelCommandProcessor(
+            database,
+            "processor",
+            { true },
+            { now++ },
+            provider = provider,
+            profiles = fixedProfileStore(),
+        )
+
+        processor.processNext()
+        awaitRunStatus("r-owner-employment", "AWAITING_CONFIRMATION")
+        assertNull(database.contactIntelligenceDao().findCurrentUserEmployment(RelationshipPersonIds.SELF))
+        val approval = requireNotNull(database.runtimeEventDao().latestByType("r-owner-employment", "ApprovalRequested"))
+        val payload = Json.parseToJsonElement(approval.payloadJson).jsonObject
+        assertEquals("确认本人当前任职", payload["title"]?.jsonPrimitive?.content)
+        assertTrue(payload["details"]?.jsonPrimitive?.content?.contains("公司：") == true)
+        assertNull(payload["message"])
+        val revision = requireNotNull(database.runtimeSessionDao().find("s-owner-employment")).nextSequence - 1
+        gateway.accept(
+            RuntimeUiCommand.RunAction(
+                RuntimeAction.APPROVE,
+                "s-owner-employment",
+                "r-owner-employment",
+                "approve-owner-employment",
+                "approve-owner-employment-action",
+                revision,
+                "chat",
+                requireNotNull(payload["proposalId"]).jsonPrimitive.content,
+                requireNotNull(payload["payloadRef"]).jsonPrimitive.content,
+            ),
+        )
+        processor.processNext()
+        awaitRunStatus("r-owner-employment", "SUCCEEDED")
+
+        val employment = requireNotNull(database.contactIntelligenceDao().findCurrentUserEmployment(RelationshipPersonIds.SELF))
+        assertEquals("平凯星辰（北京）科技有限公司", employment.companyNameSnapshot)
+        assertEquals("USER_CONFIRMED", employment.verificationState)
+        assertNull(employment.validFromEpochMs)
+        val change = database.changeLogDao().listByRun("r-owner-employment").single()
+        val undoRevision = requireNotNull(database.runtimeSessionDao().find("s-owner-employment")).nextSequence - 1
+        gateway.accept(
+            RuntimeUiCommand.RunAction(
+                RuntimeAction.UNDO,
+                "s-owner-employment",
+                "r-owner-employment",
+                "undo-owner-employment",
+                "undo-owner-employment-action",
+                undoRevision,
+                "chat",
+                payloadRef = change.changeId,
+            ),
+        )
+        assertEquals(KernelCommandProcessor.Outcome.PROCESSED, processor.processNext())
+        assertNull(database.contactIntelligenceDao().findCurrentUserEmployment(RelationshipPersonIds.SELF))
+        assertEquals("UNDONE", database.changeLogDao().find(change.changeId)?.undoState)
     }
 
     @Test fun relationshipCandidateRequiresConfirmationWritesEvidenceDigestAndCanUndo() = runBlocking {

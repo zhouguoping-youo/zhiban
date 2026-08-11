@@ -28,9 +28,10 @@ class AgentMemoryPageTest {
         context.getSharedPreferences("agent_controls", android.content.Context.MODE_PRIVATE).edit().clear().commit()
         database = Room.inMemoryDatabaseBuilder(context, AgentDatabase::class.java).build()
         val controls = AgentControlStore(context)
+        val viewModel = AgentMemoryViewModel(AgentMemorySettingsService(database), controls)
         compose.setContent {
             ZhiBanTheme {
-                AgentMemoryPage(onBack = {}, viewModel = AgentMemoryViewModel(AgentMemorySettingsService(database), controls))
+                AgentMemoryPage(onBack = {}, viewModel = viewModel)
             }
         }
     }

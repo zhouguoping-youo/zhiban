@@ -1,6 +1,7 @@
 package com.zhiban.rebuild.runtime.tool
 
 import com.zhiban.rebuild.data.contact.ContactDao
+import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.runtime.governance.ContactProfileCandidateCall
 import com.zhiban.rebuild.runtime.governance.ContactProfileDomainWriter
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
@@ -16,6 +17,7 @@ internal class ContactProfileUpdateCandidateToolBinding(
     private val contacts: ContactDao,
     private val store: RoomRuntimeStore,
     private val writer: ContactProfileDomainWriter,
+    private val ownerProfile: () -> ContactOwnerProfileSnapshot = { ContactOwnerProfileSnapshot() },
 ) : RuntimeToolBinding {
     override suspend fun requestApproval(request: RuntimeToolCallRequest, context: RuntimeToolRouteContext): Boolean {
         val args = parseToolArgs(request.argumentsJson, ALLOWED_KEYS) { throw IllegalArgumentException("INVALID_TOOL_ARGUMENTS") }
@@ -25,17 +27,19 @@ internal class ContactProfileUpdateCandidateToolBinding(
         fun optional(name: String, max: Int) = args[name]?.jsonPrimitive?.content?.trim()?.takeIf(String::isNotBlank)
             ?.also { require(it.length <= max) { "INVALID_TOOL_ARGUMENTS" } }
         val contactId = required("contactId", 128)
-        val contact = contacts.findById(contactId) ?: throw IllegalArgumentException("CONTACT_NOT_FOUND")
-        val confidence = args["confidence"]?.jsonPrimitive?.content?.toDoubleOrNull() ?: 0.75
+        val isOwner = contactId == RelationshipPersonIds.SELF
+        val contact = contactForTarget(contactId, isOwner)
+        val confidence = args["confidence"]?.jsonPrimitive?.content?.toDoubleOrNull() ?: DEFAULT_CONFIDENCE
         require(confidence in 0.0..1.0) { "INVALID_TOOL_ARGUMENTS" }
-        val factText = optional("factText", 1_000)
-        val factType = optional("factType", 40)
-        require((factText == null) == (factType == null)) { "INVALID_TOOL_ARGUMENTS" }
-        factType?.let { require(it in ContactProfileDomainWriter.FACT_TYPES) { "INVALID_TOOL_ARGUMENTS" } }
+        val (factText, factType) = validatedFact(
+            optional("factText", FACT_TEXT_MAX_LENGTH),
+            optional("factType", FACT_TYPE_MAX_LENGTH),
+        )
         val patchValues = ContactProfileDomainWriter.PROFILE_FIELDS.associateWith {
             optional(it, FIELD_LIMITS.getValue(it))
         }
         require(patchValues.values.any { it != null } || factText != null) { "INVALID_TOOL_ARGUMENTS" }
+        validateOwnerPatch(isOwner, patchValues, factText)
         val evidenceSummary = required("evidenceSummary", 1_000)
         val staged = buildJsonObject {
             put("contactId", contactId)
@@ -68,7 +72,7 @@ internal class ContactProfileUpdateCandidateToolBinding(
         return store.requestContactProfileApproval(
             call = call,
             stagedPayloadJson = staged,
-            displayName = contact.displayName,
+            displayName = if (isOwner) ownerProfile().name.ifBlank { "我" } else requireNotNull(contact).displayName,
             sessionId = context.sessionId,
             runId = context.runId,
             attemptId = context.attemptId,
@@ -76,6 +80,26 @@ internal class ContactProfileUpdateCandidateToolBinding(
             fencingEpoch = context.fencingEpoch,
             nowEpochMs = context.nowEpochMs,
         )
+    }
+
+    private suspend fun contactForTarget(contactId: String, isOwner: Boolean) = if (isOwner) {
+        null
+    } else {
+        contacts.findById(contactId) ?: throw IllegalArgumentException("CONTACT_NOT_FOUND")
+    }
+
+    private fun validateOwnerPatch(isOwner: Boolean, patchValues: Map<String, String?>, factText: String?) {
+        if (!isOwner) return
+        require(patchValues["company"] != null && factText == null) { "INVALID_OWNER_PROFILE_ARGUMENTS" }
+        require(patchValues.filterKeys { it !in OWNER_EMPLOYMENT_FIELDS }.values.none { it != null }) {
+            "INVALID_OWNER_PROFILE_ARGUMENTS"
+        }
+    }
+
+    private fun validatedFact(factText: String?, factType: String?): Pair<String?, String?> {
+        require((factText == null) == (factType == null)) { "INVALID_TOOL_ARGUMENTS" }
+        factType?.let { require(it in ContactProfileDomainWriter.FACT_TYPES) { "INVALID_TOOL_ARGUMENTS" } }
+        return factText to factType
     }
 
     override suspend fun executeApproved(planJson: String, context: ConfirmedToolExecutionContext): RoutedToolResult {
@@ -102,6 +126,9 @@ internal class ContactProfileUpdateCandidateToolBinding(
     }
 
     private companion object {
+        const val DEFAULT_CONFIDENCE = 0.75
+        const val FACT_TEXT_MAX_LENGTH = 1_000
+        const val FACT_TYPE_MAX_LENGTH = 40
         val ALLOWED_KEYS = ContactProfileDomainWriter.PROFILE_FIELDS.toSet() +
             setOf("contactId", "factType", "factText", "evidenceSummary", "confidence")
         val FIELD_LIMITS = mapOf(
@@ -112,5 +139,6 @@ internal class ContactProfileUpdateCandidateToolBinding(
             "title" to 100,
             "note" to 1_000,
         )
+        val OWNER_EMPLOYMENT_FIELDS = setOf("company", "title")
     }
 }

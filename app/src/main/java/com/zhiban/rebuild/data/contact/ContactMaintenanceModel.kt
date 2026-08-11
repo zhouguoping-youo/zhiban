@@ -4,7 +4,6 @@ import kotlin.math.roundToInt
 
 enum class ContactMaintenanceIssue {
     NO_REACHABLE_METHOD,
-    EMPLOYMENT_TIME_UNKNOWN,
     STALE_PROFILE,
 }
 
@@ -80,9 +79,6 @@ object ContactMaintenanceEvaluator {
     private fun issues(contact: ContactEntity, employments: List<PersonEmploymentEpisodeEntity>, nowEpochMs: Long): Set<ContactMaintenanceIssue> = buildSet {
         if (contact.phone.isNullOrBlank() && contact.email.isNullOrBlank() && contact.wechatId.isNullOrBlank()) {
             add(ContactMaintenanceIssue.NO_REACHABLE_METHOD)
-        }
-        if (employments.any { it.validFromEpochMs == null && it.validToEpochMs == null && it.currentState == "UNKNOWN" }) {
-            add(ContactMaintenanceIssue.EMPLOYMENT_TIME_UNKNOWN)
         }
         if (nowEpochMs - contact.updatedAtEpochMs > STALE_AFTER_MS) add(ContactMaintenanceIssue.STALE_PROFILE)
     }

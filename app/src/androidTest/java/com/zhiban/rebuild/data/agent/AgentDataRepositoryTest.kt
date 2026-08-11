@@ -515,6 +515,24 @@ class AgentDataRepositoryTest {
     }
 
     @Test
+    fun systemImportRunsDeterministicIdentityCleaningBeforeReturning() = runBlocking {
+        database.contactDao().insert(testContact("duplicate-a", "丁波", "13800138000", "ding@example.com", 1_000L))
+        database.contactDao().insert(testContact("duplicate-b", "老丁", "138-0013-8000", "DING@example.com", 2_000L))
+
+        val summary = repository.importConfirmedSystemContacts(
+            contacts = listOf(systemContact("new-contact", "新联系人", "13900139000")),
+            ownerPhone = null,
+            ownerWechatId = null,
+            ownerName = null,
+            nowEpochMs = 3_000L,
+        )
+
+        assertEquals(1, summary.automaticallyMerged)
+        assertEquals(1, database.contactIdentityDao().observeActiveMergeLinks().first().size)
+        assertEquals(2, repository.observeContacts().first().size)
+    }
+
+    @Test
     fun systemContactMatchingOwnerPhoneIsNeverImported() = runBlocking {
         val result = repository.importConfirmedSystemContacts(
             listOf(systemContact("self", "老周", "+86 138-0013-8000")),

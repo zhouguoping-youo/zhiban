@@ -61,6 +61,7 @@ import com.zhiban.rebuild.runtime.tool.ContactDetailToolBinding
 import com.zhiban.rebuild.runtime.tool.ContactEnrichmentSuggestToolBinding
 import com.zhiban.rebuild.runtime.tool.ContactIdentityResolutionToolBinding
 import com.zhiban.rebuild.runtime.tool.ContactMaintenanceToolBinding
+import com.zhiban.rebuild.runtime.tool.ContactOwnerProfileSnapshot
 import com.zhiban.rebuild.runtime.tool.ContactProfileUpdateCandidateToolBinding
 import com.zhiban.rebuild.runtime.tool.ContactSearchToolBinding
 import com.zhiban.rebuild.runtime.tool.ContactTagDomainWriter
@@ -142,6 +143,7 @@ internal data class ProviderEngineConfig(
     val heartbeatIntervalMs: Long = DEFAULT_HEARTBEAT_INTERVAL_MS,
     val leaseDurationMs: Long = LEASE_DURATION_MS,
     val personalization: () -> String? = { null },
+    val ownerProfile: () -> ContactOwnerProfileSnapshot = { ContactOwnerProfileSnapshot() },
     val memoryPolicy: () -> com.zhiban.rebuild.runtime.config.MemoryPolicy = {
         com.zhiban.rebuild.runtime.config.MemoryPolicy()
     },
@@ -251,6 +253,8 @@ internal class ProviderExecutionEngine(
                 database.contactDao(),
                 database.contactIdentityDao(),
                 database.contactIntelligenceDao(),
+                database.contactKnowledgeDao(),
+                config.ownerProfile,
             ),
             ContactIdentityResolutionToolBinding(
                 toolCatalog.requireRegistered("contact.identity.resolve"),
@@ -276,6 +280,7 @@ internal class ProviderExecutionEngine(
                 database.contactDao(),
                 store,
                 com.zhiban.rebuild.runtime.governance.ContactProfileDomainWriter(database),
+                config.ownerProfile,
             ),
             ContactEnrichmentSuggestToolBinding(
                 toolCatalog.requireRegistered("contact.enrichment.suggest"),

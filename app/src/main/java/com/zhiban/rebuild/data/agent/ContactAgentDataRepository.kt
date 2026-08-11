@@ -551,6 +551,7 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
         contacts.distinctBy(SystemContactCandidate::sourceId).forEach { candidate ->
             processSystemContactCandidate(ctx, candidate)
         }
+        val automaticallyMerged = applyDeterministicIdentityLinks(dao.listActiveForIntelligence(), nowEpochMs)
         stageLocalOrganizationSuggestions(nowEpochMs)
         ContactImportSummary(
             created = ctx.created,
@@ -561,6 +562,7 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
             skippedSelfPhone = ctx.skippedSelfPhone,
             skippedSelfWechat = ctx.skippedSelfWechat,
             selfIdentityMissing = ctx.selfIdentityMissing,
+            automaticallyMerged = automaticallyMerged,
         )
     }
 
@@ -854,8 +856,9 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
         stageLocalOrganizationSuggestions(nowEpochMs)
     }
 
-    private suspend fun applyDeterministicIdentityLinks(contacts: List<ContactEntity>, nowEpochMs: Long) {
+    private suspend fun applyDeterministicIdentityLinks(contacts: List<ContactEntity>, nowEpochMs: Long): Int {
         val identityDao = database.contactIdentityDao()
+        var createdCount = 0
         ContactIdentityResolver.resolve(
             contacts = contacts,
             aliases = identityDao.listAliases(),
@@ -905,7 +908,9 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
                         createdAtEpochMs = nowEpochMs,
                     ),
                 )
+                createdCount++
             }
+        return createdCount
     }
 
     private suspend fun upsertSystemContactOrganization(

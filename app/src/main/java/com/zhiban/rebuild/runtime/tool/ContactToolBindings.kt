@@ -2,9 +2,16 @@ package com.zhiban.rebuild.runtime.tool
 
 import com.zhiban.rebuild.data.contact.ContactDao
 import com.zhiban.rebuild.data.contact.ContactIdentityDao
+import com.zhiban.rebuild.data.contact.ContactIdentityResolver
 import com.zhiban.rebuild.data.contact.ContactIntelligenceDao
+import com.zhiban.rebuild.data.contact.ContactKnowledgeDao
 import com.zhiban.rebuild.data.contact.ContactMaintenanceEvaluator
 import com.zhiban.rebuild.data.contact.ContactMaintenanceIssue
+import com.zhiban.rebuild.data.contact.ContactMaintenanceOverview
+import com.zhiban.rebuild.data.contact.IdentityResolutionDecision
+import com.zhiban.rebuild.data.contact.OwnerContactLinkEntity
+import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
+import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import java.text.Normalizer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
@@ -102,6 +109,8 @@ internal class ContactMaintenanceToolBinding(
     private val contacts: ContactDao,
     private val identities: ContactIdentityDao,
     private val intelligence: ContactIntelligenceDao,
+    private val knowledge: ContactKnowledgeDao,
+    private val ownerProfile: () -> ContactOwnerProfileSnapshot = { ContactOwnerProfileSnapshot() },
 ) : RuntimeToolBinding {
     override suspend fun requestApproval(request: RuntimeToolCallRequest, context: RuntimeToolRouteContext) =
         throw ToolPolicyRejectedException("contact.maintenance.list is read-only")
@@ -113,19 +122,44 @@ internal class ContactMaintenanceToolBinding(
                 ?: throw IllegalArgumentException("INVALID_TOOL_ARGUMENTS")
         }
         val limit = (args["limit"]?.jsonPrimitive?.content?.toIntOrNull() ?: 20).coerceIn(1, 50)
-        val overview = ContactMaintenanceEvaluator.evaluate(
-            contacts = contacts.listActiveForIntelligence(),
-            employments = intelligence.listAllEmployments(),
-            platformIdentities = identities.listPlatformIdentities(),
-            duplicateReviewCount = 0,
-            enrichmentReviewCount = 0,
-            nowEpochMs = context.nowEpochMs,
-        )
-        val items = overview.items.filter { item -> item.issues.isNotEmpty() && (issue == null || issue in item.issues) }.take(limit)
+        val snapshot = loadSnapshot(context.nowEpochMs)
+        val actionableItems = snapshot.overview.items.filter { item ->
+            item.issues.isNotEmpty() && (issue == null || issue in item.issues)
+        }
+        val items = actionableItems.take(limit)
         val unresolvedIdentities = if (issue == null) intelligence.listUnresolvedIdentities(limit) else emptyList()
+        val unresolvedIdentityCount = if (issue == null) intelligence.countUnresolvedIdentities() else 0
         val result = buildJsonObject {
+            put("totalContactCount", snapshot.overview.items.size)
+            put("totalIssueCount", actionableItems.size)
+            put("returnedCount", items.size)
+            put("truncated", actionableItems.size > items.size)
             put("count", items.size)
-            put("unresolvedIdentityCount", unresolvedIdentities.size)
+            put("duplicateReviewCount", snapshot.overview.duplicateReviewCount)
+            put("automaticallyResolvedDuplicateCount", snapshot.automaticallyResolvedDuplicateCount)
+            put("userConfirmedMergeCount", snapshot.userConfirmedMergeCount)
+            put("enrichmentReviewCount", snapshot.overview.enrichmentReviewCount)
+            put("deferredRelationshipEvidenceCount", snapshot.deferredRelationshipEvidenceCount)
+            put("unresolvedIdentityCount", unresolvedIdentityCount)
+            put("unresolvedIdentityReturnedCount", unresolvedIdentities.size)
+            put("unresolvedIdentityTruncated", unresolvedIdentityCount > unresolvedIdentities.size)
+            put("ownerProfile", ownerProfileJson(ownerProfile(), snapshot.ownerLinks, snapshot.employments))
+            put(
+                "interactionPolicy",
+                buildJsonObject {
+                    put("askAtMostOneQuestion", true)
+                    put("doNotAskEveryContactEmploymentDate", true)
+                    put("deferUnknownRelationships", true)
+                },
+            )
+            put(
+                "issueCounts",
+                buildJsonObject {
+                    ContactMaintenanceIssue.entries.forEach { issueKind ->
+                        put(issueKind.name, snapshot.overview.items.count { issueKind in it.issues })
+                    }
+                },
+            )
             put(
                 "items",
                 buildJsonArray {
@@ -166,7 +200,95 @@ internal class ContactMaintenanceToolBinding(
         }
         return RoutedToolResult(spec.name, request.providerCallId, result.toString())
     }
+
+    private suspend fun loadSnapshot(nowEpochMs: Long): ContactMaintenanceSnapshot {
+        val contactList = contacts.listActiveForIntelligence()
+        val employments = intelligence.listAllEmployments()
+        val platformIdentities = identities.listPlatformIdentities()
+        val activeMergeLinks = identities.listActiveMergeLinks()
+        val duplicateReviewCount = ContactIdentityResolver.resolve(
+            contactList,
+            identities.listAliases(),
+            platformIdentities,
+        ).count { it.decision == IdentityResolutionDecision.REVIEW }
+        val overview = ContactMaintenanceEvaluator.evaluate(
+            contacts = contactList,
+            employments = employments,
+            platformIdentities = platformIdentities,
+            duplicateReviewCount = duplicateReviewCount,
+            enrichmentReviewCount = knowledge.countAllPendingEnrichment(nowEpochMs),
+            nowEpochMs = nowEpochMs,
+        )
+        return ContactMaintenanceSnapshot(
+            overview = overview,
+            employments = employments,
+            ownerLinks = knowledge.listActiveOwnerContactLinks(),
+            automaticallyResolvedDuplicateCount = activeMergeLinks.count { !it.userConfirmed },
+            userConfirmedMergeCount = activeMergeLinks.count { it.userConfirmed },
+            deferredRelationshipEvidenceCount = employments.asSequence()
+                .filter { it.status == "ACTIVE" && it.currentState == "UNKNOWN" }
+                .map(PersonEmploymentEpisodeEntity::personId)
+                .distinct()
+                .count(),
+        )
+    }
 }
+
+private data class ContactMaintenanceSnapshot(
+    val overview: ContactMaintenanceOverview,
+    val employments: List<PersonEmploymentEpisodeEntity>,
+    val ownerLinks: List<OwnerContactLinkEntity>,
+    val automaticallyResolvedDuplicateCount: Int,
+    val userConfirmedMergeCount: Int,
+    val deferredRelationshipEvidenceCount: Int,
+)
+
+internal data class ContactOwnerProfileSnapshot(val name: String = "", val occupations: Set<String> = emptySet(), val hasConfiguredIdentity: Boolean = false)
+
+private fun ownerProfileJson(profile: ContactOwnerProfileSnapshot, ownerLinks: List<OwnerContactLinkEntity>, employments: List<PersonEmploymentEpisodeEntity>) =
+    buildJsonObject {
+        val ownerContactIds = ownerLinks.mapTo(hashSetOf(), OwnerContactLinkEntity::contactId)
+        val ownerEmployments = employments.filter {
+            it.status == "ACTIVE" && (it.personId == RelationshipPersonIds.SELF || it.personId in ownerContactIds)
+        }
+        val profilePresent = profile.hasConfiguredIdentity || profile.name.isNotBlank() || profile.occupations.isNotEmpty()
+        val currentEmploymentConfirmed = ownerEmployments.any {
+            it.currentState == "CURRENT" && it.verificationState == "USER_CONFIRMED"
+        }
+        put("identityKnown", profilePresent || ownerLinks.isNotEmpty())
+        profile.name.takeIf(String::isNotBlank)?.let { put("knownName", it) }
+        put("contactCardLinked", ownerLinks.isNotEmpty())
+        put("linkedContactCount", ownerLinks.size)
+        put("knownOccupations", buildJsonArray { profile.occupations.sorted().forEach { add(JsonPrimitive(it)) } })
+        put("currentEmploymentConfirmed", currentEmploymentConfirmed)
+        put("hasKnownEmploymentDates", ownerEmployments.any { it.validFromEpochMs != null || it.validToEpochMs != null })
+        put("relationshipClassificationReady", (profilePresent || ownerLinks.isNotEmpty()) && currentEmploymentConfirmed)
+        put(
+            "nextStep",
+            when {
+                !profilePresent && ownerLinks.isEmpty() -> "本轮只问：应该如何称呼你？"
+                !currentEmploymentConfirmed -> "本轮只问：你目前在哪家公司工作？职位和过去经历以后按需要逐步补充"
+                else -> "可依据双方时间证据判断当前或历史关系；证据不足的联系人保持待发现"
+            },
+        )
+        put(
+            "employments",
+            buildJsonArray {
+                ownerEmployments.forEach { employment ->
+                    add(
+                        buildJsonObject {
+                            put("company", employment.companyNameSnapshot)
+                            employment.title?.let { put("title", it) }
+                            employment.validFromEpochMs?.let { put("validFromEpochMs", it) }
+                            employment.validToEpochMs?.let { put("validToEpochMs", it) }
+                            put("currentState", employment.currentState)
+                            put("verificationState", employment.verificationState)
+                        },
+                    )
+                }
+            },
+        )
+    }
 
 internal fun normalizeContactQuery(value: String): String = Normalizer.normalize(value.trim(), Normalizer.Form.NFKC).lowercase()
 

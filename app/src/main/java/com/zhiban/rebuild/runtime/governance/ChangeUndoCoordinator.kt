@@ -253,6 +253,9 @@ internal class ChangeUndoCoordinator(private val database: AgentDatabase) {
     private suspend fun restoreContactProfile(change: ChangeLogEntity, nowEpochMs: Long): Boolean {
         val json =
             runSuspendCatching { Json.parseToJsonElement(change.inversePayloadJson).jsonObject }.getOrNull() ?: return false
+        json["deleteEmploymentEpisodeId"]?.jsonPrimitive?.content?.let { episodeId ->
+            return restoreOwnerEmployment(change, episodeId)
+        }
         val clearFields = json["clearFields"]?.jsonArray.orEmpty().map { it.jsonPrimitive.content }
         if (clearFields.any { it !in ContactProfileDomainWriter.PROFILE_FIELDS }) return false
         val contact = database.contactDao().findById(change.targetId) ?: return false
@@ -270,5 +273,13 @@ internal class ChangeUndoCoordinator(private val database: AgentDatabase) {
         val factId = json["deleteFactId"]?.jsonPrimitive?.content
         if (factId != null && !FactIndex(database).delete(factId)) return false
         return clearFields.isNotEmpty() || factId != null
+    }
+
+    private suspend fun restoreOwnerEmployment(change: ChangeLogEntity, episodeId: String): Boolean {
+        if (episodeId.isBlank() || change.targetId != com.zhiban.rebuild.data.contact.RelationshipPersonIds.SELF) return false
+        val intelligence = database.contactIntelligenceDao()
+        val employment = intelligence.findEmploymentEpisode(episodeId) ?: return false
+        if (ownerEmploymentDigest(employment) != change.afterDigest) return false
+        return intelligence.deleteEmploymentEpisode(episodeId) == 1
     }
 }

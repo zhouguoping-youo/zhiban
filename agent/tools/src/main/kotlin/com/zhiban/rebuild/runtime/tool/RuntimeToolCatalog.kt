@@ -121,7 +121,7 @@ class RuntimeToolCatalog(val specs: Map<String, RuntimeToolSpec>) {
                     "contact.maintenance.list",
                     1,
                     RuntimeToolRisk.READ_ONLY,
-                    """{"type":"function","function":{"name":"contact.maintenance.list","description":"读取联系人库中需要维护的档案及尚未关联的社交账号或群昵称。用于主动提出最少的核实问题，不得凭同名臆测身份。","parameters":{"type":"object","additionalProperties":false,"properties":{"issue":{"type":"string","enum":["NO_REACHABLE_METHOD","EMPLOYMENT_TIME_UNKNOWN","STALE_PROFILE"]},"limit":{"type":"integer","minimum":1,"maximum":50}}}}}""",
+                    """{"type":"function","function":{"name":"contact.maintenance.list","description":"读取联系人全库的真实清洗摘要、本人职业锚点状态，以及一页需要维护的档案。totalContactCount 才是全库人数，returnedCount 只是本页条数；deferredRelationshipEvidenceCount 是留待未来对话发现的关系证据，不是当前任务。必须遵守 ownerProfile.nextStep，每轮最多问一个问题。","parameters":{"type":"object","additionalProperties":false,"properties":{"issue":{"type":"string","enum":["NO_REACHABLE_METHOD","STALE_PROFILE"]},"limit":{"type":"integer","minimum":1,"maximum":50}}}}}""",
                     8,
                 ),
                 RuntimeToolSpec(
@@ -142,7 +142,7 @@ class RuntimeToolCatalog(val specs: Map<String, RuntimeToolSpec>) {
                     "contact.profile.proposeUpdate",
                     1,
                     RuntimeToolRisk.WRITE_CONFIRMATION_REQUIRED,
-                    """{"type":"function","function":{"name":"contact.profile.proposeUpdate","description":"基于可追溯证据提出对已有联系人档案的补全。只补充空缺字段，不覆盖已有资料；执行前必须由用户确认。稳定但不属于基础字段的信息可写成联系人事实。","parameters":{"type":"object","additionalProperties":false,"required":["contactId","evidenceSummary"],"properties":{"contactId":{"type":"string"},"phone":{"type":"string"},"email":{"type":"string"},"wechatId":{"type":"string"},"company":{"type":"string"},"title":{"type":"string"},"note":{"type":"string"},"factType":{"type":"string","enum":["CONTACT_MEMORY","IMPORTANT_DATE","COMMUNICATION_PREFERENCE","CURRENT_MATTER"]},"factText":{"type":"string"},"evidenceSummary":{"type":"string","description":"说明信息来自哪段已授权资料，不写入原文"},"confidence":{"type":"number","minimum":0,"maximum":1}}}}}""",
+                    """{"type":"function","function":{"name":"contact.profile.proposeUpdate","description":"基于可追溯证据提出档案补全。普通联系人只补充空缺字段；当用户明确回答自己的当前公司时，contactId 必须传 user:self，company 必填，可带 title。所有写入执行前必须由用户确认，未出现确认卡前不得声称已保存。","parameters":{"type":"object","additionalProperties":false,"required":["contactId","evidenceSummary"],"properties":{"contactId":{"type":"string","description":"普通联系人 ID；本人职业档案固定使用 user:self"},"phone":{"type":"string"},"email":{"type":"string"},"wechatId":{"type":"string"},"company":{"type":"string"},"title":{"type":"string"},"note":{"type":"string"},"factType":{"type":"string","enum":["CONTACT_MEMORY","IMPORTANT_DATE","COMMUNICATION_PREFERENCE","CURRENT_MATTER"]},"factText":{"type":"string"},"evidenceSummary":{"type":"string","description":"说明信息来自哪段已授权资料，不写入原文"},"confidence":{"type":"number","minimum":0,"maximum":1}}}}}""",
                     4,
                 ),
                 RuntimeToolSpec(

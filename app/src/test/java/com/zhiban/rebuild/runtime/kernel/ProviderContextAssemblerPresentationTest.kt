@@ -23,5 +23,12 @@ class ProviderContextAssemblerPresentationTest {
 
         val policy = result.messages.first { it.role == "system" }.content
         assertTrue(policy.contains("不要展示工具名、内部状态、检索条数或实现说明"))
+        assertTrue(policy.contains("totalContactCount 才是全库人数"))
+        assertTrue(policy.contains("不得要求用户逐个填写所有联系人的入职时间"))
+        assertTrue(policy.contains("每轮严格只问一个问题"))
+        assertTrue(policy.contains("不能因为 contactCardLinked 为 false 就再次询问用户是哪张名片"))
+        assertTrue(policy.contains("contactId 固定为 user:self"))
+        assertTrue(policy.contains("确认卡出现前不得说已确认"))
+        assertTrue(policy.contains("用户暂不完善就保留待发现"))
     }
 }

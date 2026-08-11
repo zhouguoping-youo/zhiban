@@ -150,6 +150,12 @@ interface ContactKnowledgeDao {
     )
     fun observeAllPendingEnrichment(nowEpochMs: Long): Flow<List<ContactEnrichmentCandidateEntity>>
 
+    @Query(
+        """SELECT COUNT(*) FROM contact_enrichment_candidates
+        WHERE status = 'PENDING' AND (expiresAtEpochMs IS NULL OR expiresAtEpochMs > :nowEpochMs)""",
+    )
+    suspend fun countAllPendingEnrichment(nowEpochMs: Long): Int
+
     @Query("SELECT * FROM contact_enrichment_candidates WHERE candidateId = :candidateId")
     suspend fun findEnrichmentCandidate(candidateId: String): ContactEnrichmentCandidateEntity?
 
@@ -177,6 +183,11 @@ interface ContactKnowledgeDao {
         "SELECT * FROM owner_contact_links WHERE undoneAtEpochMs IS NULL AND userConfirmed = 1 ORDER BY createdAtEpochMs DESC",
     )
     fun observeActiveOwnerContactLinks(): Flow<List<OwnerContactLinkEntity>>
+
+    @Query(
+        "SELECT * FROM owner_contact_links WHERE undoneAtEpochMs IS NULL AND userConfirmed = 1 ORDER BY createdAtEpochMs DESC",
+    )
+    suspend fun listActiveOwnerContactLinks(): List<OwnerContactLinkEntity>
 
     @Query(
         "UPDATE owner_contact_links SET undoneAtEpochMs = :nowEpochMs WHERE contactId = :contactId AND undoneAtEpochMs IS NULL AND userConfirmed = 1",

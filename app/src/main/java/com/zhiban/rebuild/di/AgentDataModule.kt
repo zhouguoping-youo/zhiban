@@ -233,6 +233,14 @@ object AgentDataModule {
                 val profile = userProfile.profile.value
                 buildPersonalizationPrompt(value, profile)
             },
+            ownerProfile = {
+                val profile = userProfile.profile.value
+                com.zhiban.rebuild.runtime.tool.ContactOwnerProfileSnapshot(
+                    name = profile.name,
+                    occupations = profile.occupations,
+                    hasConfiguredIdentity = listOf(profile.name, profile.phone, profile.wechatId).any(String::isNotBlank),
+                )
+            },
             memoryPolicy = controls::memory,
             feedbackPolicy = controls::feedback,
             toolEnabled = controls::isToolAvailable,

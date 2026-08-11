@@ -6,7 +6,7 @@ import org.junit.Test
 
 class ContactMaintenanceEvaluatorTest {
     @Test
-    fun unknownEmploymentAndMissingReachabilityBecomeExplicitMaintenanceIssues() {
+    fun unknownEmploymentRemainsDeferredWhileActionableIssuesStayExplicit() {
         val contact = contact("a", updatedAt = 1L)
         val overview = ContactMaintenanceEvaluator.evaluate(
             contacts = listOf(contact),
@@ -19,8 +19,8 @@ class ContactMaintenanceEvaluatorTest {
 
         val issues = overview.items.single().issues
         assertTrue(ContactMaintenanceIssue.NO_REACHABLE_METHOD in issues)
-        assertTrue(ContactMaintenanceIssue.EMPLOYMENT_TIME_UNKNOWN in issues)
         assertTrue(ContactMaintenanceIssue.STALE_PROFILE in issues)
+        assertEquals(2, issues.size)
         assertEquals(6, overview.needsAttentionCount)
     }
 
@@ -36,7 +36,7 @@ class ContactMaintenanceEvaluatorTest {
         ).items.single()
 
         assertEquals(0.4, item.quality.temporal, 0.0)
-        assertTrue(ContactMaintenanceIssue.EMPLOYMENT_TIME_UNKNOWN in item.issues)
+        assertTrue(item.issues.isEmpty())
     }
 
     private fun contact(id: String, phone: String? = null, company: String? = null, updatedAt: Long) = ContactEntity(

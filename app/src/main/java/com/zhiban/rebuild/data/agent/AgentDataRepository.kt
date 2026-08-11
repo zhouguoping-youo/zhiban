@@ -81,6 +81,7 @@ data class ContactImportSummary(
     val skippedSelfPhone: String? = null,
     val skippedSelfWechat: String? = null,
     val selfIdentityMissing: Boolean = false,
+    val automaticallyMerged: Int = 0,
 ) {
     val imported: Int get() = created + updated
 }

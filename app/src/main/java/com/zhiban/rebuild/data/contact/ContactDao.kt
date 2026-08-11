@@ -303,6 +303,9 @@ interface ContactIdentityDao {
     @Query("SELECT * FROM contact_merge_links WHERE undoneAtEpochMs IS NULL ORDER BY createdAtEpochMs DESC")
     fun observeActiveMergeLinks(): Flow<List<ContactMergeLinkEntity>>
 
+    @Query("SELECT * FROM contact_merge_links WHERE undoneAtEpochMs IS NULL ORDER BY createdAtEpochMs DESC")
+    suspend fun listActiveMergeLinks(): List<ContactMergeLinkEntity>
+
     @Query("SELECT * FROM contact_merge_links WHERE sourceContactId = :sourceContactId AND undoneAtEpochMs IS NULL")
     suspend fun activeMergeLink(sourceContactId: String): ContactMergeLinkEntity?
 

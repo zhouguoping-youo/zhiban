@@ -3,6 +3,10 @@ package com.zhiban.rebuild.runtime.governance
 import androidx.room.withTransaction
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.ToolAuditEntity
+import com.zhiban.rebuild.data.contact.ContactEntity
+import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
+import com.zhiban.rebuild.data.contact.PersonEntity
+import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.context.FactIndex
 import com.zhiban.rebuild.runtime.spi.RUNTIME_SCHEMA_VERSION
@@ -61,6 +65,18 @@ internal class ContactProfileDomainWriter(private val database: AgentDatabase) {
         require(staged.state in setOf("PENDING", "APPROVED") && staged.expiresAtEpochMs > context.nowEpochMs)
         require(staged.payloadDigest == call.canonicalInputDigest)
         val payload = Json.parseToJsonElement(staged.payloadJson).jsonObject
+        return if (call.contactId == RelationshipPersonIds.SELF) {
+            applyOwnerEmployment(payload, context)
+        } else {
+            applyContactProfile(payload, context, call)
+        }
+    }
+
+    private suspend fun applyContactProfile(
+        payload: kotlinx.serialization.json.JsonObject,
+        context: ConfirmedToolExecutionContext,
+        call: ContactProfileCandidateCall,
+    ): AppliedProfile {
         val contact = requireNotNull(database.contactDao().findById(call.contactId))
         fun proposed(name: String) = payload[name]?.jsonPrimitive?.content?.trim()?.takeIf(String::isNotBlank)
         fun additive(current: String?, name: String): String? {
@@ -111,16 +127,67 @@ internal class ContactProfileDomainWriter(private val database: AgentDatabase) {
             )
             id
         }
-        return AppliedProfile(updated, changedFields, factText, factType, factId)
+        return AppliedProfile(updated, changedFields, factId, null)
+    }
+
+    private suspend fun applyOwnerEmployment(payload: kotlinx.serialization.json.JsonObject, context: ConfirmedToolExecutionContext): AppliedProfile {
+        val company = requireNotNull(payload["company"]?.jsonPrimitive?.content?.trim()?.takeIf(String::isNotBlank))
+        val title = payload["title"]?.jsonPrimitive?.content?.trim()?.takeIf(String::isNotBlank)
+        val intelligence = database.contactIntelligenceDao()
+        require(intelligence.findCurrentUserEmployment(RelationshipPersonIds.SELF) == null) {
+            "OWNER_CURRENT_EMPLOYMENT_ALREADY_CONFIRMED"
+        }
+        if (intelligence.findPerson(RelationshipPersonIds.SELF) == null) {
+            intelligence.upsertPerson(
+                PersonEntity(
+                    personId = RelationshipPersonIds.SELF,
+                    canonicalContactId = null,
+                    displayName = "我",
+                    normalizedName = "我",
+                    kind = "SELF",
+                    status = "ACTIVE",
+                    createdAtEpochMs = context.nowEpochMs,
+                    updatedAtEpochMs = context.nowEpochMs,
+                ),
+            )
+        }
+        val employment = PersonEmploymentEpisodeEntity(
+            episodeId = "owner-employment-${sha256(company.lowercase()).take(24)}",
+            personId = RelationshipPersonIds.SELF,
+            organizationId = null,
+            companyNameSnapshot = company,
+            department = null,
+            title = title,
+            validFromEpochMs = null,
+            validToEpochMs = null,
+            temporalPrecision = "UNKNOWN",
+            currentState = "CURRENT",
+            sourceRef = "runtime:${context.runId}",
+            confidence = 1.0,
+            verificationState = "USER_CONFIRMED",
+            status = "ACTIVE",
+            recordedAtEpochMs = context.nowEpochMs,
+            updatedAtEpochMs = context.nowEpochMs,
+        )
+        intelligence.upsertEmployment(employment)
+        val changedFields = buildList {
+            add("company")
+            if (title != null) add("title")
+        }
+        return AppliedProfile(null, changedFields, null, employment)
     }
 
     private suspend fun approveAndWriteChangeLog(applied: AppliedProfile, call: ContactProfileCandidateCall, context: ConfirmedToolExecutionContext): String {
         database.stagedContactCandidateDao().approve(call.candidateId, context.nowEpochMs)
 
-        val appliedDigest = contactProfileFieldsDigest(applied.updated, applied.changedFields)
+        val appliedDigest = applied.employment?.let(::ownerEmploymentDigest)
+            ?: contactProfileFieldsDigest(requireNotNull(applied.updatedContact), applied.changedFields)
         val inverse = buildJsonObject {
-            put("clearFields", buildJsonArray { applied.changedFields.forEach { add(JsonPrimitive(it)) } })
+            if (applied.updatedContact != null) {
+                put("clearFields", buildJsonArray { applied.changedFields.forEach { add(JsonPrimitive(it)) } })
+            }
             applied.factId?.let { put("deleteFactId", it) }
+            applied.employment?.let { put("deleteEmploymentEpisodeId", it.episodeId) }
         }.toString()
         val changeId = changeIdFor(call.idempotencyKey)
         database.changeLogDao().insert(
@@ -129,7 +196,7 @@ internal class ContactProfileDomainWriter(private val database: AgentDatabase) {
                 context.runId,
                 TOOL_NAME,
                 call.idempotencyKey,
-                "CONTACT",
+                if (applied.employment == null) "CONTACT" else "PERSON_EMPLOYMENT",
                 call.contactId,
                 "UPDATE",
                 null,
@@ -155,6 +222,7 @@ internal class ContactProfileDomainWriter(private val database: AgentDatabase) {
             put("contactId", call.contactId)
             put("updatedFieldCount", applied.changedFields.size)
             put("factAdded", applied.factId != null)
+            put("employmentAdded", applied.employment != null)
             put("confidence", call.confidence)
             put("status", "profile_enriched")
             put("changeId", changeId)
@@ -254,11 +322,10 @@ internal class ContactProfileDomainWriter(private val database: AgentDatabase) {
     }
 
     private data class AppliedProfile(
-        val updated: com.zhiban.rebuild.data.contact.ContactEntity,
+        val updatedContact: ContactEntity?,
         val changedFields: List<String>,
-        val factText: String?,
-        val factType: String?,
         val factId: String?,
+        val employment: PersonEmploymentEpisodeEntity?,
     )
 
     companion object {
@@ -271,6 +338,18 @@ internal class ContactProfileDomainWriter(private val database: AgentDatabase) {
 internal fun contactProfileFieldsDigest(contact: com.zhiban.rebuild.data.contact.ContactEntity, fields: List<String>): String = sha256(
     buildJsonObject {
         fields.sorted().forEach { name -> fieldValue(contact, name)?.let { put(name, it) } }
+    }.toString(),
+)
+
+internal fun ownerEmploymentDigest(value: PersonEmploymentEpisodeEntity): String = sha256(
+    buildJsonObject {
+        put("episodeId", value.episodeId)
+        put("personId", value.personId)
+        put("company", value.companyNameSnapshot)
+        value.title?.let { put("title", it) }
+        put("currentState", value.currentState)
+        put("verificationState", value.verificationState)
+        put("status", value.status)
     }.toString(),
 )
 

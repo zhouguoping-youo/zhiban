@@ -21,6 +21,12 @@ interface ContactIntelligenceDao {
     @Upsert
     suspend fun upsertEmployment(value: PersonEmploymentEpisodeEntity)
 
+    @Query("SELECT * FROM person_employment_episodes WHERE episodeId = :episodeId")
+    suspend fun findEmploymentEpisode(episodeId: String): PersonEmploymentEpisodeEntity?
+
+    @Query("DELETE FROM person_employment_episodes WHERE episodeId = :episodeId")
+    suspend fun deleteEmploymentEpisode(episodeId: String): Int
+
     @Upsert
     suspend fun upsertRelationship(value: RelationshipEpisodeEntity)
 
@@ -63,6 +69,12 @@ interface ContactIntelligenceDao {
            ORDER BY lastObservedAtEpochMs DESC LIMIT :limit""",
     )
     suspend fun listUnresolvedIdentities(limit: Int): List<SourceIdentityEntity>
+
+    @Query(
+        """SELECT COUNT(*) FROM source_identities
+           WHERE personId IS NULL AND resolutionStatus IN ('UNRESOLVED', 'CANDIDATE')""",
+    )
+    suspend fun countUnresolvedIdentities(): Int
 
     @Query("SELECT * FROM source_identities WHERE sourceIdentityId = :sourceIdentityId")
     suspend fun findSourceIdentity(sourceIdentityId: String): SourceIdentityEntity?

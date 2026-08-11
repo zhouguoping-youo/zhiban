@@ -14,7 +14,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.AlternateEmail
 import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.LinkOff
 import androidx.compose.material.icons.outlined.PersonSearch
 import androidx.compose.material3.Icon
@@ -122,7 +121,6 @@ private fun ContactMaintenanceRow(item: ContactMaintenanceItem, onAsk: (String) 
     val primaryIssue = item.issues.first()
     val (icon, label) = when (primaryIssue) {
         ContactMaintenanceIssue.NO_REACHABLE_METHOD -> Icons.Outlined.LinkOff to "缺少联系方式"
-        ContactMaintenanceIssue.EMPLOYMENT_TIME_UNKNOWN -> Icons.Outlined.History to "任职时间待核实"
         ContactMaintenanceIssue.STALE_PROFILE -> Icons.Outlined.PersonSearch to "资料较久未更新"
     }
     MaintenanceActionRow(
@@ -157,7 +155,6 @@ private fun MaintenanceActionRow(icon: ImageVector, title: String, detail: Strin
 private fun verificationPrompt(item: ContactMaintenanceItem, issue: ContactMaintenanceIssue): String {
     val task = when (issue) {
         ContactMaintenanceIssue.NO_REACHABLE_METHOD -> "核实可用联系方式"
-        ContactMaintenanceIssue.EMPLOYMENT_TIME_UNKNOWN -> "核实任职公司、职位和起止时间"
         ContactMaintenanceIssue.STALE_PROFILE -> "核实姓名、公司、职位和联系方式是否仍有效"
     }
     return "请帮我为联系人“${item.contact.displayName}”$task。先检查本地已有证据；无法确认时生成一条简短、自然的询问文案。不要猜测，对外发送前让我最后确认。"
