@@ -20,7 +20,13 @@ object ZhiBanSpacing {
     val Xxxl = 32.dp
 
     val PageHorizontal = Xl
-    val PageTop = Md
+
+    /**
+     * The app shell already places page content immediately after the real
+     * status-bar/cutout safe area. Pages must not add a second decorative row
+     * above their header.
+     */
+    val PageTop = 0.dp
     val PageBottom = Xxl
     val Section = Xxl
     val ContentGap = Md

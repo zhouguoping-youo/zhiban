@@ -131,7 +131,6 @@ fun ZhiBanScaffold(
                         .fillMaxHeight()
                         .windowInsetsPadding(contentInsets)
                         .padding(
-                            top = ZhiBanSpacing.Sm,
                             bottom = if (usesBottomNavigation) BottomBarReservedHeight else 0.dp,
                         ),
                 ) { content(PaddingValues()) }

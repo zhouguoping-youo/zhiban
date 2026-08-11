@@ -3,8 +3,12 @@ package com.zhiban.rebuild.ui.theme
 import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ripple.RippleAlpha
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
+import androidx.compose.material3.RippleConfiguration
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -71,6 +75,19 @@ private val ZhiBanShapes = Shapes(
     extraLarge = RoundedCornerShape(ZhiBanRadius.Dialog),
 )
 
+/** Quiet brand feedback shared by rows, cards, icons, tabs and buttons. */
+@OptIn(ExperimentalMaterial3Api::class)
+internal val ZhiBanRippleConfiguration = RippleConfiguration(
+    color = ZhiBanTerracotta,
+    rippleAlpha = RippleAlpha(
+        pressedAlpha = 0.10f,
+        focusedAlpha = 0.08f,
+        draggedAlpha = 0.12f,
+        hoveredAlpha = 0.04f,
+    ),
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ZhiBanTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
@@ -90,6 +107,7 @@ fun ZhiBanTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable
         shapes = ZhiBanShapes,
     ) {
         CompositionLocalProvider(
+            LocalRippleConfiguration provides ZhiBanRippleConfiguration,
             LocalRelationshipGraphColors provides if (darkTheme) {
                 DarkRelationshipGraphColors
             } else {
