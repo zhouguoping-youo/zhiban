@@ -46,6 +46,7 @@ import com.zhiban.rebuild.data.notification.MessageCollectionPreferences
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.NotificationInsightAnalyzer
 import com.zhiban.rebuild.data.notification.ScheduleInsight
+import com.zhiban.rebuild.relationship.RelationshipTaxonomy
 import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.context.FactIndex
 import com.zhiban.rebuild.runtime.governance.ActionDecision
@@ -80,10 +81,7 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
 
     suspend fun confirmContactRole(contactId: String, roleType: String, skillId: String, nowEpochMs: Long = System.currentTimeMillis()) {
         require(database.contactDao().findById(contactId) != null) { "联系人不存在" }
-        require(
-            roleType in
-                setOf("FAMILY", "FRIEND", "COLLEAGUE", "CUSTOMER", "SUPPLIER", "TEACHER", "CLASSMATE", "PROJECT_PARTNER", "OTHER"),
-        ) {
+        require(roleType in RelationshipTaxonomy.selectableCodes) {
             "不支持的联系人角色"
         }
         database.contactDao().upsertRole(

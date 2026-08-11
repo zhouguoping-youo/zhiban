@@ -83,6 +83,27 @@ class ForceRelationshipGraphTest {
         assertTrue(bodies.values.all { it.velocity.getDistance() > 0f })
     }
 
+    @Test
+    fun `historical link keeps its state and displays the concrete past relationship`() {
+        val people = mapOf(
+            RelationshipPersonIds.SELF to RelationshipPersonUi(RelationshipPersonIds.SELF, "我", true),
+            "former" to RelationshipPersonUi("former", "前同事", false),
+        )
+        val historical = edge(
+            "history",
+            RelationshipPersonIds.SELF,
+            "former",
+            "COLLEAGUE",
+            1.0,
+            true,
+        ).copy(status = "HISTORICAL")
+
+        val model = buildForceGraphModel(RelationshipPersonIds.SELF, people, listOf(historical))
+
+        assertTrue(model.links.single().isHistorical)
+        assertEquals("前同事", graphRelationLabel("COLLEAGUE", isHistorical = true))
+    }
+
     private fun edge(id: String, from: String, to: String, type: String, confidence: Double, confirmed: Boolean) = RelationshipEdgeEntity(
         edgeId = id,
         fromContactId = from,

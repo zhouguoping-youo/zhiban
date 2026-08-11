@@ -1,5 +1,9 @@
 package com.zhiban.rebuild.runtime.tool
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertThrows
@@ -83,6 +87,25 @@ class RuntimeToolContractsTest {
         assertEquals(sha256("知伴"), sha256("知伴"))
         assertNotEquals(sha256("a"), sha256("b"))
         assertTrue(sha256("x").all { it in '0'..'9' || it in 'a'..'f' })
+    }
+
+    @Test
+    fun `relationship tool schema follows canonical selectable taxonomy`() {
+        val definition = RuntimeToolCatalog.production()
+            .requireRegistered("relationship.createCandidate")
+            .providerDefinitionJson
+        val relationshipTypes = Json.parseToJsonElement(definition)
+            .jsonObject.getValue("function")
+            .jsonObject.getValue("parameters")
+            .jsonObject.getValue("properties")
+            .jsonObject.getValue("relationType")
+            .jsonObject.getValue("enum")
+            .jsonArray
+            .map { it.jsonPrimitive.content }
+
+        assertTrue("MANAGER" in relationshipTypes)
+        assertTrue("CLASSMATE" in relationshipTypes)
+        assertTrue("UNKNOWN" !in relationshipTypes)
     }
 
     @Test

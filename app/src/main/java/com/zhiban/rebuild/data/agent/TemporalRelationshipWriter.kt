@@ -3,6 +3,8 @@ package com.zhiban.rebuild.data.agent
 import com.zhiban.rebuild.data.contact.PersonEntity
 import com.zhiban.rebuild.data.contact.RelationshipEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
+import com.zhiban.rebuild.relationship.RelationshipDirection
+import com.zhiban.rebuild.relationship.RelationshipTaxonomy
 
 /**
  * Writes one relationship episode without collapsing other relationship types between the same
@@ -40,7 +42,10 @@ internal class TemporalRelationshipWriter(private val database: AgentDatabase) {
             fromPersonId = fromPersonId,
             toPersonId = toPersonId,
             relationshipType = relationshipType,
-            direction = "BIDIRECTIONAL",
+            direction = when (RelationshipTaxonomy.requireSupported(relationshipType).direction) {
+                RelationshipDirection.SYMMETRIC -> "BIDIRECTIONAL"
+                RelationshipDirection.DIRECTED -> "FROM_TO"
+            },
             validFromEpochMs = nowEpochMs.takeIf { temporalState == "CURRENT" },
             validToEpochMs = nowEpochMs.takeIf { temporalState == "PAST" },
             temporalPrecision = when (temporalState) {

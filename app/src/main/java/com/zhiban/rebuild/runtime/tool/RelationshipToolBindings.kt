@@ -4,6 +4,7 @@ import com.zhiban.rebuild.data.contact.ContactIntelligenceDao
 import com.zhiban.rebuild.data.contact.RelationshipEdgeDao
 import com.zhiban.rebuild.data.contact.RelationshipEventDao
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
+import com.zhiban.rebuild.relationship.RelationshipTaxonomy
 import com.zhiban.rebuild.runtime.governance.RelationshipCandidateCall
 import com.zhiban.rebuild.runtime.governance.RelationshipDomainWriter
 import com.zhiban.rebuild.runtime.runSuspendCatching
@@ -255,8 +256,7 @@ internal class RelationshipCreateCandidateToolBinding(
     }
 
     private companion object {
-        val ALLOWED_RELATIONS =
-            setOf("FAMILY", "FRIEND", "COLLEAGUE", "CUSTOMER", "SUPPLIER", "TEACHER", "CLASSMATE", "PROJECT_PARTNER", "OTHER")
+        val ALLOWED_RELATIONS = RelationshipTaxonomy.selectableCodes
         val ALLOWED_TEMPORAL_STATES = setOf("CURRENT", "PAST", "UNKNOWN")
     }
 }

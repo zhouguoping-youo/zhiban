@@ -197,6 +197,39 @@ class RelationGraphInferenceTest {
         assertEquals("FRIEND", history.single().relationType)
     }
 
+    @Test
+    fun `current and historical relationships share one graph without duplicate type`() {
+        val currentColleague = edge("self", "contact", "COLLEAGUE")
+        val historicalColleague = currentColleague.copy(edgeId = "history-colleague", status = "HISTORICAL")
+        val historicalFriend = edge("self", "contact", "FRIEND").copy(
+            edgeId = "history-friend",
+            status = "HISTORICAL",
+        )
+
+        val result = mergeCurrentAndHistoricalRelationships(
+            current = listOf(currentColleague),
+            historical = listOf(historicalColleague, historicalFriend),
+        )
+
+        assertEquals(2, result.size)
+        assertEquals(1, result.count { it.relationType == "COLLEAGUE" })
+        assertTrue(result.any { it.relationType == "FRIEND" && it.status == "HISTORICAL" })
+    }
+
+    @Test
+    fun `expanded taxonomy participates in existing category filters`() {
+        val person = contact("person", "联系人", null)
+        val relationships = listOf(
+            edge(RelationshipPersonIds.SELF, person.contactId, "MANAGER"),
+            edge(RelationshipPersonIds.SELF, person.contactId, "SPOUSE"),
+            edge(RelationshipPersonIds.SELF, person.contactId, "CLOSE_FRIEND"),
+        )
+
+        assertTrue(contactMatchesRelationCategory(person, "工作", relationships))
+        assertTrue(contactMatchesRelationCategory(person, "家人", relationships))
+        assertTrue(contactMatchesRelationCategory(person, "朋友", relationships))
+    }
+
     private fun contact(id: String, name: String, company: String?, email: String? = null) = ContactEntity(
         contactId = id,
         displayName = name,

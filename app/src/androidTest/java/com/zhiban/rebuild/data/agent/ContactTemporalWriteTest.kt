@@ -103,4 +103,42 @@ class ContactTemporalWriteTest {
             database.close()
         }
     }
+
+    @Test
+    fun directionalRelationshipPersistsDirectionAndInverseCompatibleType() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val database = Room.inMemoryDatabaseBuilder(context, AgentDatabase::class.java).build()
+        try {
+            val contacts = ContactAgentDataRepository(database)
+            val relationships = RelationshipAgentDataRepository(database)
+            val contactId = contacts.saveUserContact(
+                contactId = null,
+                displayName = "直属下属",
+                phone = null,
+                wechatId = null,
+                company = null,
+                title = null,
+                tag = null,
+                note = null,
+                nowEpochMs = 10,
+            )
+
+            relationships.saveConfirmedRelationship(
+                com.zhiban.rebuild.data.contact.RelationshipPersonIds.SELF,
+                contactId,
+                "MANAGER",
+                "CURRENT",
+                100,
+            )
+
+            val episode = database.contactIntelligenceDao().listRelationships(
+                com.zhiban.rebuild.data.contact.RelationshipPersonIds.SELF,
+                20,
+            ).single()
+            assertEquals("MANAGER", episode.relationshipType)
+            assertEquals("FROM_TO", episode.direction)
+        } finally {
+            database.close()
+        }
+    }
 }

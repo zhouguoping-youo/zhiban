@@ -77,6 +77,8 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
+import com.zhiban.rebuild.relationship.RelationshipGroup
+import com.zhiban.rebuild.relationship.RelationshipTaxonomy
 import com.zhiban.rebuild.ui.theme.LocalRelationshipGraphColors
 import com.zhiban.rebuild.ui.theme.RelationshipGraphColors
 import com.zhiban.rebuild.ui.theme.ZhiBanRadius
@@ -92,7 +94,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-private val WorkRelations = setOf("COLLEAGUE", "CUSTOMER", "SUPPLIER", "PROJECT_PARTNER")
+private val WorkRelations = RelationshipTaxonomy.selectableDefinitions
+    .filter { it.group == RelationshipGroup.WORK }
+    .mapTo(hashSetOf()) { it.code }
 
 internal enum class ForceGraphNodeKind { FOCUS, CONTACT, WORK }
 
@@ -104,6 +108,7 @@ internal data class ForceGraphLink(
     val relationType: String,
     val confidence: Float,
     val isInferred: Boolean,
+    val isHistorical: Boolean = false,
     val evidenceLabel: String? = null,
 )
 
@@ -150,6 +155,7 @@ internal fun buildForceGraphModel(rootId: String, peopleById: Map<String, Relati
             relationType = edge.relationType,
             confidence = edge.confidence.toFloat().coerceIn(0f, 1f),
             isInferred = !edge.userConfirmed,
+            isHistorical = edge.status == "HISTORICAL",
             evidenceLabel = sharedCompany ?: edge.evidenceDigest
                 .takeIf { edge.isInferredEvidenceRelationship() }
                 ?.substringAfter('：', missingDelimiterValue = edge.evidenceDigest),
@@ -462,19 +468,25 @@ internal fun ForceRelationshipGraphCanvas(
                             color = if (link.evidenceLabel != null) {
                                 graphColors.sharedCompany.copy(alpha = 0.58f)
                             } else {
-                                lineColor.copy(alpha = if (link.isInferred) 0.28f else 0.48f)
+                                lineColor.copy(
+                                    alpha = when {
+                                        link.isInferred -> 0.28f
+                                        link.isHistorical -> 0.34f
+                                        else -> 0.48f
+                                    },
+                                )
                             },
                             start = from,
                             end = to,
                             strokeWidth = (1.2f + link.confidence * 1.8f) * densityValue,
                             cap = StrokeCap.Round,
-                            pathEffect = if (link.isInferred) PathEffect.dashPathEffect(floatArrayOf(8f, 8f)) else null,
+                            pathEffect = when {
+                                link.isInferred -> PathEffect.dashPathEffect(floatArrayOf(8f, 8f))
+                                link.isHistorical -> PathEffect.dashPathEffect(floatArrayOf(16f, 7f))
+                                else -> null
+                            },
                         )
-                        val relationshipText = if (link.evidenceLabel != null) {
-                            "同公司"
-                        } else {
-                            forceRelationLabel(link.relationType)
-                        }
+                        val relationshipText = graphRelationLabel(link.relationType, link.isHistorical)
                         if (relationshipText.isNotBlank()) {
                             val center = (from + to) / 2f
                             val labelWidth = max(50.dp.toPx(), (relationshipText.length * 13 + 16).dp.toPx())
@@ -782,7 +794,7 @@ private fun ForceNodeDetailSheet(node: ForceGraphNode, model: ForceGraphModel, o
                             )
                             Text(
                                 buildString {
-                                    append(forceRelationLabel(link.relationType))
+                                    append(graphRelationLabel(link.relationType, link.isHistorical))
                                     link.evidenceLabel?.let { append(" · 依据：").append(it) }
                                     if (link.isInferred) append(" · 智能推测")
                                 },
@@ -818,16 +830,4 @@ private fun nodeKindLabel(kind: ForceGraphNodeKind): String = when (kind) {
     ForceGraphNodeKind.FOCUS -> "我 / 当前焦点"
     ForceGraphNodeKind.CONTACT -> "联系人"
     ForceGraphNodeKind.WORK -> "工作关系"
-}
-
-private fun forceRelationLabel(type: String): String = when (type) {
-    "FAMILY" -> "家人"
-    "FRIEND" -> "朋友"
-    "COLLEAGUE" -> "同事"
-    "CUSTOMER" -> "客户"
-    "SUPPLIER" -> "供应商"
-    "TEACHER" -> "师生"
-    "CLASSMATE" -> "同学"
-    "PROJECT_PARTNER" -> "项目伙伴"
-    else -> "其他关系"
 }

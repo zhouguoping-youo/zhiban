@@ -40,6 +40,7 @@ import com.zhiban.rebuild.data.notification.MessageCollectionPreferences
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.NotificationInsightAnalyzer
 import com.zhiban.rebuild.data.notification.ScheduleInsight
+import com.zhiban.rebuild.relationship.RelationshipTaxonomy
 import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.context.FactIndex
 import com.zhiban.rebuild.runtime.governance.ActionDecision
@@ -79,12 +80,7 @@ internal class RelationshipAgentDataRepository(private val database: AgentDataba
     ): String = database.withTransaction {
         require(fromContactId != toContactId) { "请选择两个不同的联系人" }
         require(temporalState in setOf("CURRENT", "PAST", "UNKNOWN")) { "关系时间状态无效" }
-        require(
-            relationType in setOf(
-                "FAMILY", "FRIEND", "COLLEAGUE", "CUSTOMER", "SUPPLIER",
-                "TEACHER", "CLASSMATE", "PROJECT_PARTNER", "OTHER",
-            ),
-        ) { "关系类型无效" }
+        require(relationType in RelationshipTaxonomy.selectableCodes) { "关系类型无效" }
         require(
             fromContactId == RelationshipPersonIds.SELF ||
                 database.contactDao().findById(fromContactId) != null,
@@ -141,12 +137,7 @@ internal class RelationshipAgentDataRepository(private val database: AgentDataba
 
     suspend fun updateConfirmedRelationship(edgeId: String, relationType: String, nowEpochMs: Long = System.currentTimeMillis()): Boolean =
         database.withTransaction {
-            require(
-                relationType in setOf(
-                    "FAMILY", "FRIEND", "COLLEAGUE", "CUSTOMER", "SUPPLIER",
-                    "TEACHER", "CLASSMATE", "PROJECT_PARTNER", "OTHER",
-                ),
-            ) { "关系类型无效" }
+            require(relationType in RelationshipTaxonomy.selectableCodes) { "关系类型无效" }
             val current = database.relationshipEdgeDao().find(edgeId) ?: return@withTransaction false
             require(current.userConfirmed) { "只有你确认的关系可以修改" }
             database.relationshipEdgeDao().upsert(

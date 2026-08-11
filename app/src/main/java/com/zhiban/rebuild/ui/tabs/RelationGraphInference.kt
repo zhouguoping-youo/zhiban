@@ -6,6 +6,8 @@ import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.data.contact.corporateEmailDomain
+import com.zhiban.rebuild.relationship.RelationshipGroup
+import com.zhiban.rebuild.relationship.RelationshipTaxonomy
 
 internal const val INFERRED_COMPANY_RELATIONSHIP_STATUS = "INFERRED_COMPANY"
 internal const val INFERRED_COMPANY_UNKNOWN_TIME_STATUS = "INFERRED_COMPANY_UNKNOWN_TIME"
@@ -182,10 +184,23 @@ internal fun contactMatchesRelationCategory(contact: ContactEntity, category: St
         .map(RelationshipEdgeEntity::relationType)
         .toSet()
     val acceptedTypes = when (category) {
-        "工作" -> setOf("COLLEAGUE", "CUSTOMER", "SUPPLIER", "PROJECT_PARTNER")
-        "家人" -> setOf("FAMILY")
-        "朋友" -> setOf("FRIEND", "CLASSMATE")
+        "工作" ->
+            RelationshipTaxonomy.selectableDefinitions
+                .filter { it.group == RelationshipGroup.WORK }
+                .mapTo(hashSetOf()) { it.code }
+
+        "家人" ->
+            RelationshipTaxonomy.selectableDefinitions
+                .filter { it.group == RelationshipGroup.FAMILY || it.group == RelationshipGroup.ROMANTIC }
+                .mapTo(hashSetOf()) { it.code }
+
+        "朋友" ->
+            RelationshipTaxonomy.selectableDefinitions
+                .filter { it.group == RelationshipGroup.SOCIAL }
+                .mapTo(hashSetOf()) { it.code }
+
         "客户" -> setOf("CUSTOMER")
+
         else -> emptySet()
     }
     return relationTypes.any(acceptedTypes::contains)
@@ -230,6 +245,18 @@ internal fun historicalRelationshipEdges(episodes: List<RelationshipEpisodeEntit
     .distinctBy(RelationshipEdgeEntity::edgeId)
     .toList()
 
+/**
+ * Shows current and past relationships together while preventing a current edge and its closed
+ * predecessor from being drawn twice between the same people.
+ */
+internal fun mergeCurrentAndHistoricalRelationships(
+    current: List<RelationshipEdgeEntity>,
+    historical: List<RelationshipEdgeEntity>,
+): List<RelationshipEdgeEntity> {
+    val currentKeys = current.mapTo(hashSetOf(), ::relationshipIdentityKey)
+    return current + historical.filterNot { relationshipIdentityKey(it) in currentKeys }
+}
+
 internal fun relationshipGraphEdgesForRoot(rootId: String, edges: List<RelationshipEdgeEntity>): List<RelationshipEdgeEntity> {
     val incident = edges.filter { it.fromContactId == rootId || it.toContactId == rootId }
     return if (rootId == RelationshipPersonIds.SELF && incident.isEmpty()) edges else incident
@@ -256,3 +283,5 @@ private fun String.toNormalizedCompany(): NormalizedCompany? {
 }
 
 private fun relationshipPairKey(firstId: String, secondId: String): String = listOf(firstId, secondId).sorted().joinToString("::")
+
+private fun relationshipIdentityKey(edge: RelationshipEdgeEntity): String = "${relationshipPairKey(edge.fromContactId, edge.toContactId)}::${edge.relationType}"

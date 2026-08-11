@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.runtime.tool
 
+import com.zhiban.rebuild.relationship.RelationshipTaxonomy
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -41,6 +42,9 @@ class RuntimeToolCatalog(val specs: Map<String, RuntimeToolSpec>) {
     fun names(): Set<String> = specs.keys
 
     companion object {
+        private val RELATIONSHIP_TYPE_ENUM_JSON = RelationshipTaxonomy.selectableCodes
+            .joinToString(prefix = "[\"", separator = "\",\"", postfix = "\"]")
+
         fun production(): RuntimeToolCatalog = RuntimeToolCatalog(
             listOf(
                 RuntimeToolSpec(
@@ -166,7 +170,7 @@ class RuntimeToolCatalog(val specs: Map<String, RuntimeToolSpec>) {
                     "relationship.createCandidate",
                     1,
                     RuntimeToolRisk.WRITE_CONFIRMATION_REQUIRED,
-                    """{"type":"function","function":{"name":"relationship.createCandidate","description":"提出一条带时间状态的联系人关系候选，必须经用户确认后才写入关系图；当前、过往和时间不确定不能混为一谈","parameters":{"type":"object","additionalProperties":false,"required":["fromContactId","toContactId","relationType","temporalState","evidenceSummary"],"properties":{"fromContactId":{"type":"string"},"toContactId":{"type":"string"},"relationType":{"type":"string","enum":["FAMILY","FRIEND","COLLEAGUE","CUSTOMER","SUPPLIER","TEACHER","CLASSMATE","PROJECT_PARTNER","OTHER"]},"temporalState":{"type":"string","enum":["CURRENT","PAST","UNKNOWN"]},"evidenceSummary":{"type":"string"},"confidence":{"type":"number","minimum":0,"maximum":1},"skillId":{"type":"string"}}}}}""",
+                    """{"type":"function","function":{"name":"relationship.createCandidate","description":"提出一条带时间状态的联系人关系候选，必须经用户确认后才写入关系图；当前、过往和时间不确定不能混为一谈","parameters":{"type":"object","additionalProperties":false,"required":["fromContactId","toContactId","relationType","temporalState","evidenceSummary"],"properties":{"fromContactId":{"type":"string"},"toContactId":{"type":"string"},"relationType":{"type":"string","enum":$RELATIONSHIP_TYPE_ENUM_JSON},"temporalState":{"type":"string","enum":["CURRENT","PAST","UNKNOWN"]},"evidenceSummary":{"type":"string"},"confidence":{"type":"number","minimum":0,"maximum":1},"skillId":{"type":"string"}}}}}""",
                     4,
                 ),
                 RuntimeToolSpec(

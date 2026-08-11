@@ -167,8 +167,6 @@ internal fun RelationshipEditorDialog(
     var type by remember { mutableStateOf("") }
     var temporalState by remember { mutableStateOf("CURRENT") }
     var error by remember { mutableStateOf<String?>(null) }
-    val relationTypes =
-        listOf("COLLEAGUE", "FAMILY", "FRIEND", "CUSTOMER", "SUPPLIER", "TEACHER", "CLASSMATE", "PROJECT_PARTNER", "OTHER")
     fun filteredPeople(query: String, excludedId: String, includeOwner: Boolean): List<RelationshipPersonUi> {
         val clean = query.trim()
         return people.asSequence()
@@ -225,21 +223,22 @@ internal fun RelationshipEditorDialog(
                 }
                 Column(
                     Modifier
-                        .weight(1f, fill = false)
-                        .verticalScroll(rememberScrollState()),
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(bottom = 8.dp),
                 ) {
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        "关系从谁开始",
+                        "记录谁和谁",
                         color = RelationInk,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Medium,
                     )
                     Text(
                         if (chooseContactAsSource) {
-                            "记录两位联系人之间的关系"
+                            "选择两位联系人"
                         } else {
-                            "手动添加；知伴也会提出待确认的关系建议"
+                            "默认记录你与联系人的关系"
                         },
                         color = RelationMuted,
                         style = MaterialTheme.typography.labelSmall,
@@ -254,7 +253,7 @@ internal fun RelationshipEditorDialog(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         RelationshipSourceOption(
-                            label = "我",
+                            label = "我与联系人",
                             selected = !chooseContactAsSource,
                             modifier = Modifier.weight(1f),
                         ) {
@@ -325,15 +324,24 @@ internal fun RelationshipEditorDialog(
                         }
                     }
                     Spacer(Modifier.height(16.dp))
+                    val fromName = people.firstOrNull { it.personId == fromId }?.let {
+                        if (it.isOwner) "我" else it.displayName
+                    }
+                    val toName = people.firstOrNull { it.personId == toId }?.let {
+                        if (it.isOwner) "我" else it.displayName
+                    }
                     Text(
-                        "他们是什么关系",
+                        if (fromName != null && toName != null) {
+                            "$fromName 是 $toName 的……"
+                        } else {
+                            "选择关系"
+                        },
                         color = RelationInk,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Medium,
                     )
-                    Text("关系类型会用于筛选、搜索和图谱连线", color = RelationMuted, style = MaterialTheme.typography.labelSmall)
                     Spacer(Modifier.height(8.dp))
-                    RelationshipTypeGrid(relationTypes, type) { selectedType ->
+                    RelationshipTypePicker(type) { selectedType ->
                         type = selectedType
                         error = null
                     }
@@ -345,7 +353,7 @@ internal fun RelationshipEditorDialog(
                         fontWeight = FontWeight.Medium,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("CURRENT" to "现在", "PAST" to "以前", "UNKNOWN" to "时间不确定").forEach { (value, label) ->
+                        listOf("CURRENT" to "当前", "PAST" to "已结束", "UNKNOWN" to "时间不确定").forEach { (value, label) ->
                             FilterChip(
                                 selected = temporalState == value,
                                 onClick = { temporalState = value },
@@ -411,40 +419,6 @@ internal fun RelationshipSourceOption(label: String, selected: Boolean, modifier
 }
 
 @Composable
-internal fun RelationshipTypeGrid(relationTypes: List<String>, selectedType: String, enabled: Boolean = true, onSelect: (String) -> Unit) {
-    relationTypes.chunked(5).forEachIndexed { rowIndex, rowTypes ->
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            rowTypes.forEach { value ->
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .height(ZhiBanSize.Control)
-                        .clip(RoundedCornerShape(ZhiBanRadius.Medium))
-                        .background(if (selectedType == value) RelationAccent else RelationSoft)
-                        .clickable(enabled = enabled) { onSelect(value) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        relationLabel(value),
-                        color = if (selectedType == value) MaterialTheme.colorScheme.onPrimary else RelationMuted,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                    )
-                }
-            }
-            repeat(5 - rowTypes.size) {
-                Spacer(Modifier.weight(1f))
-            }
-        }
-        if (rowIndex != relationTypes.chunked(5).lastIndex) Spacer(Modifier.height(6.dp))
-    }
-}
-
-@Composable
 internal fun PersonChoiceRow(people: List<RelationshipPersonUi>, selectedId: String, onSelect: (String) -> Unit) {
     Row(
         Modifier
@@ -471,25 +445,6 @@ internal fun PersonChoiceRow(people: List<RelationshipPersonUi>, selectedId: Str
             )
         }
     }
-}
-
-internal fun relationLabel(type: String): String = when (type) {
-    "FAMILY" -> "家人"
-    "FRIEND" -> "朋友"
-    "COLLEAGUE" -> "同事"
-    "CUSTOMER" -> "客户"
-    "SUPPLIER" -> "供应商"
-    "TEACHER" -> "老师"
-    "CLASSMATE" -> "同学"
-    "PROJECT_PARTNER" -> "项目伙伴"
-    else -> "其他"
-}
-
-/** Compact labels keep the relationship readable between two nearby nodes. */
-internal fun graphRelationLabel(type: String): String = when (type) {
-    "SUPPLIER" -> "供应"
-    "PROJECT_PARTNER" -> "项目"
-    else -> relationLabel(type)
 }
 
 internal fun relationshipEventTypeLabel(type: String): String = when (type) {
@@ -832,10 +787,16 @@ internal fun RelationshipEvidenceDialog(
     var error by remember { mutableStateOf<String?>(null) }
     val from = personNames[edge.fromContactId] ?: "未知联系人"
     val to = personNames[edge.toContactId] ?: "未知联系人"
-    val relationTypes =
-        listOf("FAMILY", "FRIEND", "COLLEAGUE", "CUSTOMER", "SUPPLIER", "TEACHER", "CLASSMATE", "PROJECT_PARTNER", "OTHER")
     ZhiBanDialogHost(onDismissRequest = onDismiss) {
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Dialog)).background(RelationSurface).padding(20.dp)) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(max = 720.dp)
+                .clip(RoundedCornerShape(ZhiBanRadius.Dialog))
+                .background(RelationSurface)
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
+        ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) { Icon(Icons.Rounded.Close, "关闭") }
                 Text(
@@ -859,9 +820,9 @@ internal fun RelationshipEvidenceDialog(
                 style = MaterialTheme.typography.bodySmall,
             )
             Spacer(Modifier.height(18.dp))
-            Text("两人的关系", color = RelationMuted, style = MaterialTheme.typography.labelMedium)
+            Text("$from 是 $to 的……", color = RelationMuted, style = MaterialTheme.typography.labelMedium)
             Spacer(Modifier.height(8.dp))
-            RelationshipTypeGrid(relationTypes, type, enabled = edge.userConfirmed) { selectedType ->
+            RelationshipTypePicker(type, enabled = edge.userConfirmed) { selectedType ->
                 type = selectedType
                 error = null
             }
