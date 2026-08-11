@@ -53,7 +53,8 @@ class NotificationCandidateDialogTest {
             }
         }
 
-        compose.onNodeWithText("知伴需要你确认").assertIsDisplayed()
+        compose.onNodeWithText("待确认").assertIsDisplayed()
+        compose.onNodeWithText("还有 1 项需要你确认").assertIsDisplayed()
         compose.onNodeWithText("识别到一位联系人，但身份还不唯一").assertIsDisplayed()
         compose.onNodeWithText("采集来源").assertDoesNotExist()
         compose.onNodeWithText("新建联系人").performClick()

@@ -416,7 +416,7 @@ internal fun NotificationCandidateDialog(
                         when {
                             linking != null -> "选择其他联系人"
                             showCollectionSettings -> "消息感知设置"
-                            else -> "知伴需要你确认"
+                            else -> "待确认"
                         },
                         color = RelationInk,
                         style = MaterialTheme.typography.titleLarge,
@@ -426,8 +426,8 @@ internal fun NotificationCandidateDialog(
                         when {
                             linking != null -> "只有当前匹配不正确时才需要重新选择"
                             showCollectionSettings -> "选择知伴可以整理的消息来源"
-                            candidates.isEmpty() -> "明确内容会自动整理，拿不准的才会来到这里"
-                            else -> "已整理完成，只留下 ${candidates.size} 个关键歧义"
+                            candidates.isEmpty() -> "仅显示知伴无法确定的内容"
+                            else -> "还有 ${candidates.size} 项需要你确认"
                         },
                         color = RelationMuted,
                         style = MaterialTheme.typography.bodySmall,
@@ -750,7 +750,7 @@ internal fun NotificationCandidateDialog(
                 }
             } else if (!enabled) {
                 Text(
-                    "开启后，知伴会整理新消息。明确的人和安排自动归档，可随时撤销；拿不准的才请你确认。",
+                    "开启后，知伴会自动整理新消息；无法确定时再请你确认。",
                     color = RelationMuted,
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -760,10 +760,10 @@ internal fun NotificationCandidateDialog(
                     modifier = Modifier.fillMaxWidth().height(ZhiBanSize.Control),
                     colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
                     shape = RoundedCornerShape(ZhiBanRadius.Card),
-                ) { Text("我知道了，去开启") }
+                ) { Text("开启消息感知") }
             } else if (candidates.isEmpty()) {
                 Text(
-                    "信息采集已开启。明确内容会自动整理，只有不确定的才会出现在这里。",
+                    "暂无待确认内容",
                     modifier = Modifier.fillMaxWidth().padding(vertical = 44.dp),
                     color = RelationMuted,
                     style = MaterialTheme.typography.bodyMedium,
