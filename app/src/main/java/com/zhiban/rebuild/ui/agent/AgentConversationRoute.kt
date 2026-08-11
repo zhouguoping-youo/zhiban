@@ -56,6 +56,7 @@ fun AgentConversationRoute(
     onNavigateToSettings: () -> Unit = {},
     onManagePlugins: () -> Unit = {},
     viewModel: AgentConversationViewModel = hiltViewModel(),
+    identityViewModel: ConversationIdentityViewModel = hiltViewModel(),
 ) {
     BackHandler(onBack = onBackToHome)
     val state by viewModel.uiState.collectAsState()
@@ -487,8 +488,11 @@ fun AgentConversationRoute(
     val selectedLevel by viewModel.selectedLevel.collectAsState()
     val conversationHistory by viewModel.conversationHistory.collectAsState()
     val perceptionCandidates by viewModel.perceptionCandidates.collectAsState()
+    val conversationIdentity by identityViewModel.identity.collectAsState()
     AgentConversationScreen(
         state = state,
+        userAvatarBytes = conversationIdentity.avatarBytes,
+        userAvatarLabel = conversationIdentity.fallbackLabel,
         perceptionCandidates = perceptionCandidates,
         onConfirmPerception = viewModel::confirmPerceptionCandidate,
         onDismissPerception = viewModel::dismissPerceptionCandidate,

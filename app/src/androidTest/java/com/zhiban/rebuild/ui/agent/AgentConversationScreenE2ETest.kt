@@ -31,6 +31,31 @@ import org.junit.Test
 class AgentConversationScreenE2ETest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun userMessageUsesSavedProfileAvatarInsteadOfFixedLabel() {
+        compose.setContent {
+            ZhiBanTheme {
+                AgentConversationScreen(
+                    state = AgentConversationUiState(
+                        messages = listOf(
+                            AgentConversationMessageUi(
+                                turnId = "avatar-turn",
+                                role = "user",
+                                text = "测试头像",
+                            ),
+                        ),
+                    ),
+                    userAvatarBytes = android.util.Base64.decode(
+                        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZlqkAAAAASUVORK5CYII=",
+                        android.util.Base64.NO_WRAP,
+                    ),
+                )
+            }
+        }
+
+        compose.onNodeWithContentDescription("我的头像").assertIsDisplayed()
+        compose.onNodeWithText("我").assertDoesNotExist()
+    }
+
     @Test fun executingWithoutPlanAlwaysOffersCancelEscape() {
         val cancellations = AtomicInteger(0)
         compose.setContent {

@@ -129,6 +129,8 @@ fun AgentConversationScreen(
     onOpenConversation: (String) -> Unit = {},
     onDeleteConversation: (String) -> Unit = {},
     onNewConversation: () -> Unit = {},
+    userAvatarBytes: ByteArray? = null,
+    userAvatarLabel: String = "我",
 ) {
     var permissionDialogDismissed by androidx.compose.runtime.remember(multimodalState.microphonePermission) {
         androidx.compose.runtime.mutableStateOf(false)
@@ -189,6 +191,8 @@ fun AgentConversationScreen(
                 onShareAssistant = onShareAssistant,
                 onUndo = onUndo,
                 feedbackEnabled = feedbackEnabled,
+                userAvatarBytes = userAvatarBytes,
+                userAvatarLabel = userAvatarLabel,
             )
             if (state.stage == AgentConversationStage.EMPTY && state.messages.isEmpty() && state.userMessage == null) {
                 EmptyConversationSuggestions(

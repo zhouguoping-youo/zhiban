@@ -53,6 +53,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -207,6 +208,8 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
     onShareAssistant: () -> Unit = {},
     onUndo: () -> Unit = {},
     feedbackEnabled: Boolean = true,
+    userAvatarBytes: ByteArray? = null,
+    userAvatarLabel: String = "我",
 ) {
     val listState = rememberLazyListState()
     val scrollScope = androidx.compose.runtime.rememberCoroutineScope()
@@ -246,14 +249,16 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
         ) {
             items(state.messages, key = AgentConversationMessageUi::turnId) { message ->
                 if (message.role == "user") {
-                    UserMessageBubble(message.text)
+                    UserMessageBubble(message.text, userAvatarBytes, userAvatarLabel)
                 } else {
                     AssistantMessageBubble(message.text)
                 }
             }
             val latestUser = state.messages.lastOrNull { it.role == "user" }?.text
             val latestAssistant = state.messages.lastOrNull { it.role == "assistant" }?.text
-            state.userMessage?.takeIf { it != latestUser }?.let { item { UserMessageBubble(it) } }
+            state.userMessage?.takeIf { it != latestUser }?.let {
+                item { UserMessageBubble(it, userAvatarBytes, userAvatarLabel) }
+            }
             if (state.stage == AgentConversationStage.PLANNING) {
                 item {
                     Column {
@@ -469,7 +474,7 @@ private fun ReplyVectorAction(icon: androidx.compose.ui.graphics.vector.ImageVec
     }
 }
 
-@Composable fun UserMessageBubble(text: String) = Row(
+@Composable fun UserMessageBubble(text: String, avatarBytes: ByteArray? = null, avatarLabel: String = "我") = Row(
     Modifier.fillMaxWidth(),
     verticalAlignment = Alignment.Top,
 ) {
@@ -483,7 +488,35 @@ private fun ReplyVectorAction(icon: androidx.compose.ui.graphics.vector.ImageVec
         )
     }
     Spacer(Modifier.width(10.dp))
-    ConversationAvatar("我", ZhiBanTerracottaSoft, ZhiBanTerracotta)
+    UserConversationAvatar(avatarBytes, avatarLabel)
+}
+
+@Composable
+private fun UserConversationAvatar(avatarBytes: ByteArray?, fallbackLabel: String) {
+    Box(
+        Modifier
+            .size(28.dp)
+            .clip(CircleShape)
+            .background(ZhiBanTerracottaSoft)
+            .semantics { contentDescription = "我的头像" },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (avatarBytes != null) {
+            coil.compose.AsyncImage(
+                model = avatarBytes,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Text(
+                fallbackLabel,
+                color = ZhiBanTerracotta,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+    }
 }
 
 @Composable fun AssistantMessageBubble(text: String) = Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
