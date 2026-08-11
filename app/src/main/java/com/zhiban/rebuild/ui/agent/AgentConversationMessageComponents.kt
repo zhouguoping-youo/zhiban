@@ -1,6 +1,5 @@
 package com.zhiban.rebuild.ui.agent
 
-import android.content.ClipData
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -11,7 +10,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -62,7 +60,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
@@ -212,8 +209,6 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
 ) {
     val listState = rememberLazyListState()
     val scrollScope = androidx.compose.runtime.rememberCoroutineScope()
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
     val isNearBottom by remember {
         derivedStateOf {
             val layout = listState.layoutInfo
@@ -242,9 +237,6 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
         }
     }
     Box(Modifier.fillMaxSize()) {
-        var actionMessage by androidx.compose.runtime.remember {
-            androidx.compose.runtime.mutableStateOf<AgentConversationMessageUi?>(null)
-        }
         LazyColumn(
             Modifier.fillMaxSize().padding(horizontal = 16.dp),
             state = listState,
@@ -255,7 +247,7 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
                 if (message.role == "user") {
                     UserMessageBubble(message.text)
                 } else {
-                    AssistantMessageWithActions(message) { actionMessage = it }
+                    AssistantMessageBubble(message.text)
                 }
             }
             val latestUser = state.messages.lastOrNull { it.role == "user" }?.text
@@ -353,18 +345,6 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
                 }
             }
         }
-        AssistantActionMenu(
-            message = actionMessage,
-            onDismiss = { actionMessage = null },
-            onCopy = {
-                clipboard.setPrimaryClip(ClipData.newPlainText("知伴回复", actionMessage?.text.orEmpty()))
-                actionMessage = null
-            },
-            onShare = {
-                shareText(context, actionMessage?.text.orEmpty())
-                actionMessage = null
-            },
-        )
         ScrollToBottomFAB(
             visible = listState.canScrollForward,
             modifier = Modifier.align(Alignment.BottomEnd),
@@ -478,37 +458,6 @@ private fun ReplyVectorAction(icon: androidx.compose.ui.graphics.vector.ImageVec
     ConversationAvatar("知", ZhiBanTerracotta, MaterialTheme.colorScheme.onPrimary)
     Spacer(Modifier.width(ZhiBanSpacing.Sm))
     AgentRichResponse(text, Modifier.weight(1f).padding(top = 3.dp))
-}
-
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-@Composable
-private fun AssistantMessageWithActions(message: AgentConversationMessageUi, onLongPress: (AgentConversationMessageUi) -> Unit) {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(ZhiBanRadius.Card))
-            .combinedClickable(onClick = {}, onLongClick = { onLongPress(message) }),
-    ) {
-        AssistantMessageBubble(message.text)
-    }
-}
-
-@Composable
-private fun AssistantActionMenu(message: AgentConversationMessageUi?, onDismiss: () -> Unit, onCopy: () -> Unit, onShare: () -> Unit) {
-    if (message == null) return
-    DropdownMenu(expanded = true, onDismissRequest = onDismiss) {
-        DropdownMenuItem(text = { Text("复制") }, onClick = onCopy)
-        DropdownMenuItem(text = { Text("分享") }, onClick = onShare)
-    }
-}
-
-private fun shareText(context: android.content.Context, text: String) {
-    if (text.isBlank()) return
-    val share = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(android.content.Intent.EXTRA_TEXT, text)
-    }
-    context.startActivity(android.content.Intent.createChooser(share, "分享知伴回复"))
 }
 
 @Composable

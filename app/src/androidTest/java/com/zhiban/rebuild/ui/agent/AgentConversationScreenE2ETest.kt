@@ -50,8 +50,9 @@ class AgentConversationScreenE2ETest {
         assertEquals(1, cancellations.get())
     }
 
-    @Test fun longPressAssistantMessageOnlyShowsUsefulReplyActions() {
+    @Test fun longPressAssistantMessageDoesNotDuplicateInlineReplyActions() {
         val state = AgentConversationUiState(
+            stage = AgentConversationStage.SUCCEEDED,
             messages = listOf(AgentConversationMessageUi(turnId = "t1", role = "assistant", text = "这是知伴的回答")),
         )
         compose.setContent {
@@ -62,13 +63,11 @@ class AgentConversationScreenE2ETest {
             }
         }
 
-        // Feedback belongs to completed replies, not the long-press menu.
-        assertTrue(compose.onAllNodesWithText("点赞").fetchSemanticsNodes().isEmpty())
+        compose.onNodeWithContentDescription("复制").assertIsDisplayed()
+        compose.onNodeWithContentDescription("分享").assertIsDisplayed()
         compose.onNodeWithText("这是知伴的回答").performTouchInput { longClick() }
-        compose.onNodeWithText("复制").assertIsDisplayed()
-        compose.onNodeWithText("分享").assertIsDisplayed()
-        assertTrue(compose.onAllNodesWithText("点赞").fetchSemanticsNodes().isEmpty())
-        assertTrue(compose.onAllNodesWithText("点踩").fetchSemanticsNodes().isEmpty())
+        assertTrue(compose.onAllNodesWithText("复制").fetchSemanticsNodes().isEmpty())
+        assertTrue(compose.onAllNodesWithText("分享").fetchSemanticsNodes().isEmpty())
     }
 
     @Test fun unifiedAgentInputAndAttachmentMenuAreOperable() {
