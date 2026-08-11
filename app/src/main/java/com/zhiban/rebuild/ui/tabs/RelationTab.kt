@@ -191,11 +191,9 @@ fun RelationTab(
     val relationshipEvents by viewModel.relationshipEvents.collectAsStateWithLifecycle()
     val rawContacts by viewModel.rawContacts.collectAsStateWithLifecycle()
     val ownerContactLinks by viewModel.ownerContactLinks.collectAsStateWithLifecycle()
-    val pendingEnrichment by viewModel.pendingEnrichment.collectAsStateWithLifecycle()
     val temporalEmployments by viewModel.temporalEmployments.collectAsStateWithLifecycle()
     val maintenanceOverview by viewModel.maintenanceOverview.collectAsStateWithLifecycle()
     val unresolvedSourceIdentities by viewModel.unresolvedSourceIdentities.collectAsStateWithLifecycle()
-    val mergeSuggestions by viewModel.mergeSuggestions.collectAsStateWithLifecycle()
     val notificationCandidates by viewModel.notificationCandidates.collectAsStateWithLifecycle()
     val pendingCallNotes by viewModel.pendingCallNotes.collectAsStateWithLifecycle()
     val cloudAsrAvailability by viewModel.cloudAsrAvailability.collectAsStateWithLifecycle()
@@ -219,7 +217,6 @@ fun RelationTab(
     var selectedEvent by remember { mutableStateOf<RelationshipEventWithParticipants?>(null) }
     var showImportDialog by remember { mutableStateOf(false) }
     var identityEditorFor by remember { mutableStateOf<ContactEntity?>(null) }
-    var selectedMergeSuggestion by remember { mutableStateOf<ContactMergeSuggestion?>(null) }
     var showContactPermissionIntro by remember { mutableStateOf(false) }
     var showPermissionExplanation by remember { mutableStateOf(false) }
     var showNotificationCandidates by remember { mutableStateOf(false) }
@@ -312,9 +309,7 @@ fun RelationTab(
     val historyRelationships = remember(temporalRelationships) {
         historicalRelationshipEdges(temporalRelationships)
     }
-    val inferredRelationshipCount = remember(graphRelationships) {
-        graphRelationships.count(RelationshipEdgeEntity::isInferredEvidenceRelationship)
-    }
+    val maintenanceCount = maintenanceOverview.needsAttentionCount + unresolvedSourceIdentities.size
     val visible = remember(contacts, graphRelationships, query, tag) {
         contacts.filter { contact ->
             val matchesQuery = query.isBlank() || listOf(
@@ -452,32 +447,6 @@ fun RelationTab(
                     Spacer(Modifier.height(12.dp))
                 }
             }
-            val maintenanceCount = maintenanceOverview.needsAttentionCount + unresolvedSourceIdentities.size
-            if (maintenanceCount > 0) {
-                item {
-                    Row(
-                        Modifier.fillMaxWidth().zhiBanCardSurface().clickable(onClick = onOpenContactMaintenance)
-                            .padding(ZhiBanSpacing.Lg),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
-                    ) {
-                        ZhiBanLeadingIcon(Icons.Outlined.AutoAwesome, contentDescription = null)
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text("联系人维护", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                            Text(
-                                "$maintenanceCount 项值得处理",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Icon(
-                            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
             item {
                 ZhiBanSearchField(
                     value = query,
@@ -551,63 +520,32 @@ fun RelationTab(
                 }
                 Spacer(Modifier.height(18.dp))
             }
-            if (mergeSuggestions.isNotEmpty()) {
+            if (maintenanceCount > 0) {
                 item {
                     Row(
-                        Modifier.fillMaxWidth().zhiBanCardSurface(RelationSurface)
-                            .clickable { selectedMergeSuggestion = mergeSuggestions.first() }
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        Modifier.fillMaxWidth().zhiBanCardSurface().clickable(onClick = onOpenContactMaintenance)
+                            .padding(ZhiBanSpacing.Lg),
                         verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
                     ) {
-                        Column(Modifier.weight(1f)) {
+                        ZhiBanLeadingIcon(Icons.Outlined.AutoAwesome, contentDescription = null)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(
-                                "发现可能重复的联系人",
-                                color = RelationInk,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
+                                "联系人维护",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
                             )
                             Text(
-                                "${mergeSuggestions.size} 组资料等待你确认，不会自动合并",
-                                color = RelationMuted,
+                                "$maintenanceCount 项待核实",
                                 style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        Text("查看", color = RelationInk, style = MaterialTheme.typography.labelLarge)
-                    }
-                    Spacer(Modifier.height(12.dp))
-                }
-            }
-            if (pendingEnrichment.isNotEmpty()) {
-                item {
-                    Row(
-                        Modifier.fillMaxWidth().zhiBanCardSurface(RelationSurface)
-                            .clickable {
-                                pendingEnrichment.firstNotNullOfOrNull { candidate ->
-                                    candidate.contactId?.let { id -> contacts.firstOrNull { it.contactId == id } }
-                                }?.let { selected = it }
-                            }
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(Icons.Outlined.AutoAwesome, contentDescription = null, tint = RelationAccent)
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                "资料待核实",
-                                color = RelationInk,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
-                            )
-                            Text(
-                                buildString {
-                                    append("${pendingEnrichment.size} 条补全建议")
-                                    if (inferredRelationshipCount > 0) append(" · $inferredRelationshipCount 条关系推测")
-                                },
-                                color = RelationMuted,
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                        Text("查看", color = RelationAccent, style = MaterialTheme.typography.labelLarge)
+                        Icon(
+                            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                     Spacer(Modifier.height(12.dp))
                 }
@@ -836,21 +774,6 @@ fun RelationTab(
                 TextButton(onClick = { pendingPhoneSync = null }) { Text("取消", color = RelationMuted) }
             },
             containerColor = RelationSurface,
-        )
-    }
-    selectedMergeSuggestion?.let { suggestion ->
-        ContactMergeReviewDialog(
-            suggestion = suggestion,
-            onDismiss = { selectedMergeSuggestion = null },
-            onConfirm = { canonicalId, sourceId, result ->
-                viewModel.confirmMerge(canonicalId, sourceId, suggestion.reason) { error ->
-                    result(error)
-                    if (error == null) {
-                        selectedMergeSuggestion = null
-                        showFeedback("联系人已合并，可在详情中撤销")
-                    }
-                }
-            },
         )
     }
     identityEditorFor?.let { contact ->
