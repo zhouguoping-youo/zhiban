@@ -1,9 +1,12 @@
 package com.zhiban.rebuild.ui.tabs
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -230,5 +233,63 @@ class CrmContactLinkTest {
         compose.onNodeWithText("进行中的商机").assertIsDisplayed()
         compose.onNodeWithTag("contact-crm-opp-o1").assertIsDisplayed()
         compose.onNodeWithText("甲公司年度合作").assertIsDisplayed()
+    }
+
+    @Test fun contactDetailUsesCompactHierarchyAndKeepsActionsReachable() {
+        var edited = false
+        val contact = ContactEntity(
+            "c1", "丁波", "丁波", "13800000000", null, "wx-dingbo", "甲公司", "售前", "[]", "[]", null,
+            null, "USER", null, 1, 1,
+        )
+        compose.setContent {
+            ZhiBanTheme {
+                ContactDetailDialog(
+                    contact = contact,
+                    showMarkAsOwner = false,
+                    facts = emptyList(),
+                    aliases = emptyList(),
+                    platformIdentities = emptyList(),
+                    mergedSources = emptyList(),
+                    relatedEdges = emptyList(),
+                    relatedEvents = emptyList(),
+                    recentCalls = emptyList(),
+                    crmOpportunities = emptyList(),
+                    enrichmentSuggestions = emptyList(),
+                    contactNames = emptyMap(),
+                    onDismiss = {},
+                    onEdit = { edited = true },
+                    onMarkAsOwner = {},
+                    onDelete = {},
+                    onAddFact = {},
+                    onAddEvent = {},
+                    onAddIdentity = {},
+                    onInspectEvent = {},
+                    onDeleteFact = {},
+                    onDeleteAlias = {},
+                    onDeletePlatformIdentity = {},
+                    onUndoMerge = {},
+                    onConfirmEnrichment = {},
+                    onRejectEnrichment = {},
+                    onSaveToPhone = {},
+                    onCall = {},
+                    onMessage = {},
+                )
+            }
+        }
+
+        compose.onNodeWithText("编辑").performClick()
+        assertTrue(edited)
+        compose.onNodeWithText("电话").assertIsDisplayed()
+        compose.onNodeWithText("短信").assertIsDisplayed()
+        compose.onNodeWithText("资料").assertIsDisplayed()
+        compose.onNodeWithText("身份与称呼").assertDoesNotExist()
+        compose.onNodeWithText("你确认的信息").assertDoesNotExist()
+        compose.onNodeWithText("暂无已关联的通话记录").assertDoesNotExist()
+
+        compose.onNodeWithTag("contact-detail-content")
+            .performScrollToNode(hasTestTag("contact-detail-sync"))
+        compose.onNodeWithTag("contact-detail-sync").assertIsDisplayed()
+        compose.onNodeWithText("同步到手机通讯录").assertIsDisplayed()
+        compose.onNodeWithText("写入前可预览").assertIsDisplayed()
     }
 }

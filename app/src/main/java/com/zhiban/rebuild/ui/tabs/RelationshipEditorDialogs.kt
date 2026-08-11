@@ -86,6 +86,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -501,6 +502,138 @@ internal fun RelationshipEventRow(value: RelationshipEventWithParticipants, onCl
 }
 
 @Composable
+private fun RelationshipParticipantPicker(
+    contacts: List<ContactEntity>,
+    selected: ContactEntity?,
+    query: String,
+    required: Boolean,
+    onQueryChange: (String) -> Unit,
+    onSelect: (ContactEntity?) -> Unit,
+) {
+    if (selected != null) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = 56.dp)
+                .clip(RoundedCornerShape(ZhiBanRadius.Card))
+                .background(RelationSoft)
+                .padding(start = 12.dp, end = 4.dp)
+                .testTag("relationship-participant-selected-${selected.contactId}"),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier.size(32.dp).clip(CircleShape).background(RelationSurface),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    selected.displayName.take(1),
+                    color = RelationInk,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                Text(
+                    selected.displayName,
+                    color = RelationInk,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                selected.company?.takeIf(String::isNotBlank)?.let {
+                    Text(
+                        it,
+                        color = RelationMuted,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            TextButton(onClick = { onSelect(null) }) {
+                Text(if (required) "更换" else "移除", color = RelationAccent)
+            }
+        }
+        return
+    }
+
+    if (!required) {
+        Text(
+            "只有我和TA",
+            color = RelationMuted,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(bottom = 7.dp),
+        )
+    }
+    ZhiBanSearchField(
+        value = query,
+        onValueChange = onQueryChange,
+        placeholder = if (required) "搜索介绍人" else "搜索参与人",
+        modifier = Modifier.testTag("relationship-participant-search"),
+    )
+    val normalizedQuery = query.trim()
+    val matches = remember(normalizedQuery, contacts) {
+        if (normalizedQuery.isBlank()) {
+            emptyList()
+        } else {
+            contacts.asSequence().filter { contact ->
+                listOf(contact.displayName, contact.phone, contact.company, contact.note)
+                    .filterNotNull()
+                    .any { it.contains(normalizedQuery, ignoreCase = true) }
+            }.take(6).toList()
+        }
+    }
+    if (normalizedQuery.isNotBlank()) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 6.dp)
+                .clip(RoundedCornerShape(ZhiBanRadius.Card))
+                .background(RelationSoft),
+        ) {
+            matches.forEachIndexed { index, contact ->
+                if (index > 0) HorizontalDivider(color = RelationLine)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = ZhiBanSize.TouchTarget)
+                        .clickable { onSelect(contact) }
+                        .padding(horizontal = 12.dp)
+                        .testTag("relationship-participant-${contact.contactId}"),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        contact.displayName,
+                        color = RelationInk,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    contact.company?.takeIf(String::isNotBlank)?.let {
+                        Text(
+                            it,
+                            color = RelationMuted,
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+            if (matches.isEmpty()) {
+                Text(
+                    "没有匹配的联系人",
+                    color = RelationMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(12.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
 internal fun RelationshipEventEditorDialog(
     contacts: List<ContactEntity>,
     subject: ContactEntity,
@@ -508,14 +641,17 @@ internal fun RelationshipEventEditorDialog(
     onDismiss: () -> Unit,
     onSave: (String, String, String?, List<RelationshipEventParticipantInput>, (String?) -> Unit) -> Unit,
 ) {
-    val others = contacts.filterNot { it.contactId == subject.contactId }
+    val others = contacts.filterNot {
+        it.contactId == subject.contactId || it.contactId == RelationshipPersonIds.SELF
+    }
     val existingRelatedId = existing?.participants?.firstOrNull {
         it.contactId != null && it.contactId != subject.contactId
     }?.contactId.orEmpty()
     var type by remember(existing?.event?.eventId) { mutableStateOf(existing?.event?.eventType ?: "INTRODUCTION") }
     var relatedId by remember(existing?.event?.eventId) {
-        mutableStateOf(if (existing != null) existingRelatedId else others.firstOrNull()?.contactId.orEmpty())
+        mutableStateOf(if (existing != null) existingRelatedId else "")
     }
+    var relatedQuery by remember(existing?.event?.eventId) { mutableStateOf("") }
     var title by remember(existing?.event?.eventId) { mutableStateOf(existing?.event?.title.orEmpty()) }
     var note by remember(existing?.event?.eventId) { mutableStateOf(existing?.event?.note.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -566,6 +702,8 @@ internal fun RelationshipEventEditorDialog(
                                 .background(if (type == value) RelationAccent else RelationSoft)
                                 .clickable {
                                     type = value
+                                    relatedId = ""
+                                    relatedQuery = ""
                                     title = ""
                                     error = null
                                 }
@@ -576,58 +714,24 @@ internal fun RelationshipEventEditorDialog(
                 }
                 Spacer(Modifier.height(14.dp))
                 Text(
-                    if (type ==
-                        "INTRODUCTION"
-                    ) {
-                        "谁介绍的"
-                    } else {
-                        "还有谁参与（可选）"
-                    },
+                    if (type == "INTRODUCTION") "介绍人" else "其他参与人（可选）",
                     color = RelationMuted,
                     style = MaterialTheme.typography.labelMedium,
                 )
                 Spacer(Modifier.height(7.dp))
-                Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(7.dp),
-                ) {
-                    if (type != "INTRODUCTION") {
-                        Text(
-                            "只有我和TA",
-                            color = if (relatedId.isBlank()) MaterialTheme.colorScheme.onPrimary else RelationMuted,
-                            modifier = Modifier.clip(
-                                RoundedCornerShape(ZhiBanRadius.Card),
-                            ).background(if (relatedId.isBlank()) RelationAccent else RelationSoft)
-                                .clickable {
-                                    relatedId = ""
-                                    title = ""
-                                    error = null
-                                }.padding(horizontal = 13.dp, vertical = 8.dp),
-                            style = MaterialTheme.typography.labelMedium,
-                        )
-                    }
-                    others.forEach { contact ->
-                        Text(
-                            contact.displayName,
-                            color = if (relatedId == contact.contactId) MaterialTheme.colorScheme.onPrimary else RelationMuted,
-                            modifier = Modifier.clip(RoundedCornerShape(ZhiBanRadius.Card)).background(
-                                if (relatedId ==
-                                    contact.contactId
-                                ) {
-                                    RelationAccent
-                                } else {
-                                    RelationSoft
-                                },
-                            )
-                                .clickable {
-                                    relatedId = contact.contactId
-                                    title = ""
-                                    error = null
-                                }.padding(horizontal = 13.dp, vertical = 8.dp),
-                            style = MaterialTheme.typography.labelMedium,
-                        )
-                    }
-                }
+                RelationshipParticipantPicker(
+                    contacts = others,
+                    selected = related,
+                    query = relatedQuery,
+                    required = type == "INTRODUCTION",
+                    onQueryChange = { relatedQuery = it },
+                    onSelect = { contact ->
+                        relatedId = contact?.contactId.orEmpty()
+                        relatedQuery = ""
+                        title = ""
+                        error = null
+                    },
+                )
                 Spacer(Modifier.height(14.dp))
                 OutlinedTextField(
                     value = title,
@@ -636,7 +740,7 @@ internal fun RelationshipEventEditorDialog(
                         error = null
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("标题") },
+                    label = { Text("经历名称（可选）") },
                     placeholder = { Text(suggestedTitle()) },
                     singleLine = true,
                 )
