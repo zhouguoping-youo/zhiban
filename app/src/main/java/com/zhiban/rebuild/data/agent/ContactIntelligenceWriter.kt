@@ -3,19 +3,13 @@ package com.zhiban.rebuild.data.agent
 import com.zhiban.rebuild.data.contact.AndroidRawContactLinkEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.ContactIntelligenceDao
-import com.zhiban.rebuild.data.contact.ContactSyncSnapshotEntity
+import com.zhiban.rebuild.data.contact.ContactSyncSnapshotState
 import com.zhiban.rebuild.data.contact.IdentityClaimEntity
 import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
 import com.zhiban.rebuild.data.contact.PersonEntity
 import com.zhiban.rebuild.data.contact.SourceIdentityEntity
 import com.zhiban.rebuild.data.contact.SystemContactCandidate
 import com.zhiban.rebuild.data.contact.normalizeContactPhone
-import com.zhiban.rebuild.runtime.tool.sha256
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /** Persists observations without promoting an imported card to user-confirmed truth. */
 internal suspend fun AgentDatabase.upsertObservedSystemContactIntelligence(
@@ -118,20 +112,8 @@ private suspend fun ContactIntelligenceDao.upsertAndroidSyncState(observation: S
                 lastObservedAtEpochMs = observation.nowEpochMs,
             ),
         )
-        val baseProjection = observation.candidate.androidProjectionJson(rawContact.rawContactId)
-        upsertSyncSnapshot(
-            ContactSyncSnapshotEntity(
-                snapshotId = stableContactKnowledgeId("android-sync", linkId),
-                linkId = linkId,
-                baseProjectionJson = baseProjection,
-                baseDigest = sha256(baseProjection),
-                desiredProjectionJson = null,
-                desiredDigest = null,
-                syncState = "IN_SYNC",
-                lastVerifiedAtEpochMs = observation.nowEpochMs,
-                updatedAtEpochMs = observation.nowEpochMs,
-            ),
-        )
+        val observed = observation.candidate.androidProjection()
+        upsertSyncSnapshot(ContactSyncSnapshotState.observe(findSyncSnapshot(linkId), linkId, observed, observation.nowEpochMs))
     }
 }
 
@@ -222,12 +204,11 @@ private fun String?.cleanObservedValue(): String? = this?.trim()?.takeIf(String:
 
 private fun String.normalizeObservedHandle(): String = trim().trimStart('@').lowercase().filterNot(Char::isWhitespace)
 
-private fun SystemContactCandidate.androidProjectionJson(rawContactId: Long): String = buildJsonObject {
-    put("rawContactId", rawContactId)
-    put("displayName", displayName)
-    put("phones", JsonArray(phones.distinct().sorted().map(::JsonPrimitive)))
-    put("emails", JsonArray(emails.distinct().sorted().map(::JsonPrimitive)))
-    put("company", company?.let(::JsonPrimitive) ?: JsonNull)
-    put("title", title?.let(::JsonPrimitive) ?: JsonNull)
-    put("note", note?.let(::JsonPrimitive) ?: JsonNull)
-}.toString()
+private fun SystemContactCandidate.androidProjection() = com.zhiban.rebuild.data.contact.ContactSyncProjection(
+    displayName = displayName,
+    phones = phones,
+    emails = emails,
+    company = company,
+    title = title,
+    note = note,
+)
