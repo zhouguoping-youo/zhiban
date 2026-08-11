@@ -23,6 +23,7 @@ import com.zhiban.rebuild.data.contact.ContactMergeLinkEntity
 import com.zhiban.rebuild.data.contact.ContactMethodEntity
 import com.zhiban.rebuild.data.contact.ContactPlatformIdentityEntity
 import com.zhiban.rebuild.data.contact.ContactRoleEntity
+import com.zhiban.rebuild.data.contact.ContactSyncOperationEntity
 import com.zhiban.rebuild.data.contact.ContactSyncSnapshotEntity
 import com.zhiban.rebuild.data.contact.GroupConversationEntity
 import com.zhiban.rebuild.data.contact.GroupMembershipEpisodeEntity
@@ -91,7 +92,7 @@ const val AGENT_DATABASE_FILE_NAME = "zhiban-agent.db"
         PersonEntity::class, SourceIdentityEntity::class, IdentityClaimEntity::class,
         PersonEmploymentEpisodeEntity::class, RelationshipEpisodeEntity::class,
         GroupConversationEntity::class, GroupMembershipEpisodeEntity::class,
-        AndroidRawContactLinkEntity::class, ContactSyncSnapshotEntity::class,
+        AndroidRawContactLinkEntity::class, ContactSyncSnapshotEntity::class, ContactSyncOperationEntity::class,
         ChangeLogEntity::class, AutoWriteReceiptEntity::class,
         StagedContactCandidateEntity::class,
         FactEntity::class,
@@ -122,7 +123,7 @@ const val AGENT_DATABASE_FILE_NAME = "zhiban-agent.db"
         EventPlanEntity::class,
         EventPlanParticipantEntity::class,
     ],
-    version = 36,
+    version = 37,
     exportSchema = true,
 )
 internal abstract class AgentDatabase : RoomDatabase() {
@@ -1486,6 +1487,37 @@ internal abstract class AgentDatabase : RoomDatabase() {
                 backfillPeopleAndSourceIdentities(db)
                 backfillIdentityClaims(db)
                 backfillTemporalEpisodes(db)
+            }
+        }
+
+        val MIGRATION_36_37 = object : Migration(36, 37) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `contact_sync_operations` (
+                        `operationId` TEXT NOT NULL,
+                        `linkId` TEXT,
+                        `contactId` TEXT NOT NULL,
+                        `beforeProjectionJson` TEXT NOT NULL,
+                        `afterProjectionJson` TEXT NOT NULL,
+                        `insertedDataRowIdsJson` TEXT NOT NULL,
+                        `rawContactVersionBefore` INTEGER,
+                        `rawContactVersionAfter` INTEGER,
+                        `state` TEXT NOT NULL,
+                        `createdAtEpochMs` INTEGER NOT NULL,
+                        `undoneAtEpochMs` INTEGER,
+                        PRIMARY KEY(`operationId`),
+                        FOREIGN KEY(`linkId`) REFERENCES `android_raw_contact_links`(`linkId`)
+                            ON UPDATE NO ACTION ON DELETE SET NULL
+                    )""",
+                )
+                createIndices(
+                    db,
+                    "contact_sync_operations",
+                    "linkId" to false,
+                    "contactId" to false,
+                    "state" to false,
+                    "createdAtEpochMs" to false,
+                )
             }
         }
 

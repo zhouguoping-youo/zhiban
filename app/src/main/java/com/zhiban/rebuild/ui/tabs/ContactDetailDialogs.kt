@@ -524,7 +524,7 @@ internal fun ContactDetailDialog(
                     Text("保存到手机通讯录", color = RelationInk)
                 }
                 Text(
-                    "将打开手机系统联系人页面，由你检查并确认保存",
+                    "先预览变化；确认后写入并再次校验，可在完成提示中撤销",
                     color = RelationMuted,
                     style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.fillMaxWidth(),

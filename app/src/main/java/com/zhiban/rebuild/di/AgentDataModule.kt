@@ -89,6 +89,7 @@ object AgentDataModule {
                     AgentDatabase.MIGRATION_33_34,
                     AgentDatabase.MIGRATION_34_35,
                     AgentDatabase.MIGRATION_35_36,
+                    AgentDatabase.MIGRATION_36_37,
                 )
                 .addCallback(AgentDatabase.CALLBACK).build()
         }

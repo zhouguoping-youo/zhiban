@@ -5,6 +5,7 @@ import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.ContactIntelligenceDao
 import com.zhiban.rebuild.data.contact.ContactSyncSnapshotState
 import com.zhiban.rebuild.data.contact.IdentityClaimEntity
+import com.zhiban.rebuild.data.contact.OrganizationEntity
 import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
 import com.zhiban.rebuild.data.contact.PersonEntity
 import com.zhiban.rebuild.data.contact.SourceIdentityEntity
@@ -25,7 +26,7 @@ internal suspend fun AgentDatabase.upsertObservedSystemContactIntelligence(
     dao.upsertAndroidIdentity(androidIdentity, nowEpochMs)
     candidate.observedClaims(contact.contactId, androidIdentity.sourceIdentityId, sourceRef, nowEpochMs)
         .forEach { dao.upsertClaim(it) }
-    dao.upsertObservedEmployment(observation)
+    upsertObservedEmployment(observation)
     dao.upsertObservedPlatformIdentities(observation)
     dao.upsertAndroidSyncState(observation)
 }
@@ -39,9 +40,28 @@ private suspend fun ContactIntelligenceDao.upsertAndroidIdentity(androidIdentity
     )
 }
 
-private suspend fun ContactIntelligenceDao.upsertObservedEmployment(observation: SystemContactObservation) {
+private suspend fun AgentDatabase.upsertObservedEmployment(observation: SystemContactObservation) {
     observation.candidate.company?.trim()?.takeIf(String::isNotEmpty)?.let { company ->
-        upsertEmployment(
+        val organizationId = stableContactKnowledgeId("organization", "NAME", company.lowercase())
+        contactKnowledgeDao().upsertOrganization(
+            OrganizationEntity(
+                organizationId = organizationId,
+                canonicalName = company,
+                normalizedName = company.lowercase().filterNot(Char::isWhitespace),
+                creditCode = null,
+                status = null,
+                registeredAddress = null,
+                longitude = null,
+                latitude = null,
+                source = "SYSTEM_CONTACT",
+                sourceRef = observation.sourceRef,
+                userConfirmed = false,
+                verifiedAtEpochMs = null,
+                createdAtEpochMs = observation.nowEpochMs,
+                updatedAtEpochMs = observation.nowEpochMs,
+            ),
+        )
+        contactIntelligenceDao().upsertEmployment(
             PersonEmploymentEpisodeEntity(
                 episodeId = stableContactKnowledgeId(
                     observation.contact.contactId,
@@ -49,7 +69,7 @@ private suspend fun ContactIntelligenceDao.upsertObservedEmployment(observation:
                     observation.sourceRef,
                 ),
                 personId = observation.contact.contactId,
-                organizationId = stableContactKnowledgeId("organization", "NAME", company.lowercase()),
+                organizationId = organizationId,
                 companyNameSnapshot = company,
                 department = observation.candidate.department.cleanObservedValue(),
                 title = observation.candidate.title.cleanObservedValue(),

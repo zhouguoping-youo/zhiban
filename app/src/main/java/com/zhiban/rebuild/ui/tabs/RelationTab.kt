@@ -66,6 +66,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -102,6 +103,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.zhiban.rebuild.data.agent.AndroidContactSyncPreview
 import com.zhiban.rebuild.data.agent.RelationshipEventParticipantInput
 import com.zhiban.rebuild.data.calllog.CallRecordEntity
 import com.zhiban.rebuild.data.contact.ContactAliasEntity
@@ -221,6 +223,8 @@ fun RelationTab(
     var showNotificationCandidates by remember { mutableStateOf(false) }
     var selectedCallNote by remember { mutableStateOf<CallRecordEntity?>(null) }
     var correctingAutoWrite by remember { mutableStateOf<com.zhiban.rebuild.runtime.governance.AutoWriteReceiptRow?>(null) }
+    var pendingPhoneSync by remember { mutableStateOf<AndroidContactSyncPreview?>(null) }
+    var phoneSyncPermissionContact by remember { mutableStateOf<ContactEntity?>(null) }
     var notificationAccessEnabled by remember {
         mutableStateOf(context.packageName in NotificationManagerCompat.getEnabledListenerPackages(context))
     }
@@ -265,6 +269,19 @@ fun RelationTab(
                 viewModel.loadSystemContacts()
             } else {
                 showPermissionExplanation = true
+            }
+        }
+    val writeContactPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            val contact = phoneSyncPermissionContact
+            phoneSyncPermissionContact = null
+            if (granted && contact != null) {
+                viewModel.prepareSystemContactSync(contact) { preview, error ->
+                    pendingPhoneSync = preview
+                    error?.let(showFeedback)
+                }
+            } else if (!granted) {
+                showFeedback("需要修改通讯录权限才能回写")
             }
         }
     val openContactImport = {
@@ -743,13 +760,16 @@ fun RelationTab(
             },
             onRejectEnrichment = { candidate -> viewModel.rejectContactEnrichment(candidate) },
             onSaveToPhone = {
-                viewModel.prepareSystemContactWrite(contact) { intent, error ->
-                    when {
-                        error != null -> Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
-
-                        intent != null -> runCatching { context.startActivity(intent) }
-                            .onFailure { Toast.makeText(context, "无法打开手机通讯录", Toast.LENGTH_SHORT).show() }
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) ==
+                    PackageManager.PERMISSION_GRANTED
+                ) {
+                    viewModel.prepareSystemContactSync(contact) { preview, error ->
+                        pendingPhoneSync = preview
+                        error?.let(showFeedback)
                     }
+                } else {
+                    phoneSyncPermissionContact = contact
+                    writeContactPermissionLauncher.launch(Manifest.permission.WRITE_CONTACTS)
                 }
             },
             onCall = {
@@ -766,6 +786,49 @@ fun RelationTab(
                     }
                 }
             },
+        )
+    }
+    pendingPhoneSync?.let { preview ->
+        val hasConflicts = preview.plan.conflicts.isNotEmpty()
+        ZhiBanAlertDialog(
+            onDismissRequest = { pendingPhoneSync = null },
+            title = { Text(if (hasConflicts) "需要先核对" else "更新手机通讯录") },
+            text = {
+                Text(
+                    if (hasConflicts) {
+                        "手机里的资料和知伴档案都发生过修改。为避免覆盖，知伴不会自动写入：\n${contactSyncSummary(preview)}"
+                    } else {
+                        contactSyncSummary(preview)
+                    },
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !hasConflicts,
+                    onClick = {
+                        viewModel.applySystemContactSync(preview) { result, error ->
+                            pendingPhoneSync = null
+                            if (error != null) {
+                                showFeedback(error)
+                            } else if (result != null) {
+                                scope.launch {
+                                    val snackbarResult = snackbarHostState.showSnackbar(
+                                        message = result.message,
+                                        actionLabel = result.operationId.takeIf(String::isNotBlank)?.let { "撤销" },
+                                    )
+                                    if (snackbarResult == SnackbarResult.ActionPerformed) {
+                                        viewModel.undoSystemContactSync(result.operationId, showFeedback)
+                                    }
+                                }
+                            }
+                        }
+                    },
+                ) { Text("确认更新", color = if (hasConflicts) RelationMuted else RelationInk) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingPhoneSync = null }) { Text("取消", color = RelationMuted) }
+            },
+            containerColor = RelationSurface,
         )
     }
     selectedMergeSuggestion?.let { suggestion ->
@@ -1105,6 +1168,19 @@ fun RelationTab(
             },
         )
     }
+}
+
+private fun contactSyncSummary(preview: AndroidContactSyncPreview): String {
+    val fieldNames = mapOf("displayName" to "姓名", "company" to "公司", "title" to "职位", "note" to "备注")
+    val lines = buildList {
+        preview.plan.scalarUpdates.forEach { (field, value) -> add("${fieldNames[field] ?: field}：${value.orEmpty()}") }
+        preview.plan.phoneAdditions.forEach { add("新增手机：$it") }
+        preview.plan.emailAdditions.forEach { add("新增邮箱：$it") }
+        preview.plan.conflicts.forEach { conflict ->
+            add("${fieldNames[conflict.field] ?: conflict.field}：手机为“${conflict.deviceValue.orEmpty()}”，知伴为“${conflict.desiredValue.orEmpty()}”")
+        }
+    }
+    return if (lines.isEmpty()) "手机通讯录已经是最新" else lines.joinToString("\n")
 }
 
 /** Title for an auto-write receipt shown inline on the relation page. */

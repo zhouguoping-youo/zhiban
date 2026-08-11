@@ -35,6 +35,9 @@ interface ContactIntelligenceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertSyncSnapshot(value: ContactSyncSnapshotEntity)
 
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertSyncOperation(value: ContactSyncOperationEntity)
+
     @Query("SELECT * FROM persons WHERE status = 'ACTIVE' ORDER BY normalizedName")
     fun observeActivePeople(): Flow<List<PersonEntity>>
 
@@ -81,4 +84,10 @@ interface ContactIntelligenceDao {
 
     @Query("SELECT * FROM contact_sync_snapshots WHERE linkId = :linkId")
     suspend fun findSyncSnapshot(linkId: String): ContactSyncSnapshotEntity?
+
+    @Query("SELECT * FROM contact_sync_operations WHERE operationId = :operationId")
+    suspend fun findSyncOperation(operationId: String): ContactSyncOperationEntity?
+
+    @Query("UPDATE contact_sync_operations SET state = :state, undoneAtEpochMs = :undoneAt WHERE operationId = :operationId")
+    suspend fun updateSyncOperationState(operationId: String, state: String, undoneAt: Long?): Int
 }

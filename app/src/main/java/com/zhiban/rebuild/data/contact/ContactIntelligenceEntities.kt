@@ -292,3 +292,30 @@ data class ContactSyncSnapshotEntity(
     val lastVerifiedAtEpochMs: Long?,
     val updatedAtEpochMs: Long,
 )
+
+@Entity(
+    tableName = "contact_sync_operations",
+    foreignKeys = [
+        ForeignKey(
+            entity = AndroidRawContactLinkEntity::class,
+            parentColumns = ["linkId"],
+            childColumns = ["linkId"],
+            onDelete = ForeignKey.SET_NULL,
+        ),
+    ],
+    indices = [Index("linkId"), Index("contactId"), Index("state"), Index("createdAtEpochMs")],
+)
+data class ContactSyncOperationEntity(
+    @PrimaryKey val operationId: String,
+    val linkId: String?,
+    val contactId: String,
+    /** Stored only inside the SQLCipher database; change_log keeps just operationId. */
+    val beforeProjectionJson: String,
+    val afterProjectionJson: String,
+    val insertedDataRowIdsJson: String,
+    val rawContactVersionBefore: Long?,
+    val rawContactVersionAfter: Long?,
+    val state: String,
+    val createdAtEpochMs: Long,
+    val undoneAtEpochMs: Long?,
+)

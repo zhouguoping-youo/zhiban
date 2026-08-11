@@ -1,6 +1,7 @@
 package com.zhiban.rebuild.data.contact
 
 import android.Manifest
+import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.Context
 import android.content.pm.PackageManager
@@ -149,13 +150,11 @@ class SystemContactReader @Inject constructor(@ApplicationContext private val co
         }
         val rowId = cursor.long(ContactsContract.Data._ID) ?: return
         val mimeType = cursor.string(ContactsContract.Data.MIMETYPE).orEmpty()
-        val isReadOnly = cursor.int(ContactsContract.Data.IS_READ_ONLY) == 1
-        raw.isReadOnly = raw.isReadOnly || isReadOnly
         raw.dataRows += SystemContactDataRowSnapshot(
             rowId = rowId,
             mimeType = mimeType,
             value = cursor.string(ContactsContract.Data.DATA1)?.take(500),
-            isReadOnly = isReadOnly,
+            isReadOnly = false,
         )
     }
 
@@ -185,6 +184,16 @@ class SystemContactReader @Inject constructor(@ApplicationContext private val co
         rawContact.sourceId = cursor.string(ContactsContract.RawContacts.SOURCE_ID)
         rawContact.version = cursor.long(ContactsContract.RawContacts.VERSION) ?: 0L
         rawContact.isDirty = cursor.int(ContactsContract.RawContacts.DIRTY) == 1
+        rawContact.isReadOnly = !accountSupportsContactWrites(rawContact.accountType)
+    }
+
+    private fun accountSupportsContactWrites(accountType: String?): Boolean {
+        if (accountType.isNullOrBlank()) return true
+        return ContentResolver.getSyncAdapterTypes().any { adapter ->
+            adapter.authority == ContactsContract.AUTHORITY &&
+                adapter.accountType == accountType &&
+                adapter.supportsUploading()
+        }
     }
 
     private fun applyMimeTypeRow(cursor: Cursor, target: MutableContact) {
@@ -375,7 +384,6 @@ class SystemContactReader @Inject constructor(@ApplicationContext private val co
             ContactsContract.Data.RAW_CONTACT_ID,
             ContactsContract.Data.CONTACT_ID,
             ContactsContract.Data.LOOKUP_KEY,
-            ContactsContract.Data.IS_READ_ONLY,
             ContactsContract.Data.MIMETYPE,
             ContactsContract.Data.DISPLAY_NAME_PRIMARY,
             ContactsContract.Data.DISPLAY_NAME,
