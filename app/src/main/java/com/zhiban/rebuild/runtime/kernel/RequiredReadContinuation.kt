@@ -5,6 +5,8 @@ import com.zhiban.rebuild.runtime.tool.CapabilityRouter
 import com.zhiban.rebuild.runtime.tool.RoutedToolResult
 import com.zhiban.rebuild.runtime.tool.RuntimeToolRouteContext
 import com.zhiban.rebuild.runtime.tool.sha256
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /** Enforces explicitly requested read-only domains when a model ends observation too early. */
 internal class RequiredReadContinuation(
@@ -51,4 +53,15 @@ internal class RequiredReadContinuation(
         input,
         store.completedToolResults(runId),
     )
+
+    suspend fun completionResult(input: String, runId: String, fallback: RoutedToolResult): RoutedToolResult = completionSummary(
+        input,
+        runId,
+    )?.let { summary ->
+        RoutedToolResult(
+            "required.read.summary",
+            fallback.providerCallId,
+            buildJsonObject { put("summary", summary) }.toString(),
+        )
+    } ?: fallback
 }

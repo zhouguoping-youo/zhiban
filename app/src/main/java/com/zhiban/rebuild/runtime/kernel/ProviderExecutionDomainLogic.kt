@@ -374,6 +374,8 @@ internal fun deterministicToolSummary(toolName: String, safeResultJson: String):
     val result = runCatching { Json.parseToJsonElement(safeResultJson).jsonObject }.getOrNull()
     val count = result?.get("count")?.jsonPrimitive?.content?.toIntOrNull()
     return when (toolName) {
+        "required.read.summary" -> result?.get("summary")?.jsonPrimitive?.content.orEmpty()
+
         "schedule.create", "calendar.create", "calendar.schedule.create" ->
             scheduleCreatedSummary(result)
 

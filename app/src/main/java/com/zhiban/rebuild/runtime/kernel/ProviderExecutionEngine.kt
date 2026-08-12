@@ -1625,7 +1625,9 @@ internal class ProviderExecutionEngine(
                 // forever and the run never leaves OBSERVING. We already hold the tool's result, so
                 // answer from it (deterministic summary) instead of asking the model again.
                 if (outcome.result.canonicalName in store.completedToolNames(runId)) {
-                    appendDegradedObservation(setup.attemptId, ids, outcome.result.canonicalName, outcome.result.safeResultJson)
+                    val result = RequiredReadContinuation(capabilityRouter, store, ownerId, clock)
+                        .completionResult(setup.input.text, runId, outcome.result)
+                    appendDegradedObservation(setup.attemptId, ids, result.canonicalName, result.safeResultJson)
                 } else {
                     observeToolResult(
                         runId,
@@ -1641,25 +1643,17 @@ internal class ProviderExecutionEngine(
             ReActStreamOutcome.PendingApproval -> true
 
             is ReActStreamOutcome.Streamed -> {
-                val completedTools = store.completedToolNames(runId)
                 val continuation = RequiredReadContinuation(capabilityRouter, store, ownerId, clock)
                 val result = continuation.execute(
                     setup.input.text,
-                    completedTools,
+                    store.completedToolNames(runId),
                     runId,
                     sessionId,
                     setup.attemptId,
                     fencingEpoch,
                 )
                 if (result != null) {
-                    return observeToolResult(
-                        runId,
-                        sessionId,
-                        fencingEpoch,
-                        result.canonicalName,
-                        result.providerCallId,
-                        result.safeResultJson,
-                    )
+                    return observeToolResult(runId, sessionId, fencingEpoch, result.canonicalName, result.providerCallId, result.safeResultJson)
                 }
                 store.completeObservationWithAssistantTurn(
                     runId,
