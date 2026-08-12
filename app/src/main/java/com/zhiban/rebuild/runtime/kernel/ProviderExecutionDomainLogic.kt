@@ -306,6 +306,42 @@ internal fun remainingObservationRequirements(input: String, completedTools: Set
         .orEmpty()
 }
 
+internal fun nextRequiredReadTool(input: String, completedTools: Set<String>): String? {
+    val normalized = input.lowercase()
+    return when {
+        CONTACT_COUNT_PATTERNS.any(normalized::contains) &&
+            "contact.maintenance.list" !in completedTools -> "contact.maintenance.list"
+
+        CALENDAR_QUERY_PATTERNS.any(normalized::contains) &&
+            completedTools.none(CALENDAR_QUERY_TOOLS::contains) -> "calendar.schedule.search"
+
+        else -> null
+    }
+}
+
+internal fun requiredReadToolCall(toolName: String, input: String, nowEpochMs: Long): RuntimeToolCallRequest {
+    val arguments = when (toolName) {
+        "contact.maintenance.list" -> buildJsonObject { put("limit", 1) }
+
+        "calendar.schedule.search" -> {
+            val zone = ZoneId.systemDefault()
+            val day = Instant.ofEpochMilli(nowEpochMs).atZone(zone).toLocalDate()
+            buildJsonObject {
+                put("fromEpochMs", day.atStartOfDay(zone).toInstant().toEpochMilli())
+                put("toEpochMs", day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() - 1)
+                put("limit", 50)
+            }
+        }
+
+        else -> error("unsupported required read tool: $toolName")
+    }
+    return RuntimeToolCallRequest(
+        providerCallId = "required-${sha256("$toolName|$input").take(24)}",
+        name = toolName,
+        argumentsJson = arguments.toString(),
+    )
+}
+
 private val CONTACT_COUNT_PATTERNS = listOf("联系人数量", "联系人总数", "多少联系人", "多少位联系人", "统计联系人", "count my contact", "how many contact")
 private val CALENDAR_QUERY_PATTERNS = listOf("今天日程", "今日日程", "今天安排", "今日安排", "today's schedule", "today%27s schedule", "today schedule")
 private val CALENDAR_QUERY_TOOLS = setOf("calendar.search", "calendar.schedule.search")

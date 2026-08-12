@@ -1641,6 +1641,25 @@ internal class ProviderExecutionEngine(
             ReActStreamOutcome.PendingApproval -> true
 
             is ReActStreamOutcome.Streamed -> {
+                val completedTools = store.completedToolNames(runId)
+                val result = RequiredReadContinuation(capabilityRouter, store, ownerId, clock).execute(
+                    setup.input.text,
+                    completedTools,
+                    runId,
+                    sessionId,
+                    setup.attemptId,
+                    fencingEpoch,
+                )
+                if (result != null) {
+                    return observeToolResult(
+                        runId,
+                        sessionId,
+                        fencingEpoch,
+                        result.canonicalName,
+                        result.providerCallId,
+                        result.safeResultJson,
+                    )
+                }
                 store.completeObservationWithAssistantTurn(
                     runId,
                     outcome.assistantText,

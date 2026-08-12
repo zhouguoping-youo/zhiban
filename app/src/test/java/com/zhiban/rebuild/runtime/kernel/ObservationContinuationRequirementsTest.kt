@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.runtime.kernel
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -35,5 +36,24 @@ class ObservationContinuationRequirementsTest {
         )
 
         assertTrue(instruction.isEmpty())
+    }
+
+    @Test
+    fun `runtime chooses the missing explicit read instead of trusting early model final`() {
+        assertEquals(
+            "contact.maintenance.list",
+            nextRequiredReadTool("联系人总数和今天安排", setOf("calendar.schedule.search")),
+        )
+        assertEquals(
+            "calendar.schedule.search",
+            nextRequiredReadTool("联系人总数和今天安排", setOf("contact.maintenance.list")),
+        )
+        assertEquals(
+            null,
+            nextRequiredReadTool(
+                "联系人总数和今天安排",
+                setOf("contact.maintenance.list", "calendar.schedule.search"),
+            ),
+        )
     }
 }
