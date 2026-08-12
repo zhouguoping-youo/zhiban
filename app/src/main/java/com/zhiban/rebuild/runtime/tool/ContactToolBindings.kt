@@ -274,7 +274,24 @@ private fun ownerProfileJson(profile: ContactOwnerProfileSnapshot, ownerLinks: L
                         group.name,
                         buildJsonObject {
                             put("guidance", RelationshipTaxonomy.groupGuidance(group))
-                            put("requiresCurrentEmployment", group == RelationshipGroup.WORK)
+                            put(
+                                "types",
+                                buildJsonObject {
+                                    RelationshipTaxonomy.definitionsFor(group).forEach { definition ->
+                                        put(
+                                            definition.code,
+                                            buildJsonObject {
+                                                put("displayName", definition.displayName)
+                                                put("evidence", definition.evidencePolicy.guidance)
+                                                put(
+                                                    "requiresCurrentEmployment",
+                                                    definition.evidencePolicy.requiresOwnerEmployment,
+                                                )
+                                            },
+                                        )
+                                    }
+                                },
+                            )
                         },
                     )
                 }

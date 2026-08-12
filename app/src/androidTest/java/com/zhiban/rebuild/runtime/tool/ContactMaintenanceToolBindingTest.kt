@@ -90,13 +90,26 @@ class ContactMaintenanceToolBindingTest {
             assertEquals("true", owner.getValue("relationshipClassificationReady").jsonPrimitive.content)
             assertEquals("false", owner.getValue("workRelationshipClassificationReady").jsonPrimitive.content)
             val prerequisites = owner.getValue("relationshipPrerequisites").jsonObject
-            assertEquals(
-                "false",
-                prerequisites.getValue("SERVICE").jsonObject.getValue("requiresCurrentEmployment").jsonPrimitive.content,
-            )
+            val workTypes = prerequisites.getValue("WORK").jsonObject.getValue("types").jsonObject
+            val serviceTypes = prerequisites.getValue("SERVICE").jsonObject.getValue("types").jsonObject
             assertEquals(
                 "true",
-                prerequisites.getValue("WORK").jsonObject.getValue("requiresCurrentEmployment").jsonPrimitive.content,
+                workTypes.getValue("COLLEAGUE").jsonObject
+                    .getValue("requiresCurrentEmployment").jsonPrimitive.content,
+            )
+            assertEquals(
+                "false",
+                workTypes.getValue("CUSTOMER").jsonObject
+                    .getValue("requiresCurrentEmployment").jsonPrimitive.content,
+            )
+            assertEquals(
+                "false",
+                serviceTypes.getValue("DOCTOR").jsonObject
+                    .getValue("requiresCurrentEmployment").jsonPrimitive.content,
+            )
+            assertEquals(
+                "真实项目、合同、订单或业务沟通；不能只凭公司名称判断",
+                workTypes.getValue("CUSTOMER").jsonObject.getValue("evidence").jsonPrimitive.content,
             )
             assertEquals(
                 "老张",
