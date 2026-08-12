@@ -1,12 +1,12 @@
 package com.zhiban.rebuild.runtime.kernel
 
+import com.zhiban.rebuild.runtime.store.AttemptStartRequest
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
+import com.zhiban.rebuild.runtime.store.RuntimeEventDraft
 import com.zhiban.rebuild.runtime.tool.CapabilityRouter
 import com.zhiban.rebuild.runtime.tool.RoutedToolResult
 import com.zhiban.rebuild.runtime.tool.RuntimeToolRouteContext
 import com.zhiban.rebuild.runtime.tool.sha256
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /** Enforces explicitly requested read-only domains when a model ends observation too early. */
 internal class RequiredReadContinuation(
@@ -54,14 +54,44 @@ internal class RequiredReadContinuation(
         store.completedToolResults(runId),
     )
 
-    suspend fun completionResult(input: String, runId: String, fallback: RoutedToolResult): RoutedToolResult = completionSummary(
-        input,
-        runId,
-    )?.let { summary ->
-        RoutedToolResult(
-            "required.read.summary",
-            fallback.providerCallId,
-            buildJsonObject { put("summary", summary) }.toString(),
+    suspend fun completeSummary(input: String, runId: String, sessionId: String, fencingEpoch: Long): Boolean {
+        val summary = completionSummary(input, runId) ?: return false
+        val attemptOrdinal = store.recoverySnapshot(runId, "ui").attempts.size + 1
+        val attemptId = "attempt-$runId-$attemptOrdinal"
+        store.startObservationAttempt(AttemptStartRequest(attemptId, runId, attemptOrdinal, ownerId, fencingEpoch, clock()))
+        appendSummaryEvent(runId, sessionId, attemptId, fencingEpoch, 0, summary, final = false)
+        appendSummaryEvent(runId, sessionId, attemptId, fencingEpoch, 1, "", final = true)
+        store.completeObservationWithAssistantTurn(runId, summary, "{}", ownerId, fencingEpoch, clock())
+        return true
+    }
+
+    private suspend fun appendSummaryEvent(
+        runId: String,
+        sessionId: String,
+        attemptId: String,
+        fencingEpoch: Long,
+        ordinal: Long,
+        part: String,
+        final: Boolean,
+    ) {
+        val payload = "{\"ordinal\":$ordinal,\"part\":${jsonString(part)},\"final\":$final}"
+        store.appendObservationEventOnce(
+            RuntimeEventDraft(
+                "event-required-summary-$attemptId-$ordinal",
+                "AssistantDelta",
+                sessionId,
+                runId,
+                attemptId,
+                attemptId,
+                runId,
+                payload,
+                clock(),
+            ),
+            ownerId,
+            fencingEpoch,
+            clock(),
         )
-    } ?: fallback
+    }
+
+    private fun jsonString(value: String): String = kotlinx.serialization.json.JsonPrimitive(value).toString()
 }

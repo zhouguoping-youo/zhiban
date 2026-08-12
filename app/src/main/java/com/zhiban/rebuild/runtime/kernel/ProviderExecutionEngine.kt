@@ -1417,14 +1417,11 @@ internal class ProviderExecutionEngine(
     }
 
     private suspend fun appendObservationUsageEvent(event: ModelEvent.Usage, capability: CapabilitySnapshot, attemptId: String, ids: RunIdentifiers) {
-        val runId = ids.runId
-        val sessionId = ids.sessionId
-        val fencingEpoch = ids.fencingEpoch
         appendObservation(
             attemptId,
-            runId,
-            sessionId,
-            fencingEpoch,
+            ids.runId,
+            ids.sessionId,
+            ids.fencingEpoch,
             "usage",
             "ProviderUsageRecorded",
             buildJsonObject {
@@ -1455,14 +1452,11 @@ internal class ProviderExecutionEngine(
     }
 
     private suspend fun appendObservationFinalEvent(event: ModelEvent.Final, lastOrdinal: Long, attemptId: String, ids: RunIdentifiers) {
-        val runId = ids.runId
-        val sessionId = ids.sessionId
-        val fencingEpoch = ids.fencingEpoch
         appendObservation(
             attemptId,
-            runId,
-            sessionId,
-            fencingEpoch,
+            ids.runId,
+            ids.sessionId,
+            ids.fencingEpoch,
             "final-delta",
             "AssistantDelta",
             buildJsonObject {
@@ -1625,9 +1619,12 @@ internal class ProviderExecutionEngine(
                 // forever and the run never leaves OBSERVING. We already hold the tool's result, so
                 // answer from it (deterministic summary) instead of asking the model again.
                 if (outcome.result.canonicalName in store.completedToolNames(runId)) {
-                    val result = RequiredReadContinuation(capabilityRouter, store, ownerId, clock)
-                        .completionResult(setup.input.text, runId, outcome.result)
-                    appendDegradedObservation(setup.attemptId, ids, result.canonicalName, result.safeResultJson)
+                    if (!RequiredReadContinuation(capabilityRouter, store, ownerId, clock)
+                            .completeSummary(setup.input.text, runId, sessionId, fencingEpoch)
+                    ) {
+                        appendDegradedObservation(setup.attemptId, ids, outcome.result.canonicalName, outcome.result.safeResultJson)
+                    }
+                    true
                 } else {
                     observeToolResult(
                         runId,
@@ -1655,6 +1652,7 @@ internal class ProviderExecutionEngine(
                 if (result != null) {
                     return observeToolResult(runId, sessionId, fencingEpoch, result.canonicalName, result.providerCallId, result.safeResultJson)
                 }
+                if (continuation.completeSummary(setup.input.text, runId, sessionId, fencingEpoch)) return true
                 store.completeObservationWithAssistantTurn(
                     runId,
                     continuation.completionSummary(setup.input.text, runId) ?: outcome.assistantText,
