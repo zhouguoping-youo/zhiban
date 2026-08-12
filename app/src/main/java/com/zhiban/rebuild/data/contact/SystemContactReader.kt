@@ -243,10 +243,15 @@ class SystemContactReader @Inject constructor(@ApplicationContext private val co
             }
 
             ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE -> {
-                cursor.string(
-                    ContactsContract.CommonDataKinds.Phone.NORMALIZED_NUMBER,
-                    ContactsContract.CommonDataKinds.Phone.NUMBER,
-                )?.let(::normalizeContactPhone)?.let(target.phones::add)
+                // AOSP and some OEM providers temporarily expose NORMALIZED_NUMBER as an empty
+                // string after a Data-row insert. Treat blank/invalid normalized values as absent
+                // and fall back to NUMBER; otherwise a successfully written phone disappears from
+                // the aggregate projection and a retry can insert it again.
+                val phone = cursor.string(ContactsContract.CommonDataKinds.Phone.NORMALIZED_NUMBER)
+                    ?.let(::normalizeContactPhone)
+                    ?: cursor.string(ContactsContract.CommonDataKinds.Phone.NUMBER)
+                        ?.let(::normalizeContactPhone)
+                phone?.let(target.phones::add)
             }
 
             ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE -> {

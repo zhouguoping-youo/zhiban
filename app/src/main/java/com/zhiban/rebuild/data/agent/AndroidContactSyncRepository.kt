@@ -35,6 +35,7 @@ import kotlinx.serialization.json.Json
 data class AndroidContactSyncPreview(
     val contact: ContactEntity,
     val deviceContact: SystemContactCandidate,
+    val deviceProjection: ContactSyncProjection,
     val rawContact: SystemRawContactSnapshot,
     val base: ContactSyncProjection,
     val desired: ContactSyncProjection,
@@ -64,7 +65,10 @@ class AndroidContactSyncRepository @Inject internal constructor(
             ?: error("这个联系人属于只读账号，无法由知伴直接更新")
         val linkId = stableContactKnowledgeId("android-raw-contact", raw.rawContactId.toString())
         val snapshot = database.contactIntelligenceDao().findSyncSnapshot(linkId)
-        val device = existing.toSyncProjection()
+        // Android's aggregate Contacts view can lag behind the raw Data rows that were just
+        // committed. Include the authoritative writable-raw values so an immediate retry does
+        // not insert the same phone or email a second time while aggregation catches up.
+        val device = existing.toSyncProjection().includingRawContactValues(raw)
         val base = snapshot?.baseProjectionJson?.let(ContactSyncProjection::decode) ?: device
         val requested = contact.toSyncProjection()
         val desired = device.copy(
@@ -78,6 +82,7 @@ class AndroidContactSyncRepository @Inject internal constructor(
         return AndroidContactSyncPreview(
             contact = contact,
             deviceContact = existing,
+            deviceProjection = device,
             rawContact = raw,
             base = base,
             desired = desired,
@@ -110,7 +115,7 @@ class AndroidContactSyncRepository @Inject internal constructor(
         val contact = database.contactDao().findById(operation.contactId) ?: error("联系人已不存在")
         val fresh = prepare(contact)
         val after = ContactSyncProjection.decode(operation.afterProjectionJson)
-        check(fresh.deviceContact.toSyncProjection() == after) { "手机联系人后来又被改过，请手动纠正，知伴不会覆盖" }
+        check(fresh.deviceProjection.containsExpected(after)) { "手机联系人后来又被改过，请手动纠正，知伴不会覆盖" }
         val before = ContactSyncProjection.decode(operation.beforeProjectionJson)
         val reversePlan = ContactThreeWayMerge.plan(after, after, before)
         val reverse = fresh.copy(base = after, desired = before, plan = reversePlan)
@@ -145,7 +150,7 @@ class AndroidContactSyncRepository @Inject internal constructor(
         nowEpochMs: Long,
     ): AndroidContactSyncResult {
         val operationId = UUID.randomUUID().toString()
-        val beforeJson = preview.deviceContact.toSyncProjection().encode()
+        val beforeJson = preview.deviceProjection.encode()
         val afterJson = preview.desired.encode()
         database.withTransaction {
             database.contactIntelligenceDao().insertSyncOperation(
@@ -237,13 +242,14 @@ class AndroidContactSyncRepository @Inject internal constructor(
     private suspend fun awaitVerifiedProjection(contact: ContactEntity, expected: ContactSyncProjection): AndroidContactSyncPreview {
         var latest = prepare(contact)
         repeat(CONTACT_PROVIDER_VERIFY_RETRIES) { attempt ->
-            if (latest.deviceContact.toSyncProjection() == expected) return latest
+            if (latest.deviceProjection.containsExpected(expected)) return latest
             if (attempt < CONTACT_PROVIDER_VERIFY_RETRIES - 1) {
                 delay(CONTACT_PROVIDER_VERIFY_RETRY_MS)
                 latest = prepare(contact)
             }
         }
-        error("手机通讯录写入后仍未完成聚合，请稍后重试")
+        val mismatch = contactProjectionMismatchFields(latest.deviceProjection, expected)
+        error("手机通讯录写入后仍未完成聚合（${mismatch.joinToString()}），请稍后重试")
     }
 
     private fun appendScalarOperations(
@@ -328,6 +334,35 @@ class AndroidContactSyncRepository @Inject internal constructor(
         const val CONTACT_PROVIDER_VERIFY_RETRIES = 50
         const val CONTACT_PROVIDER_VERIFY_RETRY_MS = 100L
     }
+}
+
+internal fun contactProjectionMismatchFields(actual: ContactSyncProjection, expected: ContactSyncProjection): Set<String> = buildSet {
+    if (actual.displayName != expected.displayName) add("displayName")
+    if (!actual.phones.containsAll(expected.phones)) add("phones")
+    if (!actual.emails.containsAll(expected.emails)) add("emails")
+    if (actual.company != expected.company) add("company")
+    if (actual.title != expected.title) add("title")
+    if (actual.note != expected.note) add("note")
+}
+
+internal fun ContactSyncProjection.includingRawContactValues(raw: SystemRawContactSnapshot): ContactSyncProjection = copy(
+    phones = phones + raw.dataRows
+        .filter { it.mimeType == ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE }
+        .mapNotNull(SystemContactDataRowSnapshot::value),
+    emails = emails + raw.dataRows
+        .filter { it.mimeType == ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE }
+        .mapNotNull(SystemContactDataRowSnapshot::value),
+).canonical()
+
+internal fun ContactSyncProjection.containsExpected(expected: ContactSyncProjection): Boolean {
+    val actual = canonical()
+    val normalizedExpected = expected.canonical()
+    return actual.displayName == normalizedExpected.displayName &&
+        actual.phones.containsAll(normalizedExpected.phones) &&
+        actual.emails.containsAll(normalizedExpected.emails) &&
+        actual.company == normalizedExpected.company &&
+        actual.title == normalizedExpected.title &&
+        actual.note == normalizedExpected.note
 }
 
 internal fun selectWritableRawContact(candidate: SystemContactCandidate, contact: ContactEntity): SystemRawContactSnapshot? {

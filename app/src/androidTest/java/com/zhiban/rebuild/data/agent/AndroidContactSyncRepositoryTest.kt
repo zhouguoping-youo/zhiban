@@ -91,15 +91,22 @@ class AndroidContactSyncRepositoryTest {
         val updated = reader.readAll().contacts.single { it.sourceId == candidate.sourceId }
         assertEquals("新公司", updated.company)
         assertEquals("负责人", updated.title)
-        assertTrue(testSecondPhone in updated.phones)
+        assertEquals(1, matchingPhoneRows(updated))
         assertEquals("APPLIED", database.contactIntelligenceDao().findSyncOperation(result.operationId)?.state)
         assertEquals("AVAILABLE", database.changeLogDao().find(result.operationId)?.undoState)
+
+        val replayPreview = repository.prepare(contact)
+        assertTrue("a verified write must converge to a no-op instead of adding duplicate fields", replayPreview.plan.isNoOp)
+        val replay = repository.apply(replayPreview, nowEpochMs = 25)
+        assertEquals("", replay.operationId)
+        val replayed = reader.readAll().contacts.single { it.sourceId == candidate.sourceId }
+        assertEquals(1, matchingPhoneRows(replayed))
 
         repository.undo(result.operationId, nowEpochMs = 30)
         val restored = reader.readAll().contacts.single { it.sourceId == candidate.sourceId }
         assertEquals("旧公司", restored.company)
         assertEquals("销售", restored.title)
-        assertTrue(testSecondPhone !in restored.phones)
+        assertEquals(0, matchingPhoneRows(restored))
         assertEquals("UNDONE", database.contactIntelligenceDao().findSyncOperation(result.operationId)?.state)
     }
 
@@ -171,5 +178,13 @@ class AndroidContactSyncRepositoryTest {
         createdAtEpochMs = 1,
         updatedAtEpochMs = 1,
     )
+
+    private fun matchingPhoneRows(candidate: com.zhiban.rebuild.data.contact.SystemContactCandidate): Int = candidate.rawContacts
+        .single { it.rawContactId == rawContactId }
+        .dataRows
+        .count { row ->
+            row.mimeType == ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE &&
+                normalizeContactPhone(row.value) == normalizeContactPhone(testSecondPhone)
+        }
 
 }
