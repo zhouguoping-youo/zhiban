@@ -55,6 +55,11 @@ internal class RoomCrmToolExecutor(private val database: AgentDatabase, private 
                 put("requiresSeparateCalendarConfirmation", true)
             }
         }.toString()
+        val targetDigest = if (toolName == CrmMutationToolBinding.LEAD_CREATE) {
+            canonicalChangeDigest(requireNotNull(database.crmDao().findLead(mutation.targetId)))
+        } else {
+            digest
+        }
         insertConfirmedChangeLog(
             ConfirmedChangeLogInputs(
                 changeId = changeId,
@@ -62,7 +67,7 @@ internal class RoomCrmToolExecutor(private val database: AgentDatabase, private 
                 toolName = toolName,
                 idempotencyKey = idempotencyKey,
                 mutation = mutation,
-                afterDigest = digest,
+                afterDigest = targetDigest,
                 nowEpochMs = context.nowEpochMs,
             ),
         )
@@ -151,13 +156,13 @@ internal class RoomCrmToolExecutor(private val database: AgentDatabase, private 
                 runtimeRunId = runId,
                 toolName = toolName,
                 idempotencyKey = idempotencyKey,
-                targetDomain = "CRM",
+                targetDomain = if (toolName == CrmMutationToolBinding.LEAD_CREATE) "CRM_LEAD" else "CRM",
                 targetId = mutation.targetId,
                 operation = mutation.operation,
                 beforeDigest = mutation.beforeDigest,
                 afterDigest = afterDigest,
                 inversePayloadJson = mutation.inversePayloadJson,
-                undoState = "UNAVAILABLE",
+                undoState = if (toolName == CrmMutationToolBinding.LEAD_CREATE) "AVAILABLE" else "UNAVAILABLE",
                 createdAtEpochMs = nowEpochMs,
                 undoneAtEpochMs = null,
             ),

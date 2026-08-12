@@ -232,8 +232,8 @@ interface CrmDao {
     )
     suspend fun promoteCandidateLead(leadId: String, nowEpochMs: Long): Int
 
-    @Query("DELETE FROM crm_leads WHERE leadId = :leadId AND status = 'CANDIDATE' AND sourceType = 'AGENT_AUTO'")
-    suspend fun deleteAutoCandidateLead(leadId: String): Int
+    @Query("DELETE FROM crm_leads WHERE leadId = :leadId AND status = 'CANDIDATE'")
+    suspend fun deleteCandidateLead(leadId: String): Int
 
     @Query("DELETE FROM crm_activities WHERE activityId = :activityId AND sourceType = 'AGENT_AUTO'")
     suspend fun deleteAutoActivity(activityId: String): Int

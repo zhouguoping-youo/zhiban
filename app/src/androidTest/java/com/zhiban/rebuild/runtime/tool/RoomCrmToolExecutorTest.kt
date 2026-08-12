@@ -251,6 +251,8 @@ class RoomCrmToolExecutorTest {
         assertTrue(lead.userConfirmed)
         assertTrue(database.crmDao().observeLeads().first().none { it.leadId == lead.leadId })
         assertEquals(lead.leadId, database.crmDao().observeCandidateLeads().first().single().leadId)
+        assertTrue(AutoWriteRepository(database, appContext).ignoreCandidateLead(lead.leadId, 50))
+        assertEquals(null, database.crmDao().findLead(lead.leadId))
     }
 
     @Test

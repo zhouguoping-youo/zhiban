@@ -160,7 +160,7 @@ internal class ChangeUndoCoordinator(private val database: AgentDatabase) {
     private suspend fun undoCrmLeadCandidate(change: ChangeLogEntity): Boolean {
         val current = database.crmDao().findLead(change.targetId) ?: return false
         if (!changeDigestMatches(change.afterDigest, canonicalChangeDigest(current), current)) return false
-        return database.crmDao().deleteAutoCandidateLead(change.targetId) == 1
+        return database.crmDao().deleteCandidateLead(change.targetId) == 1
     }
 
     private suspend fun undoCrmActivity(change: ChangeLogEntity): Boolean {

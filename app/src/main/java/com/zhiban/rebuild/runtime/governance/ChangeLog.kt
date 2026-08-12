@@ -118,6 +118,12 @@ interface ChangeLogDao {
     suspend fun findAvailableAutoChangeForTarget(targetDomain: String, targetId: String): ChangeLogEntity?
 
     @Query(
+        "SELECT * FROM change_log WHERE targetDomain = :targetDomain AND targetId = :targetId " +
+            "AND undoState = 'AVAILABLE' ORDER BY createdAtEpochMs DESC LIMIT 1",
+    )
+    suspend fun findAvailableChangeForTarget(targetDomain: String, targetId: String): ChangeLogEntity?
+
+    @Query(
         """SELECT change_log.changeId AS changeId, change_log.toolName AS toolName,
             change_log.targetDomain AS targetDomain, change_log.targetId AS targetId,
             change_log.operation AS operation, change_log.undoState AS undoState,

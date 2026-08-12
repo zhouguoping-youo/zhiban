@@ -43,23 +43,43 @@ class AutoWriteRepository @Inject internal constructor(private val database: Age
     }
 
     suspend fun promoteCandidateLead(leadId: String, nowEpochMs: Long = System.currentTimeMillis()): Boolean = database.withTransaction {
-        val change = database.changeLogDao().findAvailableAutoChangeForTarget("CRM_LEAD", leadId)
+        val lead = database.crmDao().findLead(leadId)
+            ?.takeIf { it.status == com.zhiban.rebuild.data.crm.CrmLeadStatus.CANDIDATE }
             ?: return@withTransaction false
+        val change = database.changeLogDao().findAvailableChangeForTarget("CRM_LEAD", lead.leadId)
         if (database.crmDao().promoteCandidateLead(leadId, nowEpochMs) != 1) return@withTransaction false
-        database.changeLogDao().markUnavailable(change.changeId)
-        database.changeLogDao().markAutoWriteCorrected(change.changeId)
+        change?.let {
+            database.changeLogDao().markUnavailable(it.changeId)
+            database.changeLogDao().markAutoWriteCorrected(it.changeId)
+        }
         true
     }
 
     suspend fun ignoreCandidateLead(leadId: String, nowEpochMs: Long = System.currentTimeMillis()): Boolean = database.withTransaction {
-        val change = database.changeLogDao().findAvailableAutoChangeForTarget("CRM_LEAD", leadId)
+        val lead = database.crmDao().findLead(leadId)
+            ?.takeIf { it.status == com.zhiban.rebuild.data.crm.CrmLeadStatus.CANDIDATE }
             ?: return@withTransaction false
-        undoAndMarkCorrected(change.changeId, nowEpochMs)
+        val change = database.changeLogDao().findAvailableChangeForTarget("CRM_LEAD", lead.leadId)
+        if (change != null) {
+            undoAndMarkCorrected(change.changeId, nowEpochMs)
+        } else {
+            // Compatibility for candidates created by builds that marked confirmed creation as
+            // non-undoable. The status predicate still prevents deleting any formal lead.
+            database.crmDao().deleteCandidateLead(lead.leadId) == 1
+        }
     }
 
     private suspend fun undoAndMarkCorrected(changeId: String, nowEpochMs: Long): Boolean {
-        if (ChangeUndoCoordinator(database).undoVisibleInTransaction(changeId, nowEpochMs) == null) return false
-        check(database.changeLogDao().markAutoWriteCorrected(changeId) == 1)
+        val change = database.changeLogDao().find(changeId) ?: return false
+        val coordinator = ChangeUndoCoordinator(database)
+        val undone = if (database.changeLogDao().findAutoWriteReceipt(changeId) != null) {
+            coordinator.undoVisibleInTransaction(changeId, nowEpochMs)
+        } else {
+            change.runtimeRunId?.let { coordinator.undoInTransaction(changeId, it, nowEpochMs) }
+        }
+        if (undone == null) return false
+        // User-confirmed candidates have a normal change log but no auto-write receipt.
+        database.changeLogDao().markAutoWriteCorrected(changeId)
         return true
     }
 
