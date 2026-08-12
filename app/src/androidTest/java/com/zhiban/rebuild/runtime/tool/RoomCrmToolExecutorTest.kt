@@ -236,6 +236,24 @@ class RoomCrmToolExecutorTest {
     }
 
     @Test
+    fun confirmedCreateCandidateStillWaitsInCandidatePoolUntilPromoted() = runBlocking {
+        val sample = Sample(
+            CrmMutationToolBinding.LEAD_CREATE,
+            """{"contactId":"contact-1","fitSummary":"试点机会","confidence":0.8,"evidenceSummary":"业务活动中讨论试点","sourceRef":"event-42"}""",
+        )
+        val mutationPlan = plan(109, sample)
+        val result = executor.execute(mutationPlan, fixture(109, mutationPlan, approved = true))
+        val leadId = Json.parseToJsonElement(result.safeResultJson).jsonObject.requiredText("targetId")
+
+        val lead = requireNotNull(database.crmDao().findLead(leadId))
+        assertEquals(CrmLeadStatus.CANDIDATE, lead.status)
+        assertEquals("AGENT_CONFIRMED", lead.sourceType)
+        assertTrue(lead.userConfirmed)
+        assertTrue(database.crmDao().observeLeads().first().none { it.leadId == lead.leadId })
+        assertEquals(lead.leadId, database.crmDao().observeCandidateLeads().first().single().leadId)
+    }
+
+    @Test
     fun candidatePromotionEntersFormalListAndIgnoreRemovesCandidate() = runBlocking {
         val repository = AutoWriteRepository(database, appContext)
         val promoted = executor.executeAuto(

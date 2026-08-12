@@ -424,7 +424,10 @@ internal class RoomCrmToolExecutor(private val database: AgentDatabase, private 
                     contactId = contact.contactId,
                     displayNameSnapshot = contact.displayName,
                     companyNameSnapshot = contact.company,
-                    status = if (auto) CrmLeadStatus.CANDIDATE else CrmLeadStatus.NEW,
+                    // This tool only stages a candidate. Confirmation authorizes the write, but it
+                    // must not silently promote the lead into the formal funnel; promotion has its
+                    // own explicit user action and audit trail.
+                    status = CrmLeadStatus.CANDIDATE,
                     sourceType = if (auto) "AGENT_AUTO" else "AGENT_CONFIRMED",
                     sourceRef = plan.optionalText("sourceRef"),
                     fitSummary = plan.optionalText("fitSummary") ?: plan.requiredText("evidenceSummary"),
