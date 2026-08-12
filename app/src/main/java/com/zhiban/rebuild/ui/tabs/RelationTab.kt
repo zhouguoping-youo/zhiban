@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -117,6 +119,7 @@ import com.zhiban.rebuild.data.contact.SystemContactCandidate
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.OutgoingMessageAccessibilityService
 import com.zhiban.rebuild.data.notification.ScheduleInsight
+import com.zhiban.rebuild.relationship.RelationshipGroup
 import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.personalization.UserProfile
@@ -166,8 +169,10 @@ internal val RelationSoft: Color @Composable get() = MaterialTheme.colorScheme.s
 internal val RelationLine: Color @Composable get() = MaterialTheme.colorScheme.outlineVariant
 internal val RelationAccent: Color @Composable get() = MaterialTheme.colorScheme.primary
 internal val RelationDanger: Color @Composable get() = MaterialTheme.colorScheme.error
-internal val RelationTags = listOf("全部", "工作", "家人", "朋友", "客户")
+internal val RelationFilters = listOf("全部") + RelationshipGroup.entries.map(RelationshipGroup::displayName)
+internal val ContactCategoryTags = RelationshipGroup.entries.map(RelationshipGroup::displayName)
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun RelationTab(
     modifier: Modifier = Modifier,
@@ -482,15 +487,15 @@ fun RelationTab(
                 Spacer(Modifier.height(14.dp))
             }
             item {
-                Row(
+                FlowRow(
                     Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    verticalArrangement = Arrangement.spacedBy(7.dp),
                 ) {
-                    RelationTags.forEach { label ->
+                    RelationFilters.forEach { label ->
                         ZhiBanChip(
                             text = label,
                             selected = tag == label,
-                            modifier = Modifier.weight(1f),
                             color = RelationAccent,
                             onClick = { tag = label },
                         )
@@ -1096,7 +1101,7 @@ fun RelationTab(
 }
 
 private fun contactSyncSummary(preview: AndroidContactSyncPreview): String {
-    val fieldNames = mapOf("displayName" to "姓名", "company" to "公司", "title" to "职位", "note" to "备注")
+    val fieldNames = mapOf("displayName" to "姓名", "company" to "公司全称", "title" to "职位", "note" to "备注")
     val lines = buildList {
         preview.plan.scalarUpdates.forEach { (field, value) -> add("${fieldNames[field] ?: field}：${value.orEmpty()}") }
         preview.plan.phoneAdditions.forEach { add("新增手机：$it") }

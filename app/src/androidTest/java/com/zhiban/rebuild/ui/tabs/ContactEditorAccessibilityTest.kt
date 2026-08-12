@@ -73,7 +73,7 @@ class ContactEditorAccessibilityTest {
         }
 
         val workChip = compose.onNodeWithTag("contact-relation-chip-工作").performScrollTo()
-        val friendChip = compose.onNodeWithTag("contact-relation-chip-朋友").performScrollTo()
+        val friendChip = compose.onNodeWithTag("contact-relation-chip-朋友同学").performScrollTo()
         val workBounds = workChip.getUnclippedBoundsInRoot()
         val friendBounds = friendChip.getUnclippedBoundsInRoot()
         val workTextBounds = compose.onNodeWithText("工作", useUnmergedTree = true).getUnclippedBoundsInRoot()

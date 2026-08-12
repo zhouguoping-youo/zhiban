@@ -31,7 +31,7 @@ class ContactEnrichmentConfirmTest {
 
     @Test fun confirmAppliesScalarFieldToBlankProfileAndResolvesCandidate() = runBlocking {
         db.contactDao().insert(contact(company = null, title = null))
-        val candidate = candidate(fieldKind = "EMPLOYMENT", value = """{"title":"采购经理","company":"星河科技"}""")
+        val candidate = candidate(fieldKind = "EMPLOYMENT", value = """{"title":"采购经理","company":"星河科技有限公司"}""")
         repository.stageContactEnrichmentCandidate(candidate)
 
         val applied = repository.applyContactEnrichmentCandidate(candidate)
@@ -39,7 +39,10 @@ class ContactEnrichmentConfirmTest {
         assertTrue(applied)
         val updated = db.contactDao().findRawById("c1")!!
         assertEquals("采购经理", updated.title)
-        assertEquals("星河科技", updated.company)
+        assertEquals("星河科技有限公司", updated.company)
+        val temporalEmployment = db.contactIntelligenceDao().listAllEmployments().single()
+        assertEquals("UNKNOWN", temporalEmployment.currentState)
+        assertEquals("星河科技有限公司", temporalEmployment.companyNameSnapshot)
         assertTrue(db.contactKnowledgeDao().observePendingEnrichment("c1").first().isEmpty())
     }
 
@@ -156,6 +159,9 @@ class ContactEnrichmentConfirmTest {
         assertEquals("91310000TEST", organization.creditCode)
         assertEquals("存续", organization.status)
         assertEquals("上海市徐汇区", organization.registeredAddress)
+        val temporalEmployment = db.contactIntelligenceDao().listAllEmployments().single()
+        assertEquals(organization.organizationId, temporalEmployment.organizationId)
+        assertEquals("UNKNOWN", temporalEmployment.currentState)
     }
 
     @Test fun registryConfirmationDoesNotOverwriteCompanyChangedAfterLookup() = runBlocking {

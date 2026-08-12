@@ -117,6 +117,7 @@ import com.zhiban.rebuild.data.contact.SystemContactWriteIntent
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.OutgoingMessageAccessibilityService
 import com.zhiban.rebuild.data.notification.ScheduleInsight
+import com.zhiban.rebuild.relationship.RelationshipGroup
 import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.personalization.UserProfile
@@ -333,7 +334,7 @@ internal fun ContactEditorDialog(
     var wechat by remember(contact?.contactId) { mutableStateOf(contact?.wechatId.orEmpty()) }
     var company by remember(contact?.contactId) { mutableStateOf(contact?.company.orEmpty()) }
     var title by remember(contact?.contactId) { mutableStateOf(contact?.title.orEmpty()) }
-    var tag by remember(contact?.contactId) { mutableStateOf(contact?.firstKnownTag() ?: "朋友") }
+    var tag by remember(contact?.contactId) { mutableStateOf(contact?.firstKnownTag() ?: RelationshipGroup.SOCIAL.displayName) }
     var note by remember(contact?.contactId) { mutableStateOf(contact?.note.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
     val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
@@ -398,7 +399,7 @@ internal fun ContactEditorDialog(
                     Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                         OutlinedTextField(company, {
                             company = it
-                        }, Modifier.weight(1f), label = { Text("公司") }, singleLine = true)
+                        }, Modifier.weight(1f), label = { Text("公司全称") }, singleLine = true)
                         OutlinedTextField(title, {
                             title = it
                         }, Modifier.weight(1f), label = { Text("职位") }, singleLine = true)
@@ -412,7 +413,7 @@ internal fun ContactEditorDialog(
                         horizontalArrangement = Arrangement.spacedBy(7.dp),
                         verticalArrangement = Arrangement.spacedBy(7.dp),
                     ) {
-                        RelationTags.drop(1).forEach { label ->
+                        ContactCategoryTags.forEach { label ->
                             ZhiBanChip(
                                 text = label,
                                 selected = tag == label,
@@ -453,4 +454,9 @@ internal fun ContactField(label: String, value: String, onValueChange: (String) 
 }
 
 internal fun ContactEntity.firstKnownTag(): String? = tagsJson.firstKnownTag()
-internal fun String.firstKnownTag(): String? = RelationTags.drop(1).firstOrNull { contains(it, ignoreCase = true) }
+internal fun String.firstKnownTag(): String? = ContactCategoryTags.firstOrNull { contains(it, ignoreCase = true) }
+    ?: when {
+        contains("客户", ignoreCase = true) -> RelationshipGroup.WORK.displayName
+        contains("朋友", ignoreCase = true) || contains("同学", ignoreCase = true) -> RelationshipGroup.SOCIAL.displayName
+        else -> null
+    }

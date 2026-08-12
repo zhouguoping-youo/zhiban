@@ -104,7 +104,7 @@ internal fun OwnerEmploymentEditorDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md)) {
                 Text(
-                    "用于建立以你为中心的工作关系；更换公司后，原记录会保留为过往经历。",
+                    "填写公司全称，用于区分现同事与前同事。",
                     color = RelationMuted,
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -114,7 +114,7 @@ internal fun OwnerEmploymentEditorDialog(
                         company = it.take(120)
                         error = null
                     },
-                    label = { Text("当前公司") },
+                    label = { Text("当前公司全称") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().testTag("owner-employment-company"),
                 )

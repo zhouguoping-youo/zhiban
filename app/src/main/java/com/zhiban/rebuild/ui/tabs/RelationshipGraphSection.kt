@@ -207,27 +207,8 @@ internal fun RelationshipGraphState(
         relationshipGraphEdgesForRoot(rootId, allValidEdges)
     }
     val root = peopleById.getValue(rootId)
-    val unanchoredContactEdges = remember(root.isOwner, displayedEdges, allValidEdges) {
-        if (root.isOwner && displayedEdges.isEmpty()) {
-            allValidEdges.filter {
-                it.fromContactId != RelationshipPersonIds.SELF && it.toContactId != RelationshipPersonIds.SELF
-            }
-        } else {
-            emptyList()
-        }
-    }
-    val graphEdges = displayedEdges.ifEmpty { unanchoredContactEdges }
-    val graphRootId = remember(rootId, graphEdges, unanchoredContactEdges) {
-        if (unanchoredContactEdges.isEmpty()) {
-            rootId
-        } else {
-            graphEdges.flatMap { listOf(it.fromContactId, it.toContactId) }
-                .groupingBy { it }
-                .eachCount()
-                .maxByOrNull { it.value }
-                ?.key ?: rootId
-        }
-    }
+    val graphEdges = displayedEdges
+    val graphRootId = rootId
     val relatedContactIds = remember(displayedEdges, rootId) {
         displayedEdges.flatMap { edge -> listOf(edge.fromContactId, edge.toContactId) }
             .filter { it != rootId }
@@ -319,11 +300,11 @@ internal fun RelationshipGraphState(
                 color = RelationMuted,
                 style = MaterialTheme.typography.bodySmall,
             )
-        } else if (displayedEdges.isEmpty() && unanchoredContactEdges.isEmpty()) {
+        } else if (displayedEdges.isEmpty()) {
             Spacer(Modifier.height(14.dp))
             Text(
                 if (root.isOwner) {
-                    "还没有可追溯的“我与联系人”关系"
+                    "还没有与我相关的可靠关系"
                 } else {
                     "这个人还没有已确认的关联联系人"
                 },
@@ -333,20 +314,12 @@ internal fun RelationshipGraphState(
         } else {
             Spacer(Modifier.height(12.dp))
             Text(
-                if (unanchoredContactEdges.isEmpty()) "关系图谱" else "联系人之间的关系",
+                "关系图谱",
                 Modifier.fillMaxWidth(),
                 color = RelationInk,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
             )
-            if (unanchoredContactEdges.isNotEmpty()) {
-                Text(
-                    "这些关系已有资料证据，但尚未与“我”建立可靠关联",
-                    Modifier.fillMaxWidth(),
-                    color = RelationMuted,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
             Spacer(Modifier.height(16.dp))
             if (graphEdges.isNotEmpty()) {
                 ForceRelationshipGraphCanvas(
@@ -365,7 +338,7 @@ internal fun RelationshipGraphState(
                     Spacer(Modifier.height(8.dp))
                 }
                 Text(
-                    if (unanchoredContactEdges.isEmpty()) "与我相关" else "联系人之间",
+                    if (root.isOwner) "与我相关" else "与 ${root.displayName} 相关",
                     Modifier.fillMaxWidth(),
                     color = RelationInk,
                     style = MaterialTheme.typography.labelMedium,

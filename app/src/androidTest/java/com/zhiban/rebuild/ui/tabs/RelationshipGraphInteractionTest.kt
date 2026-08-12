@@ -35,7 +35,7 @@ class RelationshipGraphInteractionTest {
     }
 
     @Test
-    fun unrelatedContactNetworkIsClearlySeparatedFromOwner() {
+    fun unrelatedContactNetworkIsNotPresentedAsOwnersGraph() {
         compose.setContent {
             ZhiBanTheme {
                 RelationshipGraphState(
@@ -54,9 +54,10 @@ class RelationshipGraphInteractionTest {
 
         compose.onNodeWithText("我的关系图").assertExists()
         compose.onNodeWithText("还不知道你现在在哪工作").assertExists()
-        compose.onNodeWithText("联系人之间的关系").assertExists()
-        compose.onNodeWithText("这些关系已有资料证据，但尚未与“我”建立可靠关联").assertExists()
-        compose.onNodeWithContentDescription("重置关系图视图").assertExists()
+        compose.onNodeWithText("还没有与我相关的可靠关系").assertExists()
+        compose.onNodeWithText("联系人之间的关系").assertDoesNotExist()
+        compose.onNodeWithText("这些关系已有资料证据，但尚未与“我”建立可靠关联").assertDoesNotExist()
+        compose.onNodeWithContentDescription("重置关系图视图").assertDoesNotExist()
     }
 
     @Test

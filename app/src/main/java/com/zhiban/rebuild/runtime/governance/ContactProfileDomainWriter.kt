@@ -3,6 +3,10 @@ package com.zhiban.rebuild.runtime.governance
 import androidx.room.withTransaction
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.ToolAuditEntity
+import com.zhiban.rebuild.data.agent.normalizeOrganizationFullName
+import com.zhiban.rebuild.data.agent.stableContactKnowledgeId
+import com.zhiban.rebuild.data.agent.upsertUserConfirmedOrganization
+import com.zhiban.rebuild.data.contact.ContactEmploymentEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
 import com.zhiban.rebuild.data.contact.PersonEntity
@@ -78,7 +82,9 @@ internal class ContactProfileDomainWriter(private val database: AgentDatabase) {
         call: ContactProfileCandidateCall,
     ): AppliedProfile {
         val contact = requireNotNull(database.contactDao().findById(call.contactId))
-        fun proposed(name: String) = payload[name]?.jsonPrimitive?.content?.trim()?.takeIf(String::isNotBlank)
+        fun proposed(name: String) = payload[name]?.jsonPrimitive?.content?.trim()?.takeIf(String::isNotBlank)?.let { value ->
+            if (name == "company") normalizeOrganizationFullName(value) else value
+        }
         fun additive(current: String?, name: String): String? {
             val value = proposed(name) ?: return current
             require(current.isNullOrBlank() || current == value) { "CONTACT_FIELD_CONFLICT:$name" }
@@ -102,6 +108,7 @@ internal class ContactProfileDomainWriter(private val database: AgentDatabase) {
         val factType = proposed("factType")
         require(changedFields.isNotEmpty() || factText != null) { "CONTACT_PROFILE_NO_CHANGE" }
         if (changedFields.isNotEmpty()) check(database.contactDao().update(updated) == 1)
+        val employmentWrite = writeConfirmedContactEmployment(updated, changedFields, context)
 
         val factId = factText?.let { text ->
             val type = requireNotNull(factType).also { require(it in FACT_TYPES) }
@@ -127,11 +134,87 @@ internal class ContactProfileDomainWriter(private val database: AgentDatabase) {
             )
             id
         }
-        return AppliedProfile(updated, changedFields, factId, null)
+        return AppliedProfile(updated, changedFields, factId, null, employmentWrite)
+    }
+
+    private suspend fun writeConfirmedContactEmployment(
+        contact: ContactEntity,
+        changedFields: List<String>,
+        context: ConfirmedToolExecutionContext,
+    ): ContactEmploymentWrite? {
+        if ("company" !in changedFields) return null
+        val company = normalizeOrganizationFullName(requireNotNull(contact.company))
+        val organization = database.upsertUserConfirmedOrganization(
+            company,
+            "runtime:${context.runId}",
+            context.nowEpochMs,
+        )
+        val knowledge = database.contactKnowledgeDao()
+        val contactEmployment = ContactEmploymentEntity(
+            employmentId = stableContactKnowledgeId(contact.contactId, "EMPLOYMENT", organization.organizationId),
+            contactId = contact.contactId,
+            organizationId = organization.organizationId,
+            companyNameSnapshot = company,
+            department = null,
+            title = contact.title,
+            jobDescription = null,
+            officeLocation = null,
+            // A confirmed legal company name is not evidence that the role is current.
+            isCurrent = false,
+            source = "USER",
+            evidenceRef = "runtime:${context.runId}",
+            confidence = 1.0,
+            userConfirmed = true,
+            createdAtEpochMs = context.nowEpochMs,
+            updatedAtEpochMs = context.nowEpochMs,
+        )
+        knowledge.upsertEmployment(contactEmployment)
+
+        val intelligence = database.contactIntelligenceDao()
+        if (intelligence.findPerson(contact.contactId) == null) {
+            intelligence.upsertPerson(
+                PersonEntity(
+                    contact.contactId,
+                    contact.contactId,
+                    contact.displayName,
+                    contact.normalizedName,
+                    "CONTACT",
+                    "ACTIVE",
+                    contact.createdAtEpochMs,
+                    context.nowEpochMs,
+                ),
+            )
+        }
+        val temporalEmployment = PersonEmploymentEpisodeEntity(
+            episodeId = stableContactKnowledgeId(
+                contact.contactId,
+                "USER_EMPLOYMENT",
+                "${organization.organizationId}:${context.nowEpochMs}",
+            ),
+            personId = contact.contactId,
+            organizationId = organization.organizationId,
+            companyNameSnapshot = company,
+            department = null,
+            title = contact.title,
+            validFromEpochMs = null,
+            validToEpochMs = null,
+            temporalPrecision = "UNKNOWN",
+            currentState = "UNKNOWN",
+            sourceRef = "runtime:${context.runId}",
+            confidence = 1.0,
+            verificationState = "USER_CONFIRMED",
+            status = "ACTIVE",
+            recordedAtEpochMs = context.nowEpochMs,
+            updatedAtEpochMs = context.nowEpochMs,
+        )
+        intelligence.upsertEmployment(temporalEmployment)
+        return ContactEmploymentWrite(contactEmployment, temporalEmployment)
     }
 
     private suspend fun applyOwnerEmployment(payload: kotlinx.serialization.json.JsonObject, context: ConfirmedToolExecutionContext): AppliedProfile {
-        val company = requireNotNull(payload["company"]?.jsonPrimitive?.content?.trim()?.takeIf(String::isNotBlank))
+        val company = normalizeOrganizationFullName(
+            requireNotNull(payload["company"]?.jsonPrimitive?.content?.takeIf(String::isNotBlank)),
+        )
         val title = payload["title"]?.jsonPrimitive?.content?.trim()?.takeIf(String::isNotBlank)
         val intelligence = database.contactIntelligenceDao()
         require(intelligence.findCurrentUserEmployment(RelationshipPersonIds.SELF) == null) {
@@ -151,10 +234,15 @@ internal class ContactProfileDomainWriter(private val database: AgentDatabase) {
                 ),
             )
         }
+        val organization = database.upsertUserConfirmedOrganization(
+            fullName = company,
+            sourceRef = "runtime:${context.runId}",
+            nowEpochMs = context.nowEpochMs,
+        )
         val employment = PersonEmploymentEpisodeEntity(
             episodeId = "owner-employment-${sha256(company.lowercase()).take(24)}",
             personId = RelationshipPersonIds.SELF,
-            organizationId = null,
+            organizationId = organization.organizationId,
             companyNameSnapshot = company,
             department = null,
             title = title,
@@ -174,13 +262,16 @@ internal class ContactProfileDomainWriter(private val database: AgentDatabase) {
             add("company")
             if (title != null) add("title")
         }
-        return AppliedProfile(null, changedFields, null, employment)
+        return AppliedProfile(null, changedFields, null, employment, null)
     }
 
     private suspend fun approveAndWriteChangeLog(applied: AppliedProfile, call: ContactProfileCandidateCall, context: ConfirmedToolExecutionContext): String {
         database.stagedContactCandidateDao().approve(call.candidateId, context.nowEpochMs)
 
         val appliedDigest = applied.employment?.let(::ownerEmploymentDigest)
+            ?: applied.contactEmploymentWrite?.let { write ->
+                contactProfileWriteDigest(requireNotNull(applied.updatedContact), applied.changedFields, write)
+            }
             ?: contactProfileFieldsDigest(requireNotNull(applied.updatedContact), applied.changedFields)
         val inverse = buildJsonObject {
             if (applied.updatedContact != null) {
@@ -188,6 +279,10 @@ internal class ContactProfileDomainWriter(private val database: AgentDatabase) {
             }
             applied.factId?.let { put("deleteFactId", it) }
             applied.employment?.let { put("deleteEmploymentEpisodeId", it.episodeId) }
+            applied.contactEmploymentWrite?.let { write ->
+                put("deleteContactEmploymentId", write.contactEmployment.employmentId)
+                put("deleteEmploymentEpisodeId", write.temporalEmployment.episodeId)
+            }
         }.toString()
         val changeId = changeIdFor(call.idempotencyKey)
         database.changeLogDao().insert(
@@ -326,7 +421,10 @@ internal class ContactProfileDomainWriter(private val database: AgentDatabase) {
         val changedFields: List<String>,
         val factId: String?,
         val employment: PersonEmploymentEpisodeEntity?,
+        val contactEmploymentWrite: ContactEmploymentWrite?,
     )
+
+    internal data class ContactEmploymentWrite(val contactEmployment: ContactEmploymentEntity, val temporalEmployment: PersonEmploymentEpisodeEntity)
 
     companion object {
         const val TOOL_NAME = "contact.profile.proposeUpdate"
@@ -340,6 +438,20 @@ internal fun contactProfileFieldsDigest(contact: com.zhiban.rebuild.data.contact
         fields.sorted().forEach { name -> fieldValue(contact, name)?.let { put(name, it) } }
     }.toString(),
 )
+
+internal fun contactProfileWriteDigest(contact: ContactEntity, fields: List<String>, employment: ContactProfileDomainWriter.ContactEmploymentWrite?): String =
+    sha256(
+        buildJsonObject {
+            put("profile", contactProfileFieldsDigest(contact, fields))
+            employment?.let { write ->
+                put("contactEmploymentId", write.contactEmployment.employmentId)
+                put("temporalEmploymentId", write.temporalEmployment.episodeId)
+                put("organizationId", requireNotNull(write.contactEmployment.organizationId))
+                put("company", write.contactEmployment.companyNameSnapshot)
+                write.contactEmployment.title?.let { put("title", it) }
+            }
+        }.toString(),
+    )
 
 internal fun ownerEmploymentDigest(value: PersonEmploymentEpisodeEntity): String = sha256(
     buildJsonObject {

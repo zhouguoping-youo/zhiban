@@ -98,8 +98,9 @@ internal class CompanyEnrichmentCoordinator(private val database: AgentDatabase,
     }
 
     private fun proposedValue(companyHint: String, match: CompanyRegistryMatch): String = buildJsonObject {
-        put("company", match.canonicalName)
-        put("canonicalName", match.canonicalName)
+        val canonicalName = match.canonicalName.trim()
+        put("company", canonicalName)
+        put("canonicalName", canonicalName)
         put("matchedCompanyHint", companyHint)
         put("providerRecordId", match.providerRecordId)
         match.creditCode?.let { put("creditCode", it) }

@@ -113,8 +113,13 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
 
     suspend fun saveOwnerCurrentEmployment(company: String, title: String?, nowEpochMs: Long = System.currentTimeMillis()): PersonEmploymentEpisodeEntity =
         database.withTransaction {
-            val normalizedCompany = company.trim().replace(Regex("\\s+"), " ")
-            require(normalizedCompany.isNotBlank()) { "公司名称不能为空" }
+            val normalizedCompany = normalizeOrganizationFullName(company)
+            require(normalizedCompany.isNotBlank()) { "公司全称不能为空" }
+            val organization = database.upsertUserConfirmedOrganization(
+                fullName = normalizedCompany,
+                sourceRef = "USER_PROFILE",
+                nowEpochMs = nowEpochMs,
+            )
             val normalizedTitle = title?.trim()?.takeIf(String::isNotBlank)
             val intelligence = database.contactIntelligenceDao()
             val ownerPersonIds = database.contactKnowledgeDao().listActiveOwnerContactLinks()
@@ -143,6 +148,8 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
             if (current != null && sameCompany) {
                 ownerPersonIds.forEach { intelligence.endCurrentUserEmployments(it, nowEpochMs) }
                 return@withTransaction current.copy(
+                    organizationId = organization.organizationId,
+                    companyNameSnapshot = organization.canonicalName,
                     title = normalizedTitle,
                     validToEpochMs = null,
                     currentState = "CURRENT",
@@ -159,7 +166,7 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
                     "$normalizedCompany:$nowEpochMs",
                 ),
                 personId = RelationshipPersonIds.SELF,
-                organizationId = null,
+                organizationId = organization.organizationId,
                 companyNameSnapshot = normalizedCompany,
                 department = null,
                 title = normalizedTitle,
@@ -312,7 +319,7 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
             phone = phone.cleanContactField(),
             email = existing?.email,
             wechatId = wechatId.cleanContactField(),
-            company = company.cleanContactField(),
+            company = company.cleanContactField()?.let(::normalizeOrganizationFullName),
             title = title.cleanContactField(),
             aliasesJson = existing?.aliasesJson ?: "[]",
             tagsJson = tag.cleanContactField()?.let { cleanTag ->

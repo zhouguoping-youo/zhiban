@@ -256,7 +256,7 @@ internal class RoomApprovalStore(
             "phone" to "手机号",
             "email" to "邮箱",
             "wechatId" to "微信",
-            "company" to "公司",
+            "company" to "公司全称",
             "title" to "职位",
             "note" to "备注",
         )

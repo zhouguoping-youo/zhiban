@@ -254,6 +254,9 @@ internal class ChangeUndoCoordinator(private val database: AgentDatabase) {
         val json =
             runSuspendCatching { Json.parseToJsonElement(change.inversePayloadJson).jsonObject }.getOrNull() ?: return false
         json["deleteEmploymentEpisodeId"]?.jsonPrimitive?.content?.let { episodeId ->
+            if (change.targetId != com.zhiban.rebuild.data.contact.RelationshipPersonIds.SELF) {
+                return restoreContactProfileWithEmployment(change, json, episodeId, nowEpochMs)
+            }
             return restoreOwnerEmployment(change, episodeId)
         }
         val clearFields = json["clearFields"]?.jsonArray.orEmpty().map { it.jsonPrimitive.content }
@@ -273,6 +276,36 @@ internal class ChangeUndoCoordinator(private val database: AgentDatabase) {
         val factId = json["deleteFactId"]?.jsonPrimitive?.content
         if (factId != null && !FactIndex(database).delete(factId)) return false
         return clearFields.isNotEmpty() || factId != null
+    }
+
+    private suspend fun restoreContactProfileWithEmployment(
+        change: ChangeLogEntity,
+        json: kotlinx.serialization.json.JsonObject,
+        temporalEmploymentId: String,
+        nowEpochMs: Long,
+    ): Boolean {
+        val contactEmploymentId = json["deleteContactEmploymentId"]?.jsonPrimitive?.content ?: return false
+        val clearFields = json["clearFields"]?.jsonArray.orEmpty().map { it.jsonPrimitive.content }
+        if (clearFields.any { it !in ContactProfileDomainWriter.PROFILE_FIELDS }) return false
+        val contact = database.contactDao().findById(change.targetId) ?: return false
+        val contactEmployment = database.contactKnowledgeDao().findEmployment(contactEmploymentId) ?: return false
+        val temporalEmployment = database.contactIntelligenceDao().findEmploymentEpisode(temporalEmploymentId) ?: return false
+        val write = ContactProfileDomainWriter.ContactEmploymentWrite(contactEmployment, temporalEmployment)
+        if (contactProfileWriteDigest(contact, clearFields, write) != change.afterDigest) return false
+        val restored = contact.copy(
+            phone = contact.phone.takeUnless { "phone" in clearFields },
+            email = contact.email.takeUnless { "email" in clearFields },
+            wechatId = contact.wechatId.takeUnless { "wechatId" in clearFields },
+            company = contact.company.takeUnless { "company" in clearFields },
+            title = contact.title.takeUnless { "title" in clearFields },
+            note = contact.note.takeUnless { "note" in clearFields },
+            updatedAtEpochMs = nowEpochMs,
+        )
+        if (database.contactDao().update(restored) != 1) return false
+        if (database.contactKnowledgeDao().deleteEmployment(contactEmploymentId) != 1) return false
+        if (database.contactIntelligenceDao().deleteEmploymentEpisode(temporalEmploymentId) != 1) return false
+        val factId = json["deleteFactId"]?.jsonPrimitive?.content
+        return factId == null || FactIndex(database).delete(factId)
     }
 
     private suspend fun restoreOwnerEmployment(change: ChangeLogEntity, episodeId: String): Boolean {

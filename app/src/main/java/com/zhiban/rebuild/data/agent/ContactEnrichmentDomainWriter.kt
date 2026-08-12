@@ -5,6 +5,8 @@ import com.zhiban.rebuild.data.contact.ContactEmploymentEntity
 import com.zhiban.rebuild.data.contact.ContactEnrichmentCandidateEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.OrganizationEntity
+import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
+import com.zhiban.rebuild.data.contact.PersonEntity
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -25,7 +27,7 @@ internal class ContactEnrichmentDomainWriter(private val database: AgentDatabase
 
             "EMPLOYMENT", "COMMUNICATION_METHOD" -> applyScalarPatch(
                 contact,
-                candidate.fieldKind,
+                candidate,
                 value,
                 nowEpochMs,
             )
@@ -43,7 +45,7 @@ internal class ContactEnrichmentDomainWriter(private val database: AgentDatabase
     }
 
     private suspend fun applyOrganization(contact: ContactEntity, candidate: ContactEnrichmentCandidateEntity, value: JsonObject, nowEpochMs: Long): Boolean {
-        val canonicalName = value.text("canonicalName") ?: value.text("company") ?: return false
+        val canonicalName = normalizeOrganizationFullName(value.text("canonicalName") ?: value.text("company") ?: return false)
         val matchedHint = value.text("matchedCompanyHint")
         require(
             matchedHint == null || contact.company?.trim() == matchedHint,
@@ -116,7 +118,7 @@ internal class ContactEnrichmentDomainWriter(private val database: AgentDatabase
                 title = existing?.title ?: contact.title,
                 jobDescription = existing?.jobDescription,
                 officeLocation = existing?.officeLocation,
-                isCurrent = true,
+                isCurrent = existing?.isCurrent ?: false,
                 source = candidate.providerId,
                 evidenceRef = candidate.sourceRef,
                 confidence = candidate.confidence,
@@ -125,10 +127,59 @@ internal class ContactEnrichmentDomainWriter(private val database: AgentDatabase
                 updatedAtEpochMs = nowEpochMs,
             ),
         )
+        upsertTemporalEmployment(contact, organizationId, canonicalName, candidate, nowEpochMs)
     }
 
-    private suspend fun applyScalarPatch(contact: ContactEntity, fieldKind: String, value: JsonObject, nowEpochMs: Long): Boolean {
-        val patch = scalarPatch(fieldKind, value)
+    private suspend fun upsertTemporalEmployment(
+        contact: ContactEntity,
+        organizationId: String,
+        canonicalName: String,
+        candidate: ContactEnrichmentCandidateEntity,
+        nowEpochMs: Long,
+    ) {
+        val intelligence = database.contactIntelligenceDao()
+        if (intelligence.findPerson(contact.contactId) == null) {
+            intelligence.upsertPerson(
+                PersonEntity(
+                    contact.contactId,
+                    contact.contactId,
+                    contact.displayName,
+                    contact.normalizedName,
+                    "CONTACT",
+                    "ACTIVE",
+                    contact.createdAtEpochMs,
+                    nowEpochMs,
+                ),
+            )
+        }
+        val episodeId = stableContactKnowledgeId(contact.contactId, "CONFIRMED_EMPLOYMENT", organizationId)
+        val existing = intelligence.findEmploymentEpisode(episodeId)
+        intelligence.upsertEmployment(
+            PersonEmploymentEpisodeEntity(
+                episodeId = episodeId,
+                personId = contact.contactId,
+                organizationId = organizationId,
+                companyNameSnapshot = canonicalName,
+                department = existing?.department,
+                title = existing?.title ?: contact.title,
+                validFromEpochMs = existing?.validFromEpochMs,
+                validToEpochMs = existing?.validToEpochMs,
+                temporalPrecision = existing?.temporalPrecision ?: "UNKNOWN",
+                currentState = existing?.currentState ?: "UNKNOWN",
+                sourceRef = candidate.sourceRef,
+                confidence = candidate.confidence,
+                verificationState = "USER_CONFIRMED",
+                status = "ACTIVE",
+                recordedAtEpochMs = existing?.recordedAtEpochMs ?: nowEpochMs,
+                updatedAtEpochMs = nowEpochMs,
+            ),
+        )
+    }
+
+    private suspend fun applyScalarPatch(contact: ContactEntity, candidate: ContactEnrichmentCandidateEntity, value: JsonObject, nowEpochMs: Long): Boolean {
+        val patch = scalarPatch(candidate.fieldKind, value).mapValues { (field, proposed) ->
+            if (field == "company") normalizeOrganizationFullName(proposed) else proposed
+        }
         var updated = contact
         var applied = false
         patch.forEach { (field, proposed) ->
@@ -139,6 +190,11 @@ internal class ContactEnrichmentDomainWriter(private val database: AgentDatabase
         }
         if (applied) {
             check(database.contactDao().update(updated.copy(updatedAtEpochMs = nowEpochMs)) == 1)
+            if (contact.company.isNullOrBlank() && !updated.company.isNullOrBlank()) {
+                val company = requireNotNull(updated.company)
+                val organization = database.upsertUserConfirmedOrganization(company, candidate.sourceRef ?: candidate.providerId, nowEpochMs)
+                upsertEmployment(updated, organization.organizationId, company, candidate, nowEpochMs)
+            }
         }
         return applied
     }

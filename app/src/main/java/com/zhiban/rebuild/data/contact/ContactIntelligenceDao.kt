@@ -143,6 +143,9 @@ interface ContactIntelligenceDao {
     )
     suspend fun findCurrentUserEmployment(personId: String): PersonEmploymentEpisodeEntity?
 
+    @Query("SELECT * FROM person_employment_episodes WHERE personId = :personId ORDER BY updatedAtEpochMs DESC")
+    suspend fun listEmploymentEpisodes(personId: String): List<PersonEmploymentEpisodeEntity>
+
     @Query(
         """UPDATE person_employment_episodes
            SET validToEpochMs = :nowEpochMs, currentState = 'PAST', updatedAtEpochMs = :nowEpochMs

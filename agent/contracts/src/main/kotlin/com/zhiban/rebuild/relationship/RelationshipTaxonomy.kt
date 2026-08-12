@@ -2,13 +2,38 @@ package com.zhiban.rebuild.relationship
 
 enum class RelationshipGroup(val displayName: String) {
     FAMILY("家人"),
-    ROMANTIC("伴侣"),
     SOCIAL("朋友同学"),
     WORK("工作"),
     EDUCATION("教育"),
     SERVICE("生活服务"),
     COMMUNITY("组织社区"),
     OTHER("其他"),
+}
+
+/**
+ * Describes how a relationship changes over time. This is deliberately separate from interaction
+ * frequency: not speaking for years does not, by itself, end a friendship or classmate relation.
+ */
+enum class RelationshipContinuity {
+    /** Created by kinship or a shared life stage and normally keeps its meaning over time. */
+    ENDURING_ORIGIN,
+
+    /** Remains until the user or reliable contrary evidence explicitly changes it. */
+    EXPLICIT_END_ONLY,
+
+    /** A role whose current/past state depends on a dated context such as employment or service. */
+    CONTEXT_BOUND,
+}
+
+enum class HistoricalRelationshipVisibility {
+    /** Keep the ordinary label even when the supporting episode is in the past. */
+    PRESERVE_LABEL,
+
+    /** Show a precise historical label, for example "前同事". */
+    SHOW_AS_HISTORICAL,
+
+    /** Retain the record for user control but do not surface it in the default graph. */
+    HIDE_FROM_DEFAULT_GRAPH,
 }
 
 enum class RelationshipDirection {
@@ -36,6 +61,8 @@ data class RelationshipTypeDefinition(
     val iosLabelName: String? = null,
     val iosQuality: RelationshipMappingQuality = RelationshipMappingQuality.CUSTOM,
     val isSelectable: Boolean = true,
+    val continuity: RelationshipContinuity = RelationshipContinuity.EXPLICIT_END_ONLY,
+    val historicalVisibility: HistoricalRelationshipVisibility = HistoricalRelationshipVisibility.PRESERVE_LABEL,
 ) {
     val extensionType: String = "x-zhiban-${code.lowercase().replace('_', '-')}"
 }
@@ -54,15 +81,26 @@ object RelationshipTaxonomy {
 
     val definitions: List<RelationshipTypeDefinition> = listOf(
         family("FAMILY", "家人", "kin"),
-        family("SPOUSE", "配偶", "spouse", android = "TYPE_SPOUSE", ios = "CNLabelContactRelationSpouse"),
+        family(
+            "SPOUSE",
+            "伴侣",
+            "spouse",
+            android = "TYPE_SPOUSE",
+            ios = "CNLabelContactRelationSpouse",
+            isSelectable = false,
+            continuity = RelationshipContinuity.EXPLICIT_END_ONLY,
+            historicalVisibility = HistoricalRelationshipVisibility.HIDE_FROM_DEFAULT_GRAPH,
+        ),
         type(
             code = "PARTNER",
-            group = RelationshipGroup.ROMANTIC,
+            group = RelationshipGroup.FAMILY,
             label = "伴侣",
             vCard = "sweetheart",
             vCardQuality = RelationshipMappingQuality.LOSSY,
             android = "TYPE_PARTNER",
             ios = "CNLabelContactRelationPartner",
+            continuity = RelationshipContinuity.EXPLICIT_END_ONLY,
+            historicalVisibility = HistoricalRelationshipVisibility.HIDE_FROM_DEFAULT_GRAPH,
         ),
         directedFamily("PARENT", "父母", "CHILD", "parent", "TYPE_PARENT", "CNLabelContactRelationParent"),
         directedFamily("CHILD", "子女", "PARENT", "child", "TYPE_CHILD", "CNLabelContactRelationChild"),
@@ -82,23 +120,116 @@ object RelationshipTaxonomy {
         directedFamily("GUARDIAN", "监护人", "WARD", "agent"),
         directedFamily("WARD", "被监护人", "GUARDIAN", "kin"),
         family("CO_PARENT", "共同抚养人", "kin"),
-        type("FIANCE", RelationshipGroup.ROMANTIC, "未婚伴侣", vCard = "date"),
-        type("DATE", RelationshipGroup.ROMANTIC, "约会对象", vCard = "date", vCardQuality = RelationshipMappingQuality.EXACT),
-        type("CRUSH", RelationshipGroup.ROMANTIC, "喜欢的人", vCard = "crush", vCardQuality = RelationshipMappingQuality.EXACT),
+        type(
+            "FIANCE",
+            RelationshipGroup.FAMILY,
+            "伴侣",
+            vCard = "date",
+            isSelectable = false,
+            historicalVisibility = HistoricalRelationshipVisibility.HIDE_FROM_DEFAULT_GRAPH,
+        ),
+        type(
+            "DATE",
+            RelationshipGroup.FAMILY,
+            "交往关系",
+            vCard = "date",
+            vCardQuality = RelationshipMappingQuality.EXACT,
+            isSelectable = false,
+            historicalVisibility = HistoricalRelationshipVisibility.HIDE_FROM_DEFAULT_GRAPH,
+        ),
+        type(
+            "CRUSH",
+            RelationshipGroup.FAMILY,
+            "私人关系",
+            vCard = "crush",
+            vCardQuality = RelationshipMappingQuality.EXACT,
+            isSelectable = false,
+            historicalVisibility = HistoricalRelationshipVisibility.HIDE_FROM_DEFAULT_GRAPH,
+        ),
         social("FRIEND", "朋友", "friend", android = "TYPE_FRIEND", ios = "CNLabelContactRelationFriend"),
         social("CLOSE_FRIEND", "密友", "friend"),
-        social("CHILDHOOD_FRIEND", "发小", "friend"),
-        social("CLASSMATE", "同学", "friend"),
-        social("SCHOOLMATE", "校友", "acquaintance"),
-        social("ROOMMATE", "室友", "co-resident", RelationshipMappingQuality.EXACT),
-        social("FELLOW_TOWNSMAN", "老乡", "acquaintance"),
-        social("NEIGHBOR", "邻居", "neighbor", RelationshipMappingQuality.EXACT),
+        social(
+            "CHILDHOOD_FRIEND",
+            "发小",
+            "friend",
+            continuity = RelationshipContinuity.ENDURING_ORIGIN,
+            historicalVisibility = HistoricalRelationshipVisibility.PRESERVE_LABEL,
+        ),
+        social(
+            "CLASSMATE",
+            "同学",
+            "friend",
+            continuity = RelationshipContinuity.ENDURING_ORIGIN,
+            historicalVisibility = HistoricalRelationshipVisibility.PRESERVE_LABEL,
+        ),
+        social(
+            "SCHOOLMATE",
+            "校友",
+            "acquaintance",
+            continuity = RelationshipContinuity.ENDURING_ORIGIN,
+            historicalVisibility = HistoricalRelationshipVisibility.PRESERVE_LABEL,
+        ),
+        social(
+            "ROOMMATE",
+            "室友",
+            "co-resident",
+            RelationshipMappingQuality.EXACT,
+            continuity = RelationshipContinuity.CONTEXT_BOUND,
+            historicalVisibility = HistoricalRelationshipVisibility.SHOW_AS_HISTORICAL,
+        ),
+        social(
+            "FELLOW_TOWNSMAN",
+            "老乡",
+            "acquaintance",
+            continuity = RelationshipContinuity.ENDURING_ORIGIN,
+            historicalVisibility = HistoricalRelationshipVisibility.PRESERVE_LABEL,
+        ),
+        social(
+            "NEIGHBOR",
+            "邻居",
+            "neighbor",
+            RelationshipMappingQuality.EXACT,
+            continuity = RelationshipContinuity.CONTEXT_BOUND,
+            historicalVisibility = HistoricalRelationshipVisibility.SHOW_AS_HISTORICAL,
+        ),
         social("ONLINE_FRIEND", "网友", "acquaintance"),
-        social("TEAMMATE", "队友", "friend"),
-        social("HOBBY_FRIEND", "兴趣圈友", "acquaintance"),
-        social("TRAVEL_COMPANION", "旅行伙伴", "acquaintance"),
-        social("ACQUAINTANCE", "熟人", "acquaintance", RelationshipMappingQuality.EXACT),
-        social("MET", "见过", "met", RelationshipMappingQuality.EXACT),
+        social(
+            "TEAMMATE",
+            "队友",
+            "friend",
+            continuity = RelationshipContinuity.CONTEXT_BOUND,
+            historicalVisibility = HistoricalRelationshipVisibility.SHOW_AS_HISTORICAL,
+        ),
+        social(
+            "HOBBY_FRIEND",
+            "兴趣圈友",
+            "acquaintance",
+            continuity = RelationshipContinuity.CONTEXT_BOUND,
+            historicalVisibility = HistoricalRelationshipVisibility.SHOW_AS_HISTORICAL,
+        ),
+        social(
+            "TRAVEL_COMPANION",
+            "旅行伙伴",
+            "acquaintance",
+            continuity = RelationshipContinuity.CONTEXT_BOUND,
+            historicalVisibility = HistoricalRelationshipVisibility.SHOW_AS_HISTORICAL,
+        ),
+        social(
+            "ACQUAINTANCE",
+            "熟人",
+            "acquaintance",
+            RelationshipMappingQuality.EXACT,
+            continuity = RelationshipContinuity.ENDURING_ORIGIN,
+            historicalVisibility = HistoricalRelationshipVisibility.PRESERVE_LABEL,
+        ),
+        social(
+            "MET",
+            "见过",
+            "met",
+            RelationshipMappingQuality.EXACT,
+            continuity = RelationshipContinuity.ENDURING_ORIGIN,
+            historicalVisibility = HistoricalRelationshipVisibility.PRESERVE_LABEL,
+        ),
         work("COLLEAGUE", "同事", "co-worker", RelationshipMappingQuality.EXACT),
         directedWork("MANAGER", "上级", "SUBORDINATE", "co-worker", android = "TYPE_MANAGER", ios = "CNLabelContactRelationManager"),
         directedWork("SUBORDINATE", "下属", "MANAGER", "co-worker"),
@@ -136,8 +267,24 @@ object RelationshipTaxonomy {
         service("CAREGIVER", "照护人", "agent"),
         service("THERAPIST", "心理咨询师"),
         service("ACCOUNTANT", "会计／税务顾问", "agent"),
-        directed("LANDLORD", RelationshipGroup.SERVICE, "房东", "TENANT", "contact"),
-        directed("TENANT", RelationshipGroup.SERVICE, "租客", "LANDLORD", "contact"),
+        directed(
+            "LANDLORD",
+            RelationshipGroup.SERVICE,
+            "房东",
+            "TENANT",
+            "contact",
+            continuity = RelationshipContinuity.CONTEXT_BOUND,
+            historicalVisibility = HistoricalRelationshipVisibility.SHOW_AS_HISTORICAL,
+        ),
+        directed(
+            "TENANT",
+            RelationshipGroup.SERVICE,
+            "租客",
+            "LANDLORD",
+            "contact",
+            continuity = RelationshipContinuity.CONTEXT_BOUND,
+            historicalVisibility = HistoricalRelationshipVisibility.SHOW_AS_HISTORICAL,
+        ),
         service("VETERINARIAN", "宠物医生"),
         community("CLUB_MEMBER", "社团成员"),
         community("COMMUNITY_ORGANIZER", "社群组织者"),
@@ -165,6 +312,10 @@ object RelationshipTaxonomy {
 
     fun displayName(code: String, isHistorical: Boolean): String {
         if (!isHistorical) return displayName(code)
+        val definition = find(code) ?: return "其他关系"
+        if (definition.historicalVisibility != HistoricalRelationshipVisibility.SHOW_AS_HISTORICAL) {
+            return definition.displayName
+        }
         return when (code.uppercase()) {
             "COLLEAGUE" -> "前同事"
             "MANAGER" -> "前上级"
@@ -173,9 +324,6 @@ object RelationshipTaxonomy {
             "SUPPLIER" -> "前供应商"
             "PROJECT_PARTNER" -> "前项目伙伴"
             "BUSINESS_PARTNER", "CHANNEL_PARTNER" -> "前合作伙伴"
-            "PARTNER" -> "前任伴侣"
-            "SPOUSE" -> "前配偶"
-            "FRIEND", "CLOSE_FRIEND", "CHILDHOOD_FRIEND" -> "曾是朋友"
             "ROOMMATE" -> "前室友"
             "NEIGHBOR" -> "以前的邻居"
             "TEACHER" -> "曾任老师"
@@ -189,7 +337,16 @@ object RelationshipTaxonomy {
 
     fun definitionsFor(group: RelationshipGroup): List<RelationshipTypeDefinition> = selectableDefinitions.filter { it.group == group }
 
-    private fun family(code: String, label: String, vCard: String, android: String? = null, ios: String? = null) = type(
+    private fun family(
+        code: String,
+        label: String,
+        vCard: String,
+        android: String? = null,
+        ios: String? = null,
+        isSelectable: Boolean = true,
+        continuity: RelationshipContinuity = RelationshipContinuity.ENDURING_ORIGIN,
+        historicalVisibility: HistoricalRelationshipVisibility = HistoricalRelationshipVisibility.PRESERVE_LABEL,
+    ) = type(
         code = code,
         group = RelationshipGroup.FAMILY,
         label = label,
@@ -199,6 +356,9 @@ object RelationshipTaxonomy {
         androidQuality = mappingQuality(android, code in EXACT_ANDROID_FAMILY),
         ios = ios,
         iosQuality = if (ios == null) RelationshipMappingQuality.CUSTOM else RelationshipMappingQuality.EXACT,
+        isSelectable = isSelectable,
+        continuity = continuity,
+        historicalVisibility = historicalVisibility,
     )
 
     private fun directedFamily(code: String, label: String, inverse: String, vCard: String, android: String? = null, ios: String? = null) =
@@ -212,6 +372,8 @@ object RelationshipTaxonomy {
         android: String? = null,
         ios: String? = null,
         group: RelationshipGroup = RelationshipGroup.SOCIAL,
+        continuity: RelationshipContinuity = RelationshipContinuity.EXPLICIT_END_ONLY,
+        historicalVisibility: HistoricalRelationshipVisibility = HistoricalRelationshipVisibility.HIDE_FROM_DEFAULT_GRAPH,
     ) = type(
         code = code,
         group = group,
@@ -222,17 +384,50 @@ object RelationshipTaxonomy {
         androidQuality = mappingQuality(android, isExact = true),
         ios = ios,
         iosQuality = if (ios == null) RelationshipMappingQuality.CUSTOM else RelationshipMappingQuality.EXACT,
+        continuity = continuity,
+        historicalVisibility = historicalVisibility,
     )
 
-    private fun work(code: String, label: String, vCard: String, quality: RelationshipMappingQuality = RelationshipMappingQuality.LOSSY) =
-        type(code, RelationshipGroup.WORK, label, vCard = vCard, vCardQuality = quality)
+    private fun work(code: String, label: String, vCard: String, quality: RelationshipMappingQuality = RelationshipMappingQuality.LOSSY) = type(
+        code,
+        RelationshipGroup.WORK,
+        label,
+        vCard = vCard,
+        vCardQuality = quality,
+        continuity = RelationshipContinuity.CONTEXT_BOUND,
+        historicalVisibility = HistoricalRelationshipVisibility.SHOW_AS_HISTORICAL,
+    )
 
-    private fun directedWork(code: String, label: String, inverse: String?, vCard: String, android: String? = null, ios: String? = null) =
-        directed(code, RelationshipGroup.WORK, label, inverse, vCard, android, ios)
+    private fun directedWork(code: String, label: String, inverse: String?, vCard: String, android: String? = null, ios: String? = null) = directed(
+        code,
+        RelationshipGroup.WORK,
+        label,
+        inverse,
+        vCard,
+        android,
+        ios,
+        continuity = RelationshipContinuity.CONTEXT_BOUND,
+        historicalVisibility = HistoricalRelationshipVisibility.SHOW_AS_HISTORICAL,
+    )
 
-    private fun service(code: String, label: String, vCard: String = "contact") = directed(code, RelationshipGroup.SERVICE, label, null, vCard)
+    private fun service(code: String, label: String, vCard: String = "contact") = directed(
+        code,
+        RelationshipGroup.SERVICE,
+        label,
+        null,
+        vCard,
+        continuity = RelationshipContinuity.CONTEXT_BOUND,
+        historicalVisibility = HistoricalRelationshipVisibility.SHOW_AS_HISTORICAL,
+    )
 
-    private fun community(code: String, label: String) = type(code, RelationshipGroup.COMMUNITY, label, vCard = "acquaintance")
+    private fun community(code: String, label: String) = type(
+        code,
+        RelationshipGroup.COMMUNITY,
+        label,
+        vCard = "acquaintance",
+        continuity = RelationshipContinuity.CONTEXT_BOUND,
+        historicalVisibility = HistoricalRelationshipVisibility.SHOW_AS_HISTORICAL,
+    )
 
     private fun directed(
         code: String,
@@ -242,6 +437,8 @@ object RelationshipTaxonomy {
         vCard: String,
         android: String? = null,
         ios: String? = null,
+        continuity: RelationshipContinuity = RelationshipContinuity.ENDURING_ORIGIN,
+        historicalVisibility: HistoricalRelationshipVisibility = HistoricalRelationshipVisibility.PRESERVE_LABEL,
     ) = type(
         code = code,
         group = group,
@@ -254,6 +451,8 @@ object RelationshipTaxonomy {
         androidQuality = mappingQuality(android, code in EXACT_ANDROID_DIRECTED),
         ios = ios,
         iosQuality = if (ios == null) RelationshipMappingQuality.CUSTOM else RelationshipMappingQuality.EXACT,
+        continuity = continuity,
+        historicalVisibility = historicalVisibility,
     )
 
     @Suppress("LongParameterList")
@@ -270,6 +469,8 @@ object RelationshipTaxonomy {
         ios: String? = null,
         iosQuality: RelationshipMappingQuality = RelationshipMappingQuality.CUSTOM,
         isSelectable: Boolean = true,
+        continuity: RelationshipContinuity = RelationshipContinuity.EXPLICIT_END_ONLY,
+        historicalVisibility: HistoricalRelationshipVisibility = HistoricalRelationshipVisibility.PRESERVE_LABEL,
     ) = RelationshipTypeDefinition(
         code = code,
         group = group,
@@ -283,6 +484,8 @@ object RelationshipTaxonomy {
         iosLabelName = ios,
         iosQuality = iosQuality,
         isSelectable = isSelectable,
+        continuity = continuity,
+        historicalVisibility = historicalVisibility,
     )
 
     private fun mappingQuality(mapping: String?, isExact: Boolean): RelationshipMappingQuality = when {

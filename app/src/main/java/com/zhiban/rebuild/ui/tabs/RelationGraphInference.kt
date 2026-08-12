@@ -5,7 +5,7 @@ import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
-import com.zhiban.rebuild.data.contact.corporateEmailDomain
+import com.zhiban.rebuild.relationship.HistoricalRelationshipVisibility
 import com.zhiban.rebuild.relationship.RelationshipGroup
 import com.zhiban.rebuild.relationship.RelationshipTaxonomy
 
@@ -13,7 +13,6 @@ internal const val INFERRED_COMPANY_RELATIONSHIP_STATUS = "INFERRED_COMPANY"
 internal const val INFERRED_HISTORICAL_COMPANY_RELATIONSHIP_STATUS = "INFERRED_HISTORICAL_COMPANY"
 internal const val INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME_STATUS = "INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME"
 internal const val INFERRED_COMPANY_UNKNOWN_TIME_STATUS = "INFERRED_COMPANY_UNKNOWN_TIME"
-internal const val INFERRED_EMAIL_DOMAIN_RELATIONSHIP_STATUS = "INFERRED_EMAIL_DOMAIN"
 
 /**
  * Adds reversible, display-only colleague links when two people have the same explicit company.
@@ -28,59 +27,59 @@ internal fun withInferredCompanyRelationships(
     employmentEpisodes: List<PersonEmploymentEpisodeEntity> = emptyList(),
 ): List<RelationshipEdgeEntity> {
     val ownerIds = ownerContactSources.mapTo(hashSetOf(), ContactEntity::contactId)
-    val employmentEvidence = employmentEvidenceByPerson(employmentEpisodes, ownerIds)
-    val emailDomainsByPerson = emailDomainEvidenceByPerson(contacts, ownerContactSources)
-    if (employmentEvidence.size < 2 && emailDomainsByPerson.size < 2) return savedEdges
+    val visiblePersonIds = contacts.mapTo(hashSetOf(), ContactEntity::contactId).apply {
+        addAll(ownerIds)
+        add(RelationshipPersonIds.SELF)
+    }
+    val employmentEvidence = employmentEvidenceByPerson(employmentEpisodes, ownerIds, visiblePersonIds)
+    if (employmentEvidence.size < 2) return savedEdges
 
     val savedColleaguePairs = savedEdges.asSequence()
         .filter { it.relationType == "COLLEAGUE" }
         .map { relationshipPairKey(it.fromContactId, it.toContactId) }
         .toMutableSet()
     val companyEdges = inferTemporalCompanyPairs(employmentEvidence, savedColleaguePairs)
-    savedColleaguePairs += companyEdges.map { relationshipPairKey(it.fromContactId, it.toContactId) }
-    val emailEdges = inferEvidencePairs(
-        evidenceByPerson = emailDomainsByPerson.mapValues { (_, values) -> values.associateWith { it } },
-        status = INFERRED_EMAIL_DOMAIN_RELATIONSHIP_STATUS,
-        evidencePrefix = "企业邮箱域一致",
-        evidenceRef = "contact.email.domain",
-        confidence = 0.8,
-        blockedPairs = savedColleaguePairs,
-    )
-    return savedEdges + companyEdges + emailEdges
+    return savedEdges + companyEdges
 }
 
-private fun employmentEvidenceByPerson(episodes: List<PersonEmploymentEpisodeEntity>, ownerContactIds: Set<String>): Map<String, List<EmploymentEvidence>> =
-    episodes.filter { it.status == "ACTIVE" }
-        .mapNotNull { episode ->
-            val company = episode.companyNameSnapshot.toNormalizedCompany() ?: return@mapNotNull null
-            val personId = if (episode.personId in ownerContactIds) RelationshipPersonIds.SELF else episode.personId
-            personId to EmploymentEvidence(
-                company,
-                episode.validFromEpochMs,
-                episode.validToEpochMs,
-                episode.currentState,
-            )
-        }.groupBy({ it.first }, { it.second })
+private fun employmentEvidenceByPerson(
+    episodes: List<PersonEmploymentEpisodeEntity>,
+    ownerContactIds: Set<String>,
+    visiblePersonIds: Set<String>,
+): Map<String, List<EmploymentEvidence>> = episodes
+    .filter { it.status == "ACTIVE" && it.personId in visiblePersonIds }
+    .filter { episode ->
+        val belongsToOwner = episode.personId == RelationshipPersonIds.SELF || episode.personId in ownerContactIds
+        !belongsToOwner || episode.verificationState == "USER_CONFIRMED"
+    }
+    .mapNotNull { episode ->
+        val company = episode.companyNameSnapshot.toNormalizedCompany() ?: return@mapNotNull null
+        val personId = if (episode.personId in ownerContactIds) RelationshipPersonIds.SELF else episode.personId
+        personId to EmploymentEvidence(
+            company,
+            episode.organizationId,
+            episode.validFromEpochMs,
+            episode.validToEpochMs,
+            episode.currentState,
+        )
+    }.groupBy({ it.first }, { it.second })
 
 private fun inferTemporalCompanyPairs(evidenceByPerson: Map<String, List<EmploymentEvidence>>, blockedPairs: Set<String>): List<RelationshipEdgeEntity> =
     buildList {
         val emittedPairs = blockedPairs.toMutableSet()
         val peopleByCompany = evidenceByPerson.flatMap { (personId, episodes) ->
-            episodes.map { it.company.key to personId }
+            episodes.map { it.groupingKey to personId }
         }.groupBy({ it.first }, { it.second })
         peopleByCompany.forEach { (companyKey, people) ->
             val distinctPeople = people.distinct().sorted()
-            if (distinctPeople.size < 2) return@forEach
-            val pairs = if (RelationshipPersonIds.SELF in distinctPeople) {
-                distinctPeople.filterNot { it == RelationshipPersonIds.SELF }.map { RelationshipPersonIds.SELF to it }
-            } else {
-                distinctPeople.zipWithNext()
-            }
+            if (distinctPeople.size < 2 || RelationshipPersonIds.SELF !in distinctPeople) return@forEach
+            val pairs = distinctPeople.filterNot { it == RelationshipPersonIds.SELF }
+                .map { RelationshipPersonIds.SELF to it }
             pairs.forEach { (firstId, secondId) ->
                 val pairKey = relationshipPairKey(firstId, secondId)
                 if (pairKey in emittedPairs) return@forEach
-                val firstEpisodes = evidenceByPerson.getValue(firstId).filter { it.company.key == companyKey }
-                val secondEpisodes = evidenceByPerson.getValue(secondId).filter { it.company.key == companyKey }
+                val firstEpisodes = evidenceByPerson.getValue(firstId).filter { it.groupingKey == companyKey }
+                val secondEpisodes = evidenceByPerson.getValue(secondId).filter { it.groupingKey == companyKey }
                 val timing = temporalMatch(firstEpisodes, secondEpisodes) ?: return@forEach
                 emittedPairs += pairKey
                 val company = (firstEpisodes + secondEpisodes).first().company.displayName
@@ -124,57 +123,6 @@ private fun temporalMatch(first: List<EmploymentEvidence>, second: List<Employme
     return TemporalCompanyMatch(INFERRED_COMPANY_UNKNOWN_TIME_STATUS, "同公司，时间待核实", 0.65)
 }
 
-private fun emailDomainEvidenceByPerson(contacts: List<ContactEntity>, ownerContactSources: List<ContactEntity>): Map<String, Set<String>> = buildMap {
-    contacts.forEach { contact -> corporateEmailDomain(contact.email)?.let { put(contact.contactId, setOf(it)) } }
-    ownerContactSources.mapNotNull { corporateEmailDomain(it.email) }.toSet()
-        .takeIf { it.isNotEmpty() }
-        ?.let { put(RelationshipPersonIds.SELF, it) }
-}
-
-private fun inferEvidencePairs(
-    evidenceByPerson: Map<String, Map<String, String>>,
-    status: String,
-    evidencePrefix: String,
-    evidenceRef: String,
-    confidence: Double,
-    blockedPairs: Set<String>,
-): List<RelationshipEdgeEntity> = buildList {
-    val emittedPairs = blockedPairs.toMutableSet()
-    val peopleByEvidence = buildMap<String, MutableList<String>> {
-        evidenceByPerson.forEach { (personId, evidence) ->
-            evidence.keys.forEach { key -> getOrPut(key, ::mutableListOf).add(personId) }
-        }
-    }
-    peopleByEvidence.toSortedMap().forEach evidenceGroup@{ (evidenceKey, rawPeople) ->
-        val people = rawPeople.distinct().sorted()
-        if (people.size < 2) return@evidenceGroup
-        val pairs = if (RelationshipPersonIds.SELF in people) {
-            people.asSequence()
-                .filterNot { it == RelationshipPersonIds.SELF }
-                .map { RelationshipPersonIds.SELF to it }
-        } else {
-            people.zipWithNext().asSequence()
-        }
-        pairs.forEach pair@{ (firstId, secondId) ->
-            val pairKey = relationshipPairKey(firstId, secondId)
-            if (!emittedPairs.add(pairKey)) return@pair
-            val displayValue = evidenceByPerson.getValue(firstId)[evidenceKey]
-                ?: evidenceByPerson.getValue(secondId).getValue(evidenceKey)
-            add(
-                inferredColleagueEdge(
-                    firstId,
-                    secondId,
-                    pairKey,
-                    status,
-                    "$evidencePrefix：$displayValue",
-                    evidenceRef,
-                    confidence,
-                ),
-            )
-        }
-    }
-}
-
 private fun inferredColleagueEdge(
     firstId: String,
     secondId: String,
@@ -200,31 +148,24 @@ private fun inferredColleagueEdge(
 
 internal fun contactMatchesRelationCategory(contact: ContactEntity, category: String, relationships: List<RelationshipEdgeEntity>): Boolean {
     if (category == "全部") return true
-    if (contact.tagsJson.contains(category, ignoreCase = true)) return true
+    val group = RelationshipGroup.entries.firstOrNull { it.displayName == category } ?: return false
+    val legacyTags = when (group) {
+        RelationshipGroup.WORK -> listOf("工作", "客户")
+        RelationshipGroup.SOCIAL -> listOf("朋友", "同学")
+        else -> listOf(group.displayName)
+    }
+    if (legacyTags.any { contact.tagsJson.contains(it, ignoreCase = true) }) {
+        return true
+    }
     val relationTypes = relationships.asSequence()
         .filter { it.fromContactId == contact.contactId || it.toContactId == contact.contactId }
         .map(RelationshipEdgeEntity::relationType)
         .toSet()
-    val acceptedTypes = when (category) {
-        "工作" ->
-            RelationshipTaxonomy.selectableDefinitions
-                .filter { it.group == RelationshipGroup.WORK }
-                .mapTo(hashSetOf()) { it.code }
-
-        "家人" ->
-            RelationshipTaxonomy.selectableDefinitions
-                .filter { it.group == RelationshipGroup.FAMILY || it.group == RelationshipGroup.ROMANTIC }
-                .mapTo(hashSetOf()) { it.code }
-
-        "朋友" ->
-            RelationshipTaxonomy.selectableDefinitions
-                .filter { it.group == RelationshipGroup.SOCIAL }
-                .mapTo(hashSetOf()) { it.code }
-
-        "客户" -> setOf("CUSTOMER")
-
-        else -> emptySet()
-    }
+    // Legacy imported codes such as SPOUSE remain readable even when they are no longer offered
+    // in the editor; hiding a picker option must never orphan existing data from its group.
+    val acceptedTypes = RelationshipTaxonomy.definitions
+        .filter { it.group == group }
+        .mapTo(hashSetOf()) { it.code }
     return relationTypes.any(acceptedTypes::contains)
 }
 
@@ -238,7 +179,6 @@ internal fun RelationshipEdgeEntity.isInferredEvidenceRelationship(): Boolean = 
     INFERRED_HISTORICAL_COMPANY_RELATIONSHIP_STATUS,
     INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME_STATUS,
     INFERRED_COMPANY_UNKNOWN_TIME_STATUS,
-    INFERRED_EMAIL_DOMAIN_RELATIONSHIP_STATUS,
 )
 
 internal fun RelationshipEdgeEntity.inferredEvidenceLabel(): String? = when (status) {
@@ -246,13 +186,16 @@ internal fun RelationshipEdgeEntity.inferredEvidenceLabel(): String? = when (sta
     INFERRED_HISTORICAL_COMPANY_RELATIONSHIP_STATUS -> "曾在同公司任职"
     INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME_STATUS -> "曾在同公司 · 时间待核实"
     INFERRED_COMPANY_UNKNOWN_TIME_STATUS -> "同公司 · 时间待核实"
-    INFERRED_EMAIL_DOMAIN_RELATIONSHIP_STATUS -> "企业邮箱推测"
     else -> null
 }
 
 /** Projects closed temporal episodes into a read-only graph layer. */
 internal fun historicalRelationshipEdges(episodes: List<RelationshipEpisodeEntity>): List<RelationshipEdgeEntity> = episodes.asSequence()
     .filter { it.status == "ACTIVE" && it.validToEpochMs != null }
+    .filter {
+        RelationshipTaxonomy.find(it.relationshipType)?.historicalVisibility !=
+            HistoricalRelationshipVisibility.HIDE_FROM_DEFAULT_GRAPH
+    }
     .sortedByDescending { it.validToEpochMs }
     .map { episode ->
         RelationshipEdgeEntity(
@@ -291,7 +234,16 @@ internal fun relationshipGraphEdgesForRoot(rootId: String, edges: List<Relations
 
 private data class NormalizedCompany(val key: String, val displayName: String)
 
-private data class EmploymentEvidence(val company: NormalizedCompany, val validFromEpochMs: Long?, val validToEpochMs: Long?, val currentState: String) {
+private data class EmploymentEvidence(
+    val company: NormalizedCompany,
+    val organizationId: String?,
+    val validFromEpochMs: Long?,
+    val validToEpochMs: Long?,
+    val currentState: String,
+) {
+    // Registry-backed contacts may use a credit-code ID while an older owner record uses a
+    // name-derived ID. The confirmed legal name is the shared key until aliases are explicit.
+    val groupingKey: String = "name:${company.key}"
     val hasKnownInterval: Boolean get() = validFromEpochMs != null || validToEpochMs != null
 
     fun overlaps(other: EmploymentEvidence): Boolean {
@@ -308,7 +260,6 @@ internal fun RelationshipEdgeEntity.isHistoricalRelationship(): Boolean = status
 internal fun RelationshipEdgeEntity.displayRelationLabel(): String = when (status) {
     INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME_STATUS -> "可能是前同事"
     INFERRED_COMPANY_UNKNOWN_TIME_STATUS -> "同公司"
-    INFERRED_EMAIL_DOMAIN_RELATIONSHIP_STATUS -> "同企业域"
     else -> relationLabel(relationType, isHistorical = isHistoricalRelationship())
 }
 

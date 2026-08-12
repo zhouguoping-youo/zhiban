@@ -306,7 +306,7 @@ internal fun ContactDetailDialog(
                             )
                         }
                         DetailValue(
-                            "公司",
+                            "公司全称",
                             listOfNotNull(contact.company, contact.title)
                                 .joinToString(" · ")
                                 .takeIf(String::isNotBlank),
@@ -1091,7 +1091,7 @@ internal fun enrichmentValueSummary(proposedValueJson: String): String {
 }
 
 private fun enrichmentValueLabel(key: String): String = when (key) {
-    "canonicalName", "company" -> "公司"
+    "canonicalName", "company" -> "公司全称"
     "registrationStatus" -> "状态"
     "creditCode" -> "统一信用代码"
     "registeredAddress", "formattedAddress" -> "地址"

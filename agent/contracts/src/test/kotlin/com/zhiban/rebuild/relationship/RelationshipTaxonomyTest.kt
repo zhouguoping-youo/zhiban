@@ -26,8 +26,38 @@ class RelationshipTaxonomyTest {
     @Test
     fun `historical labels describe the relationship instead of a count`() {
         assertEquals("前同事", RelationshipTaxonomy.displayName("COLLEAGUE", isHistorical = true))
-        assertEquals("曾是朋友", RelationshipTaxonomy.displayName("FRIEND", isHistorical = true))
+        assertEquals("朋友", RelationshipTaxonomy.displayName("FRIEND", isHistorical = true))
+        assertEquals("同学", RelationshipTaxonomy.displayName("CLASSMATE", isHistorical = true))
         assertEquals("父母", RelationshipTaxonomy.displayName("PARENT", isHistorical = true))
+    }
+
+    @Test
+    fun `friendship never expires from inactivity and classmate is an enduring origin`() {
+        val friend = RelationshipTaxonomy.requireSupported("FRIEND")
+        val classmate = RelationshipTaxonomy.requireSupported("CLASSMATE")
+        val colleague = RelationshipTaxonomy.requireSupported("COLLEAGUE")
+
+        assertEquals(RelationshipContinuity.EXPLICIT_END_ONLY, friend.continuity)
+        assertEquals(HistoricalRelationshipVisibility.HIDE_FROM_DEFAULT_GRAPH, friend.historicalVisibility)
+        assertEquals(RelationshipContinuity.ENDURING_ORIGIN, classmate.continuity)
+        assertEquals(HistoricalRelationshipVisibility.PRESERVE_LABEL, classmate.historicalVisibility)
+        assertEquals(RelationshipContinuity.CONTEXT_BOUND, colleague.continuity)
+        assertEquals(HistoricalRelationshipVisibility.SHOW_AS_HISTORICAL, colleague.historicalVisibility)
+    }
+
+    @Test
+    fun `partner belongs to family and sensitive former relationship types are not offered`() {
+        val partner = RelationshipTaxonomy.requireSupported("PARTNER")
+
+        assertEquals(7, RelationshipGroup.entries.size)
+        assertEquals(RelationshipGroup.FAMILY, partner.group)
+        assertEquals("伴侣", partner.displayName)
+        assertEquals("伴侣", RelationshipTaxonomy.displayName("SPOUSE"))
+        assertEquals(HistoricalRelationshipVisibility.HIDE_FROM_DEFAULT_GRAPH, partner.historicalVisibility)
+        assertFalse("SPOUSE" in RelationshipTaxonomy.selectableCodes)
+        assertFalse("FIANCE" in RelationshipTaxonomy.selectableCodes)
+        assertFalse("DATE" in RelationshipTaxonomy.selectableCodes)
+        assertFalse("CRUSH" in RelationshipTaxonomy.selectableCodes)
     }
 
     @Test

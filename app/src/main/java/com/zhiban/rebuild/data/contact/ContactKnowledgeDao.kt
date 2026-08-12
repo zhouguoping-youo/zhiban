@@ -38,6 +38,9 @@ interface ContactKnowledgeDao {
     @Query("SELECT * FROM contact_employments WHERE employmentId = :employmentId")
     suspend fun findEmployment(employmentId: String): ContactEmploymentEntity?
 
+    @Query("DELETE FROM contact_employments WHERE employmentId = :employmentId")
+    suspend fun deleteEmployment(employmentId: String): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAddresses(values: List<ContactAddressEntity>)
 

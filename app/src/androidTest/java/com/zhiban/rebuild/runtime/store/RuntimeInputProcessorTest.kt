@@ -1022,7 +1022,7 @@ class RuntimeInputProcessorTest {
         val approval = requireNotNull(database.runtimeEventDao().latestByType("r-owner-employment", "ApprovalRequested"))
         val payload = Json.parseToJsonElement(approval.payloadJson).jsonObject
         assertEquals("确认本人当前任职", payload["title"]?.jsonPrimitive?.content)
-        assertTrue(payload["details"]?.jsonPrimitive?.content?.contains("公司：") == true)
+        assertTrue(payload["details"]?.jsonPrimitive?.content?.contains("公司全称：") == true)
         assertNull(payload["message"])
         val revision = requireNotNull(database.runtimeSessionDao().find("s-owner-employment")).nextSequence - 1
         gateway.accept(
@@ -1061,6 +1061,111 @@ class RuntimeInputProcessorTest {
         )
         assertEquals(KernelCommandProcessor.Outcome.PROCESSED, processor.processNext())
         assertNull(database.contactIntelligenceDao().findCurrentUserEmployment(RelationshipPersonIds.SELF))
+        assertEquals("UNDONE", database.changeLogDao().find(change.changeId)?.undoState)
+    }
+
+    @Test fun contactCompanyProfileWritesCanonicalEmploymentAndUndoRemovesBothProjections() = runBlocking {
+        database.contactDao().insert(
+            ContactEntity(
+                "profile-company-contact", "丁波", "丁波", null, null, null, null, "销售", "[]", "[]", null, null, "USER", null, now, now,
+            ),
+        )
+        val staged = RoomTextInputGateway(database, { true }, { now }).stage(
+            """{"schemaVersion":1,"text":"丁波在平凯星辰（北京）科技有限公司工作","mode":"Work","model":"M2.7","level":"高"}""",
+        )
+        val gateway = RoomRuntimeGateways(database, "test") { now++ }
+        gateway.accept(
+            RuntimeUiCommand.Start(
+                "s-profile-company",
+                staged.inputRef,
+                "c-profile-company",
+                "a-profile-company",
+                0,
+                "chat",
+                "r-profile-company",
+            ),
+        )
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile) = capability(profile)
+            override fun stream(request: ModelRequest): kotlinx.coroutines.flow.Flow<ModelEvent> =
+                if (request.messages.any { it.content.contains("profile_enriched") }) {
+                    flowOf(ModelEvent.Delta(0, "联系人任职已保存。"), ModelEvent.Final("stop"))
+                } else {
+                    flowOf(
+                        ModelEvent.ToolCall(
+                            0,
+                            "call-profile-company",
+                            "contact.profile.proposeUpdate",
+                            """{"contactId":"profile-company-contact","company":"  平凯星辰（北京）科技有限公司  ","evidenceSummary":"用户在当前会话明确提供","confidence":1.0}""",
+                        ),
+                        ModelEvent.Final("tool_calls"),
+                    )
+                }
+
+            override fun cancel(requestId: String) = true
+        }
+        val processor = KernelCommandProcessor(
+            database,
+            "processor",
+            { true },
+            { now++ },
+            provider = provider,
+            profiles = fixedProfileStore(),
+        )
+
+        processor.processNext()
+        awaitRunStatus("r-profile-company", "AWAITING_CONFIRMATION")
+        val approval = requireNotNull(database.runtimeEventDao().latestByType("r-profile-company", "ApprovalRequested"))
+        val approvalPayload = Json.parseToJsonElement(approval.payloadJson).jsonObject
+        val revision = requireNotNull(database.runtimeSessionDao().find("s-profile-company")).nextSequence - 1
+        gateway.accept(
+            RuntimeUiCommand.RunAction(
+                RuntimeAction.APPROVE,
+                "s-profile-company",
+                "r-profile-company",
+                "approve-profile-company",
+                "approve-profile-company-action",
+                revision,
+                "chat",
+                requireNotNull(approvalPayload["proposalId"]).jsonPrimitive.content,
+                requireNotNull(approvalPayload["payloadRef"]).jsonPrimitive.content,
+            ),
+        )
+        processor.processNext()
+        awaitRunStatus("r-profile-company", "SUCCEEDED")
+
+        val contact = requireNotNull(database.contactDao().findById("profile-company-contact"))
+        assertEquals("平凯星辰（北京）科技有限公司", contact.company)
+        val temporalEmployment = requireNotNull(
+            database.contactIntelligenceDao().listEmploymentEpisodes(contact.contactId).single(),
+        )
+        assertEquals("平凯星辰（北京）科技有限公司", temporalEmployment.companyNameSnapshot)
+        assertEquals("UNKNOWN", temporalEmployment.currentState)
+        val contactEmployment = database.contactKnowledgeDao().observeEmployments(contact.contactId).first().single()
+        assertEquals(temporalEmployment.organizationId, contactEmployment.organizationId)
+        assertEquals(
+            "平凯星辰（北京）科技有限公司",
+            database.contactKnowledgeDao().findOrganization(requireNotNull(contactEmployment.organizationId))?.canonicalName,
+        )
+
+        val change = database.changeLogDao().listByRun("r-profile-company").single()
+        val undoRevision = requireNotNull(database.runtimeSessionDao().find("s-profile-company")).nextSequence - 1
+        gateway.accept(
+            RuntimeUiCommand.RunAction(
+                RuntimeAction.UNDO,
+                "s-profile-company",
+                "r-profile-company",
+                "undo-profile-company",
+                "undo-profile-company-action",
+                undoRevision,
+                "chat",
+                payloadRef = change.changeId,
+            ),
+        )
+        assertEquals(KernelCommandProcessor.Outcome.PROCESSED, processor.processNext())
+        assertNull(database.contactDao().findById(contact.contactId)?.company)
+        assertNull(database.contactIntelligenceDao().findEmploymentEpisode(temporalEmployment.episodeId))
+        assertNull(database.contactKnowledgeDao().findEmployment(contactEmployment.employmentId))
         assertEquals("UNDONE", database.changeLogDao().find(change.changeId)?.undoState)
     }
 
@@ -2274,7 +2379,7 @@ class RuntimeInputProcessorTest {
         val leaseExpiresAt = System.currentTimeMillis() + 250
         database.openHelper.writableDatabase.execSQL(
             "UPDATE runtime_sessions SET leaseExpiresAtEpochMs=? WHERE sessionId=?",
-                arrayOf<Any>(leaseExpiresAt, "s-recover-wake"),
+            arrayOf<Any>(leaseExpiresAt, "s-recover-wake"),
         )
         val provider = object : ProviderAdapter {
             override suspend fun probe(profile: ProviderProfile) = capability(profile)
@@ -2478,9 +2583,11 @@ class RuntimeInputProcessorTest {
 
         assertEquals(25, providerCalls.get())
         assertEquals(25, database.runtimeRunDao().idsBySession("s-sequential").size)
-        assertTrue(database.runtimeRunDao().idsBySession("s-sequential").all { runId ->
-            database.runtimeRunDao().find(runId)?.status == "SUCCEEDED"
-        })
+        assertTrue(
+            database.runtimeRunDao().idsBySession("s-sequential").all { runId ->
+                database.runtimeRunDao().find(runId)?.status == "SUCCEEDED"
+            },
+        )
         assertEquals(0, database.runtimeInputStagingDao().count())
         val turns = database.runtimeConversationTurnDao().listBySession("s-sequential", 100)
         assertEquals(25, turns.count { it.role == "user" })

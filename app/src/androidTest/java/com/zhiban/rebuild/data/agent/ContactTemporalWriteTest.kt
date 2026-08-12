@@ -28,6 +28,9 @@ class ContactTemporalWriteTest {
             assertEquals("乙公司", employments.single { it.currentState == "CURRENT" }.companyNameSnapshot)
             assertEquals("负责人", employments.single { it.currentState == "CURRENT" }.title)
             assertEquals(200L, employments.single { it.currentState == "PAST" }.validToEpochMs)
+            val current = employments.single { it.currentState == "CURRENT" }
+            assertNotNull(current.organizationId)
+            assertEquals("乙公司", database.contactKnowledgeDao().findOrganization(current.organizationId!!)?.canonicalName)
         } finally {
             database.close()
         }
