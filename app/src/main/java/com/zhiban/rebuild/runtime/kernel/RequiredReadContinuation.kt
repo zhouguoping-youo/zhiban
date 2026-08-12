@@ -46,4 +46,9 @@ internal class RequiredReadContinuation(
         )
         return result
     }
+
+    suspend fun completionSummary(input: String, runId: String): String? = requiredReadCompletionSummary(
+        input,
+        store.completedToolResults(runId),
+    )
 }

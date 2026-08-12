@@ -56,4 +56,18 @@ class ObservationContinuationRequirementsTest {
             ),
         )
     }
+
+    @Test
+    fun `completed multi-domain read summarizes every verified result`() {
+        val summary = requiredReadCompletionSummary(
+            "联系人总数和今天安排",
+            listOf(
+                "contact.maintenance.list" to "{\"totalContactCount\":12}",
+                "calendar.schedule.search" to "{\"count\":0}",
+            ),
+        )
+
+        assertTrue(summary.orEmpty().contains("联系人总数：12 人"))
+        assertTrue(summary.orEmpty().contains("没有日程安排"))
+    }
 }

@@ -752,6 +752,8 @@ internal class RoomRuntimeStore(private val database: AgentDatabase, private val
 
     suspend fun completedToolNames(runId: String): Set<String> = approvals.completedToolNames(runId)
 
+    suspend fun completedToolResults(runId: String): List<Pair<String, String>> = approvals.completedToolResults(runId)
+
     suspend fun toolProposalCount(runId: String, toolName: String): Int = approvals.toolProposalCount(runId, toolName)
 
     suspend fun totalToolInvocationCount(runId: String): Int = approvals.totalToolInvocationCount(runId)

@@ -690,6 +690,11 @@ internal class RoomApprovalStore(
         .map { it.toolName }
         .toSet()
 
+    suspend fun completedToolResults(runId: String): List<Pair<String, String>> = database.runtimeToolExecutionDao()
+        .listByRunId(runId)
+        .filter { it.status == "SUCCEEDED" }
+        .mapNotNull { execution -> execution.safeResultJson?.let { execution.toolName to it } }
+
     suspend fun toolProposalCount(runId: String, toolName: String): Int = maxOf(
         database.runtimeToolExecutionDao().countByRunAndTool(runId, toolName),
         database.runtimeEventDao().listByRunId(runId).count { event ->

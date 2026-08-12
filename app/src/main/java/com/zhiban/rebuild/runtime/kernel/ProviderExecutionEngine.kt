@@ -1642,7 +1642,8 @@ internal class ProviderExecutionEngine(
 
             is ReActStreamOutcome.Streamed -> {
                 val completedTools = store.completedToolNames(runId)
-                val result = RequiredReadContinuation(capabilityRouter, store, ownerId, clock).execute(
+                val continuation = RequiredReadContinuation(capabilityRouter, store, ownerId, clock)
+                val result = continuation.execute(
                     setup.input.text,
                     completedTools,
                     runId,
@@ -1662,7 +1663,7 @@ internal class ProviderExecutionEngine(
                 }
                 store.completeObservationWithAssistantTurn(
                     runId,
-                    outcome.assistantText,
+                    continuation.completionSummary(setup.input.text, runId) ?: outcome.assistantText,
                     "{}",
                     ownerId,
                     fencingEpoch,

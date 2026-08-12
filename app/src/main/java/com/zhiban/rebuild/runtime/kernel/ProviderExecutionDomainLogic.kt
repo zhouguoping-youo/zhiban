@@ -307,16 +307,25 @@ internal fun remainingObservationRequirements(input: String, completedTools: Set
 }
 
 internal fun nextRequiredReadTool(input: String, completedTools: Set<String>): String? {
-    val normalized = input.lowercase()
-    return when {
-        CONTACT_COUNT_PATTERNS.any(normalized::contains) &&
-            "contact.maintenance.list" !in completedTools -> "contact.maintenance.list"
-
-        CALENDAR_QUERY_PATTERNS.any(normalized::contains) &&
-            completedTools.none(CALENDAR_QUERY_TOOLS::contains) -> "calendar.schedule.search"
-
-        else -> null
+    val required = requestedRequiredReadTools(input)
+    return required.firstOrNull { toolName ->
+        toolName !in completedTools &&
+            (toolName != "calendar.schedule.search" || completedTools.none(CALENDAR_QUERY_TOOLS::contains))
     }
+}
+
+internal fun requiredReadCompletionSummary(input: String, results: List<Pair<String, String>>): String? {
+    val required = requestedRequiredReadTools(input)
+    if (required.size < 2) return null
+    val resultByTool = results.associate { it.first to it.second }
+    if (required.any { it !in resultByTool }) return null
+    return required.joinToString(separator = "\n") { deterministicToolSummary(it, resultByTool.getValue(it)) }
+}
+
+private fun requestedRequiredReadTools(input: String): List<String> = buildList {
+    val normalized = input.lowercase()
+    if (CONTACT_COUNT_PATTERNS.any(normalized::contains)) add("contact.maintenance.list")
+    if (CALENDAR_QUERY_PATTERNS.any(normalized::contains)) add("calendar.schedule.search")
 }
 
 internal fun requiredReadToolCall(toolName: String, input: String, nowEpochMs: Long): RuntimeToolCallRequest {
@@ -373,6 +382,9 @@ internal fun deterministicToolSummary(toolName: String, safeResultJson: String):
         }
 
         "contacts.search", "contact.search" -> if (count == 0) "没有找到匹配的联系人。" else "已找到 ${count ?: 0} 位联系人。"
+
+        "contact.maintenance.list" ->
+            "联系人总数：${result?.get("totalContactCount")?.jsonPrimitive?.content?.toIntOrNull() ?: 0} 人。"
 
         "relationships.search", "relationship.search" -> if (count ==
             0
