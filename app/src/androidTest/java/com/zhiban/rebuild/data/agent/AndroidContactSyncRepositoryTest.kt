@@ -35,6 +35,7 @@ class AndroidContactSyncRepositoryTest {
     private lateinit var database: AgentDatabase
     private lateinit var reader: SystemContactReader
     private var rawContactId: Long? = null
+    private lateinit var testName: String
     private lateinit var testPhone: String
     private lateinit var testSecondPhone: String
 
@@ -44,6 +45,7 @@ class AndroidContactSyncRepositoryTest {
         database = Room.inMemoryDatabaseBuilder(context, AgentDatabase::class.java).build()
         reader = SystemContactReader(context)
         val uniqueSuffix = (System.nanoTime() % 100_000_000L).toString().padStart(8, '0')
+        testName = "知伴同步测试$uniqueSuffix"
         testPhone = "139$uniqueSuffix"
         testSecondPhone = "138$uniqueSuffix"
         rawContactId = createSystemContact()
@@ -118,7 +120,7 @@ class AndroidContactSyncRepositoryTest {
             .withValue(ContactsContract.RawContacts.ACCOUNT_NAME, localAccountName)
             .build()
         operations += dataInsert(ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
-            .withValue(ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME, TEST_NAME)
+            .withValue(ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME, testName)
             .build()
         operations += dataInsert(ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE)
             .withValue(ContactsContract.CommonDataKinds.Phone.NUMBER, testPhone)
@@ -153,8 +155,8 @@ class AndroidContactSyncRepositoryTest {
 
     private fun contact(sourceId: String, company: String, title: String, secondPhone: String) = ContactEntity(
         contactId = "sync-test-contact",
-        displayName = TEST_NAME,
-        normalizedName = TEST_NAME,
+        displayName = testName,
+        normalizedName = testName,
         phone = secondPhone,
         email = null,
         wechatId = null,
@@ -170,7 +172,4 @@ class AndroidContactSyncRepositoryTest {
         updatedAtEpochMs = 1,
     )
 
-    private companion object {
-        const val TEST_NAME = "知伴同步测试"
-    }
 }

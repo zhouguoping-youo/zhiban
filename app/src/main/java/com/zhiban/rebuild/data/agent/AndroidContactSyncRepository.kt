@@ -14,9 +14,11 @@ import com.zhiban.rebuild.data.contact.ContactSyncSnapshotEntity
 import com.zhiban.rebuild.data.contact.ContactThreeWayMerge
 import com.zhiban.rebuild.data.contact.ContactThreeWayMergePlan
 import com.zhiban.rebuild.data.contact.SystemContactCandidate
+import com.zhiban.rebuild.data.contact.SystemContactDataRowSnapshot
 import com.zhiban.rebuild.data.contact.SystemContactReader
 import com.zhiban.rebuild.data.contact.SystemRawContactSnapshot
 import com.zhiban.rebuild.data.contact.findExistingSystemContact
+import com.zhiban.rebuild.data.contact.normalizeContactPhone
 import com.zhiban.rebuild.data.contact.toSyncProjection
 import com.zhiban.rebuild.runtime.governance.ChangeLogEntity
 import com.zhiban.rebuild.runtime.tool.sha256
@@ -58,7 +60,7 @@ class AndroidContactSyncRepository @Inject internal constructor(
         check(result.errorMessage == null) { result.errorMessage ?: "无法读取手机通讯录" }
         val existing = findExistingSystemContact(contact, result.contacts)
             ?: error("手机通讯录里还没有此联系人，请先用系统联系人页新建")
-        val raw = existing.rawContacts.firstOrNull { !it.isReadOnly }
+        val raw = selectWritableRawContact(existing, contact)
             ?: error("这个联系人属于只读账号，无法由知伴直接更新")
         val linkId = stableContactKnowledgeId("android-raw-contact", raw.rawContactId.toString())
         val snapshot = database.contactIntelligenceDao().findSyncSnapshot(linkId)
@@ -320,7 +322,27 @@ class AndroidContactSyncRepository @Inject internal constructor(
     private companion object {
         val JSON = Json
         const val UNDO_WINDOW_MS = 90L * 24L * 60L * 60L * 1_000L
-        const val CONTACT_PROVIDER_VERIFY_RETRIES = 20
-        const val CONTACT_PROVIDER_VERIFY_RETRY_MS = 50L
+
+        // Aggregation is asynchronous and can exceed one second on a busy device or a large book.
+        // Keep verification strict, but allow the provider a bounded five-second convergence window.
+        const val CONTACT_PROVIDER_VERIFY_RETRIES = 50
+        const val CONTACT_PROVIDER_VERIFY_RETRY_MS = 100L
+    }
+}
+
+internal fun selectWritableRawContact(candidate: SystemContactCandidate, contact: ContactEntity): SystemRawContactSnapshot? {
+    val writable = candidate.rawContacts.filterNot(SystemRawContactSnapshot::isReadOnly)
+    if (writable.size < 2) return writable.firstOrNull()
+    val phone = contact.phone?.let(::normalizeContactPhone)
+    val email = contact.email?.trim()?.lowercase()?.takeIf { '@' in it }
+    return writable.maxByOrNull { raw ->
+        val rowValues = raw.dataRows.mapNotNull(SystemContactDataRowSnapshot::value)
+        val phoneMatch = phone != null && rowValues.any { normalizeContactPhone(it) == phone }
+        val emailMatch = email != null && rowValues.any { it.trim().lowercase() == email }
+        when {
+            phoneMatch -> 3
+            emailMatch -> 2
+            else -> 1
+        }
     }
 }
