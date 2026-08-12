@@ -290,6 +290,13 @@ internal fun feedbackContextMessage(feedback: List<String>): String = "以下是
 
 internal data class AssembledModelContext(val messages: List<ModelMessage>, val sources: List<String>)
 
+internal fun shouldCompleteObservationDeterministically(toolName: String, intentLabel: com.zhiban.rebuild.runtime.context.IntentLabel): Boolean = (
+    toolName == SchedulePlanValidator.TOOL_NAME &&
+        intentLabel == com.zhiban.rebuild.runtime.context.IntentLabel.CALENDAR_CREATE
+    ) ||
+    toolName == CommunicationMessageToolBinding.TOOL_NAME ||
+    toolName == CrmMutationToolBinding.LEAD_CREATE
+
 internal fun deterministicToolSummary(toolName: String, safeResultJson: String): String {
     val result = runCatching { Json.parseToJsonElement(safeResultJson).jsonObject }.getOrNull()
     val count = result?.get("count")?.jsonPrimitive?.content?.toIntOrNull()
@@ -333,6 +340,9 @@ internal fun deterministicToolSummary(toolName: String, safeResultJson: String):
         }
 
         "crm.opportunity.get" -> crmOpportunityFallbackSummary(result)
+
+        CrmMutationToolBinding.LEAD_CREATE ->
+            "已放入“知伴发现的候选线索”，尚未转为正式机会。可在个人 CRM 中查看、转正或忽略。"
 
         CommunicationMessageToolBinding.TOOL_NAME -> {
             val platform = result?.get("platform")?.jsonPrimitive?.content.orEmpty()

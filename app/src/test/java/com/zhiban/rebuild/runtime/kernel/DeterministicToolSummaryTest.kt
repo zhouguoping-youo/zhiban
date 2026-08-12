@@ -1,15 +1,44 @@
 package com.zhiban.rebuild.runtime.kernel
 
+import com.zhiban.rebuild.runtime.context.IntentLabel
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DeterministicToolSummaryTest {
+    @Test
+    fun `candidate lead summary states it is not a formal opportunity`() {
+        val summary = deterministicToolSummary(
+            "crm.lead.createCandidate",
+            """{"targetId":"lead-1","status":"created","candidatePool":true}""",
+        )
+
+        assertTrue(summary.contains("候选线索"))
+        assertTrue(summary.contains("尚未转为正式机会"))
+    }
+
+    @Test
+    fun `candidate lead completes observation without exposing a follow-up opportunity write`() {
+        assertTrue(
+            shouldCompleteObservationDeterministically(
+                "crm.lead.createCandidate",
+                IntentLabel.SALES_CRM,
+            ),
+        )
+        assertFalse(
+            shouldCompleteObservationDeterministically(
+                "crm.activity.append",
+                IntentLabel.SALES_CRM,
+            ),
+        )
+    }
+
     private val zone: ZoneId = ZoneId.systemDefault()
 
     @Test

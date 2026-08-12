@@ -54,6 +54,8 @@ object AgentProjectionUiMapper {
             },
             pendingProposalId = projection.pendingApproval?.proposalId,
             plan = projection.pendingApproval?.let { approval ->
+                val isExternalMessage = approval.platform?.isNotBlank() == true &&
+                    approval.recipient?.isNotBlank() == true
                 AgentPlanUi(
                     title = approval.title.ifBlank { "执行知伴计划" },
                     subject = approval.title,
@@ -65,8 +67,14 @@ object AgentProjectionUiMapper {
                     reminder = formatReminderLine(approval.scheduleReminderMinutesBefore),
                     platform = approval.platform.orEmpty(),
                     recipient = approval.recipient.orEmpty(),
-                    message = approval.message.orEmpty(),
-                    details = approval.details.orEmpty(),
+                    // Several internal tools use a payload field named `message` as their
+                    // confirmation summary. It is only an outbound message when the plan also
+                    // carries an explicit platform and recipient. Treating every such field as
+                    // outbound made CRM cards claim "将发送 / 打开目标应用".
+                    message = approval.message.orEmpty().takeIf { isExternalMessage }.orEmpty(),
+                    details = approval.details.orEmpty().ifBlank {
+                        approval.message.orEmpty().takeUnless { isExternalMessage }.orEmpty()
+                    },
                 )
             },
             usedTokens = projection.budget?.usedTokens,

@@ -1229,16 +1229,12 @@ internal class ProviderExecutionEngine(
         val sessionId = ids.sessionId
         val fencingEpoch = ids.fencingEpoch
         // A single, explicit calendar request can be acknowledged from the verified local
-        // result without asking the model to restate identifiers or invent details.
-        // Composite requests still enter observation so the planner can propose the next
+        // result without asking the model to restate identifiers or invent details. A newly
+        // discovered CRM lead must also stop here: it belongs to the candidate pool and must not
+        // be silently chained into a formal opportunity during the same observation turn.
+        // Other composite requests still enter observation so the planner can propose the next
         // separately-approved tool.
-        if (
-            (
-                toolName == SchedulePlanValidator.TOOL_NAME &&
-                    queryContext.intentLabel == com.zhiban.rebuild.runtime.context.IntentLabel.CALENDAR_CREATE
-                ) ||
-            toolName == CommunicationMessageToolBinding.TOOL_NAME
-        ) {
+        if (shouldCompleteObservationDeterministically(toolName, queryContext.intentLabel)) {
             val summary = deterministicToolSummary(toolName, safeResultJson)
             appendObservation(
                 attemptId,

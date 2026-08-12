@@ -67,6 +67,28 @@ class AgentProjectionUiMapperTest {
     }
 
     @Test
+    fun `internal approval message is rendered as details not outbound content`() {
+        val result = AgentProjectionUiMapper.map(
+            SessionProjection(
+                sessionId = "session-1",
+                runId = "run-1",
+                lastAppliedSequence = 2,
+                runStatus = RuntimeRunStatus.AWAITING_CONFIRMATION,
+                pendingApproval = PendingApprovalProjection(
+                    "proposal-1",
+                    "payload-ref-1",
+                    "创建候选线索",
+                    message = "联系人：王建国；依据：连续两次询价",
+                ),
+            ),
+        )
+
+        assertEquals("联系人：王建国；依据：连续两次询价", result.plan?.details)
+        assertEquals("", result.plan?.message)
+        assertEquals("", result.plan?.recipient)
+    }
+
+    @Test
     fun `cancel requested remains non terminal and disables input`() {
         val result = AgentProjectionUiMapper.map(
             SessionProjection(
