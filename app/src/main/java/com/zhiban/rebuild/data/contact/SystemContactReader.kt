@@ -6,6 +6,7 @@ import android.content.ContentUris
 import android.content.Context
 import android.content.pm.PackageManager
 import android.database.Cursor
+import android.os.Build
 import android.provider.ContactsContract
 import androidx.core.content.ContextCompat
 import com.zhiban.rebuild.runtime.runSuspendCatching
@@ -154,6 +155,8 @@ class SystemContactReader @Inject constructor(@ApplicationContext private val co
             rowId = rowId,
             mimeType = mimeType,
             value = cursor.string(ContactsContract.Data.DATA1)?.take(500),
+            // Row mutations are additionally guarded by the authoritative raw-contact flag below.
+            // Some OEM providers do not expose Data.IS_READ_ONLY on Data.CONTENT_URI consistently.
             isReadOnly = false,
         )
     }
@@ -164,19 +167,29 @@ class SystemContactReader @Inject constructor(@ApplicationContext private val co
     }
 
     private fun hydrateRawContactChunk(ids: List<Long>, rawContacts: MutableMap<Long, MutableRawContact>) {
+        try {
+            queryRawContactChunk(ids, rawContacts, includeReadOnlyFlag = true)
+        } catch (_: IllegalArgumentException) {
+            // A few OEM ContactsProvider implementations omit the standard read-only projection.
+            // Fall back to account capabilities without losing the whole address book import.
+            queryRawContactChunk(ids, rawContacts, includeReadOnlyFlag = false)
+        }
+    }
+
+    private fun queryRawContactChunk(ids: List<Long>, rawContacts: MutableMap<Long, MutableRawContact>, includeReadOnlyFlag: Boolean) {
         val placeholders = ids.joinToString(",") { "?" }
         context.contentResolver.query(
             ContactsContract.RawContacts.CONTENT_URI,
-            RAW_CONTACT_PROJECTION,
+            if (includeReadOnlyFlag) RAW_CONTACT_PROJECTION else RAW_CONTACT_COMPAT_PROJECTION,
             "${ContactsContract.RawContacts._ID} IN ($placeholders)",
             ids.map(Long::toString).toTypedArray(),
             null,
         )?.use { cursor ->
-            while (cursor.moveToNext()) applyRawContactMetadata(cursor, rawContacts)
+            while (cursor.moveToNext()) applyRawContactMetadata(cursor, rawContacts, includeReadOnlyFlag)
         }
     }
 
-    private fun applyRawContactMetadata(cursor: Cursor, rawContacts: MutableMap<Long, MutableRawContact>) {
+    private fun applyRawContactMetadata(cursor: Cursor, rawContacts: MutableMap<Long, MutableRawContact>, includesReadOnlyFlag: Boolean) {
         val id = cursor.long(ContactsContract.RawContacts._ID) ?: return
         val rawContact = rawContacts[id] ?: return
         rawContact.accountName = cursor.string(ContactsContract.RawContacts.ACCOUNT_NAME)
@@ -184,11 +197,21 @@ class SystemContactReader @Inject constructor(@ApplicationContext private val co
         rawContact.sourceId = cursor.string(ContactsContract.RawContacts.SOURCE_ID)
         rawContact.version = cursor.long(ContactsContract.RawContacts.VERSION) ?: 0L
         rawContact.isDirty = cursor.int(ContactsContract.RawContacts.DIRTY) == 1
-        rawContact.isReadOnly = !accountSupportsContactWrites(rawContact.accountType)
+        rawContact.isReadOnly = if (includesReadOnlyFlag) {
+            cursor.int(ContactsContract.RawContacts.RAW_CONTACT_IS_READ_ONLY) == 1
+        } else {
+            !accountSupportsContactWrites(rawContact.accountName, rawContact.accountType)
+        }
     }
 
-    private fun accountSupportsContactWrites(accountType: String?): Boolean {
-        if (accountType.isNullOrBlank()) return true
+    private fun accountSupportsContactWrites(accountName: String?, accountType: String?): Boolean {
+        if (accountName.isNullOrBlank() && accountType.isNullOrBlank()) return true
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+            accountName == ContactsContract.RawContacts.getLocalAccountName(context) &&
+            accountType == ContactsContract.RawContacts.getLocalAccountType(context)
+        ) {
+            return true
+        }
         return ContentResolver.getSyncAdapterTypes().any { adapter ->
             adapter.authority == ContactsContract.AUTHORITY &&
                 adapter.accountType == accountType &&
@@ -403,7 +426,10 @@ class SystemContactReader @Inject constructor(@ApplicationContext private val co
             ContactsContract.RawContacts.SOURCE_ID,
             ContactsContract.RawContacts.VERSION,
             ContactsContract.RawContacts.DIRTY,
+            ContactsContract.RawContacts.RAW_CONTACT_IS_READ_ONLY,
         )
+
+        val RAW_CONTACT_COMPAT_PROJECTION = RAW_CONTACT_PROJECTION.dropLast(1).toTypedArray()
     }
 }
 

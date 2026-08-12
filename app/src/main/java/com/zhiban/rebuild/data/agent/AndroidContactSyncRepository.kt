@@ -25,6 +25,7 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -94,8 +95,7 @@ class AndroidContactSyncRepository @Inject internal constructor(
         markPending(fresh, nowEpochMs)
         return withContext(Dispatchers.IO) {
             val applied = applyOperations(fresh)
-            val verified = prepare(fresh.contact)
-            check(verified.deviceContact.toSyncProjection() == fresh.desired) { "写入后校验失败，未确认同步完成" }
+            val verified = awaitVerifiedProjection(fresh.contact, fresh.desired)
             recordSuccess(fresh, applied, verified.rawContact.version, nowEpochMs)
         }
     }
@@ -115,8 +115,7 @@ class AndroidContactSyncRepository @Inject internal constructor(
         withContext(Dispatchers.IO) {
             applyOperations(reverse, JSON.decodeFromString(operation.insertedDataRowIdsJson))
         }
-        val verified = prepare(contact)
-        check(verified.deviceContact.toSyncProjection() == before) { "撤销后校验失败，请在系统通讯录检查" }
+        awaitVerifiedProjection(contact, before)
         database.withTransaction {
             database.contactIntelligenceDao().updateSyncOperationState(operationId, "UNDONE", nowEpochMs)
             database.changeLogDao().markUndone(operationId, nowEpochMs)
@@ -232,6 +231,19 @@ class AndroidContactSyncRepository @Inject internal constructor(
         )
     }
 
+    /** ContactsProvider aggregation can expose a stale aggregate briefly after a successful batch write. */
+    private suspend fun awaitVerifiedProjection(contact: ContactEntity, expected: ContactSyncProjection): AndroidContactSyncPreview {
+        var latest = prepare(contact)
+        repeat(CONTACT_PROVIDER_VERIFY_RETRIES) { attempt ->
+            if (latest.deviceContact.toSyncProjection() == expected) return latest
+            if (attempt < CONTACT_PROVIDER_VERIFY_RETRIES - 1) {
+                delay(CONTACT_PROVIDER_VERIFY_RETRY_MS)
+                latest = prepare(contact)
+            }
+        }
+        error("手机通讯录写入后仍未完成聚合，请稍后重试")
+    }
+
     private fun appendScalarOperations(
         preview: AndroidContactSyncPreview,
         operations: MutableList<ContentProviderOperation>,
@@ -308,5 +320,7 @@ class AndroidContactSyncRepository @Inject internal constructor(
     private companion object {
         val JSON = Json
         const val UNDO_WINDOW_MS = 90L * 24L * 60L * 60L * 1_000L
+        const val CONTACT_PROVIDER_VERIFY_RETRIES = 20
+        const val CONTACT_PROVIDER_VERIFY_RETRY_MS = 50L
     }
 }

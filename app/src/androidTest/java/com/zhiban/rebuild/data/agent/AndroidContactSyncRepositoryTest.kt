@@ -3,6 +3,7 @@ package com.zhiban.rebuild.data.agent
 import android.Manifest
 import android.content.ContentProviderOperation
 import android.content.Context
+import android.os.Build
 import android.provider.ContactsContract
 import androidx.room.Room
 import androidx.room.withTransaction
@@ -12,6 +13,7 @@ import androidx.test.rule.GrantPermissionRule
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.SystemContactReader
 import com.zhiban.rebuild.data.contact.normalizeContactPhone
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -33,12 +35,17 @@ class AndroidContactSyncRepositoryTest {
     private lateinit var database: AgentDatabase
     private lateinit var reader: SystemContactReader
     private var rawContactId: Long? = null
+    private lateinit var testPhone: String
+    private lateinit var testSecondPhone: String
 
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
         database = Room.inMemoryDatabaseBuilder(context, AgentDatabase::class.java).build()
         reader = SystemContactReader(context)
+        val uniqueSuffix = (System.nanoTime() % 100_000_000L).toString().padStart(8, '0')
+        testPhone = "139$uniqueSuffix"
+        testSecondPhone = "138$uniqueSuffix"
         rawContactId = createSystemContact()
     }
 
@@ -56,15 +63,17 @@ class AndroidContactSyncRepositoryTest {
 
     @Test
     fun confirmedWriteIsVerifiedAuditedAndReversible() = runBlocking {
-        val candidate = reader.readAll().contacts.single { candidate ->
-            candidate.phones.any { normalizeContactPhone(it) == TEST_PHONE }
-        }
-        val contact = contact(candidate.sourceId, company = "新公司", title = "负责人", secondPhone = TEST_SECOND_PHONE)
+        val candidate = awaitCreatedContact()
+        assertTrue(
+            "the local test raw contact must remain writable regardless of OEM account metadata",
+            candidate.rawContacts.any { it.rawContactId == rawContactId && !it.isReadOnly },
+        )
+        val contact = contact(candidate.sourceId, company = "新公司", title = "负责人", secondPhone = testSecondPhone)
         database.withTransaction {
             database.contactDao().insert(contact)
             database.upsertObservedSystemContactIntelligence(
                 candidate = candidate,
-                contact = contact.copy(phone = TEST_PHONE, company = "旧公司", title = "销售"),
+                contact = contact.copy(phone = testPhone, company = "旧公司", title = "销售"),
                 sourceRef = "android-contact:${candidate.sourceId}",
                 nowEpochMs = 10,
             )
@@ -74,13 +83,13 @@ class AndroidContactSyncRepositoryTest {
         val preview = repository.prepare(contact)
         assertTrue(preview.plan.canApply)
         assertEquals("新公司", preview.plan.scalarUpdates["company"])
-        assertEquals(listOf(TEST_SECOND_PHONE), preview.plan.phoneAdditions)
+        assertEquals(listOf(testSecondPhone), preview.plan.phoneAdditions)
 
         val result = repository.apply(preview, nowEpochMs = 20)
         val updated = reader.readAll().contacts.single { it.sourceId == candidate.sourceId }
         assertEquals("新公司", updated.company)
         assertEquals("负责人", updated.title)
-        assertTrue(TEST_SECOND_PHONE in updated.phones)
+        assertTrue(testSecondPhone in updated.phones)
         assertEquals("APPLIED", database.contactIntelligenceDao().findSyncOperation(result.operationId)?.state)
         assertEquals("AVAILABLE", database.changeLogDao().find(result.operationId)?.undoState)
 
@@ -88,21 +97,31 @@ class AndroidContactSyncRepositoryTest {
         val restored = reader.readAll().contacts.single { it.sourceId == candidate.sourceId }
         assertEquals("旧公司", restored.company)
         assertEquals("销售", restored.title)
-        assertTrue(TEST_SECOND_PHONE !in restored.phones)
+        assertTrue(testSecondPhone !in restored.phones)
         assertEquals("UNDONE", database.contactIntelligenceDao().findSyncOperation(result.operationId)?.state)
     }
 
     private fun createSystemContact(): Long {
         val operations = arrayListOf<ContentProviderOperation>()
+        val localAccountName = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            ContactsContract.RawContacts.getLocalAccountName(context)
+        } else {
+            null
+        }
+        val localAccountType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            ContactsContract.RawContacts.getLocalAccountType(context)
+        } else {
+            null
+        }
         operations += ContentProviderOperation.newInsert(ContactsContract.RawContacts.CONTENT_URI)
-            .withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, null)
-            .withValue(ContactsContract.RawContacts.ACCOUNT_NAME, null)
+            .withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, localAccountType)
+            .withValue(ContactsContract.RawContacts.ACCOUNT_NAME, localAccountName)
             .build()
         operations += dataInsert(ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
             .withValue(ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME, TEST_NAME)
             .build()
         operations += dataInsert(ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE)
-            .withValue(ContactsContract.CommonDataKinds.Phone.NUMBER, TEST_PHONE)
+            .withValue(ContactsContract.CommonDataKinds.Phone.NUMBER, testPhone)
             .build()
         operations += dataInsert(ContactsContract.CommonDataKinds.Organization.CONTENT_ITEM_TYPE)
             .withValue(ContactsContract.CommonDataKinds.Organization.COMPANY, "旧公司")
@@ -112,10 +131,25 @@ class AndroidContactSyncRepositoryTest {
             .uri?.lastPathSegment?.toLongOrNull() ?: error("未创建测试联系人")
     }
 
-    private fun dataInsert(mimeType: String): ContentProviderOperation.Builder =
-        ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
-            .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
-            .withValue(ContactsContract.Data.MIMETYPE, mimeType)
+    private fun dataInsert(mimeType: String): ContentProviderOperation.Builder = ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+        .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
+        .withValue(ContactsContract.Data.MIMETYPE, mimeType)
+
+    private suspend fun awaitCreatedContact(): com.zhiban.rebuild.data.contact.SystemContactCandidate {
+        var lastResult: com.zhiban.rebuild.data.contact.SystemContactReadResult? = null
+        repeat(20) {
+            val result = reader.readAll()
+            lastResult = result
+            result.contacts.firstOrNull { candidate ->
+                candidate.phones.any { normalizeContactPhone(it) == testPhone }
+            }?.let { return it }
+            delay(100)
+        }
+        error(
+            "测试联系人未出现在系统通讯录：raw=$rawContactId, rows=${lastResult?.rowsRead}, " +
+                "contacts=${lastResult?.contacts?.size}, error=${lastResult?.errorMessage}",
+        )
+    }
 
     private fun contact(sourceId: String, company: String, title: String, secondPhone: String) = ContactEntity(
         contactId = "sync-test-contact",
@@ -138,7 +172,5 @@ class AndroidContactSyncRepositoryTest {
 
     private companion object {
         const val TEST_NAME = "知伴同步测试"
-        const val TEST_PHONE = "13900001111"
-        const val TEST_SECOND_PHONE = "13900002222"
     }
 }
