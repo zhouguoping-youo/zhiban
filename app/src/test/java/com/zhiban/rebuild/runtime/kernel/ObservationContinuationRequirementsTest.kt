@@ -70,4 +70,18 @@ class ObservationContinuationRequirementsTest {
         assertTrue(summary.orEmpty().contains("联系人总数：12 人"))
         assertTrue(summary.orEmpty().contains("没有日程安排"))
     }
+
+    @Test
+    fun `completed summary accepts canonical calendar alias`() {
+        val summary = requiredReadCompletionSummary(
+            "Count my contacts and check today's schedule.",
+            listOf(
+                "contact.maintenance.list" to "{\"totalContactCount\":3}",
+                "calendar.search" to "{\"count\":2}",
+            ),
+        )
+
+        assertTrue(summary.orEmpty().contains("联系人总数：3 人"))
+        assertTrue(summary.orEmpty().contains("已查到 2 条日程"))
+    }
 }

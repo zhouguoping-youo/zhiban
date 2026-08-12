@@ -318,8 +318,14 @@ internal fun requiredReadCompletionSummary(input: String, results: List<Pair<Str
     val required = requestedRequiredReadTools(input)
     if (required.size < 2) return null
     val resultByTool = results.associate { it.first to it.second }
-    if (required.any { it !in resultByTool }) return null
-    return required.joinToString(separator = "\n") { deterministicToolSummary(it, resultByTool.getValue(it)) }
+    val summaries = required.mapNotNull { requestedTool ->
+        val matched = when (requestedTool) {
+            "calendar.schedule.search" -> CALENDAR_QUERY_TOOLS.firstNotNullOfOrNull { resultByTool[it] }
+            else -> resultByTool[requestedTool]
+        }
+        matched?.let { deterministicToolSummary(requestedTool, it) }
+    }
+    return summaries.takeIf { it.size == required.size }?.joinToString(separator = "\n")
 }
 
 private fun requestedRequiredReadTools(input: String): List<String> = buildList {
