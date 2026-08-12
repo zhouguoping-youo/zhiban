@@ -30,5 +30,8 @@ class ProviderContextAssemblerPresentationTest {
         assertTrue(policy.contains("contactId 固定为 user:self"))
         assertTrue(policy.contains("确认卡出现前不得说已确认"))
         assertTrue(policy.contains("用户暂不完善就保留待发现"))
+        assertTrue(policy.contains("仅同事和上下级依赖用户当前公司全称"))
+        assertTrue(policy.contains("不能在非工作关系下机械追问当前公司"))
+        assertTrue(policy.contains("客户与合作方依据真实项目、合同、订单或业务沟通"))
     }
 }

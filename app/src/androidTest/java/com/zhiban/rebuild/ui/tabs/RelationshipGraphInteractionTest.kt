@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.ui.tabs
 
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -8,6 +9,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
+import com.zhiban.rebuild.relationship.RelationshipGroup
 import com.zhiban.rebuild.runtime.personalization.UserProfile
 import com.zhiban.rebuild.ui.theme.ZhiBanTheme
 import org.junit.Assert.assertEquals
@@ -53,11 +55,39 @@ class RelationshipGraphInteractionTest {
         }
 
         compose.onNodeWithText("我的关系图").assertExists()
-        compose.onNodeWithText("还不知道你现在在哪工作").assertExists()
+        compose.onNodeWithText("还不知道你现在在哪工作").assertDoesNotExist()
         compose.onNodeWithText("还没有与我相关的可靠关系").assertExists()
         compose.onNodeWithText("联系人之间的关系").assertDoesNotExist()
         compose.onNodeWithText("这些关系已有资料证据，但尚未与“我”建立可靠关联").assertDoesNotExist()
         compose.onNodeWithContentDescription("重置关系图视图").assertDoesNotExist()
+    }
+
+    @Test
+    fun currentEmploymentPromptOnlyAppearsForWorkFilter() {
+        val group = mutableStateOf(RelationshipGroup.SERVICE)
+        compose.setContent {
+            ZhiBanTheme {
+                RelationshipGraphState(
+                    owner = UserProfile(name = "周国平"),
+                    contacts = emptyList(),
+                    edges = emptyList(),
+                    events = emptyList(),
+                    canAddRelationship = false,
+                    activeFilter = group.value.displayName,
+                    activeGroup = group.value,
+                    onAdd = {},
+                    onInspect = {},
+                    onInspectEvent = {},
+                )
+            }
+        }
+
+        compose.onNodeWithText("还不知道你现在在哪工作").assertDoesNotExist()
+        compose.onNodeWithText("还没有可靠关系 · 依据预约、订单或服务往来，不依赖你的工作信息").assertExists()
+
+        compose.runOnIdle { group.value = RelationshipGroup.WORK }
+        compose.onNodeWithText("还不知道你现在在哪工作").assertExists()
+        compose.onNodeWithText("还没有可靠关系 · 同事看任职重叠；客户与合作方看真实业务往来").assertExists()
     }
 
     @Test

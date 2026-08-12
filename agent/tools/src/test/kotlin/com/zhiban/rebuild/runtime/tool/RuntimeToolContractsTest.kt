@@ -94,11 +94,13 @@ class RuntimeToolContractsTest {
         val definition = RuntimeToolCatalog.production()
             .requireRegistered("relationship.createCandidate")
             .providerDefinitionJson
-        val relationshipTypes = Json.parseToJsonElement(definition)
+        val parameters = Json.parseToJsonElement(definition)
             .jsonObject.getValue("function")
             .jsonObject.getValue("parameters")
-            .jsonObject.getValue("properties")
-            .jsonObject.getValue("relationType")
+            .jsonObject
+        val relationshipTypes = parameters.getValue("properties")
+            .jsonObject
+            .getValue("relationType")
             .jsonObject.getValue("enum")
             .jsonArray
             .map { it.jsonPrimitive.content }
@@ -106,6 +108,8 @@ class RuntimeToolContractsTest {
         assertTrue("MANAGER" in relationshipTypes)
         assertTrue("CLASSMATE" in relationshipTypes)
         assertTrue("UNKNOWN" !in relationshipTypes)
+        assertTrue("evidenceBasis" !in parameters.getValue("required").jsonArray.map { it.jsonPrimitive.content })
+        assertTrue("evidenceBasis" !in parameters.getValue("properties").jsonObject)
     }
 
     @Test

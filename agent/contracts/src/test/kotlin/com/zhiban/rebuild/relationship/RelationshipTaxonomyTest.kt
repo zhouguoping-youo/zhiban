@@ -91,4 +91,58 @@ class RelationshipTaxonomyTest {
         assertFalse(RelationshipTaxonomy.requireSupported("UNKNOWN").isSelectable)
         assertFalse("UNKNOWN" in RelationshipTaxonomy.selectableCodes)
     }
+
+    @Test
+    fun `each relationship uses its own evidence prerequisite`() {
+        assertEquals(
+            RelationshipEvidenceBasis.SHARED_EMPLOYMENT,
+            RelationshipTaxonomy.evidencePolicy("COLLEAGUE").basis,
+        )
+        assertTrue(RelationshipTaxonomy.evidencePolicy("COLLEAGUE").requiresOwnerEmployment)
+        assertEquals(
+            RelationshipEvidenceBasis.BUSINESS_INTERACTION,
+            RelationshipTaxonomy.evidencePolicy("CUSTOMER").basis,
+        )
+        assertFalse(RelationshipTaxonomy.evidencePolicy("CUSTOMER").requiresOwnerEmployment)
+        assertEquals(
+            RelationshipEvidenceBasis.SHARED_EDUCATION,
+            RelationshipTaxonomy.evidencePolicy("CLASSMATE").basis,
+        )
+        assertEquals(
+            RelationshipEvidenceBasis.SERVICE_INTERACTION,
+            RelationshipTaxonomy.evidencePolicy("DOCTOR").basis,
+        )
+        assertEquals(
+            RelationshipEvidenceBasis.EXPLICIT_DESIGNATION,
+            RelationshipTaxonomy.evidencePolicy("EMERGENCY_CONTACT").basis,
+        )
+        assertTrue(
+            RelationshipTaxonomy.definitions.all { definition ->
+                runCatching { definition.evidencePolicy }.isSuccess
+            },
+        )
+    }
+
+    @Test
+    fun `temporal choices follow relationship continuity`() {
+        val classmate = RelationshipTaxonomy.temporalPolicy("CLASSMATE")
+        val friend = RelationshipTaxonomy.temporalPolicy("FRIEND")
+        val colleague = RelationshipTaxonomy.temporalPolicy("COLLEAGUE")
+        val partner = RelationshipTaxonomy.temporalPolicy("PARTNER")
+        val teacher = RelationshipTaxonomy.temporalPolicy("TEACHER")
+        val emergency = RelationshipTaxonomy.temporalPolicy("EMERGENCY_CONTACT")
+        val authorizedAgent = RelationshipTaxonomy.temporalPolicy("AUTHORIZED_AGENT")
+
+        assertEquals(null, classmate.title)
+        assertEquals(setOf("CURRENT"), classmate.allowedValues)
+        assertEquals(setOf("CURRENT", "PAST", "UNKNOWN"), friend.allowedValues)
+        assertEquals("关系阶段", colleague.title)
+        assertEquals("时间待核实", colleague.options.single { it.value == "UNKNOWN" }.label)
+        assertEquals(setOf("CURRENT"), partner.allowedValues)
+        assertEquals("关系阶段", teacher.title)
+        assertEquals(setOf("CURRENT", "PAST", "UNKNOWN"), teacher.allowedValues)
+        assertEquals("关系状态", emergency.title)
+        assertEquals("关系阶段", authorizedAgent.title)
+        assertTrue(runCatching { RelationshipTaxonomy.requireAllowedTemporalState("CLASSMATE", "PAST") }.isFailure)
+    }
 }

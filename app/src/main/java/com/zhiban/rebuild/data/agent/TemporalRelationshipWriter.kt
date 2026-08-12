@@ -23,7 +23,7 @@ internal class TemporalRelationshipWriter(private val database: AgentDatabase) {
         verificationState: String,
         nowEpochMs: Long,
     ): RelationshipEpisodeEntity {
-        require(temporalState in setOf("CURRENT", "PAST", "UNKNOWN"))
+        RelationshipTaxonomy.requireAllowedTemporalState(relationshipType, temporalState)
         ensurePerson(fromPersonId, nowEpochMs)
         ensurePerson(toPersonId, nowEpochMs)
         database.contactIntelligenceDao().closeOpenUserRelationships(

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -19,10 +20,13 @@ import com.zhiban.rebuild.ui.components.ZhiBanChip
 
 @Composable
 internal fun RelationshipTypePicker(selectedType: String, enabled: Boolean = true, onSelect: (String) -> Unit) {
-    val initialGroup = RelationshipTaxonomy.find(selectedType)?.group ?: RelationshipGroup.WORK
-    var selectedGroup by remember(selectedType) { mutableStateOf(initialGroup) }
+    val initialGroup = RelationshipTaxonomy.find(selectedType)?.group
+    var selectedGroup by remember { mutableStateOf(initialGroup) }
+    LaunchedEffect(selectedType) {
+        RelationshipTaxonomy.find(selectedType)?.group?.let { selectedGroup = it }
+    }
     val groups = RelationshipGroup.entries
-    val definitions = remember(selectedGroup) { RelationshipTaxonomy.definitionsFor(selectedGroup) }
+    val definitions = remember(selectedGroup) { selectedGroup?.let(RelationshipTaxonomy::definitionsFor).orEmpty() }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         groups.chunked(GROUP_COLUMNS).forEach { rowGroups ->
@@ -37,12 +41,16 @@ internal fun RelationshipTypePicker(selectedType: String, enabled: Boolean = tru
                         enabled = enabled,
                         modifier = Modifier.weight(1f),
                     ) {
+                        if (selectedGroup != group && RelationshipTaxonomy.find(selectedType)?.group != group) {
+                            onSelect("")
+                        }
                         selectedGroup = group
                     }
                 }
                 repeat(GROUP_COLUMNS - rowGroups.size) { Spacer(Modifier.weight(1f)) }
             }
         }
+        if (selectedGroup == null) return@Column
         Spacer(Modifier.height(2.dp))
         definitions.chunked(TYPE_COLUMNS).forEach { rowDefinitions ->
             Row(
@@ -90,5 +98,5 @@ internal fun graphRelationLabel(type: String, isHistorical: Boolean = false): St
     }
 }
 
-private const val GROUP_COLUMNS = 4
+private const val GROUP_COLUMNS = 3
 private const val TYPE_COLUMNS = 3

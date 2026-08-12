@@ -116,6 +116,8 @@ import com.zhiban.rebuild.data.contact.SystemContactWriteIntent
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.OutgoingMessageAccessibilityService
 import com.zhiban.rebuild.data.notification.ScheduleInsight
+import com.zhiban.rebuild.relationship.RelationshipGroup
+import com.zhiban.rebuild.relationship.RelationshipTaxonomy
 import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.personalization.UserProfile
@@ -162,6 +164,7 @@ internal fun RelationshipGraphState(
     events: List<RelationshipEventWithParticipants>,
     canAddRelationship: Boolean,
     activeFilter: String?,
+    activeGroup: RelationshipGroup? = null,
     onAdd: () -> Unit,
     onInspect: (RelationshipEdgeEntity) -> Unit,
     onInspectEvent: (RelationshipEventWithParticipants) -> Unit,
@@ -281,7 +284,7 @@ internal fun RelationshipGraphState(
                 Text("添加关系", color = if (canAddRelationship) RelationInk else RelationMuted)
             }
         }
-        if (root.isOwner) {
+        if (root.isOwner && activeGroup == RelationshipGroup.WORK && currentOwnerEmployment == null) {
             Spacer(Modifier.height(ZhiBanSpacing.Md))
             OwnerEmploymentAnchor(
                 current = currentOwnerEmployment,
@@ -292,11 +295,7 @@ internal fun RelationshipGraphState(
         if (contacts.isEmpty()) {
             Spacer(Modifier.height(16.dp))
             Text(
-                if (activeFilter != null) {
-                    "“$activeFilter”下还没有匹配的联系人或关系"
-                } else {
-                    "添加联系人后，可以确认你和对方的关系"
-                },
+                relationshipGraphEmptyMessage(activeFilter, activeGroup),
                 color = RelationMuted,
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -354,16 +353,18 @@ internal fun RelationshipGraphState(
                 Text("仅展示 12 条关系，可在联系人页打开更多", color = RelationMuted, style = MaterialTheme.typography.labelSmall)
             }
         }
-        Spacer(Modifier.height(14.dp))
-        Text(
-            if (inferredEdgesCount > 0) {
-                "实线为已确认关系；虚线为资料证据推测"
-            } else {
-                "只展示已保存、可追溯来源的关系"
-            },
-            color = RelationMuted,
-            style = MaterialTheme.typography.labelSmall,
-        )
+        if (displayedEdges.isNotEmpty()) {
+            Spacer(Modifier.height(14.dp))
+            Text(
+                if (inferredEdgesCount > 0) {
+                    "实线为已确认关系；虚线为资料证据推测"
+                } else {
+                    "只展示已保存、可追溯来源的关系"
+                },
+                color = RelationMuted,
+                style = MaterialTheme.typography.labelSmall,
+            )
+        }
         if (relatedEvents.isNotEmpty()) {
             Spacer(Modifier.height(18.dp))
             Box(Modifier.fillMaxWidth().height(1.dp).background(RelationLine))
@@ -380,6 +381,12 @@ internal fun RelationshipGraphState(
             }
         }
     }
+}
+
+private fun relationshipGraphEmptyMessage(activeFilter: String?, group: RelationshipGroup?): String = when {
+    group != null -> "还没有可靠关系 · ${RelationshipTaxonomy.groupGuidance(group)}"
+    activeFilter != null -> "没有找到与“$activeFilter”匹配的关系"
+    else -> "还没有与我相关的可靠关系"
 }
 
 @Composable

@@ -6,6 +6,7 @@ import com.zhiban.rebuild.data.agent.TemporalRelationshipWriter
 import com.zhiban.rebuild.data.agent.ToolAuditEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
+import com.zhiban.rebuild.relationship.RelationshipTaxonomy
 import com.zhiban.rebuild.runtime.spi.RUNTIME_SCHEMA_VERSION
 import com.zhiban.rebuild.runtime.spi.RuntimeRunStatus
 import com.zhiban.rebuild.runtime.store.RuntimeEventEntity
@@ -34,6 +35,7 @@ data class RelationshipCandidateCall(
     val fromContactId: String,
     val toContactId: String,
     val relationType: String,
+    val evidenceBasis: String,
     val evidenceDigest: String,
     val confidence: Double,
     val skillId: String?,
@@ -67,6 +69,8 @@ internal class RelationshipDomainWriter(private val database: AgentDatabase) {
             require(approved["payloadRef"]?.jsonPrimitive?.content == call.payloadRef)
             suspend fun endpointExists(id: String): Boolean = id == RelationshipPersonIds.SELF || database.contactDao().findById(id) != null
             require(endpointExists(call.fromContactId) && endpointExists(call.toContactId))
+            RelationshipTaxonomy.requireAllowedTemporalState(call.relationType, call.temporalState)
+            require(call.evidenceBasis == RelationshipTaxonomy.evidencePolicy(call.relationType).basis.name)
 
             database.relationshipEdgeDao().upsert(
                 RelationshipEdgeEntity(
@@ -110,6 +114,7 @@ internal class RelationshipDomainWriter(private val database: AgentDatabase) {
             put("fromContactId", call.fromContactId)
             put("toContactId", call.toContactId)
             put("relationType", call.relationType)
+            put("evidenceBasis", call.evidenceBasis)
             put("evidenceDigest", call.evidenceDigest)
             put("confidence", call.confidence)
             put("temporalState", call.temporalState)

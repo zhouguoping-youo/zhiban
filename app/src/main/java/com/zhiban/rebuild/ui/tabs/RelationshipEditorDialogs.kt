@@ -112,6 +112,7 @@ import com.zhiban.rebuild.data.contact.SystemContactWriteIntent
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.OutgoingMessageAccessibilityService
 import com.zhiban.rebuild.data.notification.ScheduleInsight
+import com.zhiban.rebuild.relationship.RelationshipTaxonomy
 import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.personalization.UserProfile
@@ -169,6 +170,10 @@ internal fun RelationshipEditorDialog(
     var type by remember { mutableStateOf("") }
     var temporalState by remember { mutableStateOf("CURRENT") }
     var error by remember { mutableStateOf<String?>(null) }
+    val editorScrollState = rememberScrollState()
+    LaunchedEffect(type, editorScrollState.maxValue) {
+        if (type.isNotBlank()) editorScrollState.scrollTo(editorScrollState.maxValue)
+    }
     fun filteredPeople(query: String, excludedId: String, includeOwner: Boolean): List<RelationshipPersonUi> {
         val clean = query.trim()
         return people.asSequence()
@@ -226,7 +231,7 @@ internal fun RelationshipEditorDialog(
                 Column(
                     Modifier
                         .weight(1f)
-                        .verticalScroll(rememberScrollState())
+                        .verticalScroll(editorScrollState)
                         .padding(bottom = 8.dp),
                 ) {
                     Spacer(Modifier.height(12.dp))
@@ -261,6 +266,8 @@ internal fun RelationshipEditorDialog(
                                 fromId = ""
                                 error = null
                             }
+                            type = ""
+                            temporalState = "CURRENT"
                         },
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -279,6 +286,8 @@ internal fun RelationshipEditorDialog(
                         )
                         PersonChoiceRow(filteredPeople(fromQuery, toId, includeOwner = false), fromId) {
                             fromId = it
+                            type = ""
+                            temporalState = "CURRENT"
                             error = null
                         }
                     }
@@ -311,6 +320,8 @@ internal fun RelationshipEditorDialog(
                     } else {
                         PersonChoiceRow(targetPeople, toId) { selectedId ->
                             toId = selectedId
+                            type = ""
+                            temporalState = "CURRENT"
                             error = null
                         }
                     }
@@ -323,7 +334,7 @@ internal fun RelationshipEditorDialog(
                     }
                     Text(
                         if (fromName != null && toName != null) {
-                            "$fromName 是 $toName 的……"
+                            "${fromName}和${toName}是什么关系"
                         } else {
                             "选择关系"
                         },
@@ -334,23 +345,43 @@ internal fun RelationshipEditorDialog(
                     Spacer(Modifier.height(8.dp))
                     RelationshipTypePicker(type) { selectedType ->
                         type = selectedType
+                        temporalState = selectedType.takeIf(String::isNotBlank)
+                            ?.let(RelationshipTaxonomy::temporalPolicy)
+                            ?.defaultValue
+                            ?: "CURRENT"
                         error = null
                     }
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        "这段关系",
-                        color = RelationInk,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Medium,
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("CURRENT" to "当前", "PAST" to "已结束", "UNKNOWN" to "时间不确定").forEach { (value, label) ->
-                            ZhiBanChip(
-                                text = label,
-                                selected = temporalState == value,
-                                color = RelationAccent,
-                                onClick = { temporalState = value },
+                    RelationshipTaxonomy.find(type)?.let { definition ->
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            definition.evidencePolicy.guidance,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(ZhiBanRadius.Card))
+                                .background(RelationSoft)
+                                .padding(horizontal = 12.dp, vertical = 10.dp)
+                                .testTag("relationship-evidence-guidance"),
+                            color = RelationMuted,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        definition.temporalPolicy.title?.let { title ->
+                            Spacer(Modifier.height(16.dp))
+                            Text(
+                                title,
+                                color = RelationInk,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Medium,
                             )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                definition.temporalPolicy.options.forEach { option ->
+                                    ZhiBanChip(
+                                        text = option.label,
+                                        selected = temporalState == option.value,
+                                        color = RelationAccent,
+                                        onClick = { temporalState = option.value },
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -891,7 +922,7 @@ internal fun RelationshipEvidenceDialog(
                 style = MaterialTheme.typography.bodySmall,
             )
             Spacer(Modifier.height(18.dp))
-            Text("$from 是 $to 的……", color = RelationMuted, style = MaterialTheme.typography.labelMedium)
+            Text("${from}和${to}是什么关系", color = RelationMuted, style = MaterialTheme.typography.labelMedium)
             Spacer(Modifier.height(8.dp))
             RelationshipTypePicker(type, enabled = edge.userConfirmed) { selectedType ->
                 type = selectedType

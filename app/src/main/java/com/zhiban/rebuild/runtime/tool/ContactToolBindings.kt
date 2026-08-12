@@ -12,6 +12,8 @@ import com.zhiban.rebuild.data.contact.IdentityResolutionDecision
 import com.zhiban.rebuild.data.contact.OwnerContactLinkEntity
 import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
+import com.zhiban.rebuild.relationship.RelationshipGroup
+import com.zhiban.rebuild.relationship.RelationshipTaxonomy
 import java.text.Normalizer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
@@ -262,12 +264,30 @@ private fun ownerProfileJson(profile: ContactOwnerProfileSnapshot, ownerLinks: L
         put("knownOccupations", buildJsonArray { profile.occupations.sorted().forEach { add(JsonPrimitive(it)) } })
         put("currentEmploymentConfirmed", currentEmploymentConfirmed)
         put("hasKnownEmploymentDates", ownerEmployments.any { it.validFromEpochMs != null || it.validToEpochMs != null })
-        put("relationshipClassificationReady", (profilePresent || ownerLinks.isNotEmpty()) && currentEmploymentConfirmed)
+        put("relationshipClassificationReady", profilePresent || ownerLinks.isNotEmpty())
+        put("workRelationshipClassificationReady", (profilePresent || ownerLinks.isNotEmpty()) && currentEmploymentConfirmed)
+        put(
+            "relationshipPrerequisites",
+            buildJsonObject {
+                RelationshipGroup.entries.forEach { group ->
+                    put(
+                        group.name,
+                        buildJsonObject {
+                            put("guidance", RelationshipTaxonomy.groupGuidance(group))
+                            put("requiresCurrentEmployment", group == RelationshipGroup.WORK)
+                        },
+                    )
+                }
+            },
+        )
         put(
             "nextStep",
             when {
                 !profilePresent && ownerLinks.isEmpty() -> "本轮只问：应该如何称呼你？"
-                !currentEmploymentConfirmed -> "本轮只问：你目前在哪家公司工作？职位和过去经历以后按需要逐步补充"
+
+                !currentEmploymentConfirmed ->
+                    "非工作关系可按各自证据继续整理；仅当判断同事或上下级时，再询问你目前任职的公司全称"
+
                 else -> "可依据双方时间证据判断当前或历史关系；证据不足的联系人保持待发现"
             },
         )

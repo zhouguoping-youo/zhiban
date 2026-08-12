@@ -84,8 +84,19 @@ class ContactMaintenanceToolBindingTest {
             assertEquals("true", owner.getValue("identityKnown").jsonPrimitive.content)
             assertEquals("false", owner.getValue("contactCardLinked").jsonPrimitive.content)
             assertEquals(
-                "本轮只问：你目前在哪家公司工作？职位和过去经历以后按需要逐步补充",
+                "非工作关系可按各自证据继续整理；仅当判断同事或上下级时，再询问你目前任职的公司全称",
                 owner.getValue("nextStep").jsonPrimitive.content,
+            )
+            assertEquals("true", owner.getValue("relationshipClassificationReady").jsonPrimitive.content)
+            assertEquals("false", owner.getValue("workRelationshipClassificationReady").jsonPrimitive.content)
+            val prerequisites = owner.getValue("relationshipPrerequisites").jsonObject
+            assertEquals(
+                "false",
+                prerequisites.getValue("SERVICE").jsonObject.getValue("requiresCurrentEmployment").jsonPrimitive.content,
+            )
+            assertEquals(
+                "true",
+                prerequisites.getValue("WORK").jsonObject.getValue("requiresCurrentEmployment").jsonPrimitive.content,
             )
             assertEquals(
                 "老张",
@@ -148,6 +159,7 @@ class ContactMaintenanceToolBindingTest {
             assertEquals("true", owner.getValue("contactCardLinked").jsonPrimitive.content)
             assertEquals("true", owner.getValue("currentEmploymentConfirmed").jsonPrimitive.content)
             assertEquals("true", owner.getValue("relationshipClassificationReady").jsonPrimitive.content)
+            assertEquals("true", owner.getValue("workRelationshipClassificationReady").jsonPrimitive.content)
         } finally {
             database.close()
         }

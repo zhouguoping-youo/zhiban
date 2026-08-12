@@ -44,7 +44,6 @@ class RuntimeToolCatalog(val specs: Map<String, RuntimeToolSpec>) {
     companion object {
         private val RELATIONSHIP_TYPE_ENUM_JSON = RelationshipTaxonomy.selectableCodes
             .joinToString(prefix = "[\"", separator = "\",\"", postfix = "\"]")
-
         fun production(): RuntimeToolCatalog = RuntimeToolCatalog(
             listOf(
                 RuntimeToolSpec(
@@ -121,7 +120,7 @@ class RuntimeToolCatalog(val specs: Map<String, RuntimeToolSpec>) {
                     "contact.maintenance.list",
                     1,
                     RuntimeToolRisk.READ_ONLY,
-                    """{"type":"function","function":{"name":"contact.maintenance.list","description":"读取联系人全库的真实清洗摘要、本人职业锚点状态，以及一页需要维护的档案。totalContactCount 才是全库人数，returnedCount 只是本页条数；deferredRelationshipEvidenceCount 是留待未来对话发现的关系证据，不是当前任务。必须遵守 ownerProfile.nextStep，每轮最多问一个问题。","parameters":{"type":"object","additionalProperties":false,"properties":{"issue":{"type":"string","enum":["NO_REACHABLE_METHOD","STALE_PROFILE"]},"limit":{"type":"integer","minimum":1,"maximum":50}}}}}""",
+                    """{"type":"function","function":{"name":"contact.maintenance.list","description":"读取联系人全库的真实清洗摘要、本人档案，以及一页需要维护的联系人。totalContactCount 才是全库人数，returnedCount 只是本页条数。关系前置条件必须读取 ownerProfile.relationshipPrerequisites：当前工作只影响同事和上下级判断，不得阻塞家人、同学、朋友、教育、生活服务或社群关系；每轮最多追问一个真正缺失且与当前关系相关的问题。","parameters":{"type":"object","additionalProperties":false,"properties":{"issue":{"type":"string","enum":["NO_REACHABLE_METHOD","STALE_PROFILE"]},"limit":{"type":"integer","minimum":1,"maximum":50}}}}}""",
                     8,
                 ),
                 RuntimeToolSpec(
@@ -170,7 +169,7 @@ class RuntimeToolCatalog(val specs: Map<String, RuntimeToolSpec>) {
                     "relationship.createCandidate",
                     1,
                     RuntimeToolRisk.WRITE_CONFIRMATION_REQUIRED,
-                    """{"type":"function","function":{"name":"relationship.createCandidate","description":"提出一条带时间状态的联系人关系候选，必须经用户确认后才写入关系图；当前、过往和时间不确定不能混为一谈","parameters":{"type":"object","additionalProperties":false,"required":["fromContactId","toContactId","relationType","temporalState","evidenceSummary"],"properties":{"fromContactId":{"type":"string"},"toContactId":{"type":"string"},"relationType":{"type":"string","enum":$RELATIONSHIP_TYPE_ENUM_JSON},"temporalState":{"type":"string","enum":["CURRENT","PAST","UNKNOWN"]},"evidenceSummary":{"type":"string"},"confidence":{"type":"number","minimum":0,"maximum":1},"skillId":{"type":"string"}}}}}""",
+                    """{"type":"function","function":{"name":"relationship.createCandidate","description":"提出联系人关系候选，必须经用户确认后才写入。不同关系使用不同证据：同事和上下级需要公司全称与任职重叠；客户及合作方需要实际业务往来；同学需要共同学校经历；家人和伴侣以用户确认或亲属资料为准；生活服务看预约或订单；社群看共同成员记录；紧急联系人和授权代理必须由用户明确指定。长期不联系不能作为关系结束证据。","parameters":{"type":"object","additionalProperties":false,"required":["fromContactId","toContactId","relationType","temporalState","evidenceSummary"],"properties":{"fromContactId":{"type":"string"},"toContactId":{"type":"string"},"relationType":{"type":"string","enum":$RELATIONSHIP_TYPE_ENUM_JSON},"temporalState":{"type":"string","enum":["CURRENT","PAST","UNKNOWN"],"description":"必须符合所选关系类型的时间策略；同学、亲属等长期来源关系固定用 CURRENT"},"evidenceSummary":{"type":"string","description":"说明已核验的证据，不得用缺少当前工作阻塞非工作关系"},"confidence":{"type":"number","minimum":0,"maximum":1},"skillId":{"type":"string"}}}}}""",
                     4,
                 ),
                 RuntimeToolSpec(

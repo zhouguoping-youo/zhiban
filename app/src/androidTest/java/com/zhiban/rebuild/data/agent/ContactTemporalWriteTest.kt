@@ -197,4 +197,40 @@ class ContactTemporalWriteTest {
             database.close()
         }
     }
+
+    @Test
+    fun enduringRelationshipRejectsFalsePastState() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val database = Room.inMemoryDatabaseBuilder(context, AgentDatabase::class.java).build()
+        try {
+            val contacts = ContactAgentDataRepository(database)
+            val relationships = RelationshipAgentDataRepository(database)
+            val contactId = contacts.saveUserContact(
+                contactId = null,
+                displayName = "大学同学",
+                phone = null,
+                wechatId = null,
+                company = null,
+                title = null,
+                tag = null,
+                note = null,
+                nowEpochMs = 10,
+            )
+
+            val failure = runCatching {
+                relationships.saveConfirmedRelationship(
+                    com.zhiban.rebuild.data.contact.RelationshipPersonIds.SELF,
+                    contactId,
+                    "CLASSMATE",
+                    "PAST",
+                    100,
+                )
+            }.exceptionOrNull()
+
+            assertEquals("关系时间状态与关系类型不匹配", failure?.message)
+            assertEquals(0, database.relationshipEdgeDao().touching(listOf(contactId), 10).size)
+        } finally {
+            database.close()
+        }
+    }
 }

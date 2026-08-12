@@ -332,6 +332,9 @@ fun RelationTab(
         historicalRelationshipEdges(temporalRelationships)
     }
     val maintenanceCount = maintenanceOverview.needsAttentionCount + unresolvedSourceIdentities.size
+    val selectedRelationshipGroup = remember(tag) {
+        RelationshipGroup.entries.firstOrNull { it.displayName == tag }
+    }
     val visible = remember(contacts, graphRelationships, query, tag) {
         contacts.filter { contact ->
             val matchesQuery = query.isBlank() || listOf(
@@ -610,6 +613,7 @@ fun RelationTab(
                         events = relationshipEvents,
                         canAddRelationship = contacts.isNotEmpty(),
                         activeFilter = tag.takeUnless { it == "全部" } ?: query.takeIf(String::isNotBlank),
+                        activeGroup = selectedRelationshipGroup,
                         onAdd = { showRelationEditor = true },
                         onInspect = { selectedEdge = it },
                         onInspectEvent = { selectedEvent = it },

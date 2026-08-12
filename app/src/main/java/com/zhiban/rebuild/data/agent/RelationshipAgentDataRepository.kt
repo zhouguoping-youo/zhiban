@@ -79,8 +79,8 @@ internal class RelationshipAgentDataRepository(private val database: AgentDataba
         nowEpochMs: Long = System.currentTimeMillis(),
     ): String = database.withTransaction {
         require(fromContactId != toContactId) { "请选择两个不同的联系人" }
-        require(temporalState in setOf("CURRENT", "PAST", "UNKNOWN")) { "关系时间状态无效" }
         require(relationType in RelationshipTaxonomy.selectableCodes) { "关系类型无效" }
+        RelationshipTaxonomy.requireAllowedTemporalState(relationType, temporalState)
         require(
             fromContactId == RelationshipPersonIds.SELF ||
                 database.contactDao().findById(fromContactId) != null,

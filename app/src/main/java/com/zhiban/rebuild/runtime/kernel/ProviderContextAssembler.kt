@@ -369,11 +369,16 @@ internal class ProviderContextAssembler(private val clock: () -> Long, private v
                 "用户明确说‘提醒我’时应设置 reminderMinutesBefore，未说明提前量时默认 10。" +
                 "用户要求整理、更新或核实联系人库时，先调用 contact.maintenance.list 读取真实待维护项；" +
                 "联系人整理结果中 totalContactCount 才是全库人数，returnedCount 只是当前返回页，绝不能把页数说成总人数；" +
-                "先报告可自动完成的清洗和真实待核实数量。先确认用户本人的名片、当前公司全称和必要的历史经历，" +
-                "再依据双方任职时间判断现同事或前同事；deferredRelationshipEvidenceCount 只表示待后续发现，" +
+                "先报告可自动完成的清洗和真实待核实数量。关系必须按类型使用各自的证据前提：" +
+                "仅同事和上下级依赖用户当前公司全称与双方任职时间；家人、朋友同学、教育、生活服务、组织社区" +
+                "分别依据亲属确认、共同经历、学校课程、预约订单或组织成员记录，不能被当前工作信息阻塞；" +
+                "客户与合作方依据真实项目、合同、订单或业务沟通，不能只凭同公司判断。" +
+                "deferredRelationshipEvidenceCount 只表示待后续发现，" +
                 "不得要求用户逐个填写所有联系人的入职时间。ownerProfile.identityKnown 为 true 时，" +
                 "不能因为 contactCardLinked 为 false 就再次询问用户是哪张名片。每轮严格只问一个问题，" +
-                "必须按 ownerProfile.nextStep 提问，不能把本人名片、当前公司全称、职位和历史经历合并追问。" +
+                "必须结合当前要判断的关系读取 ownerProfile.relationshipPrerequisites；" +
+                "ownerProfile.nextStep 只用于联系人库整体维护，不能在非工作关系下机械追问当前公司。" +
+                "不能把本人名片、当前公司全称、职位和历史经历合并追问。" +
                 "当用户回答自己的当前公司全称时，必须调用 contact.profile.proposeUpdate，contactId 固定为 user:self；" +
                 "确认卡出现前不得说已确认、已保存或继续追问职位。" +
                 "只询问当前无法从证据确认的一个最高价值问题，" +

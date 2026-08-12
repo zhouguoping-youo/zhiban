@@ -364,14 +364,12 @@ internal class RoomApprovalStore(
             put("fromContactId", call.fromContactId)
             put("toContactId", call.toContactId)
             put("relationType", call.relationType)
+            put("evidenceBasis", call.evidenceBasis)
             put("evidenceDigest", call.evidenceDigest)
             put("confidence", call.confidence)
             put("temporalState", call.temporalState)
             call.skillId?.let { put("skillId", it) }
-            put(
-                "title",
-                "确认${if (call.temporalState == "PAST") "过往" else "当前"}联系人关系：${call.relationType}",
-            )
+            put("title", "确认联系人关系：${com.zhiban.rebuild.relationship.RelationshipTaxonomy.displayName(call.relationType)}")
         }.toString()
         requestToolApprovalInTransaction(
             payload,

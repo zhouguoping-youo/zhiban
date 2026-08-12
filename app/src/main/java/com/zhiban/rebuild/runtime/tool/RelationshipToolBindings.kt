@@ -179,7 +179,15 @@ internal class RelationshipCreateCandidateToolBinding(
     override suspend fun requestApproval(request: RuntimeToolCallRequest, context: RuntimeToolRouteContext): Boolean {
         val args = parseToolArgs(
             request.argumentsJson,
-            setOf("fromContactId", "toContactId", "relationType", "temporalState", "evidenceSummary", "confidence", "skillId"),
+            setOf(
+                "fromContactId",
+                "toContactId",
+                "relationType",
+                "temporalState",
+                "evidenceSummary",
+                "confidence",
+                "skillId",
+            ),
         ) { throw IllegalArgumentException("INVALID_TOOL_ARGUMENTS") }
         fun required(name: String, max: Int) = args[name]?.jsonPrimitive?.content?.trim()
             ?.takeIf { it.isNotBlank() && it.length <= max } ?: throw IllegalArgumentException("INVALID_TOOL_ARGUMENTS")
@@ -189,7 +197,9 @@ internal class RelationshipCreateCandidateToolBinding(
         val relation = required("relationType", 40)
         require(relation in ALLOWED_RELATIONS) { "INVALID_TOOL_ARGUMENTS" }
         val temporalState = args["temporalState"]?.jsonPrimitive?.content ?: "CURRENT"
-        require(temporalState in ALLOWED_TEMPORAL_STATES) { "INVALID_TOOL_ARGUMENTS" }
+        runCatching { RelationshipTaxonomy.requireAllowedTemporalState(relation, temporalState) }
+            .getOrElse { throw IllegalArgumentException("INVALID_TOOL_ARGUMENTS") }
+        val evidenceBasis = RelationshipTaxonomy.evidencePolicy(relation).basis.name
         val evidence = required("evidenceSummary", 1_000)
         val confidence = args["confidence"]?.jsonPrimitive?.content?.toDoubleOrNull() ?: 0.7
         require(confidence in 0.0..1.0) { "INVALID_TOOL_ARGUMENTS" }
@@ -201,6 +211,7 @@ internal class RelationshipCreateCandidateToolBinding(
                 put("toContactId", to)
                 put("relationType", relation)
                 put("temporalState", temporalState)
+                put("evidenceBasis", evidenceBasis)
                 put("evidenceDigest", sha256(evidence))
                 put("confidence", confidence)
                 skillId?.let { put("skillId", it) }
@@ -222,7 +233,7 @@ internal class RelationshipCreateCandidateToolBinding(
             canonicalInputDigest = digest,
             idempotencyKey = envelope.idempotencyKey,
             edgeId = "edge-${sha256("${context.runId}:${request.providerCallId}:$digest").take(24)}",
-            fromContactId = from, toContactId = to, relationType = relation,
+            fromContactId = from, toContactId = to, relationType = relation, evidenceBasis = evidenceBasis,
             evidenceDigest = sha256(evidence), confidence = confidence, skillId = skillId,
             temporalState = temporalState,
         )
@@ -240,10 +251,16 @@ internal class RelationshipCreateCandidateToolBinding(
     override suspend fun executeApproved(planJson: String, context: ConfirmedToolExecutionContext): RoutedToolResult {
         val value = parseToolArgs(planJson, null) { IllegalArgumentException("INVALID_TOOL_CALL") }
         fun required(name: String) = value[name]?.jsonPrimitive?.content ?: error("INVALID_TOOL_CALL")
+        val relationType = required("relationType")
+        // Plans persisted before evidenceBasis was introduced remain executable after an upgrade.
+        // New requests still have to provide and validate the explicit basis in requestApproval().
+        val evidenceBasis = value["evidenceBasis"]?.jsonPrimitive?.content
+            ?: RelationshipTaxonomy.evidencePolicy(relationType).basis.name
         val call = RelationshipCandidateCall(
             required("providerCallId"), required("logicalStepId"), required("proposalId"), required("payloadRef"),
             required("revision").toLong(), required("canonicalInputDigest"), required("idempotencyKey"),
-            required("edgeId"), required("fromContactId"), required("toContactId"), required("relationType"),
+            required("edgeId"), required("fromContactId"), required("toContactId"), relationType,
+            evidenceBasis,
             required("evidenceDigest"), required("confidence").toDouble(), value["skillId"]?.jsonPrimitive?.content,
             required("temporalState"),
         )
@@ -257,7 +274,6 @@ internal class RelationshipCreateCandidateToolBinding(
 
     private companion object {
         val ALLOWED_RELATIONS = RelationshipTaxonomy.selectableCodes
-        val ALLOWED_TEMPORAL_STATES = setOf("CURRENT", "PAST", "UNKNOWN")
     }
 }
 
