@@ -1,6 +1,9 @@
 package com.zhiban.rebuild.runtime.provider
 
 import com.zhiban.rebuild.runtime.runSuspendCatching
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import javax.net.ssl.SSLPeerUnverifiedException
 
 data class ProviderHealth(val available: Boolean, val checkedAtEpochMs: Long, val capability: CapabilitySnapshot?, val safeFailureCode: String?)
 
@@ -63,8 +66,15 @@ class ProviderEnvironmentManager(
         return ProviderHealth(true, checkedAt, capability, null)
     }
 
-    private fun safeFailureCode(failure: Throwable): String = when (failure) {
-        is ProviderFailure -> failure.code
-        else -> "PROVIDER_UNAVAILABLE"
+    private fun safeFailureCode(failure: Throwable): String = safeConfigurationFailureCode(failure)
+
+    companion object {
+        fun safeConfigurationFailureCode(failure: Throwable): String = when (failure) {
+            is ProviderFailure -> failure.code
+            is UnknownHostException -> "NETWORK_OFFLINE"
+            is SocketTimeoutException -> "TIMEOUT"
+            is SSLPeerUnverifiedException -> "TLS_VERIFICATION_FAILED"
+            else -> "PROVIDER_UNAVAILABLE"
+        }
     }
 }

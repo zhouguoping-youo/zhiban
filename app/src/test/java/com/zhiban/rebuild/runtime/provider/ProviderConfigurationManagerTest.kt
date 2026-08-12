@@ -1,5 +1,7 @@
 package com.zhiban.rebuild.runtime.provider
 
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -8,6 +10,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProviderConfigurationManagerTest {
+    @Test fun `configuration failure codes distinguish offline timeout and provider failures`() {
+        assertEquals("NETWORK_OFFLINE", ProviderEnvironmentManager.safeConfigurationFailureCode(UnknownHostException()))
+        assertEquals("TIMEOUT", ProviderEnvironmentManager.safeConfigurationFailureCode(SocketTimeoutException()))
+        assertEquals(
+            "AUTHENTICATION_FAILED",
+            ProviderEnvironmentManager.safeConfigurationFailureCode(ProviderFailure("AUTHENTICATION_FAILED", false)),
+        )
+    }
+
     @Test fun `legacy and foreign providers are rejected by the agent boundary`() = runTest {
         val manager = ProviderConfigurationManager(FakeCredentialProvisioner(), FakeProviderProfileStore())
         listOf("minimax", "aliyun", "volc", "zhipu", "tencent").forEach { providerId ->

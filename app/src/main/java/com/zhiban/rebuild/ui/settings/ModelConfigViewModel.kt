@@ -142,11 +142,13 @@ class ModelConfigViewModel @Inject constructor(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (failure: Exception) {
                 _uiState.update {
                     it.copy(
                         isSaving = false,
-                        errorMessage = "保存失败，请检查配置后重试。",
+                        errorMessage = providerConfigurationFailureMessage(
+                            ProviderEnvironmentManager.safeConfigurationFailureCode(failure),
+                        ),
                     )
                 }
             }
@@ -176,4 +178,15 @@ class ModelConfigViewModel @Inject constructor(
             }
         }
     }
+}
+
+internal fun providerConfigurationFailureMessage(code: String): String = when (code) {
+    "AUTHENTICATION_FAILED" -> "API Key 无效或已失效，请检查后重试。"
+    "INSUFFICIENT_QUOTA" -> "阶跃星辰账户额度不足，请检查服务商账户。"
+    "MODEL_NOT_AVAILABLE" -> "当前模型暂不可用，请稍后重试。"
+    "NETWORK_OFFLINE" -> "当前设备无法连接网络，请检查网络或 DNS 后重试。"
+    "TIMEOUT" -> "连接超时，请切换网络后重试。"
+    "TLS_VERIFICATION_FAILED" -> "安全连接验证失败，请检查网络环境或更新知伴。"
+    "RATE_LIMITED" -> "请求较多，请稍后重试。"
+    else -> "暂时无法连接 AI 服务，请稍后重试。"
 }
