@@ -80,6 +80,45 @@ class AgentRuntimeProjectionControllerTest {
     }
 
     @Test
+    fun `late older event cannot regress a completed run to executing`() = runTest {
+        val client = FakeRuntimeUiClient(
+            SessionProjection(
+                sessionId = "session-1",
+                runId = "run-1",
+                lastAppliedSequence = 7,
+                revision = 7,
+                runStatus = RuntimeRunStatus.EXECUTING,
+            ),
+        )
+        val controller = AgentRuntimeProjectionController(client, "session-1", "compose", this)
+        controller.initialize()
+        runCurrent()
+        client.events.emit(
+            RuntimeUiEvent.RunStatusChanged(
+                "session-1",
+                "run-1",
+                sequence = 9,
+                revision = 9,
+                status = RuntimeRunStatus.SUCCEEDED,
+            ),
+        )
+        client.events.emit(
+            RuntimeUiEvent.RunStatusChanged(
+                "session-1",
+                "run-1",
+                sequence = 8,
+                revision = 8,
+                status = RuntimeRunStatus.EXECUTING,
+            ),
+        )
+        runCurrent()
+
+        assertEquals(RuntimeRunStatus.SUCCEEDED, controller.projection.value.runStatus)
+        assertEquals(9L, controller.projection.value.lastAppliedSequence)
+        controller.close()
+    }
+
+    @Test
     fun `pending card resolves its redacted body from the staged candidate`() = runTest {
         // Live path: ApprovalRequested carries no body (journal stays redacted), only an opaque
         // candidateId. The controller must fill the card's details from the staging area.

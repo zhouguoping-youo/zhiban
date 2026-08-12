@@ -39,8 +39,16 @@ class AgentRuntimeProjectionController(
                     val snapshot = normalizedSnapshot(client.getSessionProjection(sessionId))
                     mutableProjection.value = snapshot.withResolvedApprovalDetails()
                     client.observeSession(sessionId, snapshot.lastAppliedSequence).collect { event ->
-                        mutableProjection.value = reducer.reduce(mutableProjection.value, event)
-                            .withResolvedApprovalDetails()
+                        val current = mutableProjection.value
+                        // The durable journal can briefly contain a terminal event while the compact
+                        // snapshot still points at the preceding EXECUTING watermark. Once that
+                        // terminal event is reduced, never let an older/non-terminal event from a
+                        // delayed Room emission regress the live UI back to an un-cancellable
+                        // "正在完成操作" state.
+                        if (event.sequence > current.lastAppliedSequence) {
+                            mutableProjection.value = reducer.reduce(current, event)
+                                .withResolvedApprovalDetails()
+                        }
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled

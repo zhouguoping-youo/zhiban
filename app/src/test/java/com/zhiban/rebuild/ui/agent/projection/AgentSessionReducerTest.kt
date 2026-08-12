@@ -11,6 +11,47 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AgentSessionReducerTest {
+    @Test
+    fun `observation starts a fresh assistant response after tool execution`() {
+        val previous = SessionProjection(
+            sessionId = "session-1",
+            runId = "run-1",
+            lastAppliedSequence = 8,
+            revision = 8,
+            runStatus = RuntimeRunStatus.EXECUTING,
+            assistantText = "操作已完成。",
+            assistantFinal = true,
+            appliedDeltaOrdinals = setOf("attempt-plan:0"),
+        )
+
+        val observing = AgentSessionReducer().reduce(
+            previous,
+            RuntimeUiEvent.RunStatusChanged(
+                sessionId = "session-1",
+                runId = "run-1",
+                sequence = 9,
+                revision = 9,
+                status = RuntimeRunStatus.OBSERVING,
+            ),
+        )
+        val result = AgentSessionReducer().reduce(
+            observing,
+            RuntimeUiEvent.AssistantDelta(
+                sessionId = "session-1",
+                runId = "run-1",
+                attemptId = "attempt-observation",
+                ordinal = 0,
+                part = "已更新联系人关系。",
+                final = true,
+                sequence = 10,
+                revision = 10,
+            ),
+        )
+
+        assertEquals("已更新联系人关系。", result.assistantText)
+        assertEquals(setOf("attempt-observation:0"), result.appliedDeltaOrdinals)
+    }
+
     private val reducer = AgentSessionReducer()
 
     @Test

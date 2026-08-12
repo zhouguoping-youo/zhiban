@@ -24,27 +24,7 @@ class AgentSessionReducer {
         return when (event) {
             is RuntimeUiEvent.JournalAdvanced -> base
 
-            is RuntimeUiEvent.RunStatusChanged -> base.copy(
-                runStatus = event.status,
-                safeFailureCode = event.safeFailureCode,
-                // A terminal/non-confirmation transition ends the approval lifecycle. Clearing the
-                // pending approval keeps the confirmation card from lingering after the user has
-                // already confirmed/rejected/cancelled, or after the run failed.
-                pendingApproval = if (event.status == RuntimeRunStatus.AWAITING_CONFIRMATION) {
-                    base.pendingApproval
-                } else {
-                    null
-                },
-                // The transient confirmation body follows the same lifecycle as the card itself.
-                pendingDetails = if (event.status == RuntimeRunStatus.AWAITING_CONFIRMATION) {
-                    base.pendingDetails
-                } else {
-                    null
-                },
-                allowedActions =
-                    allowedActionsFor(event.status) +
-                        if (previous.undoAvailable) setOf(RuntimeAction.UNDO) else emptySet(),
-            )
+            is RuntimeUiEvent.RunStatusChanged -> applyRunStatusChanged(base, previous, event)
 
             is RuntimeUiEvent.AssistantDelta -> applyAssistantDelta(base, previous, event)
 
@@ -122,6 +102,25 @@ class AgentSessionReducer {
                 allowedActions = base.allowedActions - RuntimeAction.UNDO,
             )
         }
+    }
+
+    private fun applyRunStatusChanged(base: SessionProjection, previous: SessionProjection, event: RuntimeUiEvent.RunStatusChanged): SessionProjection {
+        val observing = event.status == RuntimeRunStatus.OBSERVING
+        val awaitingConfirmation = event.status == RuntimeRunStatus.AWAITING_CONFIRMATION
+        return base.copy(
+            runStatus = event.status,
+            safeFailureCode = event.safeFailureCode,
+            // Observation is a new assistant attempt after a tool has completed. Keeping the
+            // pre-tool stream here makes the live bubble concatenate planning/fallback text
+            // with the verified result, and the persisted final turn then appears a second time.
+            assistantText = if (observing) "" else base.assistantText,
+            assistantFinal = if (observing) false else base.assistantFinal,
+            appliedDeltaOrdinals = if (observing) emptySet() else base.appliedDeltaOrdinals,
+            pendingApproval = if (awaitingConfirmation) base.pendingApproval else null,
+            pendingDetails = if (awaitingConfirmation) base.pendingDetails else null,
+            allowedActions = allowedActionsFor(event.status) +
+                if (previous.undoAvailable) setOf(RuntimeAction.UNDO) else emptySet(),
+        )
     }
 
     private fun applyAssistantDelta(base: SessionProjection, previous: SessionProjection, event: RuntimeUiEvent.AssistantDelta): SessionProjection {

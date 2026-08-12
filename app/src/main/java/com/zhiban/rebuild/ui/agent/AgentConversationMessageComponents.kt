@@ -270,7 +270,7 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
                     }
                 }
             }
-            if (state.stage == AgentConversationStage.EXECUTING && !state.showPlan) {
+            if (state.stage == AgentConversationStage.EXECUTING && !state.showPlan && state.assistantMessage.isNullOrBlank()) {
                 item {
                     Column {
                         AssistantMessageBubble("知伴正在完成操作…")

@@ -75,6 +75,25 @@ class AgentConversationScreenE2ETest {
         assertEquals(1, cancellations.get())
     }
 
+    @Test fun completedObservationTextSuppressesStaleExecutingPlaceholder() {
+        compose.setContent {
+            ZhiBanTheme {
+                AgentConversationScreen(
+                    state = AgentConversationUiState(
+                        stage = AgentConversationStage.EXECUTING,
+                        assistantMessage = "操作已完成。",
+                        canCancel = true,
+                        inputEnabled = true,
+                    ),
+                )
+            }
+        }
+
+        compose.onNodeWithText("操作已完成。").assertIsDisplayed()
+        compose.onNodeWithText("知伴正在完成操作…").assertDoesNotExist()
+        compose.onNodeWithText("取消").assertDoesNotExist()
+    }
+
     @Test fun completedReplyActionsAreCompactWithoutDuplicateLongPressMenu() {
         val state = AgentConversationUiState(
             stage = AgentConversationStage.SUCCEEDED,

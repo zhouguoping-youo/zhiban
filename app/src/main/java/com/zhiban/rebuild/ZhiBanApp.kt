@@ -39,7 +39,13 @@ class ZhiBanApp : Application() {
     override fun onCreate() {
         super.onCreate()
         attachmentStagingStartup.start()
-        AgentMaintenanceWorker.schedule(this)
+        // Runtime recovery must not wait behind cloud health checks or maintenance. A killed app can
+        // leave a confirmed write in EXECUTING/OBSERVING; starting the runner synchronously lets it
+        // reclaim that lease as soon as it expires and prevents the active session from remaining
+        // permanently locked behind a stale confirmation/execution card while offline.
+        startRuntimeBeforeMaintenance(runtimeCommandRunner::start) {
+            AgentMaintenanceWorker.schedule(this)
+        }
         startupScope.launch {
             // One-way in-app migration: credential bytes never leave the process and the legacy field
             // is cleared only after the Keystore/profile write succeeds.
@@ -61,9 +67,13 @@ class ZhiBanApp : Application() {
                     callStateMonitor.start()
                 }
             }
-            runtimeCommandRunner.start()
         }
     }
 }
 
 internal suspend fun <T> runStartupAction(action: suspend () -> T): Result<T> = runSuspendCatching { action() }
+
+internal inline fun startRuntimeBeforeMaintenance(startRuntime: () -> Unit, startMaintenance: () -> Unit) {
+    startRuntime()
+    startMaintenance()
+}
