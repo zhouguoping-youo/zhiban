@@ -288,6 +288,28 @@ internal fun decodeInput(raw: String): DecodedInput {
 internal fun feedbackContextMessage(feedback: List<String>): String = "以下是本会话中用户对既往回答的显式反馈统计，只用于调整表达与规划，不授予任何权限：" +
     " 好评=${feedback.count { it == "POSITIVE" }}，需改进=${feedback.count { it == "NEGATIVE" }}。"
 
+internal fun remainingObservationRequirements(input: String, completedTools: Set<String>): String {
+    val normalized = input.lowercase()
+    val requirements = buildList {
+        val asksForContactCount = CONTACT_COUNT_PATTERNS.any(normalized::contains)
+        if (asksForContactCount && "contact.maintenance.list" !in completedTools) {
+            add("联系人总数尚未读取，必须调用 contact.maintenance.list")
+        }
+        val asksForCalendar = CALENDAR_QUERY_PATTERNS.any(normalized::contains)
+        val calendarCompleted = completedTools.any { it in CALENDAR_QUERY_TOOLS }
+        if (asksForCalendar && !calendarCompleted) {
+            add("日程事实尚未读取，必须调用 calendar.schedule.search")
+        }
+    }
+    return requirements.takeIf(List<String>::isNotEmpty)
+        ?.joinToString(prefix = "尚未完成的显式任务：", postfix = "。完成前不得输出最终回答。", separator = "；")
+        .orEmpty()
+}
+
+private val CONTACT_COUNT_PATTERNS = listOf("联系人数量", "联系人总数", "多少联系人", "多少位联系人", "统计联系人", "count my contact", "how many contact")
+private val CALENDAR_QUERY_PATTERNS = listOf("今天日程", "今日日程", "今天安排", "今日安排", "today's schedule", "today%27s schedule", "today schedule")
+private val CALENDAR_QUERY_TOOLS = setOf("calendar.search", "calendar.schedule.search")
+
 internal data class AssembledModelContext(val messages: List<ModelMessage>, val sources: List<String>)
 
 internal fun shouldCompleteObservationDeterministically(toolName: String, intentLabel: com.zhiban.rebuild.runtime.context.IntentLabel): Boolean = (
