@@ -143,7 +143,7 @@ data class NotificationInsights(val schedule: ScheduleInsight? = null) {
 
 object NotificationInsightAnalyzer {
     private val actionWords = listOf(
-        "开会", "会议", "见面", "碰面", "拜访", "面试", "约", "安排",
+        "开会", "会议", "见面", "碰面", "拜访", "面试", "预约", "安排",
         "日程", "提醒", "参加", "集合", "出发", "回访", "电话沟通",
     )
     private val negativeWords = listOf("取消", "不用", "不去", "改天", "暂不", "无需")
@@ -156,7 +156,7 @@ object NotificationInsightAnalyzer {
         zoneId: ZoneId = ZoneId.systemDefault(),
     ): NotificationInsights {
         val normalized = text.replace(Regex("\\s+"), " ").trim()
-        if (normalized.isBlank() || actionWords.none(normalized::contains) || negativeWords.any(normalized::contains)) {
+        if (normalized.isBlank() || !hasSchedulingIntent(normalized) || negativeWords.any(normalized::contains)) {
             return NotificationInsights()
         }
         val date = resolveDate(normalized, postedAtEpochMs, zoneId) ?: return NotificationInsights()
@@ -174,6 +174,8 @@ object NotificationInsightAnalyzer {
         )
     }
 
+    private fun hasSchedulingIntent(text: String): Boolean = actionWords.any(text::contains) || APPOINTMENT_INTENT.containsMatchIn(text)
+
     private fun scheduleConfidence(text: String): Double = when {
         ABSOLUTE_DATE.containsMatchIn(text) -> 0.99
         listOf("今天", "明天", "后天").any(text::contains) -> 0.99
@@ -181,6 +183,8 @@ object NotificationInsightAnalyzer {
         WEEKDAY.containsMatchIn(text) -> 0.94
         else -> 0.92
     }
+
+    private val APPOINTMENT_INTENT = Regex("""(?<![合契条违续解简节制大纽特])约""")
 
     internal fun sanitizeScheduleTitle(rawText: String, source: String?): String = cleanScheduleTitle(rawText, source)
 

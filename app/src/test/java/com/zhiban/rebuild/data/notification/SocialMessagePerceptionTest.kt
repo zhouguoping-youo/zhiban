@@ -79,6 +79,32 @@ class SocialMessagePerceptionTest {
     }
 
     @Test
+    fun contractDeadlineWithoutSchedulingIntentIsNotMistakenForAnAppointment() {
+        val insights = NotificationInsightAnalyzer.analyze(
+            text = "明天下午3点这个合约到期",
+            senderName = "张三",
+            conversationTitle = "张三",
+            postedAtEpochMs = now,
+            zoneId = zone,
+        )
+
+        assertNull(insights.schedule)
+    }
+
+    @Test
+    fun explicitAppointmentStillProducesASchedule() {
+        val insights = NotificationInsightAnalyzer.analyze(
+            text = "明天下午3点约王经理吃饭",
+            senderName = "张三",
+            conversationTitle = "张三",
+            postedAtEpochMs = now,
+            zoneId = zone,
+        )
+
+        assertNotNull(insights.schedule)
+    }
+
+    @Test
     fun weekdayPhrasesKeepTheNearestOccurrenceMatrix() {
         val weekdayText = mapOf(
             DayOfWeek.MONDAY to "一",
