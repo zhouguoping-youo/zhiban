@@ -76,6 +76,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.zhiban.rebuild.data.agent.ScheduleProjection
+import com.zhiban.rebuild.data.agent.ScheduleStatus
 import com.zhiban.rebuild.data.calendar.SystemCalendarEvent
 import com.zhiban.rebuild.data.calendar.SystemCalendarWriteIntent
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
@@ -138,6 +139,7 @@ fun CalendarTab(
     var editing by remember { mutableStateOf<ScheduleProjection?>(null) }
     var showEditor by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<ScheduleProjection?>(null) }
+    var completing by remember { mutableStateOf<ScheduleProjection?>(null) }
     val schedules by viewModel.schedules.collectAsState()
     val messageScheduleCandidates by viewModel.messageScheduleCandidates.collectAsState()
     val importState by viewModel.importState.collectAsState()
@@ -294,6 +296,7 @@ fun CalendarTab(
                             showEditor = true
                         },
                         onDelete = { deleting = schedules[index] },
+                        onProgress = { completing = schedules[index] },
                     )
                     if (index != schedules.lastIndex) {
                         Box(Modifier.fillMaxWidth().padding(start = 70.dp).height(1.dp).background(CalendarLine))
@@ -307,6 +310,25 @@ fun CalendarTab(
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = ZhiBanTabBottomSpacer),
+        )
+    }
+    completing?.let { schedule ->
+        ScheduleCompletionDialog(
+            schedule = schedule,
+            onDismiss = { completing = null },
+            onComplete = { feedback ->
+                viewModel.complete(schedule.id, feedback) { completed ->
+                    completing = null
+                    showFeedback(if (completed) "已标记完成" else "日程已不存在")
+                }
+            },
+            onPostpone = {
+                viewModel.reopen(schedule.id) {
+                    completing = null
+                    editing = schedule.copy(status = ScheduleStatus.PENDING, outcomeNote = null, completedAtEpochMs = null)
+                    showEditor = true
+                }
+            },
         )
     }
 
@@ -778,7 +800,7 @@ internal fun MonthGrid(selected: LocalDate, onSelect: (LocalDate) -> Unit) {
 }
 
 @Composable
-private fun ScheduleRow(schedule: ScheduleProjection, onClick: () -> Unit, onDelete: () -> Unit) {
+private fun ScheduleRow(schedule: ScheduleProjection, onClick: () -> Unit, onDelete: () -> Unit, onProgress: () -> Unit) {
     val start = Instant.ofEpochMilli(schedule.startAtEpochMs).atZone(ZoneId.systemDefault()).toLocalTime()
     val end = start.plusMinutes(schedule.durationMinutes.toLong())
     Row(
@@ -792,6 +814,14 @@ private fun ScheduleRow(schedule: ScheduleProjection, onClick: () -> Unit, onDel
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
             )
+            val lifecycle = scheduleLifecycleLabel(schedule, System.currentTimeMillis())
+            TextButton(
+                onClick = onProgress,
+                modifier = Modifier.semantics { contentDescription = "${schedule.title}，$lifecycle" },
+                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
+            ) {
+                Text(lifecycle, color = if (schedule.status == ScheduleStatus.COMPLETED) CalendarMuted else CalendarAccent)
+            }
             Text(
                 end.format(DateFormats.Time),
                 color = CalendarMuted,
@@ -810,6 +840,10 @@ private fun ScheduleRow(schedule: ScheduleProjection, onClick: () -> Unit, onDel
             schedule.note?.takeIf(String::isNotBlank)?.let {
                 Spacer(Modifier.height(3.dp))
                 Text(it, color = CalendarMuted, style = MaterialTheme.typography.bodySmall, maxLines = 2)
+            }
+            schedule.outcomeNote?.takeIf(String::isNotBlank)?.let {
+                Spacer(Modifier.height(3.dp))
+                Text("结果：$it", color = CalendarMuted, style = MaterialTheme.typography.bodySmall, maxLines = 2)
             }
             Text(
                 buildString {
@@ -838,6 +872,12 @@ private fun ScheduleRow(schedule: ScheduleProjection, onClick: () -> Unit, onDel
             )
         }
     }
+}
+
+internal fun scheduleLifecycleLabel(schedule: ScheduleProjection, nowEpochMs: Long): String = when {
+    schedule.status == ScheduleStatus.COMPLETED -> "已完成"
+    schedule.startAtEpochMs + schedule.durationMinutes * 60_000L < nowEpochMs -> "待反馈"
+    else -> "完成或延期"
 }
 
 @Composable

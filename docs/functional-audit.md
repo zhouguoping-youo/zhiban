@@ -19,7 +19,8 @@
 | 1.8 | 重复导入去重 | ⚪无法复现 | 未发现重复：第二次导入显示“10 条已更新”，没有新增副本 | 对同一批 10 条系统日历事件连续导入两次 | — | — | — | `AgentDataRepositoryTest.confirmedSystemCalendarImportIsIdempotent`；`CalendarPersistenceEdgeTest.duplicateSystemCalendarInstancesInOneImportAreStoredOnce` | 2026-08-13 真机验证通过 |
 | 1.9 | 改期后旧提醒失效 | ⚪无法复现 | 未发现功能问题：同一日程改期后，旧唯一任务被替换，新任务按新时间重新计算延迟 | 将 `AUDIT_CROSS_001` 设为 2026-08-14 13:30、提前 1 天；记录任务后改为 14:30，再检查 WorkManager | — | — | — | `ScheduleReminderSchedulerTest.reschedulingSameScheduleReplacesOldReminder`；`ScheduleReminderWorkerTest.staleWorkerDoesNotNotify` | 2026-08-13 真机验证通过：唯一任务名不变，任务 ID `dd33…`→`4a4a…`，延迟约 34.6 分钟→94.2 分钟，旧任务已移除 |
 | 1.10 | CRM 下一步动作联动 | — | 尚未实测 | — | — | — | — | — | — |
-| 1.11 | 消息日程误识别 | ✅已修复 | 含日期时间的普通“合约到期”消息被当作“约见”日程候选 | 用通知感知输入“明天下午3点这个合约到期” | 功能不可用 | 日程动作词把单字“约”作为任意子串匹配，命中“合约” | 待提交 | `SocialMessagePerceptionTest.contractDeadlineWithoutSchedulingIntentIsNotMistakenForAnAppointment`；`explicitAppointmentStillProducesASchedule` | 修复包待真机复验 |
+| 1.11 | 消息日程误识别 | ✅已修复 | 含日期时间的普通“合约到期”消息被当作“约见”日程候选 | 用通知感知输入“明天下午3点这个合约到期” | 功能不可用 | 日程动作词把单字“约”作为任意子串匹配，命中“合约” | `a2773e5` | `SocialMessagePerceptionTest.contractDeadlineWithoutSchedulingIntentIsNotMistakenForAnAppointment`；`explicitAppointmentStillProducesASchedule` | 修复包待真机复验 |
+| 1.12 | 日程完成、延期与结果反馈 | ✅已修复 | 日程到期后没有待反馈状态，也不能记录完成结果或延期，用户无法闭环安排 | 创建一个日程，等待到期后查看日历；尝试记录结果或改期 | 功能不可用 | `ScheduleEntity` 只有时间、标题和备注，没有生命周期与结果字段；日历行只有编辑、删除 | 本提交 | `ScheduleLifecycleMigrationTest.existingSchedulesRemainPendingAfterLifecycleMigration`；`CalendarPersistenceEdgeTest.completionStoresFeedbackAndReschedulingReopensTheSchedule`；`ScheduleLifecycleLabelTest` | 2026-08-13 真机验证：数据库 37→38 与持久化 5/5 通过；新建 `AUDIT_LIFECYCLE` 后可打开“更新进展”，键盘反馈 `AUDIT_DONE` 持久化并显示“已完成 / 结果：AUDIT_DONE”；语音入口可启动系统识别器；延期进入原日程改期页 |
 
 ## 2. 关系 TAB
 

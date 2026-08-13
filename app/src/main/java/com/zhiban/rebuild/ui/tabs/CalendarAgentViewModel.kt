@@ -109,6 +109,14 @@ class CalendarAgentViewModel @Inject constructor(
         }
     }
 
+    fun complete(scheduleId: String, outcomeNote: String?, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch { onDone(repository.completeSchedule(scheduleId, outcomeNote)) }
+    }
+
+    fun reopen(scheduleId: String, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch { onDone(repository.reopenSchedule(scheduleId)) }
+    }
+
     fun loadSystemCalendar() {
         if (mutableImportState.value.isLoading) return
         viewModelScope.launch {

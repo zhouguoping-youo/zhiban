@@ -742,6 +742,10 @@ class AgentDataRepository internal constructor(
 
     fun observeSchedules(fromEpochMs: Long, toEpochMs: Long): Flow<List<ScheduleProjection>> = calendar.observeSchedules(fromEpochMs, toEpochMs)
     suspend fun findSchedule(scheduleId: String): ScheduleEntity? = calendar.findSchedule(scheduleId)
+
+    suspend fun completeSchedule(scheduleId: String, outcomeNote: String?): Boolean = calendar.completeSchedule(scheduleId, outcomeNote)
+
+    suspend fun reopenSchedule(scheduleId: String): Boolean = calendar.reopenSchedule(scheduleId)
     suspend fun saveUserSchedule(
         scheduleId: String?,
         title: String,

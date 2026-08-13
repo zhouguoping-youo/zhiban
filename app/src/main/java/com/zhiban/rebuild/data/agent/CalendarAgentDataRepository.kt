@@ -99,12 +99,35 @@ internal class CalendarAgentDataRepository(private val database: AgentDatabase) 
             createdByRuntimeAttemptId = existing?.createdByRuntimeAttemptId,
             createdAtEpochMs = existing?.createdAtEpochMs ?: nowEpochMs,
             updatedAtEpochMs = nowEpochMs,
+            status = if (existing != null && existing.startAtEpochMs != startAtEpochMs) {
+                ScheduleStatus.PENDING
+            } else {
+                existing?.status ?: ScheduleStatus.PENDING
+            },
+            outcomeNote = if (existing != null && existing.startAtEpochMs != startAtEpochMs) null else existing?.outcomeNote,
+            completedAtEpochMs = if (existing != null && existing.startAtEpochMs != startAtEpochMs) null else existing?.completedAtEpochMs,
         )
         if (existing == null) schedules.insert(value) else check(schedules.update(value) == 1)
         return id
     }
 
     suspend fun deleteSchedule(scheduleId: String): Boolean = schedules.deleteById(scheduleId) == 1
+
+    suspend fun completeSchedule(scheduleId: String, outcomeNote: String?, nowEpochMs: Long = System.currentTimeMillis()): Boolean = schedules.updateCompletion(
+        id = scheduleId,
+        status = ScheduleStatus.COMPLETED,
+        outcomeNote = outcomeNote?.trim()?.take(1_000)?.takeIf(String::isNotBlank),
+        completedAtEpochMs = nowEpochMs,
+        nowEpochMs = nowEpochMs,
+    ) == 1
+
+    suspend fun reopenSchedule(scheduleId: String, nowEpochMs: Long = System.currentTimeMillis()): Boolean = schedules.updateCompletion(
+        id = scheduleId,
+        status = ScheduleStatus.PENDING,
+        outcomeNote = null,
+        completedAtEpochMs = null,
+        nowEpochMs = nowEpochMs,
+    ) == 1
 
     suspend fun importConfirmedSystemCalendarEvents(events: List<SystemCalendarEvent>, nowEpochMs: Long = System.currentTimeMillis()): CalendarImportSummary =
         database.withTransaction {
@@ -136,6 +159,9 @@ internal class CalendarAgentDataRepository(private val database: AgentDatabase) 
                     createdByRuntimeAttemptId = null,
                     createdAtEpochMs = existing?.createdAtEpochMs ?: nowEpochMs,
                     updatedAtEpochMs = nowEpochMs,
+                    status = existing?.status ?: ScheduleStatus.PENDING,
+                    outcomeNote = existing?.outcomeNote,
+                    completedAtEpochMs = existing?.completedAtEpochMs,
                 )
                 if (existing == null) {
                     schedules.insert(value)

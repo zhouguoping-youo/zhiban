@@ -33,6 +33,9 @@ data class ScheduleEntity(
     val createdAtEpochMs: Long,
     val updatedAtEpochMs: Long,
     val reminderMinutesBefore: Int? = null,
+    val status: String = ScheduleStatus.PENDING,
+    val outcomeNote: String? = null,
+    val completedAtEpochMs: Long? = null,
 )
 
 data class ScheduleProjection(
@@ -42,7 +45,15 @@ data class ScheduleProjection(
     val durationMinutes: Int,
     val note: String?,
     val reminderMinutesBefore: Int? = null,
+    val status: String = ScheduleStatus.PENDING,
+    val outcomeNote: String? = null,
+    val completedAtEpochMs: Long? = null,
 )
+
+object ScheduleStatus {
+    const val PENDING = "PENDING"
+    const val COMPLETED = "COMPLETED"
+}
 
 @Entity(tableName = "agent_runs", indices = [Index("expiresAtEpochMs")])
 data class AgentRunEntity(

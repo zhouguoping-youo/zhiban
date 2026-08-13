@@ -65,6 +65,22 @@ class CalendarPersistenceEdgeTest {
         assertEquals("重复会议", db.scheduleDao().findById("system-calendar-42:1000")?.title)
     }
 
+    @Test fun completionStoresFeedbackAndReschedulingReopensTheSchedule() = runBlocking {
+        val scheduleId = calendar.saveUserSchedule(null, "回访客户", 1_000_000L, 30, null, null, nowEpochMs = 1L)
+
+        assertTrue(calendar.completeSchedule(scheduleId, "客户确认下周给答复", nowEpochMs = 2L))
+        val completed = requireNotNull(calendar.findSchedule(scheduleId))
+        assertEquals(ScheduleStatus.COMPLETED, completed.status)
+        assertEquals("客户确认下周给答复", completed.outcomeNote)
+        assertEquals(2L, completed.completedAtEpochMs)
+
+        calendar.saveUserSchedule(scheduleId, completed.title, 2_000_000L, 30, null, null, nowEpochMs = 3L)
+        val postponed = requireNotNull(calendar.findSchedule(scheduleId))
+        assertEquals(ScheduleStatus.PENDING, postponed.status)
+        assertNull(postponed.outcomeNote)
+        assertNull(postponed.completedAtEpochMs)
+    }
+
     private fun opportunity() = CrmOpportunityEntity(
         OPPORTUNITY_ID, "历史商机", "客户公司", null, null, CrmOpportunityStage.QUALIFIED,
         CrmRecordStatus.OPEN, null, "CNY", 45, null, null, null, null, "USER_CONFIRMED", 1, 1,

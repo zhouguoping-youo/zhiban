@@ -120,7 +120,7 @@ const val AGENT_DATABASE_FILE_NAME = "zhiban-agent.db"
         EventPlanEntity::class,
         EventPlanParticipantEntity::class,
     ],
-    version = 37,
+    version = 38,
     exportSchema = true,
 )
 internal abstract class AgentDatabase : RoomDatabase() {
@@ -196,6 +196,7 @@ internal abstract class AgentDatabase : RoomDatabase() {
         val MIGRATION_34_35 = AgentDatabaseSchema.MIGRATION_34_35
         val MIGRATION_35_36 = AgentDatabaseSchema.MIGRATION_35_36
         val MIGRATION_36_37 = AgentDatabaseSchema.MIGRATION_36_37
+        val MIGRATION_37_38 = AgentDatabaseSchema.MIGRATION_37_38
         val CALLBACK = AgentDatabaseSchema.CALLBACK
     }
 }

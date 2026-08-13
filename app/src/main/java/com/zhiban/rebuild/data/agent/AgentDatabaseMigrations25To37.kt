@@ -4,7 +4,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.zhiban.rebuild.data.contact.normalizeContactPhone
 
-/** Current schema steps 25 through 37. */
+/** Current schema steps 25 through 38. */
 internal object AgentDatabaseMigrations25To37 {
     val MIGRATION_25_26 = object : Migration(25, 26) {
         override fun migrate(db: SupportSQLiteDatabase) {
@@ -530,6 +530,17 @@ internal object AgentDatabaseMigrations25To37 {
                 "state" to false,
                 "createdAtEpochMs" to false,
             )
+        }
+    }
+
+    val MIGRATION_37_38 = object : Migration(37, 38) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // CALLBACK owns this partial index, so Room's schema model cannot declare it.
+            // Remove an existing install's copy before validation; CALLBACK.onOpen restores it.
+            db.execSQL("DROP INDEX IF EXISTS `index_plan_runs_single_active_per_definition`")
+            db.execSQL("ALTER TABLE `schedules` ADD COLUMN `status` TEXT NOT NULL DEFAULT 'PENDING'")
+            db.execSQL("ALTER TABLE `schedules` ADD COLUMN `outcomeNote` TEXT")
+            db.execSQL("ALTER TABLE `schedules` ADD COLUMN `completedAtEpochMs` INTEGER")
         }
     }
 }

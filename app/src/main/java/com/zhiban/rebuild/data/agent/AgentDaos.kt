@@ -19,7 +19,7 @@ interface ScheduleDao {
     suspend fun findByRunId(runId: String): List<ScheduleEntity>
 
     @Query(
-        """SELECT id, title, startAtEpochMs, durationMinutes, note, reminderMinutesBefore FROM schedules
+        """SELECT id, title, startAtEpochMs, durationMinutes, note, reminderMinutesBefore, status, outcomeNote, completedAtEpochMs FROM schedules
            WHERE startAtEpochMs <= :toEpochMs
              AND (startAtEpochMs + durationMinutes * 60000) > :fromEpochMs
            ORDER BY startAtEpochMs""",
@@ -27,7 +27,7 @@ interface ScheduleDao {
     fun observeRange(fromEpochMs: Long, toEpochMs: Long): Flow<List<ScheduleProjection>>
 
     @Query(
-        """SELECT id, title, startAtEpochMs, durationMinutes, note, reminderMinutesBefore FROM schedules
+        """SELECT id, title, startAtEpochMs, durationMinutes, note, reminderMinutesBefore, status, outcomeNote, completedAtEpochMs FROM schedules
            WHERE startAtEpochMs <= :toEpochMs
              AND (startAtEpochMs + durationMinutes * 60000) > :fromEpochMs
            ORDER BY startAtEpochMs LIMIT :limit""",
@@ -35,7 +35,7 @@ interface ScheduleDao {
     suspend fun listRange(fromEpochMs: Long, toEpochMs: Long, limit: Int): List<ScheduleProjection>
 
     @Query(
-        """SELECT id, title, startAtEpochMs, durationMinutes, note, reminderMinutesBefore FROM schedules
+        """SELECT id, title, startAtEpochMs, durationMinutes, note, reminderMinutesBefore, status, outcomeNote, completedAtEpochMs FROM schedules
            WHERE startAtEpochMs <= :toEpochMs
              AND (startAtEpochMs + durationMinutes * 60000) > :fromEpochMs
              AND (:query = '' OR title LIKE '%' || :query || '%' OR note LIKE '%' || :query || '%')
@@ -44,7 +44,7 @@ interface ScheduleDao {
     suspend fun searchRange(query: String, fromEpochMs: Long, toEpochMs: Long, limit: Int): List<ScheduleProjection>
 
     @Query(
-        """SELECT id, title, startAtEpochMs, durationMinutes, note, reminderMinutesBefore FROM schedules
+        """SELECT id, title, startAtEpochMs, durationMinutes, note, reminderMinutesBefore, status, outcomeNote, completedAtEpochMs FROM schedules
         WHERE startAtEpochMs < :endEpochMs
           AND (startAtEpochMs + durationMinutes * 60000) > :startEpochMs
           AND (:excludeId IS NULL OR id != :excludeId)
@@ -54,6 +54,13 @@ interface ScheduleDao {
 
     @Query("SELECT * FROM schedules WHERE id = :id")
     suspend fun findById(id: String): ScheduleEntity?
+
+    @Query(
+        """UPDATE schedules SET status = :status, outcomeNote = :outcomeNote,
+           completedAtEpochMs = :completedAtEpochMs, updatedAtEpochMs = :nowEpochMs
+           WHERE id = :id""",
+    )
+    suspend fun updateCompletion(id: String, status: String, outcomeNote: String?, completedAtEpochMs: Long?, nowEpochMs: Long): Int
 
     @Query("SELECT COUNT(*) FROM schedules")
     suspend fun count(): Int

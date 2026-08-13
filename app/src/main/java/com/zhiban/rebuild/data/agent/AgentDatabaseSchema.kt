@@ -38,5 +38,6 @@ internal object AgentDatabaseSchema {
     val MIGRATION_34_35 = AgentDatabaseMigrations25To37.MIGRATION_34_35
     val MIGRATION_35_36 = AgentDatabaseMigrations25To37.MIGRATION_35_36
     val MIGRATION_36_37 = AgentDatabaseMigrations25To37.MIGRATION_36_37
+    val MIGRATION_37_38 = AgentDatabaseMigrations25To37.MIGRATION_37_38
     val CALLBACK = AGENT_DATABASE_CALLBACK
 }

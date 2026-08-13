@@ -109,6 +109,7 @@ class CalendarSearchToolBindingTest {
                 it.startAtEpochMs + it.durationMinutes * 60_000L > startEpochMs
         }.take(limit)
         override suspend fun findById(id: String): ScheduleEntity? = null
+        override suspend fun updateCompletion(id: String, status: String, outcomeNote: String?, completedAtEpochMs: Long?, nowEpochMs: Long): Int = 0
         override suspend fun count(): Int = rows.size
         override suspend fun listPageForExport(limit: Int, offset: Int) = emptyList<ScheduleEntity>()
         override suspend fun deleteById(id: String): Int = 0
