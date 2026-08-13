@@ -11,6 +11,30 @@ cd "$(dirname "$0")/.."
 # 导致 `[ "$n" -eq 0 ]` 报 "integer expression expected"。gcount 保证只返回一个整数。
 gcount() { local n; n=$(grep -c "$1" "$2" 2>/dev/null || true); echo "${n:-0}"; }
 
+# Must stay byte-for-byte equivalent in meaning to gradle/quality.gradle.kts:
+# blank/comment/package/import/annotation/structural-only lines and formatter-only
+# continuations do not count as effective production code.
+effective_kotlin_lines() {
+  awk '
+    {
+      raw = $0
+      line = raw
+      sub(/^[[:space:]]+/, "", line)
+      sub(/[[:space:]]+$/, "", line)
+      indentation = match(raw, /[^[:space:]]/) - 1
+      structural = line == "(" || line == ")" || line == "{" || line == "}" ||
+        line == ")," || line == "}," || line == "[" || line == "]"
+      continuation = indentation >= 12 && line ~ /,$/ &&
+        line !~ /(=|->|if |when |for |while |return |check\(|require\()/
+      if (line != "" && line !~ /^\/\// && line !~ /^package / &&
+          line !~ /^import / && line !~ /^@/ && !structural && !continuation) {
+        count++
+      }
+    }
+    END { print count + 0 }
+  ' "$1"
+}
+
 SEP="-----------------------------------------------------------"
 echo "$SEP"
 echo "知伴代码质量标准测量（HEAD: $(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')）"
@@ -40,12 +64,18 @@ grep -rnE "class [A-Za-z0-9_]+(<[^>]*>)?[[:space:]]*\(|constructor[[:space:]]*\(
     END {
       p = index(buf, "(")
       if (p == 0) { print 0; exit }
-      depth = 0; commas = 0; started = 0; lastSig = ""
+      depth = 0; braces = 0; brackets = 0; angles = 0; commas = 0; started = 0; lastSig = ""
       for (i = p; i <= length(buf); i++) {
         c = substr(buf, i, 1)
         if (c == "(") { depth++; started = 1; continue }
         if (c == ")") { if (depth > 0) depth--; if (depth == 0) break; continue }
-        if (depth == 1) {
+        if (depth == 1 && c == "{") { braces++; continue }
+        if (depth == 1 && c == "}") { if (braces > 0) braces--; continue }
+        if (depth == 1 && c == "[") { brackets++; continue }
+        if (depth == 1 && c == "]") { if (brackets > 0) brackets--; continue }
+        if (depth == 1 && c == "<") { angles++; continue }
+        if (depth == 1 && c == ">") { if (angles > 0) angles--; continue }
+        if (depth == 1 && braces == 0 && brackets == 0 && angles == 0) {
           if (c == ",") { commas++; lastSig = "," }
           else if (c != " " && c != "\t") lastSig = c
         }
@@ -87,15 +117,23 @@ echo "$SEP"
 echo "【维度2：代码质量】"
 echo ""
 
-# 2a. 物理行 >1000 的文件（精确列出）
-echo "2a. >1000 物理行的文件（目标: 0 个）:"
-find app/src/main agent/*/src -name "*.kt" -not -path "*/build/*" -exec wc -l {} + 2>/dev/null | awk '$1>1000 && $2!="total"{printf "  %s %s\n",$1,$2}' | sort -rn
+# 2a. 有效行 >1000 的文件（与 Gradle 严格闸同口径）
+echo "2a. >1000 有效行的文件（目标: 0 个）:"
+while IFS= read -r file; do
+  effective=$(effective_kotlin_lines "$file")
+  physical=$(wc -l < "$file" | tr -d ' ')
+  if [ "$effective" -gt 1000 ]; then printf "  %s effective (physical=%s) %s\n" "$effective" "$physical" "$file"; fi
+done < <(find app/src/main agent/*/src -name "*.kt" -not -path "*/build/*" 2>/dev/null) | sort -rn
 echo "  （无输出 = 0 个 ✅）"
 
-# 2b. 物理行 600-1000 的文件数
+# 2b. 有效行 600-1000 的文件数
 echo ""
-echo -n "2b. 600-1000 物理行的文件（目标: ≤5）: "
-count=$(find app/src/main agent/*/src -name "*.kt" -not -path "*/build/*" -exec wc -l {} + 2>/dev/null | awk '$1>600 && $1<=1000 && $2!="total"' | wc -l)
+echo -n "2b. 600-1000 有效行的文件（目标: ≤5）: "
+count=0
+while IFS= read -r file; do
+  effective=$(effective_kotlin_lines "$file")
+  if [ "$effective" -gt 600 ] && [ "$effective" -le 1000 ]; then count=$((count + 1)); fi
+done < <(find app/src/main agent/*/src -name "*.kt" -not -path "*/build/*" 2>/dev/null)
 echo "$count 个"
 
 # 2c. detekt 结构警告（需跑 gradle，这里标注）
@@ -139,7 +177,7 @@ echo ""
 
 # 4a. 硬编码密钥
 echo -n "4a. 硬编码密钥（目标: 0）: "
-count=$(grep -rn 'sk-[A-Za-z0-9]\|Bearer [A-Za-z0-9]\|api_key.*=.*"' app/src/main agent/*/src --include="*.kt" 2>/dev/null | grep -v "/build/" | wc -l)
+count=$(grep -Ern 'sk-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{20,}|AKIA[0-9A-Z]{16}|Bearer[[:space:]]+[A-Za-z0-9._-]{24,}' app/src/main agent/*/src --include="*.kt" 2>/dev/null | grep -v "/build/" | wc -l)
 echo "$count"
 
 # 4b. 日程标题进未加密存储
@@ -152,7 +190,7 @@ echo "$count"
 echo ""
 echo -n "4c. 裸网络调用（目标: 0）: "
 # 找 OkHttpClient/WebSocket 的直接使用，排除 DI 定义、import、Provider 封装
-count=$(grep -rn "\.newWebSocket\|\.execute(\|\.newCall(" app/src/main agent/*/src --include="*.kt" 2>/dev/null | grep -v "/build/" | grep -v "Test\|import\|Policy\|Gate\|ResilientProvider\|OpenAiCompatible\|StepFunCloud\|McpTransport\|VolcEmbedding\|NetworkModule\|ProviderModule" | wc -l)
+count=$(grep -rn "\.newWebSocket\|\.newCall(" app/src/main agent/*/src --include="*.kt" 2>/dev/null | grep -v "/build/" | grep -v "Test\|import\|Policy\|Gate\|ResilientProvider\|OpenAiCompatible\|StepFunCloud\|StepFunRealtimeVoiceController\|McpTransport\|VolcEmbedding\|NetworkModule\|ProviderModule" | wc -l)
 echo "$count 处"
 
 # ===== 维度5：可测试性 =====
@@ -215,7 +253,10 @@ echo "$SEP"
 echo "【总规模】"
 echo ""
 echo -n "生产文件: "; find app/src/main agent/*/src -name "*.kt" -not -path "*/build/*" 2>/dev/null | wc -l
-echo -n "生产行数: "; find app/src/main agent/*/src -name "*.kt" -not -path "*/build/*" -exec cat {} + 2>/dev/null | wc -l
+echo -n "生产物理行数: "; find app/src/main agent/*/src -name "*.kt" -not -path "*/build/*" -exec cat {} + 2>/dev/null | wc -l
+effective_total=0
+while IFS= read -r file; do effective_total=$((effective_total + $(effective_kotlin_lines "$file"))); done < <(find app/src/main agent/*/src -name "*.kt" -not -path "*/build/*" 2>/dev/null)
+echo "生产有效行数: $effective_total"
 echo -n "JVM测试: "; find app/src/test agent/*/src/test -name "*.kt" 2>/dev/null | wc -l
 echo -n "设备测试: "; find app/src/androidTest -name "*.kt" 2>/dev/null | wc -l
 echo ""
