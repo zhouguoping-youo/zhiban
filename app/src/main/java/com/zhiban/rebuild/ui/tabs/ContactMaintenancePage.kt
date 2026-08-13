@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,6 +17,7 @@ import androidx.compose.material.icons.outlined.AlternateEmail
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.LinkOff
 import androidx.compose.material.icons.outlined.PersonSearch
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,24 +30,41 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.zhiban.rebuild.data.contact.ContactEnrichmentCandidateEntity
+import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.ContactMaintenanceIssue
 import com.zhiban.rebuild.data.contact.ContactMaintenanceItem
 import com.zhiban.rebuild.data.contact.SourceIdentityEntity
+import com.zhiban.rebuild.ui.components.ZhiBanBottomSheet
+import com.zhiban.rebuild.ui.components.ZhiBanDialogHeader
 import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
 import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
 import com.zhiban.rebuild.ui.theme.ZhiBanSpacing
 
+private val EnrichmentReviewMaxHeight = 560.dp
+
+internal data class ContactEnrichmentReviewActions(
+    val onDismiss: () -> Unit,
+    val onConfirm: (ContactEnrichmentCandidateEntity) -> Unit,
+    val onReject: (ContactEnrichmentCandidateEntity) -> Unit,
+)
+
 @Composable
 fun ContactMaintenancePage(onBack: () -> Unit, onAsk: (String) -> Unit, viewModel: RelationViewModel = hiltViewModel()) {
     val overview by viewModel.maintenanceOverview.collectAsStateWithLifecycle()
     val suggestions by viewModel.mergeSuggestions.collectAsStateWithLifecycle()
     val unresolvedIdentities by viewModel.unresolvedSourceIdentities.collectAsStateWithLifecycle()
+    val enrichmentCandidates by viewModel.pendingEnrichment.collectAsStateWithLifecycle()
+    val rawContacts by viewModel.rawContacts.collectAsStateWithLifecycle()
     var selectedMerge by remember { mutableStateOf<ContactMergeSuggestion?>(null) }
+    var reviewingEnrichment by remember { mutableStateOf(false) }
+    var enrichmentError by remember { mutableStateOf<String?>(null) }
     ZhiBanPage {
         LazyColumn(
             Modifier.fillMaxSize(),
@@ -80,7 +99,7 @@ fun ContactMaintenancePage(onBack: () -> Unit, onAsk: (String) -> Unit, viewMode
                                 icon = Icons.Outlined.AutoAwesome,
                                 title = "资料待核实",
                                 detail = "${overview.enrichmentReviewCount} 条建议",
-                                onClick = { onAsk("查看联系人资料待核实项，只使用已有证据。能确认的给出依据，不能确认的帮我生成询问文案；对外发送前让我确认。") },
+                                onClick = { reviewingEnrichment = true },
                             )
                         }
                         if (unresolvedIdentities.isNotEmpty()) {
@@ -113,6 +132,88 @@ fun ContactMaintenancePage(onBack: () -> Unit, onAsk: (String) -> Unit, viewMode
                 }
             },
         )
+    }
+    if (reviewingEnrichment) {
+        ContactEnrichmentReviewSheet(
+            candidates = enrichmentCandidates,
+            contacts = rawContacts,
+            error = enrichmentError,
+            actions = ContactEnrichmentReviewActions(
+                onDismiss = {
+                    reviewingEnrichment = false
+                    enrichmentError = null
+                },
+                onConfirm = { candidate ->
+                    viewModel.confirmContactEnrichment(candidate) { error -> enrichmentError = error }
+                },
+                onReject = viewModel::rejectContactEnrichment,
+            ),
+        )
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+internal fun ContactEnrichmentReviewSheet(
+    candidates: List<ContactEnrichmentCandidateEntity>,
+    contacts: List<ContactEntity>,
+    error: String?,
+    actions: ContactEnrichmentReviewActions,
+) {
+    val contactsById = remember(contacts) { contacts.associateBy(ContactEntity::contactId) }
+    ZhiBanBottomSheet(onDismissRequest = actions.onDismiss) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = ZhiBanSpacing.Xl)) {
+            ZhiBanDialogHeader(
+                title = "资料待核实",
+                subtitle = if (candidates.isEmpty()) "全部处理完成" else "${candidates.size} 条建议",
+                onDismiss = actions.onDismiss,
+            )
+            error?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.Md, vertical = ZhiBanSpacing.Xs),
+                )
+            }
+            ContactEnrichmentReviewList(
+                candidates = candidates,
+                contactsById = contactsById,
+                maxHeight = EnrichmentReviewMaxHeight,
+                onConfirm = actions.onConfirm,
+                onReject = actions.onReject,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ContactEnrichmentReviewList(
+    candidates: List<ContactEnrichmentCandidateEntity>,
+    contactsById: Map<String, ContactEntity>,
+    maxHeight: Dp,
+    onConfirm: (ContactEnrichmentCandidateEntity) -> Unit,
+    onReject: (ContactEnrichmentCandidateEntity) -> Unit,
+) {
+    LazyColumn(
+        Modifier.fillMaxWidth().heightIn(max = maxHeight),
+        contentPadding = PaddingValues(bottom = ZhiBanSpacing.Xxxl),
+        verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm),
+    ) {
+        items(candidates, key = ContactEnrichmentCandidateEntity::candidateId) { candidate ->
+            Column(Modifier.fillMaxWidth().zhiBanCardSurface().padding(ZhiBanSpacing.Md)) {
+                Text(
+                    text = candidate.contactId?.let(contactsById::get)?.displayName ?: "联系人",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                ContactEnrichmentRow(
+                    candidate = candidate,
+                    onConfirm = { onConfirm(candidate) },
+                    onReject = { onReject(candidate) },
+                )
+            }
+        }
     }
 }
 
