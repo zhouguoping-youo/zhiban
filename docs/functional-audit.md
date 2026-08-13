@@ -29,7 +29,7 @@
 | 2.3 | 联系人详情编辑 | ⚪无法复现 | 未发现功能问题：编辑保存后详情与列表即时刷新，未修改字段保持不变 | 打开 `AUDIT_RELATION_001` 详情，将职位 `Tester` 改为 `Tester2` 并保存；重新打开详情核对手机号、微信、公司和备注 | — | — | — | 既有联系人持久化与详情设备测试 | 2026-08-13 真机验证通过：详情显示 `Audit Company Ltd · Tester2`，其余字段未丢失 |
 | 2.4 | 同一联系人多身份 | ⚪无法复现 | 未发现覆盖问题：同一联系人可以并存不同类型关系，新增第二种关系不会覆盖第一种 | 以“我”和 `AUDIT_RELATION_001` 先建立“下属”，再新增“兴趣圈友”；返回关系图并打开联系人详情 | — | — | — | `ContactTemporalWriteTest.endingOneRelationshipTypeKeepsOtherTypeCurrent`；`AgentDataRepositoryTest.signedInUserCanBeAConfirmedRelationshipEndpointWithoutBecomingAContact` | 2026-08-13 真机验证通过：关系图统计由 1 条增至 2 条；详情“关联的人”同时显示“兴趣圈友”和“下属”，两条均指向“我” |
 | 2.5 | 合并与撤销合并 | ⚪无法复现 | 未发现数据丢失或无法恢复：合并源从列表隐藏，主资料保留恢复入口，撤销后源联系人重新可见 | 在“联系人维护”处理“叶孝玲 / 成都乐心”重复建议（两个手机号）；确认合并后分别搜索两个号码，再从主联系人详情点“恢复”并复搜 | — | — | — | `ContactMergeChainTest.undoConfirmedMergeRestoresSourceVisibilityAndClearsLink`；`AgentDataRepositoryTest.confirmedContactMergeIsNonDestructiveAndReversible` | 2026-08-13 真机验证通过：联系人总数 1194→1193，主资料显示“已合并资料/恢复”；恢复后总数回到 1194，`15682127000` 再次独立命中，真实资料已还原 |
-| 2.6 | 关系图谱点击/拖动/缩放/聚焦 | — | 尚未实测 | — | — | — | — | — | — |
+| 2.6 | 关系图谱点击/拖动/缩放/聚焦 | ⚪无法复现 | 未发现交互失效：节点点击、节点拖动、画布平移和重置聚焦均有即时反馈 | 打开含 2 条关系的“我的关系图”；点击 `AUDIT_RELATION_001` 节点；关闭详情后拖动节点、平移画布并点击重置 | — | — | — | `RelationshipGraphInteractionTest.personNodeHasNamedTouchTargetAndOpensContact`；`ForceRelationshipGraphTest.seed places requested focus at viewport center`；`ForceRelationshipGraphTest.simulation combines repulsion spring centering and damping` | 2026-08-13 真机验证通过：点击打开包含关系强度和关联对象的详情抽屉；拖动后节点位置改变；画布可平移；重置后“我”回到中心。双指缩放实现纳入最终设备测试闸 |
 | 2.7 | 智能完善建议确认/拒绝 | — | 尚未实测 | — | — | — | — | — | — |
 | 2.8 | 通知候选处理 | — | 尚未实测 | — | — | — | — | — | — |
 | 2.9 | 通话备注 | — | 尚未实测 | — | — | — | — | — | — |
