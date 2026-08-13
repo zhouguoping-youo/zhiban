@@ -235,9 +235,9 @@ internal fun deterministicCalendarToolCall(input: DecodedInput, queryContext: Qu
 
 internal fun sanitizeScheduleTitleFromText(inputText: String, candidate: String): String {
     val candidateNormalized = sanitizeCalendarCandidateTitle(candidate)
-    if (candidateNormalized.isNotBlank() && candidateNormalized != "待确认安排") return candidateNormalized
-    val fullTextNormalized = NotificationInsightAnalyzer.sanitizeScheduleTitle(inputText, null)
-    if (fullTextNormalized.isNotBlank() && fullTextNormalized != "待确认安排") return fullTextNormalized
+    if (candidateNormalized.isUsefulScheduleTitle()) return candidateNormalized
+    val fullTextNormalized = sanitizeCalendarCandidateTitle(inputText)
+    if (fullTextNormalized.isUsefulScheduleTitle()) return fullTextNormalized
     return "新日程"
 }
 
@@ -251,7 +251,7 @@ internal fun sanitizeCalendarCandidateTitle(value: String): String {
         .replace(Regex("""^\s*(?:我|你|对方|他|她|它|系统|知伴|客服|联系人)\s*[:：,，]?\s*"""), "")
         .replace(Regex("""^\s*(?:\w+)?\s*(?:说|提到|提及|发来|告诉|反馈|转告)[:：]?\s*"""), "")
         .replace(Regex("""^(?:\s*(?:请|帮我|安排|创建|加上|新增|新建)\s*)"""), "")
-        .replace(Regex("""^\s*和(?:我|你|他|她|它|对方)?\s*"""), "")
+        .replace(Regex("""^\s*和(?:我|你|他|她|它|对方)\s*"""), "")
         .replace(Regex("""^(?:明天|后天|今天|周[一二三四五六日天]|星期[一二三四五六日天])\s*"""), "")
         .replace(Regex("""^(?:上|下|中)?\s*(?:上午|中午|下午|晚上|凌晨|傍晚|早上)\s*"""), "")
         .replace(
@@ -274,6 +274,22 @@ internal fun sanitizeCalendarCandidateTitle(value: String): String {
 
     return title.take(80)
 }
+
+private fun String.isUsefulScheduleTitle(): Boolean = isNotBlank() && trim() !in GENERIC_SCHEDULE_TITLES
+
+private val GENERIC_SCHEDULE_TITLES = setOf(
+    "新日程",
+    "日程",
+    "日程安排",
+    "安排",
+    "提醒",
+    "提醒事项",
+    "事项",
+    "任务",
+    "待办",
+    "待办事项",
+    "待确认安排",
+)
 
 internal data class DecodedAttachment(
     val attachmentId: String,

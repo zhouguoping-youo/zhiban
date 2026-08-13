@@ -226,6 +226,10 @@ object NotificationInsightAnalyzer {
             TIMESTAMP_START_PREFIX,
             "",
         )
+        title = title.replace(
+            Regex("""^\s*(?:请\s*)?(?:提醒|通知)(?:我|我们)?\s*"""),
+            "",
+        )
         title = title.replace(Regex("""^\s*(?:请|麻烦|先|先给我|先发|帮我)\s*"""), "")
         title = removeEmbeddedTemporalLeading(title)
         title = title.replace(LEADING_TEMPORAL_PREFIX, "")
@@ -238,7 +242,7 @@ object NotificationInsightAnalyzer {
             "",
         )
         title = title.replace(Regex("""^(?:关于|关于你|关于我)\s*"""), "")
-        title = title.replace(Regex("""^\s*和(?:我|你|他|她|它|对方)?\s*"""), "")
+        title = title.replace(Regex("""^\s*和(?:我|你|他|她|它|对方)\s*"""), "")
         if (title.length > 26) title = title.take(26)
         title = title.trim('，', '、', ',', '。', ' ', '\t', '\n')
         title = title.replace(Regex("""\s+"""), " ")
