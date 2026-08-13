@@ -105,6 +105,50 @@ class SocialMessagePerceptionTest {
     }
 
     @Test
+    fun tentativeScheduleQuestionRemainsConfirmableButIsNotHighConfidence() {
+        val insights = NotificationInsightAnalyzer.analyze(
+            text = "明天下午三点开武汉项目复盘会吗？",
+            senderName = "张总",
+            conversationTitle = "张总",
+            postedAtEpochMs = now,
+            zoneId = zone,
+        )
+
+        val schedule = requireNotNull(insights.schedule)
+        assertTrue(schedule.confidence >= 0.85)
+        assertTrue(schedule.confidence < 0.98)
+        assertEquals("开武汉项目复盘会", schedule.title)
+    }
+
+    @Test
+    fun confirmedCompoundMeetingTitleIsRecognizedWithHighConfidence() {
+        val insights = NotificationInsightAnalyzer.analyze(
+            text = "明天下午三点开武汉项目复盘会，请准时参加",
+            senderName = "张总",
+            conversationTitle = "张总",
+            postedAtEpochMs = now,
+            zoneId = zone,
+        )
+
+        val schedule = requireNotNull(insights.schedule)
+        assertTrue(schedule.confidence >= 0.98)
+        assertEquals("开武汉项目复盘会，请准时参加", schedule.title)
+    }
+
+    @Test
+    fun unrelatedMembershipTextIsNotMistakenForACompoundMeeting() {
+        val insights = NotificationInsightAnalyzer.analyze(
+            text = "明天下午三点开会员续费服务",
+            senderName = "服务通知",
+            conversationTitle = "服务通知",
+            postedAtEpochMs = now,
+            zoneId = zone,
+        )
+
+        assertNull(insights.schedule)
+    }
+
+    @Test
     fun weekdayPhrasesKeepTheNearestOccurrenceMatrix() {
         val weekdayText = mapOf(
             DayOfWeek.MONDAY to "一",

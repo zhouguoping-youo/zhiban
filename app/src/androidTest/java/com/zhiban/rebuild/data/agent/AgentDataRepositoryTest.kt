@@ -1117,6 +1117,41 @@ class AgentDataRepositoryTest {
     }
 
     @Test
+    fun tentativeScheduleQuestionNeverAutomaticallyCreatesCalendarEvent() = runBlocking {
+        val now = System.currentTimeMillis()
+        val start = now + 24 * 60 * 60_000L
+        repository.saveUserContact(null, "王敏", null, null, null, null, null, null, now)
+
+        repository.stageNotificationCandidate(
+            NotificationCandidateEntity(
+                candidateId = "tentative-schedule-message",
+                sourceKey = "tentative-schedule-source",
+                packageName = "com.ss.android.lark",
+                appLabel = "飞书",
+                title = "王敏",
+                body = "明天下午三点开武汉项目复盘会吗？",
+                postedAtEpochMs = now,
+                platform = "FEISHU",
+                conversationTitle = "王敏",
+                senderName = "王敏",
+                direction = "INCOMING",
+                messageKind = "SCHEDULE_CANDIDATE",
+                insightJson = NotificationInsights(
+                    schedule = ScheduleInsight("开武汉项目复盘会", start, confidence = 0.90),
+                ).toJsonOrNull(),
+            ),
+        )
+
+        val pending = repository.observeNotificationCandidates().first().single()
+        assertNull(pending.createdScheduleId)
+        assertEquals(0, database.scheduleDao().count())
+        assertTrue(
+            database.changeLogDao().observeAutoWriteReceipts().first()
+                .none { it.presentationType == "SCHEDULE_CREATE" },
+        )
+    }
+
+    @Test
     fun confirmedPlatformHandlesMatchWechatFeishuDingtalkAndQqCandidates() = runBlocking {
         val now = System.currentTimeMillis()
         val contactId = repository.saveUserContact(

@@ -143,7 +143,7 @@ data class NotificationInsights(val schedule: ScheduleInsight? = null) {
 
 object NotificationInsightAnalyzer {
     private val actionWords = listOf(
-        "开会", "会议", "见面", "碰面", "拜访", "面试", "预约", "安排",
+        "会议", "见面", "碰面", "拜访", "面试", "预约", "安排",
         "日程", "提醒", "参加", "集合", "出发", "回访", "电话沟通",
     )
     private val negativeWords = listOf("取消", "不用", "不去", "改天", "暂不", "无需")
@@ -174,9 +174,12 @@ object NotificationInsightAnalyzer {
         )
     }
 
-    private fun hasSchedulingIntent(text: String): Boolean = actionWords.any(text::contains) || APPOINTMENT_INTENT.containsMatchIn(text)
+    private fun hasSchedulingIntent(text: String): Boolean = actionWords.any(text::contains) ||
+        MEETING_INTENT.containsMatchIn(text) || COMPOUND_MEETING_INTENT.containsMatchIn(text) ||
+        APPOINTMENT_INTENT.containsMatchIn(text)
 
     private fun scheduleConfidence(text: String): Double = when {
+        TENTATIVE_SCHEDULE_QUESTION.containsMatchIn(text) -> 0.90
         ABSOLUTE_DATE.containsMatchIn(text) -> 0.99
         listOf("今天", "明天", "后天").any(text::contains) -> 0.99
         "下周" in text || "下星期" in text -> 0.96
@@ -185,6 +188,9 @@ object NotificationInsightAnalyzer {
     }
 
     private val APPOINTMENT_INTENT = Regex("""(?<![合契条违续解简节制大纽特])约""")
+    private val MEETING_INTENT = Regex("""开(?:个)?会(?!员|费|籍|卡)""")
+    private val COMPOUND_MEETING_INTENT = Regex("""开(?!会员|会费|会籍|会卡)[\p{L}\p{N}·_-]{1,20}(?:会|会议|例会|复盘会|评审会|沟通会|碰头会)""")
+    private val TENTATIVE_SCHEDULE_QUESTION = Regex("""(?:吗|么|是否|能否|可否|行不行|可以吗|方便吗|有空吗)[？?]?\s*$""")
 
     internal fun sanitizeScheduleTitle(rawText: String, source: String?): String = cleanScheduleTitle(rawText, source)
 
@@ -243,6 +249,7 @@ object NotificationInsightAnalyzer {
         )
         title = title.replace(Regex("""^(?:关于|关于你|关于我)\s*"""), "")
         title = title.replace(Regex("""^\s*和(?:我|你|他|她|它|对方)\s*"""), "")
+        title = title.replace(TENTATIVE_SCHEDULE_QUESTION, "")
         if (title.length > 26) title = title.take(26)
         title = title.trim('，', '、', ',', '。', ' ', '\t', '\n')
         title = title.replace(Regex("""\s+"""), " ")
