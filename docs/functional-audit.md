@@ -28,7 +28,7 @@
 | 2.2 | 搜索与标签筛选 | ⚪无法复现 | 未发现功能问题：1194 位联系人下，姓名、手机号、公司和备注均能精确命中；大类筛选不会串类 | 新建 `AUDIT_RELATION_001`，分别搜索姓名、`13800138001`、`Audit Company`、`AUDIT_NOTE_001`；清空搜索后依次选择“工作”和“家人” | — | — | — | `RelationGraphInferenceTest.expanded taxonomy participates in existing category filters`；既有 Room 联系人查询测试 | 2026-08-13 真机验证通过：四种字段均返回唯一测试联系人；工作包含、家人排除，无卡顿/闪退 |
 | 2.3 | 联系人详情编辑 | ⚪无法复现 | 未发现功能问题：编辑保存后详情与列表即时刷新，未修改字段保持不变 | 打开 `AUDIT_RELATION_001` 详情，将职位 `Tester` 改为 `Tester2` 并保存；重新打开详情核对手机号、微信、公司和备注 | — | — | — | 既有联系人持久化与详情设备测试 | 2026-08-13 真机验证通过：详情显示 `Audit Company Ltd · Tester2`，其余字段未丢失 |
 | 2.4 | 同一联系人多身份 | ⚪无法复现 | 未发现覆盖问题：同一联系人可以并存不同类型关系，新增第二种关系不会覆盖第一种 | 以“我”和 `AUDIT_RELATION_001` 先建立“下属”，再新增“兴趣圈友”；返回关系图并打开联系人详情 | — | — | — | `ContactTemporalWriteTest.endingOneRelationshipTypeKeepsOtherTypeCurrent`；`AgentDataRepositoryTest.signedInUserCanBeAConfirmedRelationshipEndpointWithoutBecomingAContact` | 2026-08-13 真机验证通过：关系图统计由 1 条增至 2 条；详情“关联的人”同时显示“兴趣圈友”和“下属”，两条均指向“我” |
-| 2.5 | 合并与撤销合并 | — | 尚未实测 | — | — | — | — | — | — |
+| 2.5 | 合并与撤销合并 | ⚪无法复现 | 未发现数据丢失或无法恢复：合并源从列表隐藏，主资料保留恢复入口，撤销后源联系人重新可见 | 在“联系人维护”处理“叶孝玲 / 成都乐心”重复建议（两个手机号）；确认合并后分别搜索两个号码，再从主联系人详情点“恢复”并复搜 | — | — | — | `ContactMergeChainTest.undoConfirmedMergeRestoresSourceVisibilityAndClearsLink`；`AgentDataRepositoryTest.confirmedContactMergeIsNonDestructiveAndReversible` | 2026-08-13 真机验证通过：联系人总数 1194→1193，主资料显示“已合并资料/恢复”；恢复后总数回到 1194，`15682127000` 再次独立命中，真实资料已还原 |
 | 2.6 | 关系图谱点击/拖动/缩放/聚焦 | — | 尚未实测 | — | — | — | — | — | — |
 | 2.7 | 智能完善建议确认/拒绝 | — | 尚未实测 | — | — | — | — | — | — |
 | 2.8 | 通知候选处理 | — | 尚未实测 | — | — | — | — | — | — |
