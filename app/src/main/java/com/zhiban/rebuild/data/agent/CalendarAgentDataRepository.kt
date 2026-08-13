@@ -210,7 +210,22 @@ internal class CalendarAgentDataRepository(private val database: AgentDatabase) 
     }
 }
 
-internal fun normalizeScheduleIdentityTitle(value: String): String = value
-    .trim()
+internal fun normalizeScheduleIdentityTitle(value: String): String = stripConcreteParticipantPrefix(value.trim())
     .lowercase()
     .filter { it.isLetterOrDigit() }
+
+private fun stripConcreteParticipantPrefix(value: String): String {
+    val match = PARTICIPANT_ACTION_PREFIX.matchEntire(value) ?: return value
+    val participant = match.groupValues[1].trim()
+    val subject = match.groupValues[2].trim()
+    return if (participant.length in 1..8 && subject.length >= 4 && MEETING_SUBJECT_MARKERS.any(subject::contains)) {
+        subject
+    } else {
+        value
+    }
+}
+
+private val PARTICIPANT_ACTION_PREFIX = Regex(
+    """^(?:和|与)([\p{L}\p{N}·_-]{1,8})(?:一起)?(?:开|召开|参加|进行)(.+)$""",
+)
+private val MEETING_SUBJECT_MARKERS = listOf("会", "会议", "复盘", "评审", "沟通", "碰头")

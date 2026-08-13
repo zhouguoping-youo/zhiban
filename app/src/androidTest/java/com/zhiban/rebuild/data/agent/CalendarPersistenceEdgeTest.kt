@@ -89,6 +89,36 @@ class CalendarPersistenceEdgeTest {
         assertEquals(1, db.scheduleDao().count())
     }
 
+    @Test fun equivalentCrossSourceTitlesIgnoreOnlyAConcreteParticipantPrefix() = runBlocking {
+        val start = 2_000_000L
+        calendar.saveUserSchedule(null, "和张总开武汉项目复盘会", start, 60, null, null, nowEpochMs = 1L)
+
+        val summary = calendar.importConfirmedSystemCalendarEvents(
+            listOf(
+                SystemCalendarEvent(
+                    sourceId = "participant-title-duplicate",
+                    title = "武汉项目复盘会",
+                    startAtEpochMs = start,
+                    endAtEpochMs = start + 60 * 60_000L,
+                    location = null,
+                    description = null,
+                    calendarName = "My calendar",
+                ),
+            ),
+            nowEpochMs = 2L,
+        )
+
+        assertEquals(0, summary.created)
+        assertEquals(1, db.scheduleDao().count())
+    }
+
+    @Test fun differentMeetingSubjectsAtTheSameTimeRemainDifferentIdentities() = runBlocking {
+        val start = 2_000_000L
+        calendar.saveUserSchedule(null, "和张总开武汉项目复盘会", start, 60, null, null, nowEpochMs = 1L)
+
+        assertNull(calendar.findEquivalentSchedule("长沙项目复盘会", start, 60))
+    }
+
     @Test fun completionStoresFeedbackAndReschedulingReopensTheSchedule() = runBlocking {
         val scheduleId = calendar.saveUserSchedule(null, "回访客户", 1_000_000L, 30, null, null, nowEpochMs = 1L)
 
