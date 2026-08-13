@@ -573,72 +573,76 @@ internal class ProviderExecutionEngine(
         val observationTools: Set<String>,
     )
 
-    private suspend fun prepareRun(runActiveAttemptId: String?, runId: String, sessionId: String, fencingEpoch: Long): PreparedRun {
-        val rawInput = store.readRunInput(runId, clock()) ?: return PreparedRun.Failure("INPUT_EXPIRED_OR_MISSING", retryable = false)
-        val input = decodeInput(rawInput)
-        val currentNetwork = networkQuality()
-        networkPreflightFailure(currentNetwork, input.attachments.isNotEmpty())?.let { (code, retryable) ->
-            return PreparedRun.Failure(code, retryable)
-        }
-        val perceptionStartedAt = clock()
-        var perceptionDegraded = false
-        val queryContext = withTimeoutOrNull(ENTITY_EXTRACTION_TIMEOUT_MS) {
+    private data class PerceptionResult(val context: QueryContext, val durationMs: Long, val degraded: Boolean)
+
+    private data class MemoryContext(
+        val retrieval: ContextRetrievalResult,
+        val approvedMemories: List<String>,
+        val conversation: com.zhiban.rebuild.runtime.store.SessionConversationContext,
+        val feedback: List<String>,
+    )
+
+    private suspend fun perceiveForRun(input: DecodedInput): PerceptionResult {
+        val startedAt = clock()
+        var degraded = false
+        val context = withTimeoutOrNull(ENTITY_EXTRACTION_TIMEOUT_MS) {
             perceptionPipeline.perceive(input.text, input.mode)
-        } ?: perceptionPipeline.fallback(input.text, input.mode).also { perceptionDegraded = true }
-        val config = dynamicConfig()
-        val activatedSkills = SkillActivator(skillSpecs()).activate(
-            queryContext.intentLabel.name,
-            input.mode,
-            toolCatalog.names().filter(toolEnabled).toSet(),
-        ).filterNot { it.skillId in config.disabledSkills }
-        val perceptionDurationMs = (clock() - perceptionStartedAt).coerceAtLeast(0)
-        val storedProfile = profiles.load() ?: return PreparedRun.Failure("PROVIDER_NOT_CONFIGURED", retryable = false)
-        if (storedProfile.providerId in config.providerBlacklist) {
-            return PreparedRun.Failure("PROVIDER_DISABLED", retryable = false)
+        } ?: perceptionPipeline.fallback(input.text, input.mode).also { degraded = true }
+        return PerceptionResult(context, (clock() - startedAt).coerceAtLeast(0), degraded)
+    }
+
+    private suspend fun perceiveForObservation(input: DecodedInput): QueryContext = withTimeoutOrNull(ENTITY_EXTRACTION_TIMEOUT_MS) {
+        perceptionPipeline.perceive(input.text, input.mode)
+    } ?: perceptionPipeline.fallback(input.text, input.mode)
+
+    private suspend fun selectProfile(input: DecodedInput, dynamicConfig: com.zhiban.rebuild.runtime.config.AgentDynamicConfig): ProviderProfile {
+        val stored = profiles.load() ?: throw ProviderFailure("PROVIDER_NOT_CONFIGURED", retryable = false)
+        if (stored.providerId in dynamicConfig.providerBlacklist) {
+            throw ProviderFailure("PROVIDER_DISABLED", retryable = false)
         }
-        val profile = ProviderModelPolicy.selectForInput(
-            storedProfile,
+        return ProviderModelPolicy.selectForInput(
+            stored,
             input.model,
             input.attachments.any { it.mimeType.startsWith("image/") || it.mimeType == "application/pdf" },
         )
-        val policy = memoryPolicy()
-        val retrievalStartedAt = clock()
-        var retrieval = performRetrieval(input.text, queryContext, currentNetwork, config, policy)
-        val retrievalDurationMs = (clock() - retrievalStartedAt).coerceAtLeast(0)
-        val approvedMemoryRecall = if (policy.longTermMemoryEnabled && !policy.temporaryModeEnabled) {
+    }
+
+    private suspend fun loadMemoryContext(
+        initialRetrieval: ContextRetrievalResult,
+        policy: com.zhiban.rebuild.runtime.config.MemoryPolicy,
+        sessionId: String,
+        runId: String,
+    ): MemoryContext {
+        val approvedRecall = if (policy.longTermMemoryEnabled && !policy.temporaryModeEnabled) {
             memoryExecutor.recallApproved()
         } else {
             com.zhiban.rebuild.runtime.tool.ApprovedMemoryRecallResult(emptyList())
         }
-        retrieval = retrieval.withDegradations(approvedMemoryRecall.degradationReasons)
-        val approvedMemories = approvedMemoryRecall.items
-        val conversationContext = if (policy.sessionMemoryEnabled && !policy.temporaryModeEnabled) {
+        val conversation = if (policy.sessionMemoryEnabled && !policy.temporaryModeEnabled) {
             store.conversationContext(sessionId, runId)
         } else {
             com.zhiban.rebuild.runtime.store.SessionConversationContext(null, emptyList())
         }
         val feedback = if (feedbackPolicy().useHumanFeedback) store.recentFeedback(sessionId) else emptyList()
-        val attempts = store.recoverySnapshot(runId, "ui").attempts
-        val activeAttempt = attempts.firstOrNull { it.attemptId == runActiveAttemptId && it.status == "ACTIVE" }
-        val attemptId = "attempt-$runId-${attempts.size + 1}"
-        events.appendPerception(
-            attemptId,
-            runId,
-            sessionId,
-            fencingEpoch,
-            queryContext,
-            perceptionDurationMs,
-            perceptionDegraded,
+        return MemoryContext(
+            retrieval = initialRetrieval.withDegradations(approvedRecall.degradationReasons),
+            approvedMemories = approvedRecall.items,
+            conversation = conversation,
+            feedback = feedback,
         )
-        events.appendRetrieval(attemptId, runId, sessionId, fencingEpoch, retrieval, retrievalDurationMs)
-        if (activeAttempt ==
-            null
-        ) {
-            store.startAttempt(AttemptStartRequest(attemptId, runId, attempts.size + 1, ownerId, fencingEpoch, clock()))
+    }
+
+    private suspend fun startRunAttempt(activeAttemptId: String?, runId: String, fencingEpoch: Long): String {
+        val attempts = store.recoverySnapshot(runId, "ui").attempts
+        val activeAttempt = attempts.firstOrNull { it.attemptId == activeAttemptId && it.status == "ACTIVE" }
+        val nextAttemptId = "attempt-$runId-${attempts.size + 1}"
+        val request = AttemptStartRequest(nextAttemptId, runId, attempts.size + 1, ownerId, fencingEpoch, clock())
+        if (activeAttempt == null) {
+            store.startAttempt(request)
         } else {
             store.supersedeAttemptAndStart(
                 activeAttempt.attemptId,
-                attemptId,
+                nextAttemptId,
                 runId,
                 attempts.size + 1,
                 ownerId,
@@ -646,9 +650,43 @@ internal class ProviderExecutionEngine(
                 clock(),
             )
         }
+        return nextAttemptId
+    }
+
+    private suspend fun prepareRun(runActiveAttemptId: String?, runId: String, sessionId: String, fencingEpoch: Long): PreparedRun {
+        val rawInput = store.readRunInput(runId, clock()) ?: return PreparedRun.Failure("INPUT_EXPIRED_OR_MISSING", retryable = false)
+        val input = decodeInput(rawInput)
+        val currentNetwork = networkQuality()
+        networkPreflightFailure(currentNetwork, input.attachments.isNotEmpty())?.let { (code, retryable) ->
+            return PreparedRun.Failure(code, retryable)
+        }
+        val perception = perceiveForRun(input)
+        val config = dynamicConfig()
+        val activatedSkills = activatedSkillsFor(input, perception.context, config, skillSpecs(), toolCatalog.names(), toolEnabled)
+        val profile = try {
+            selectProfile(input, config)
+        } catch (failure: ProviderFailure) {
+            return PreparedRun.Failure(failure.code, failure.retryable)
+        }
+        val policy = memoryPolicy()
+        val retrievalStartedAt = clock()
+        val initialRetrieval = performRetrieval(input.text, perception.context, currentNetwork, config, policy)
+        val retrievalDurationMs = (clock() - retrievalStartedAt).coerceAtLeast(0)
+        val memory = loadMemoryContext(initialRetrieval, policy, sessionId, runId)
+        val attemptId = startRunAttempt(runActiveAttemptId, runId, fencingEpoch)
+        events.appendPerception(
+            attemptId,
+            runId,
+            sessionId,
+            fencingEpoch,
+            perception.context,
+            perception.durationMs,
+            perception.degraded,
+        )
+        events.appendRetrieval(attemptId, runId, sessionId, fencingEpoch, memory.retrieval, retrievalDurationMs)
         return PreparedRun.Ready(
-            input, queryContext, retrieval, approvedMemories, conversationContext,
-            feedback, activatedSkills, profile, config, currentNetwork, attemptId,
+            input, perception.context, memory.retrieval, memory.approvedMemories, memory.conversation,
+            memory.feedback, activatedSkills, profile, config, currentNetwork, attemptId,
         )
     }
 
@@ -1008,10 +1046,62 @@ internal class ProviderExecutionEngine(
         return ReActStreamOutcome.Streamed(assistantText.toString())
     }
 
+    private suspend fun consumeWithHeartbeat(ready: PreparedRun.Ready, ids: RunIdentifiers): ReActStreamOutcome = coroutineScope {
+        val heartbeat = launch {
+            while (isActive) {
+                delay(heartbeatIntervalMs)
+                store.claimSession(ids.sessionId, ownerId, clock(), leaseDurationMs)
+            }
+        }
+        try {
+            val context = assembleReActContext(ready, ids.runId, ids.sessionId, ids.fencingEpoch)
+            val request = buildReActModelRequest(ready, context.capability, context.assembledMessages)
+            consumeReActStream(ready, request, ids, this)
+        } finally {
+            heartbeat.cancel()
+        }
+    }
+
+    private suspend fun handleReactCancellation(cancelled: CancellationException, ids: RunIdentifiers): Boolean {
+        val cancelledByCommand = withContext(NonCancellable) {
+            val current = store.runById(ids.runId)
+            if (current?.status == RuntimeRunStatus.CANCEL_REQUESTED.name) {
+                store.claimSession(ids.sessionId, ownerId, clock(), leaseDurationMs)
+                store.cancelProviderRun(ids.runId, ownerId, ids.fencingEpoch, clock())
+                true
+            } else {
+                false
+            }
+        }
+        if (!cancelledByCommand) throw cancelled
+        return false
+    }
+
+    private suspend fun completeReactOutcome(outcome: ReActStreamOutcome, ids: RunIdentifiers): Boolean = when (outcome) {
+        is ReActStreamOutcome.ToolCompleted -> observeToolResult(
+            ids.runId,
+            ids.sessionId,
+            ids.fencingEpoch,
+            outcome.result.canonicalName,
+            outcome.result.providerCallId,
+            outcome.result.safeResultJson,
+        )
+
+        ReActStreamOutcome.PendingApproval -> true
+
+        is ReActStreamOutcome.Streamed -> {
+            store.completeProviderRunWithAssistantTurn(
+                ids.runId,
+                outcome.assistantText,
+                ownerId,
+                ids.fencingEpoch,
+                clock(),
+            )
+            true
+        }
+    }
+
     private suspend fun runReActLoop(ready: PreparedRun.Ready, runId: String, sessionId: String, fencingEpoch: Long): Boolean {
-        val input = ready.input
-        val config = ready.config
-        val currentNetwork = ready.currentNetwork
         val attemptId = ready.attemptId
         activeRequests[runId] = attemptId
         val ids = RunIdentifiers(runId, sessionId, fencingEpoch)
@@ -1019,81 +1109,24 @@ internal class ProviderExecutionEngine(
             // Multimodal reasoning has a materially longer time-to-first-token than text.
             // Applying the 30s text budget made valid Step-3 image requests fail before
             // the first SSE event arrived.
-            val configuredTimeoutMs = if (input.attachments.isNotEmpty()) {
-                maxOf(config.llmTimeoutSeconds, MIN_MULTIMODAL_TIMEOUT_SECONDS) * 1_000L
-            } else {
-                config.llmTimeoutSeconds * 1_000L
-            }
             withTimeout(
-                minOf(
-                    if (currentNetwork ==
-                        com.zhiban.rebuild.runtime.network.NetworkQuality.WEAK
-                    ) {
-                        15_000L
-                    } else {
-                        totalTimeoutMs
-                    },
-                    configuredTimeoutMs,
+                reactTimeoutMs(
+                    ready.input.attachments.isNotEmpty(),
+                    ready.config.llmTimeoutSeconds,
+                    ready.currentNetwork,
+                    totalTimeoutMs,
                 ),
-            ) {
-                coroutineScope {
-                    val heartbeat = launch {
-                        while (isActive) {
-                            delay(heartbeatIntervalMs)
-                            store.claimSession(sessionId, ownerId, clock(), leaseDurationMs)
-                        }
-                    }
-                    try {
-                        val ctx = assembleReActContext(ready, runId, sessionId, fencingEpoch)
-                        val prepared = buildReActModelRequest(ready, ctx.capability, ctx.assembledMessages)
-                        consumeReActStream(ready, prepared, ids, this)
-                    } finally {
-                        heartbeat.cancel()
-                    }
-                }
-            }
+            ) { consumeWithHeartbeat(ready, ids) }
         } catch (_: TimeoutCancellationException) {
             provider.cancel(attemptId)
             return finishFailure(runId, fencingEpoch, ProviderFailure("TIMEOUT", retryable = true))
         } catch (cancelled: CancellationException) {
             provider.cancel(attemptId)
-            val cancelledByCommand = withContext(NonCancellable) {
-                val current = store.runById(runId)
-                if (current?.status == RuntimeRunStatus.CANCEL_REQUESTED.name) {
-                    store.claimSession(sessionId, ownerId, clock(), leaseDurationMs)
-                    store.cancelProviderRun(runId, ownerId, fencingEpoch, clock())
-                    true
-                } else {
-                    false
-                }
-            }
-            if (cancelledByCommand) return false else throw cancelled
+            return handleReactCancellation(cancelled, ids)
         } catch (failure: Throwable) {
             return finishFailure(runId, fencingEpoch, failure)
         }
-        return when (outcome) {
-            is ReActStreamOutcome.ToolCompleted -> observeToolResult(
-                runId,
-                sessionId,
-                fencingEpoch,
-                outcome.result.canonicalName,
-                outcome.result.providerCallId,
-                outcome.result.safeResultJson,
-            )
-
-            ReActStreamOutcome.PendingApproval -> true
-
-            is ReActStreamOutcome.Streamed -> {
-                store.completeProviderRunWithAssistantTurn(
-                    runId,
-                    outcome.assistantText,
-                    ownerId,
-                    fencingEpoch,
-                    clock(),
-                )
-                true
-            }
-        }
+        return completeReactOutcome(outcome, ids)
     }
     suspend fun executeApprovedTool(runId: String, sessionId: String, fencingEpoch: Long): Boolean {
         val planJson = store.pendingToolPlan(runId) ?: return false
@@ -1172,24 +1205,12 @@ internal class ProviderExecutionEngine(
         val fencingEpoch = ids.fencingEpoch
         val rawInput = store.readRunInput(runId, clock()) ?: throw ProviderFailure("INPUT_EXPIRED_OR_MISSING", false)
         val input = decodeInput(rawInput)
-        val queryContext =
-            withTimeoutOrNull(ENTITY_EXTRACTION_TIMEOUT_MS) { perceptionPipeline.perceive(input.text, input.mode) }
-                ?: perceptionPipeline.fallback(input.text, input.mode)
+        val queryContext = perceiveForObservation(input)
         val config = dynamicConfig()
-        val activatedSkills = SkillActivator(skillSpecs()).activate(
-            queryContext.intentLabel.name,
-            input.mode,
-            toolCatalog.names().filter(toolEnabled).toSet(),
-        ).filterNot { it.skillId in config.disabledSkills }
-        val storedProfile = profiles.load() ?: throw ProviderFailure("PROVIDER_NOT_CONFIGURED", false)
-        if (storedProfile.providerId in config.providerBlacklist) throw ProviderFailure("PROVIDER_DISABLED", false)
-        val profile = ProviderModelPolicy.selectForInput(
-            storedProfile,
-            input.model,
-            input.attachments.any { it.mimeType.startsWith("image/") || it.mimeType == "application/pdf" },
-        )
+        val activatedSkills = activatedSkillsFor(input, queryContext, config, skillSpecs(), toolCatalog.names(), toolEnabled)
+        val profile = selectProfile(input, config)
         val policy = memoryPolicy()
-        var retrieval = runSuspendCatching {
+        val initialRetrieval = runSuspendCatching {
             retrievalPipeline.retrieve(
                 input.text,
                 queryContext,
@@ -1202,24 +1223,23 @@ internal class ProviderExecutionEngine(
                 if (failure is CancellationException) throw failure
                 ContextRetrievalResult(emptyList(), 0, listOf("retrieval_pipeline_failed"), 0)
             }
-        val approvedMemoryRecall = if (policy.longTermMemoryEnabled && !policy.temporaryModeEnabled) {
-            memoryExecutor.recallApproved()
-        } else {
-            com.zhiban.rebuild.runtime.tool.ApprovedMemoryRecallResult(emptyList())
-        }
-        retrieval = retrieval.withDegradations(approvedMemoryRecall.degradationReasons)
-        val approvedMemories = approvedMemoryRecall.items
-        val conversationContext = if (policy.sessionMemoryEnabled && !policy.temporaryModeEnabled) {
-            store.conversationContext(sessionId, runId)
-        } else {
-            com.zhiban.rebuild.runtime.store.SessionConversationContext(null, emptyList())
-        }
-        val feedback = if (feedbackPolicy().useHumanFeedback) store.recentFeedback(sessionId) else emptyList()
+        val memory = loadMemoryContext(initialRetrieval, policy, sessionId, runId)
         val attempts = store.recoverySnapshot(runId, "ui").attempts
         val attemptId = "attempt-$runId-${attempts.size + 1}"
         store.startObservationAttempt(AttemptStartRequest(attemptId, runId, attempts.size + 1, ownerId, fencingEpoch, clock()))
         activeRequests[runId] = attemptId
-        return ObservationSetup(input, queryContext, retrieval, approvedMemories, conversationContext, feedback, activatedSkills, profile, config, attemptId)
+        return ObservationSetup(
+            input,
+            queryContext,
+            memory.retrieval,
+            memory.approvedMemories,
+            memory.conversation,
+            memory.feedback,
+            activatedSkills,
+            profile,
+            config,
+            attemptId,
+        )
     }
 
     private suspend fun handleDeterministicObservation(setup: ObservationSetup, ids: RunIdentifiers, toolName: String, safeResultJson: String): Boolean {
@@ -1775,7 +1795,6 @@ internal class ProviderExecutionEngine(
         const val ENTITY_EXTRACTION_TIMEOUT_MS = 50L
         const val RERANK_TIMEOUT_MS = 200L
         const val DEFAULT_MAX_OUTPUT_TOKENS = 2_048
-        const val MIN_MULTIMODAL_TIMEOUT_SECONDS = 90
         const val MIN_MULTIMODAL_IDLE_TIMEOUT_MS = 60_000L
         const val WORK_SYSTEM_PROMPT =
             "你是知伴 Work Agent。需要创建日程时必须调用 calendar.schedule.create；" +

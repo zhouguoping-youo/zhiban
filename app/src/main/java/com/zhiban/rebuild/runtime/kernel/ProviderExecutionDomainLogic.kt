@@ -118,6 +118,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+private const val MIN_MULTIMODAL_TIMEOUT_SECONDS = 90
+
 private val ENGLISH_NAMED_TITLE = Regex(
     """\b(?:called|titled|named)\s+(.+?)(?=,?\s+(?:with\s+)?remind(?:er|\s+me)?\b|,\s*with\b|[.!?]\s*$|$)""",
     RegexOption.IGNORE_CASE,
@@ -134,6 +136,34 @@ private val CHINESE_REMINDER = Regex("""提前\s*(\d{1,4})\s*分钟""")
  * confirmation card, not a possibly-wrong restated time. All other paths stream text normally.
  */
 internal fun shouldStreamAssistantText(forcedCanonicalTool: String?): Boolean = forcedCanonicalTool != SchedulePlanValidator.TOOL_NAME
+
+internal fun activatedSkillsFor(
+    input: DecodedInput,
+    queryContext: QueryContext,
+    config: com.zhiban.rebuild.runtime.config.AgentDynamicConfig,
+    skills: List<SkillSpec>,
+    toolNames: Set<String>,
+    toolEnabled: (String) -> Boolean,
+): List<SkillActivation> = SkillActivator(skills).activate(
+    queryContext.intentLabel.name,
+    input.mode,
+    toolNames.filter(toolEnabled).toSet(),
+).filterNot { it.skillId in config.disabledSkills }
+
+internal fun reactTimeoutMs(
+    hasAttachments: Boolean,
+    llmTimeoutSeconds: Int,
+    networkQuality: com.zhiban.rebuild.runtime.network.NetworkQuality,
+    totalTimeoutMs: Long,
+): Long {
+    val configured = if (hasAttachments) {
+        maxOf(llmTimeoutSeconds, MIN_MULTIMODAL_TIMEOUT_SECONDS) * 1_000L
+    } else {
+        llmTimeoutSeconds * 1_000L
+    }
+    val network = if (networkQuality == com.zhiban.rebuild.runtime.network.NetworkQuality.WEAK) 15_000L else totalTimeoutMs
+    return minOf(network, configured)
+}
 
 /** Executes only the provider portion of a Runtime v2 run. It never exposes credential material. */
 internal fun normalizeCalendarToolCall(

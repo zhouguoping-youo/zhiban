@@ -1,6 +1,7 @@
 package com.zhiban.rebuild.runtime.kernel
 
 import com.zhiban.rebuild.runtime.context.LocalEntityExtractor
+import com.zhiban.rebuild.runtime.network.NetworkQuality
 import com.zhiban.rebuild.runtime.provider.ModelEvent
 import com.zhiban.rebuild.runtime.tool.SchedulePlanValidator
 import java.time.LocalDateTime
@@ -69,6 +70,12 @@ class CalendarTimeResolutionTest {
 
         assertEquals("Resume Confirmation Test", arguments.getValue("title").jsonPrimitive.content)
         assertEquals(10, arguments.getValue("reminderMinutesBefore").jsonPrimitive.content.toInt())
+    }
+
+    @Test fun reactTimeoutKeepsMultimodalAndWeakNetworkBudgets() {
+        assertEquals(90_000L, reactTimeoutMs(true, 30, NetworkQuality.NORMAL, 120_000L))
+        assertEquals(15_000L, reactTimeoutMs(false, 30, NetworkQuality.WEAK, 120_000L))
+        assertEquals(30_000L, reactTimeoutMs(false, 30, NetworkQuality.NORMAL, 120_000L))
     }
 
     private fun ModelEvent.ToolCall.startAt(): Long = Json.parseToJsonElement(argumentsJson).jsonObject["startAtEpochMs"]!!.jsonPrimitive.long
