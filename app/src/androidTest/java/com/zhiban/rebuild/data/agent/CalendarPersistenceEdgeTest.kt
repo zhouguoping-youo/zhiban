@@ -65,6 +65,29 @@ class CalendarPersistenceEdgeTest {
         assertEquals("重复会议", db.scheduleDao().findById("system-calendar-42:1000")?.title)
     }
 
+    @Test fun equivalentSystemEventDoesNotDuplicateAnExistingZhiBanSchedule() = runBlocking {
+        val start = 2_000_000L
+        calendar.saveUserSchedule(null, "向王经理发送武汉医院项目最终报价单", start, 30, null, null, nowEpochMs = 1L)
+
+        val summary = calendar.importConfirmedSystemCalendarEvents(
+            listOf(
+                SystemCalendarEvent(
+                    sourceId = "device-duplicate",
+                    title = "向王经理发送武汉医院项目最终报价单",
+                    startAtEpochMs = start,
+                    endAtEpochMs = start + 30 * 60_000L,
+                    location = null,
+                    description = null,
+                    calendarName = "My calendar",
+                ),
+            ),
+            nowEpochMs = 2L,
+        )
+
+        assertEquals(0, summary.created)
+        assertEquals(1, db.scheduleDao().count())
+    }
+
     @Test fun completionStoresFeedbackAndReschedulingReopensTheSchedule() = runBlocking {
         val scheduleId = calendar.saveUserSchedule(null, "回访客户", 1_000_000L, 30, null, null, nowEpochMs = 1L)
 

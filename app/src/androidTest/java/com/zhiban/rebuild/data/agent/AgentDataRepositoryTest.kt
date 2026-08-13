@@ -1216,6 +1216,39 @@ class AgentDataRepositoryTest {
     }
 
     @Test
+    fun equivalentScheduleCandidatesFromDifferentMessagesReuseOneCalendarEvent() = runBlocking {
+        val start = System.currentTimeMillis() + 24 * 60 * 60_000L
+        suspend fun stage(id: String, sourceKey: String) {
+            repository.stageNotificationCandidate(
+                NotificationCandidateEntity(
+                    candidateId = id,
+                    sourceKey = sourceKey,
+                    packageName = "com.ss.android.lark",
+                    appLabel = "飞书",
+                    title = "王敏",
+                    body = "明天下午三点开项目会议",
+                    postedAtEpochMs = System.currentTimeMillis(),
+                    platform = "FEISHU",
+                    conversationTitle = "王敏",
+                    senderName = "王敏",
+                    messageKind = "SCHEDULE_CANDIDATE",
+                    insightJson = NotificationInsights(
+                        schedule = ScheduleInsight("项目会议。", start, 60, confidence = 0.92),
+                    ).toJsonOrNull(),
+                ),
+            )
+        }
+        stage("candidate-one", "source-one")
+        stage("candidate-two", "source-two")
+
+        val first = repository.confirmNotificationSchedule("candidate-one")
+        val second = repository.confirmNotificationSchedule("candidate-two")
+
+        assertEquals(first, second)
+        assertEquals(1, database.scheduleDao().count())
+    }
+
+    @Test
     fun confirmedContactMergeIsNonDestructiveAndReversible() = runBlocking {
         val primary = repository.saveUserContact(null, "王小明", "13800138008", null, "星河科技", null, null, null, 1_000L)
         val duplicate = repository.saveUserContact(null, "王老师", "13800138008", null, null, null, null, null, 2_000L)

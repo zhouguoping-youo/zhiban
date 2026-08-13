@@ -21,6 +21,7 @@
 | 1.10 | CRM 下一步动作联动 | — | 尚未实测 | — | — | — | — | — | — |
 | 1.11 | 消息日程误识别 | ✅已修复 | 含日期时间的普通“合约到期”消息被当作“约见”日程候选 | 用通知感知输入“明天下午3点这个合约到期” | 功能不可用 | 日程动作词把单字“约”作为任意子串匹配，命中“合约” | `a2773e5` | `SocialMessagePerceptionTest.contractDeadlineWithoutSchedulingIntentIsNotMistakenForAnAppointment`；`explicitAppointmentStillProducesASchedule` | 修复包待真机复验 |
 | 1.12 | 日程完成、延期与结果反馈 | ✅已修复 | 日程到期后没有待反馈状态，也不能记录完成结果或延期，用户无法闭环安排 | 创建一个日程，等待到期后查看日历；尝试记录结果或改期 | 功能不可用 | `ScheduleEntity` 只有时间、标题和备注，没有生命周期与结果字段；日历行只有编辑、删除 | 本提交 | `ScheduleLifecycleMigrationTest.existingSchedulesRemainPendingAfterLifecycleMigration`；`CalendarPersistenceEdgeTest.completionStoresFeedbackAndReschedulingReopensTheSchedule`；`ScheduleLifecycleLabelTest` | 2026-08-13 真机验证：数据库 37→38 与持久化 5/5 通过；新建 `AUDIT_LIFECYCLE` 后可打开“更新进展”，键盘反馈 `AUDIT_DONE` 持久化并显示“已完成 / 结果：AUDIT_DONE”；语音入口可启动系统识别器；延期进入原日程改期页 |
+| 1.13 | 跨来源重复日程 | ✅已修复 | 知伴中已有同标题、同开始时间、同时长的日程，再导入系统日历会新增一条副本；不同消息候选也只按来源键去重 | 先在知伴创建“向王经理发送武汉医院项目最终报价单”；再从系统日历导入同一事件；另用两个不同消息来源确认同一安排 | 功能不可用 | 去重仅使用各来源自己的 ID/sourceKey，没有统一的日程语义身份；跨系统日历、通知、Agent 来源无法相认 | 本提交 | `CalendarPersistenceEdgeTest.equivalentSystemEventDoesNotDuplicateAnExistingZhiBanSchedule`；`AgentDataRepositoryTest.equivalentScheduleCandidatesFromDifferentMessagesReuseOneCalendarEvent` | 2026-08-13 真机设备测试 50/50 通过；修复前定向用例红：期望 0 新增、实际 1；修复后同标题标准化、开始时间 ±5 分钟、时长 ±5 分钟内复用既有日程 |
 
 ## 2. 关系 TAB
 

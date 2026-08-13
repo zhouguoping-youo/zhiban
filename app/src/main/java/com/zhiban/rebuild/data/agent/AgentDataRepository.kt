@@ -250,6 +250,15 @@ class AgentDataRepository internal constructor(
             val scheduleId = "notification-schedule-${candidate.sourceKey.take(32)}"
             val source = candidate.senderName ?: candidate.conversationTitle
             val cleanTitle = resolveScheduleTitleFromCandidate(candidate, insight, source)
+            calendar.findEquivalentSchedule(cleanTitle, insight.startAtEpochMs, insight.durationMinutes)?.let { existing ->
+                daos.notificationCandidateDao.upsert(
+                    candidate.copy(
+                        createdScheduleId = existing.id,
+                        status = candidate.completionStatus(createdScheduleId = existing.id),
+                    ),
+                )
+                return@runInTransaction calendar.findSchedule(existing.id) ?: error("已存在的日程不存在")
+            }
             saveUserSchedule(
                 scheduleId = scheduleId,
                 title = cleanTitle,
@@ -360,12 +369,16 @@ class AgentDataRepository internal constructor(
         daos.changeLogDao.findByIdempotencyKey(idempotencyKey)?.let { existing ->
             return calendar.findSchedule(existing.targetId)
         }
-        if (calendar.findScheduleConflicts(insight.startAtEpochMs, insight.durationMinutes).isNotEmpty()) return null
         val scheduleId = "notification-schedule-${sha256(candidate.sourceKey).take(32)}"
         val source = candidate.senderName ?: candidate.conversationTitle
+        val scheduleTitle = resolveScheduleTitleFromCandidate(candidate, insight, source)
+        calendar.findEquivalentSchedule(scheduleTitle, insight.startAtEpochMs, insight.durationMinutes)?.let { existing ->
+            return calendar.findSchedule(existing.id)
+        }
+        if (calendar.findScheduleConflicts(insight.startAtEpochMs, insight.durationMinutes).isNotEmpty()) return null
         calendar.saveUserSchedule(
             scheduleId = scheduleId,
-            title = resolveScheduleTitleFromCandidate(candidate, insight, source),
+            title = scheduleTitle,
             startAtEpochMs = insight.startAtEpochMs,
             durationMinutes = insight.durationMinutes,
             note = "知伴根据${candidate.appLabel}消息自动整理，可撤销",

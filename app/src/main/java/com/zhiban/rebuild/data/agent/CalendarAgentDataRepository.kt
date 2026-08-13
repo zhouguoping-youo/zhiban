@@ -147,6 +147,10 @@ internal class CalendarAgentDataRepository(private val database: AgentDatabase) 
                     event.description,
                     event.calendarName?.let { "来自系统日历：$it" },
                 ).joinToString("\n").takeIf(String::isNotBlank)
+                if (existing == null && findEquivalentSchedule(event.title, event.startAtEpochMs, duration) != null) {
+                    updated++
+                    return@forEach
+                }
                 val value = ScheduleEntity(
                     id = id,
                     title = event.title.trim().take(200),
@@ -181,7 +185,29 @@ internal class CalendarAgentDataRepository(private val database: AgentDatabase) 
             excludeId = excludeScheduleId,
         )
 
+    suspend fun findEquivalentSchedule(title: String, startAtEpochMs: Long, durationMinutes: Int, excludeScheduleId: String? = null): ScheduleProjection? {
+        val normalizedTitle = normalizeScheduleIdentityTitle(title)
+        if (normalizedTitle.isBlank()) return null
+        return schedules.listRange(
+            fromEpochMs = startAtEpochMs - EQUIVALENT_START_TOLERANCE_MS,
+            toEpochMs = startAtEpochMs + durationMinutes * 60_000L + EQUIVALENT_START_TOLERANCE_MS,
+            limit = 100,
+        ).firstOrNull { candidate ->
+            candidate.id != excludeScheduleId &&
+                kotlin.math.abs(candidate.startAtEpochMs - startAtEpochMs) <= EQUIVALENT_START_TOLERANCE_MS &&
+                kotlin.math.abs(candidate.durationMinutes - durationMinutes) <= EQUIVALENT_DURATION_TOLERANCE_MINUTES &&
+                normalizeScheduleIdentityTitle(candidate.title) == normalizedTitle
+        }
+    }
+
     private companion object {
         const val PAST_SCHEDULE_GRACE_MS = 5 * 60_000L
+        const val EQUIVALENT_START_TOLERANCE_MS = 5 * 60_000L
+        const val EQUIVALENT_DURATION_TOLERANCE_MINUTES = 5
     }
 }
+
+internal fun normalizeScheduleIdentityTitle(value: String): String = value
+    .trim()
+    .lowercase()
+    .filter { it.isLetterOrDigit() }
