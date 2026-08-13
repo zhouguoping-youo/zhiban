@@ -27,7 +27,7 @@
 | 2.1 | 系统通讯录导入 | ✅已修复 | 授权前说明称“不会默认全选”，进入选择页却默认勾选全部 1198 人，说明与真实行为相反 | 清除通讯录权限；关系 TAB 点导入→继续→允许；观察授权前说明与选择页初始状态 | 文案 | 授权说明硬编码了旧策略，选择页当前设计是默认全选且允许取消 | `ba3b3bb` | `RelationPhoneMatchingTest.contactImportPermissionIntroDescribesDefaultSelectionTruthfully` | 2026-08-13 修复包复验：说明明确“默认勾选、导入前可取消”；真实导入 1198 人约 22 秒完成，无 ANR/闪退，落库 1193 人、5 人匹配更新 |
 | 2.2 | 搜索与标签筛选 | ⚪无法复现 | 未发现功能问题：1194 位联系人下，姓名、手机号、公司和备注均能精确命中；大类筛选不会串类 | 新建 `AUDIT_RELATION_001`，分别搜索姓名、`13800138001`、`Audit Company`、`AUDIT_NOTE_001`；清空搜索后依次选择“工作”和“家人” | — | — | — | `RelationGraphInferenceTest.expanded taxonomy participates in existing category filters`；既有 Room 联系人查询测试 | 2026-08-13 真机验证通过：四种字段均返回唯一测试联系人；工作包含、家人排除，无卡顿/闪退 |
 | 2.3 | 联系人详情编辑 | ⚪无法复现 | 未发现功能问题：编辑保存后详情与列表即时刷新，未修改字段保持不变 | 打开 `AUDIT_RELATION_001` 详情，将职位 `Tester` 改为 `Tester2` 并保存；重新打开详情核对手机号、微信、公司和备注 | — | — | — | 既有联系人持久化与详情设备测试 | 2026-08-13 真机验证通过：详情显示 `Audit Company Ltd · Tester2`，其余字段未丢失 |
-| 2.4 | 同一联系人多身份 | — | 尚未实测 | — | — | — | — | — | — |
+| 2.4 | 同一联系人多身份 | ⚪无法复现 | 未发现覆盖问题：同一联系人可以并存不同类型关系，新增第二种关系不会覆盖第一种 | 以“我”和 `AUDIT_RELATION_001` 先建立“下属”，再新增“兴趣圈友”；返回关系图并打开联系人详情 | — | — | — | `ContactTemporalWriteTest.endingOneRelationshipTypeKeepsOtherTypeCurrent`；`AgentDataRepositoryTest.signedInUserCanBeAConfirmedRelationshipEndpointWithoutBecomingAContact` | 2026-08-13 真机验证通过：关系图统计由 1 条增至 2 条；详情“关联的人”同时显示“兴趣圈友”和“下属”，两条均指向“我” |
 | 2.5 | 合并与撤销合并 | — | 尚未实测 | — | — | — | — | — | — |
 | 2.6 | 关系图谱点击/拖动/缩放/聚焦 | — | 尚未实测 | — | — | — | — | — | — |
 | 2.7 | 智能完善建议确认/拒绝 | — | 尚未实测 | — | — | — | — | — | — |
