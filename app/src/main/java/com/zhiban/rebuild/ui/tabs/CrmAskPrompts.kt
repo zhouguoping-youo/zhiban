@@ -21,7 +21,8 @@ internal fun crmSuggestionPrompt(opportunityId: String?, suggestionTitle: String
         "请先调用 crm.opportunity.get 查询个人 CRM 机会 ID“$opportunityId”，再分析建议“$suggestionTitle”的依据、风险和下一步。" +
             "如果我决定执行，请调用对应的 crm.opportunity.update、crm.opportunity.changeStage、" +
             "crm.activity.append 或 crm.nextAction.create 逐项发起写入确认；" +
-            "完成下一步动作时使用 crm.nextAction.complete，日程仍走独立确认，不要只给文字建议。"
+            "完成下一步动作时使用 crm.nextAction.complete；为新动作安排时间时，先取得 crm.nextAction.create 返回的 targetId，" +
+            "再作为 crmActionId 调用 calendar.schedule.create 走独立确认，不要只给文字建议。"
     },
 )
 
@@ -35,6 +36,7 @@ internal fun crmOpportunityCoachPrompt(opportunityId: String, opportunityTitle: 
             "请先调用 crm.opportunity.get 查询个人 CRM 机会 ID“$opportunityId”，再围绕“$guidanceTitle”开展工作。" +
                 "当前界面依据为“$evidence”，请核对机会、联系人、最近活动和下一步动作，不要把界面判断直接当成事实。" +
                 "先给出简短准备结果；需要写入活动、下一步动作、机会字段或阶段时，调用对应 CRM 工具逐项确认；" +
-                "需要安排时间时走 crm.nextAction.create 和日历确认链；对外发送必须由用户最后确认。"
+                "需要安排时间时先用 crm.nextAction.create 建动作，再把返回的 targetId 作为 crmActionId 交给 " +
+                "calendar.schedule.create 走日历确认链；对外发送必须由用户最后确认。"
         },
     )

@@ -24,6 +24,7 @@ data class ScheduleCreateToolCall(
     val durationMinutes: Int,
     val note: String?,
     val reminderMinutesBefore: Int? = null,
+    val crmActionId: String? = null,
 ) {
     init {
         require(providerCallId.isNotBlank() && providerCallId.length <= 128)
@@ -37,6 +38,7 @@ data class ScheduleCreateToolCall(
         require(durationMinutes in 1..1440)
         require(note == null || note.length <= 2_000)
         require(reminderMinutesBefore == null || reminderMinutesBefore in setOf(10, 30, 60, 1_440))
+        require(crmActionId == null || (crmActionId.isNotBlank() && crmActionId.length <= 128))
     }
 }
 
@@ -136,6 +138,7 @@ object SchedulePlanValidator {
             durationMinutes = value.getValue("durationMinutes").jsonPrimitive.content.toInt(),
             note = value["note"]?.jsonPrimitive?.content,
             reminderMinutesBefore = value["reminderMinutesBefore"]?.jsonPrimitive?.content?.toInt(),
+            crmActionId = value["crmActionId"]?.jsonPrimitive?.content,
         )
     }
 
@@ -144,7 +147,7 @@ object SchedulePlanValidator {
         setOf(
             "toolName", "providerCallId", "logicalStepId", "proposalId", "payloadRef", "revision",
             "canonicalInputDigest", "idempotencyKey", "scheduleId", "title", "startAtEpochMs", "durationMinutes",
-            "note", "reminderMinutesBefore",
+            "note", "reminderMinutesBefore", "crmActionId",
         )
 }
 
@@ -166,6 +169,7 @@ fun canonicalScheduleDigest(call: ScheduleCreateToolCall): String {
         call.durationMinutes.toString(),
         call.note?.let { "1:${normalized(it)}" } ?: "0",
         call.reminderMinutesBefore?.toString() ?: "0",
+        call.crmActionId?.let { "1:${normalized(it)}" } ?: "0",
     )
     val framed = fields.joinToString(separator = "") { value -> "${value.toByteArray(Charsets.UTF_8).size}:$value" }
     return sha256(framed)

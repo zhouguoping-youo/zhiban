@@ -34,7 +34,13 @@ class RuntimeToolContractsTest {
             predicateKey = predicateKey,
         )
 
-    private fun scheduleCall(scheduleId: String = "sched-1", title: String = "周五评审", note: String? = null, reminderMinutesBefore: Int? = null) =
+    private fun scheduleCall(
+        scheduleId: String = "sched-1",
+        title: String = "周五评审",
+        note: String? = null,
+        reminderMinutesBefore: Int? = null,
+        crmActionId: String? = null,
+    ) =
         ScheduleCreateToolCall(
             providerCallId = "call-1",
             logicalStepId = "step-1",
@@ -49,6 +55,7 @@ class RuntimeToolContractsTest {
             durationMinutes = 30,
             note = note,
             reminderMinutesBefore = reminderMinutesBefore,
+            crmActionId = crmActionId,
         )
 
     private fun schedulePlan(
@@ -57,6 +64,7 @@ class RuntimeToolContractsTest {
         toolName: String = SchedulePlanValidator.TOOL_NAME,
         note: String? = "带笔记本",
         reminder: Int? = 30,
+        crmActionId: String? = null,
         extraField: String? = null,
         padNoteTo: Int = 0,
     ): String {
@@ -76,6 +84,7 @@ class RuntimeToolContractsTest {
             add(""""durationMinutes":"30"""")
             if (noteValue.isNotEmpty() || padNoteTo > 0) add(""""note":"$noteValue"""")
             reminder?.let { add(""""reminderMinutesBefore":"$it"""") }
+            crmActionId?.let { add(""""crmActionId":"$it"""") }
             extraField?.let { add(it) }
         }
         return fields.joinToString(prefix = "{", postfix = "}")
@@ -127,6 +136,15 @@ class RuntimeToolContractsTest {
         assertNotEquals(base, canonicalMemoryDigest(memoryCall(memoryType = "FACT")))
         assertNotEquals(base, canonicalMemoryDigest(memoryCall(subjectKey = "别人")))
         assertNotEquals(base, canonicalMemoryDigest(memoryCall(predicateKey = "other")))
+    }
+
+    @Test
+    fun `schedule digest and plan bind the optional CRM action`() {
+        val withoutAction = scheduleCall()
+        val withAction = scheduleCall(crmActionId = "action-1")
+
+        assertNotEquals(canonicalScheduleDigest(withoutAction), canonicalScheduleDigest(withAction))
+        assertEquals("action-1", SchedulePlanValidator.validate(schedulePlan(crmActionId = "action-1")).crmActionId)
     }
 
     @Test

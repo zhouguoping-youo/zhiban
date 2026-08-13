@@ -792,6 +792,7 @@ internal class RoomApprovalStore(
         put("durationMinutes", call.durationMinutes)
         call.note?.let { put("note", it) }
         call.reminderMinutesBefore?.let { put("reminderMinutesBefore", it) }
+        call.crmActionId?.let { put("crmActionId", it) }
     }.toString()
 
     private companion object {

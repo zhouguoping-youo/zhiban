@@ -93,6 +93,7 @@ internal fun validatedScheduleCall(request: RuntimeToolCallRequest, runId: Strin
         args["durationMinutes"]?.jsonPrimitive?.content?.toIntOrNull() ?: 30,
         args["note"]?.jsonPrimitive?.content,
         args["reminderMinutesBefore"]?.jsonPrimitive?.content?.toIntOrNull(),
+        args["crmActionId"]?.jsonPrimitive?.content,
     )
     val withDigest = seed.copy(canonicalInputDigest = canonicalScheduleDigest(seed))
     return withDigest.copy(idempotencyKey = canonicalToolIdempotencyKey(runId, attemptId, withDigest))

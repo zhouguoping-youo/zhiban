@@ -3,6 +3,7 @@ import androidx.room.withTransaction
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.ScheduleEntity
 import com.zhiban.rebuild.data.agent.ToolAuditEntity
+import com.zhiban.rebuild.data.crm.CrmActionStatus
 import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.context.FactIndex
 import com.zhiban.rebuild.runtime.governance.ChangeLogEntity
@@ -112,6 +113,11 @@ internal class RoomScheduleToolExecutor(
         if (database.scheduleDao().findConflicts(call.startAtEpochMs, endAt).isNotEmpty()) {
             throw CalendarScheduleConflictException("CALENDAR_SCHEDULE_CONFLICT")
         }
+        call.crmActionId?.let { actionId ->
+            val action = requireNotNull(database.crmDao().findAction(actionId)) { "CRM_ACTION_NOT_FOUND" }
+            check(action.status == CrmActionStatus.PENDING) { "CRM_ACTION_NOT_PENDING" }
+            check(action.scheduleId == null || action.scheduleId == call.scheduleId) { "CRM_ACTION_ALREADY_SCHEDULED" }
+        }
     }
 
     private companion object {
@@ -130,6 +136,7 @@ internal class RoomScheduleToolExecutor(
             put("title", call.title)
             put("startAtEpochMs", call.startAtEpochMs)
             put("durationMinutes", call.durationMinutes)
+            call.crmActionId?.let { put("crmActionId", it) }
         }.toString()
         val schedule = ScheduleEntity(
             call.scheduleId, call.title, call.startAtEpochMs, call.durationMinutes, call.note,
@@ -138,6 +145,18 @@ internal class RoomScheduleToolExecutor(
             reminderMinutesBefore = call.reminderMinutesBefore,
         )
         database.scheduleDao().insert(schedule)
+        call.crmActionId?.let { actionId ->
+            val action = requireNotNull(database.crmDao().findAction(actionId)) { "CRM_ACTION_NOT_FOUND" }
+            check(
+                database.crmDao().updateAction(
+                    action.copy(
+                        dueAtEpochMs = call.startAtEpochMs,
+                        scheduleId = call.scheduleId,
+                        updatedAtEpochMs = context.nowEpochMs,
+                    ),
+                ) == 1,
+            )
+        }
         FactIndex(database).upsert(
             FactEntity(
                 factId = "schedule:${call.scheduleId}", factType = "CALENDAR_EVENT",

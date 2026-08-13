@@ -64,7 +64,7 @@ class RuntimeToolCatalog(val specs: Map<String, RuntimeToolSpec>) {
                     SchedulePlanValidator.TOOL_NAME,
                     1,
                     RuntimeToolRisk.WRITE_CONFIRMATION_REQUIRED,
-                    """{"type":"function","function":{"name":"calendar.schedule.create","description":"创建用户确认后的日程；用户明确说提醒时设置 reminderMinutesBefore","parameters":{"type":"object","additionalProperties":false,"required":["title","startAtEpochMs","durationMinutes"],"properties":{"title":{"type":"string"},"startAtEpochMs":{"type":"integer"},"durationMinutes":{"type":"integer","minimum":1,"maximum":1440},"note":{"type":"string"},"reminderMinutesBefore":{"type":"integer","enum":[10,30,60,1440],"description":"提前多少分钟提醒；用户没有要求提醒时省略"}}}}}""",
+                    """{"type":"function","function":{"name":"calendar.schedule.create","description":"创建用户确认后的日程；若日程来自 CRM 下一步动作，传入 crmActionId 以建立真实关联；用户明确说提醒时设置 reminderMinutesBefore","parameters":{"type":"object","additionalProperties":false,"required":["title","startAtEpochMs","durationMinutes"],"properties":{"title":{"type":"string"},"startAtEpochMs":{"type":"integer"},"durationMinutes":{"type":"integer","minimum":1,"maximum":1440},"note":{"type":"string"},"reminderMinutesBefore":{"type":"integer","enum":[10,30,60,1440],"description":"提前多少分钟提醒；用户没有要求提醒时省略"},"crmActionId":{"type":"string","description":"可选，关联的 CRM 下一步动作 ID"}}}}}""",
                     8,
                 ),
                 RuntimeToolSpec(

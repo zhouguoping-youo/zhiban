@@ -6,6 +6,11 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.ScheduleEntity
+import com.zhiban.rebuild.data.crm.CrmActionStatus
+import com.zhiban.rebuild.data.crm.CrmNextActionEntity
+import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
+import com.zhiban.rebuild.data.crm.CrmOpportunityStage
+import com.zhiban.rebuild.data.crm.CrmRecordStatus
 import com.zhiban.rebuild.runtime.context.FactIndex
 import com.zhiban.rebuild.runtime.kernel.PersistentRuntimeKernel
 import com.zhiban.rebuild.runtime.kernel.RuntimeSignal
@@ -80,6 +85,54 @@ class RoomScheduleToolExecutorTest {
         )
     }
 
+    @Test fun confirmedScheduleLinksItsPendingCrmActionInTheSameTransaction() = runBlocking {
+        database.crmDao().insertOpportunity(
+            CrmOpportunityEntity(
+                "opp-1", "武汉项目", "客户公司", null, null, CrmOpportunityStage.QUALIFIED,
+                CrmRecordStatus.OPEN, null, "CNY", 45, null, null, null, null,
+                "USER_CONFIRMED", 1, 1,
+            ),
+        )
+        database.crmDao().insertAction(
+            CrmNextActionEntity(
+                "action-1", "opp-1", null, "FOLLOW_UP", "发送方案", 10_000,
+                CrmActionStatus.PENDING, 80, null, "USER_CONFIRMED", null, 1, 1,
+            ),
+        )
+        val unsigned = call().copy(
+            crmActionId = "action-1",
+            canonicalInputDigest = "0".repeat(64),
+            idempotencyKey = "pending",
+        )
+        val withDigest = unsigned.copy(canonicalInputDigest = canonicalScheduleDigest(unsigned))
+        val call = withDigest.copy(idempotencyKey = canonicalToolIdempotencyKey("run", "attempt", withDigest))
+        val fixture = fixture(approvedCall = call)
+
+        executor.execute(fixture, call, confirmationFor(call))
+
+        val linkedAction = requireNotNull(database.crmDao().findAction("action-1"))
+        assertEquals(call.scheduleId, linkedAction.scheduleId)
+        assertEquals(call.startAtEpochMs, linkedAction.dueAtEpochMs)
+    }
+
+    @Test fun missingCrmActionRollsBackTheConfirmedScheduleAndItsAudit() = runBlocking {
+        val unsigned = call().copy(
+            crmActionId = "missing-action",
+            canonicalInputDigest = "0".repeat(64),
+            idempotencyKey = "pending",
+        )
+        val withDigest = unsigned.copy(canonicalInputDigest = canonicalScheduleDigest(unsigned))
+        val call = withDigest.copy(idempotencyKey = canonicalToolIdempotencyKey("run", "attempt", withDigest))
+        val fixture = fixture(approvedCall = call)
+
+        val failure = runCatching { executor.execute(fixture, call, confirmationFor(call)) }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+        assertEquals(0, database.scheduleDao().count())
+        assertEquals(0, database.toolAuditDao().count())
+        assertEquals(null, store.toolResult(call.idempotencyKey))
+    }
+
     @Test fun idempotencyKeyWithDifferentCanonicalDigestIsConflictWithoutSecondWrite() = runBlocking {
         val fixture = fixture()
         val call = call()
@@ -139,6 +192,7 @@ class RoomScheduleToolExecutorTest {
             { it.copy(durationMinutes = it.durationMinutes + 1) },
             { it.copy(note = "篡改") },
             { it.copy(scheduleId = "tampered-${it.scheduleId}") },
+            { it.copy(crmActionId = "tampered-crm-action") },
         )
         mutations.forEachIndexed { index, mutate ->
             val fixture = fixtureFor("run-$index", "session-$index", "attempt-$index")
