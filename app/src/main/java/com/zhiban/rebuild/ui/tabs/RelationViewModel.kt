@@ -64,6 +64,32 @@ data class ContactImportUiState(
 
 data class ContactMergeSuggestion(val first: ContactEntity, val second: ContactEntity, val reason: String, val confidence: Double)
 
+data class RelationPageSnapshot(
+    val contacts: List<ContactEntity> = emptyList(),
+    val relationships: List<RelationshipEdgeEntity> = emptyList(),
+    val temporalRelationships: List<RelationshipEpisodeEntity> = emptyList(),
+    val relationshipEvents: List<RelationshipEventWithParticipants> = emptyList(),
+    val rawContacts: List<ContactEntity> = emptyList(),
+    val ownerContactLinks: List<OwnerContactLinkEntity> = emptyList(),
+    val temporalEmployments: List<PersonEmploymentEpisodeEntity> = emptyList(),
+    val maintenanceOverview: ContactMaintenanceOverview = ContactMaintenanceOverview(emptyList(), 0, 0),
+    val unresolvedSourceIdentities: List<SourceIdentityEntity> = emptyList(),
+    val notificationCandidates: List<NotificationCandidateEntity> = emptyList(),
+    val pendingCallNotes: List<CallRecordEntity> = emptyList(),
+    val importState: ContactImportUiState = ContactImportUiState(),
+    val cloudAsrAvailability: CloudAsrAvailability = CloudAsrAvailability.CONSENT_REQUIRED,
+    val enabledMessagePlatforms: Set<String> = MessageCollectionPreferences.DEFAULT_PLATFORMS,
+    val outgoingMessageCollectionEnabled: Boolean = false,
+)
+
+private data class RelationInboxSnapshot(
+    val unresolvedSourceIdentities: List<SourceIdentityEntity>,
+    val notificationCandidates: List<NotificationCandidateEntity>,
+    val pendingCallNotes: List<CallRecordEntity>,
+    val importState: ContactImportUiState,
+    val cloudAsrAvailability: CloudAsrAvailability,
+)
+
 class RelationContactServices @Inject constructor(
     val systemContactReader: SystemContactReader,
     val companyEnrichment: CompanyEnrichmentRefresher,
@@ -168,6 +194,55 @@ class RelationViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     private val mutableCloudAsrAvailability = MutableStateFlow(CloudAsrAvailability.CONSENT_REQUIRED)
     val cloudAsrAvailability = mutableCloudAsrAvailability.asStateFlow()
+    val pageSnapshot: StateFlow<RelationPageSnapshot> = combine(
+        combine(contacts, relationships, temporalRelationships, relationshipEvents, rawContacts) {
+                contacts,
+                relationships,
+                temporalRelationships,
+                relationshipEvents,
+                rawContacts,
+            ->
+            RelationPageSnapshot(
+                contacts = contacts,
+                relationships = relationships,
+                temporalRelationships = temporalRelationships,
+                relationshipEvents = relationshipEvents,
+                rawContacts = rawContacts,
+            )
+        },
+        combine(ownerContactLinks, temporalEmployments, maintenanceOverview) { ownerContactLinks, temporalEmployments, maintenanceOverview ->
+            Triple(ownerContactLinks, temporalEmployments, maintenanceOverview)
+        },
+        combine(
+            unresolvedSourceIdentities,
+            notificationCandidates,
+            pendingCallNotes,
+            importState,
+            cloudAsrAvailability,
+        ) { unresolvedSourceIdentities, notificationCandidates, pendingCallNotes, importState, cloudAsr ->
+            RelationInboxSnapshot(
+                unresolvedSourceIdentities,
+                notificationCandidates,
+                pendingCallNotes,
+                importState,
+                cloudAsr,
+            )
+        },
+        combine(enabledMessagePlatforms, outgoingMessageCollectionEnabled) { enabled, outgoing -> enabled to outgoing },
+    ) { base, owner, inbox, collection ->
+        base.copy(
+            ownerContactLinks = owner.first,
+            temporalEmployments = owner.second,
+            maintenanceOverview = owner.third,
+            unresolvedSourceIdentities = inbox.unresolvedSourceIdentities,
+            notificationCandidates = inbox.notificationCandidates,
+            pendingCallNotes = inbox.pendingCallNotes,
+            importState = inbox.importState,
+            cloudAsrAvailability = inbox.cloudAsrAvailability,
+            enabledMessagePlatforms = collection.first,
+            outgoingMessageCollectionEnabled = collection.second,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RelationPageSnapshot())
 
     init {
         viewModelScope.launch { repository.purgeNonPersonalSmsCandidates() }

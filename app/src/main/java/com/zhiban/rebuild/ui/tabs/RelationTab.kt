@@ -192,18 +192,19 @@ fun RelationTab(
         MainTabEmptyPage("relation", modifier)
         return
     }
-    val contacts by viewModel.contacts.collectAsStateWithLifecycle()
-    val relationships by viewModel.relationships.collectAsStateWithLifecycle()
-    val temporalRelationships by viewModel.temporalRelationships.collectAsStateWithLifecycle()
-    val relationshipEvents by viewModel.relationshipEvents.collectAsStateWithLifecycle()
-    val rawContacts by viewModel.rawContacts.collectAsStateWithLifecycle()
-    val ownerContactLinks by viewModel.ownerContactLinks.collectAsStateWithLifecycle()
-    val temporalEmployments by viewModel.temporalEmployments.collectAsStateWithLifecycle()
-    val maintenanceOverview by viewModel.maintenanceOverview.collectAsStateWithLifecycle()
-    val unresolvedSourceIdentities by viewModel.unresolvedSourceIdentities.collectAsStateWithLifecycle()
-    val notificationCandidates by viewModel.notificationCandidates.collectAsStateWithLifecycle()
-    val pendingCallNotes by viewModel.pendingCallNotes.collectAsStateWithLifecycle()
-    val cloudAsrAvailability by viewModel.cloudAsrAvailability.collectAsStateWithLifecycle()
+    val page by viewModel.pageSnapshot.collectAsStateWithLifecycle()
+    val contacts = page.contacts
+    val relationships = page.relationships
+    val temporalRelationships = page.temporalRelationships
+    val relationshipEvents = page.relationshipEvents
+    val rawContacts = page.rawContacts
+    val ownerContactLinks = page.ownerContactLinks
+    val temporalEmployments = page.temporalEmployments
+    val maintenanceOverview = page.maintenanceOverview
+    val unresolvedSourceIdentities = page.unresolvedSourceIdentities
+    val notificationCandidates = page.notificationCandidates
+    val pendingCallNotes = page.pendingCallNotes
+    val cloudAsrAvailability = page.cloudAsrAvailability
     val ownerProfile by viewModel.userProfile.collectAsStateWithLifecycle()
     val autoWriteState by autoWriteViewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -628,72 +629,36 @@ fun RelationTab(
         )
     }
 
-    selected?.let { contact ->
-        val aliases by viewModel.aliases.collectAsStateWithLifecycle()
-        val platformIdentities by viewModel.platformIdentities.collectAsStateWithLifecycle()
-        val mergeLinks by viewModel.mergeLinks.collectAsStateWithLifecycle()
-        val factFlow = remember(contact.contactId) { viewModel.contactFacts(contact.contactId) }
-        val facts by factFlow.collectAsStateWithLifecycle(initialValue = emptyList())
-        val callFlow = remember(contact.contactId) { viewModel.contactCalls(contact.contactId) }
-        val recentCalls by callFlow.collectAsStateWithLifecycle(initialValue = emptyList())
-        val opportunityFlow = remember(contact.contactId) { viewModel.contactOpportunities(contact.contactId) }
-        val contactOpportunities by opportunityFlow.collectAsStateWithLifecycle(initialValue = emptyList())
-        val enrichmentFlow = remember(contact.contactId) { viewModel.contactEnrichment(contact.contactId) }
-        val enrichmentSuggestions by enrichmentFlow.collectAsStateWithLifecycle(initialValue = emptyList())
-        ContactDetailDialog(
-            contact = contact,
-            showMarkAsOwner = contact.matchesOwnerProfile(ownerProfile) &&
-                ownerContactLinks.none { it.contactId == contact.contactId },
-            facts = facts,
-            relatedEdges = graphRelationships.filter {
-                it.fromContactId == contact.contactId ||
-                    it.toContactId == contact.contactId
-            },
-            relatedEvents = relationshipEvents.filter { event ->
-                event.participants.any {
-                    it.contactId ==
-                        contact.contactId
-                }
-            },
-            recentCalls = recentCalls,
-            crmOpportunities = contactOpportunities,
-            enrichmentSuggestions = enrichmentSuggestions,
-            contactNames = contacts.associate { it.contactId to it.displayName } +
-                (RelationshipPersonIds.SELF to ownerProfile.relationshipLabel()),
-            aliases = aliases.filter { it.contactId == contact.contactId },
-            platformIdentities = platformIdentities.filter { it.contactId == contact.contactId },
-            mergedSources = mergeLinks.filter { it.canonicalContactId == contact.contactId }.mapNotNull { link ->
-                rawContacts.firstOrNull { it.contactId == link.sourceContactId }?.let { link to it }
-            },
+    RelationDetailOverlay(
+        state = RelationDetailState(
+            selected = selected,
+            ownerProfile = ownerProfile,
+            ownerContactLinks = ownerContactLinks,
+            contacts = contacts,
+            rawContacts = rawContacts,
+            graphRelationships = graphRelationships,
+            relationshipEvents = relationshipEvents,
+        ),
+        actions = RelationDetailActions(
             onDismiss = { selected = null },
-            onEdit = {
+            onEdit = { contact ->
                 selected = null
                 editing = contact
                 showEditor = true
             },
-            onMarkAsOwner = {
+            onMarkAsOwner = { contact ->
                 selected = null
                 markingAsOwner = contact
             },
-            onDelete = {
+            onDelete = { contact ->
                 selected = null
                 deleting = contact
             },
-            onAddFact = { addFactFor = contact },
-            onAddEvent = { addEventFor = contact },
-            onAddIdentity = { identityEditorFor = contact },
+            onAddFact = { addFactFor = it },
+            onAddEvent = { addEventFor = it },
+            onAddIdentity = { identityEditorFor = it },
             onInspectEvent = { selectedEvent = it },
-            onDeleteFact = viewModel::deleteContactFact,
-            onDeleteAlias = viewModel::deleteAlias,
-            onDeletePlatformIdentity = viewModel::deletePlatformIdentity,
-            onUndoMerge = { sourceId -> viewModel.undoMerge(sourceId) },
-            onConfirmEnrichment = { candidate ->
-                viewModel.confirmContactEnrichment(candidate) { error ->
-                    error?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
-                }
-            },
-            onRejectEnrichment = { candidate -> viewModel.rejectContactEnrichment(candidate) },
-            onSaveToPhone = {
+            onRequestPhoneSync = { contact ->
                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) ==
                     PackageManager.PERMISSION_GRANTED
                 ) {
@@ -706,22 +671,10 @@ fun RelationTab(
                     writeContactPermissionLauncher.launch(Manifest.permission.WRITE_CONTACTS)
                 }
             },
-            onCall = {
-                contact.phone?.takeIf(String::isNotBlank)?.let { phone ->
-                    runCatching {
-                        context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${Uri.encode(phone)}")))
-                    }
-                }
-            },
-            onMessage = {
-                contact.phone?.takeIf(String::isNotBlank)?.let { phone ->
-                    runCatching {
-                        context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${Uri.encode(phone)}")))
-                    }
-                }
-            },
-        )
-    }
+        ),
+        viewModel = viewModel,
+        context = context,
+    )
     pendingPhoneSync?.let { preview ->
         val hasConflicts = preview.plan.conflicts.isNotEmpty()
         ZhiBanAlertDialog(
@@ -805,9 +758,8 @@ fun RelationTab(
         )
     }
     if (showImportDialog) {
-        val importState by viewModel.importState.collectAsStateWithLifecycle()
         ContactImportDialog(
-            state = importState,
+            state = page.importState,
             onDismiss = {
                 showImportDialog = false
                 viewModel.clearImportState()
@@ -854,8 +806,6 @@ fun RelationTab(
         )
     }
     if (showNotificationCandidates) {
-        val enabledMessagePlatforms by viewModel.enabledMessagePlatforms.collectAsStateWithLifecycle()
-        val outgoingCollectionEnabled by viewModel.outgoingMessageCollectionEnabled.collectAsStateWithLifecycle()
         NotificationCandidateDialog(
             enabled = notificationAccessEnabled,
             candidates = notificationCandidates,
@@ -867,9 +817,9 @@ fun RelationTab(
             onConfirmCandidate = viewModel::confirmNotificationCandidate,
             onCreateContact = viewModel::createContactFromNotification,
             onConfirmSchedule = viewModel::confirmNotificationSchedule,
-            enabledPlatforms = enabledMessagePlatforms,
+            enabledPlatforms = page.enabledMessagePlatforms,
             onPlatformEnabled = viewModel::setMessagePlatformEnabled,
-            outgoingCollectionEnabled = outgoingCollectionEnabled,
+            outgoingCollectionEnabled = page.outgoingMessageCollectionEnabled,
             outgoingAccessibilityEnabled = outgoingAccessibilityEnabled,
             onOutgoingCollectionEnabled = { enabled ->
                 viewModel.setOutgoingMessageCollectionEnabled(enabled)
