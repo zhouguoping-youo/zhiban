@@ -31,8 +31,8 @@
 | 2.5 | 合并与撤销合并 | ⚪无法复现 | 未发现数据丢失或无法恢复：合并源从列表隐藏，主资料保留恢复入口，撤销后源联系人重新可见 | 在“联系人维护”处理“叶孝玲 / 成都乐心”重复建议（两个手机号）；确认合并后分别搜索两个号码，再从主联系人详情点“恢复”并复搜 | — | — | — | `ContactMergeChainTest.undoConfirmedMergeRestoresSourceVisibilityAndClearsLink`；`AgentDataRepositoryTest.confirmedContactMergeIsNonDestructiveAndReversible` | 2026-08-13 真机验证通过：联系人总数 1194→1193，主资料显示“已合并资料/恢复”；恢复后总数回到 1194，`15682127000` 再次独立命中，真实资料已还原 |
 | 2.6 | 关系图谱点击/拖动/缩放/聚焦 | ⚪无法复现 | 未发现交互失效：节点点击、节点拖动、画布平移和重置聚焦均有即时反馈 | 打开含 2 条关系的“我的关系图”；点击 `AUDIT_RELATION_001` 节点；关闭详情后拖动节点、平移画布并点击重置 | — | — | — | `RelationshipGraphInteractionTest.personNodeHasNamedTouchTargetAndOpensContact`；`ForceRelationshipGraphTest.seed places requested focus at viewport center`；`ForceRelationshipGraphTest.simulation combines repulsion spring centering and damping` | 2026-08-13 真机验证通过：点击打开包含关系强度和关联对象的详情抽屉；拖动后节点位置改变；画布可平移；重置后“我”回到中心。双指缩放实现纳入最终设备测试闸 |
 | 2.7 | 智能完善建议确认/拒绝 | ✅已修复 | “联系人维护”的资料待核实入口只跳到空白问问会话，既未传入提示，也没有读取待核实候选的工具，26 条真实建议无法从维护入口处理 | 关系 TAB→联系人维护→点“26 条建议”；修复前进入问问且看不到候选；修复后直接打开候选面板，分别确认“于军”和拒绝“付铨”的公司建议 | 功能不可用 | `ContactMaintenancePage` 将已有 `pendingEnrichment` 错接到 `onAsk()`，没有复用联系人详情已存在的确认/拒绝路径 | 本提交 | `ContactMaintenanceEnrichmentTest.pendingSuggestionsAreVisibleAndExposeConfirmAndRejectActions`；`ContactEnrichmentConfirmTest.confirmAppliesScalarFieldToBlankProfileAndResolvesCandidate`；`ContactEnrichmentConfirmTest.rejectMarksCandidateDismissed` | 2026-08-13 真机修复包验证通过：面板显示联系人、字段、置信度和证据来源；确认/拒绝后计数 26→24，两条均移出待核实列表；定向真机设备测试 1/1 通过 |
-| 2.8 | 通知候选处理 | — | 尚未实测 | — | — | — | — | — | — |
-| 2.9 | 通话备注 | — | 尚未实测 | — | — | — | — | — | — |
+| 2.8 | 通知候选处理 | ⚪无法复现 | 未发现功能问题：支持来源的新通知能进入待确认列表，展示推断结论和原始依据；确认后联系人、证据和日程写入一致 | 在真机临时安装不进仓库的 `audit.wechat.sender` 通知发送器，发送标题 `AUDIT通知联系人`、正文“明天下午3点开会，请确认”的真实 Android 消息通知；在关系页确认“新建联系人并加入日历” | — | — | — | `NotificationCandidateDialogTest.unresolvedMessageShowsAgentConclusionBeforeRawCollectionSettings`；`AgentDataRepositoryTest.confirmedNotificationCreatesEvidenceAndIdentity`；`AgentDataRepositoryTest.confirmNotificationScheduleIsIdempotent` | 2026-08-13 真机验证通过：Listener 实时接收；待确认页识别为微信收到的安排；确认后联系人总数 1193→1194，8 月 14 日 15:00 出现“开会，请确认”，来源显示“由微信消息确认添加 · AUDIT通知联系人”；临时发送器已卸载 |
+| 2.9 | 通话备注 | 🧪需环境 | 通话记录同步正常，但测试机当前蜂窝网络 `OUT_OF_SERVICE`，10086 呼叫在 CONNECTING 阶段立即失败并落为 0 秒，按产品规则不会触发挂断备注，无法完成真实有效通话复验 | 授予通话记录/电话状态权限；开启“同步通话记录”和“挂断后提醒补充要点”；同步真实最近 90 天通话；尝试拨打 10086 | — | — | — | `CallLogImporterTest.callNotePersistsFactAndCompletesPrompt`；`CallLogImporterTest.dismissedCallNoteDoesNotReturnToPendingList`；`CallLogRepositoryTest` | 2026-08-13 真机已验证权限探针为“已允许，可读取”，同步 31 条真实记录；双卡无服务导致拨号立即失败，需 SIM 恢复网络后完成一次持续 >0 秒的呼叫，检查私密通知→手输/语音备注→联系人时间线 |
 
 ## 3. 问问（Agent 对话）
 
@@ -83,7 +83,7 @@
 
 ## 需人工 / 需环境汇总
 
-尚无。只有真机路径无法自动化或缺失外部条件时，才在这里登记条件和可执行的复验步骤。
+- `2.9 通话备注`：SM-W7023 当前两张 SIM 均无蜂窝服务。恢复任一卡网络后，拨打一通持续至少 5 秒的电话并挂断；预期 2 秒后出现私密“记录刚才的通话要点”通知，保存文字或语音备注后应进入已匹配联系人的最近互动，且不再重复提示。
 
 ## 建议（不在本任务实现）
 
