@@ -771,7 +771,7 @@ fun RelationTab(
         ZhiBanAlertDialog(
             onDismissRequest = { showContactPermissionIntro = false },
             title = { Text("导入手机联系人") },
-            text = { Text("知伴只会读取你接下来主动选择的人，不会上传、修改或默认全选通讯录。下一步 Android 会询问通讯录权限。") },
+            text = { Text(CONTACT_IMPORT_PERMISSION_INTRO) },
             confirmButton = {
                 TextButton(onClick = {
                     showContactPermissionIntro = false
@@ -1053,6 +1053,9 @@ fun RelationTab(
         )
     }
 }
+
+internal const val CONTACT_IMPORT_PERMISSION_INTRO =
+    "知伴会在本机读取通讯录并默认勾选，导入前你可以取消不需要的人；不会自动上传或修改手机通讯录。下一步 Android 会询问通讯录权限。"
 
 private fun contactSyncSummary(preview: AndroidContactSyncPreview): String {
     val fieldNames = mapOf("displayName" to "姓名", "company" to "公司全称", "title" to "职位", "note" to "备注")

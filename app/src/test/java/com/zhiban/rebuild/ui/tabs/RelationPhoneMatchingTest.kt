@@ -8,6 +8,13 @@ import org.junit.Test
 
 class RelationPhoneMatchingTest {
     @Test
+    fun contactImportPermissionIntroDescribesDefaultSelectionTruthfully() {
+        assertTrue(CONTACT_IMPORT_PERMISSION_INTRO.contains("默认勾选"))
+        assertTrue(CONTACT_IMPORT_PERMISSION_INTRO.contains("可以取消"))
+        assertFalse(CONTACT_IMPORT_PERMISSION_INTRO.contains("不会默认全选"))
+    }
+
+    @Test
     fun formattedAndCanonicalPhoneNumbersMatch() {
         assertTrue(sameNormalizedPhone("138-0013-8000", "13800138000"))
         assertTrue(sameNormalizedPhone("+86 138 0013 8000", "+8613800138000"))
