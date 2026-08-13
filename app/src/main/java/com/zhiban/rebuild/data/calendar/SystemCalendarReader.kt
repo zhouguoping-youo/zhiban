@@ -121,4 +121,5 @@ class SystemCalendarReader @Inject constructor(@ApplicationContext private val c
 }
 
 internal val ACTIVE_INSTANCE_SELECTION =
-    "${CalendarContract.Instances.VISIBLE} = 1 AND ${CalendarContract.Instances.STATUS} != ?"
+    "${CalendarContract.Instances.VISIBLE} = 1 AND " +
+        "(${CalendarContract.Instances.STATUS} IS NULL OR ${CalendarContract.Instances.STATUS} != ?)"
