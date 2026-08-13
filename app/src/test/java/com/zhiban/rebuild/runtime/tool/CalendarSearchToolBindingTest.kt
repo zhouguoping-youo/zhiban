@@ -96,6 +96,7 @@ class CalendarSearchToolBindingTest {
         override suspend fun update(entity: ScheduleEntity): Int = 0
         override suspend fun findByRunId(runId: String) = emptyList<ScheduleEntity>()
         override fun observeRange(fromEpochMs: Long, toEpochMs: Long): Flow<List<ScheduleProjection>> = flowOf(rows)
+        override fun observePendingFeedback(beforeEpochMs: Long, oldestEpochMs: Long, limit: Int): Flow<List<ScheduleProjection>> = flowOf(emptyList())
         override suspend fun listRange(fromEpochMs: Long, toEpochMs: Long, limit: Int): List<ScheduleProjection> {
             lastRange = fromEpochMs to toEpochMs
             return rows.take(limit)

@@ -9,6 +9,7 @@ import com.zhiban.rebuild.data.crm.CrmNextActionEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityStage
 import com.zhiban.rebuild.data.crm.CrmRecordStatus
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -102,6 +103,17 @@ class CalendarPersistenceEdgeTest {
         assertEquals(ScheduleStatus.PENDING, postponed.status)
         assertNull(postponed.outcomeNote)
         assertNull(postponed.completedAtEpochMs)
+    }
+
+    @Test fun pendingFeedbackIncludesOnlyElapsedUnfinishedSchedules() = runBlocking {
+        val elapsed = calendar.saveUserSchedule(null, "过期未完成", 1_000_000L, 30, null, null, nowEpochMs = 1L)
+        val completed = calendar.saveUserSchedule(null, "过期已完成", 1_100_000L, 30, null, null, nowEpochMs = 1L)
+        calendar.saveUserSchedule(null, "未来安排", 5_000_000L, 30, null, null, nowEpochMs = 1L)
+        calendar.completeSchedule(completed, "完成", nowEpochMs = 2L)
+
+        val pending = calendar.observePendingFeedback(beforeEpochMs = 4_000_000L, oldestEpochMs = 0L).first()
+
+        assertEquals(listOf(elapsed), pending.map { it.id })
     }
 
     private fun opportunity() = CrmOpportunityEntity(

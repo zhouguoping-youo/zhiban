@@ -114,6 +114,9 @@ class AgentDataRepository internal constructor(
         }
     }
 
+    fun observePendingScheduleFeedback(beforeEpochMs: Long, oldestEpochMs: Long, limit: Int = 20): Flow<List<ScheduleProjection>> =
+        calendar.observePendingFeedback(beforeEpochMs, oldestEpochMs, limit)
+
     suspend fun stageNotificationCandidate(candidate: NotificationCandidateEntity) {
         val nowEpochMs = System.currentTimeMillis()
         val externalConflict = hasExternalConflictForAutomaticSchedule(candidate)

@@ -68,6 +68,9 @@ internal class CalendarAgentDataRepository(private val database: AgentDatabase) 
     private val schedules = database.scheduleDao()
     fun observeSchedules(fromEpochMs: Long, toEpochMs: Long): Flow<List<ScheduleProjection>> = schedules.observeRange(fromEpochMs, toEpochMs)
 
+    fun observePendingFeedback(beforeEpochMs: Long, oldestEpochMs: Long, limit: Int = 20): Flow<List<ScheduleProjection>> =
+        schedules.observePendingFeedback(beforeEpochMs, oldestEpochMs, limit)
+
     suspend fun findSchedule(scheduleId: String): ScheduleEntity? = schedules.findById(scheduleId)
 
     suspend fun saveUserSchedule(

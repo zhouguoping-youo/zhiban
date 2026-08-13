@@ -15,6 +15,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -46,6 +47,7 @@ class CalendarAgentViewModel @Inject constructor(
     )
 
     private val selectedDay = MutableStateFlow(LocalDate.now())
+    private val currentDay = MutableStateFlow(LocalDate.now())
     private val mutableImportState = MutableStateFlow(ImportState())
     val importState = mutableImportState.asStateFlow()
     val schedules: StateFlow<List<ScheduleProjection>> = selectedDay
@@ -63,6 +65,25 @@ class CalendarAgentViewModel @Inject constructor(
                 values.filter { it.createdScheduleId == null && ScheduleInsight.from(it) != null }
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val pendingFeedback: StateFlow<List<ScheduleProjection>> = currentDay
+        .flatMapLatest { day ->
+            val zone = ZoneId.systemDefault()
+            repository.observePendingScheduleFeedback(
+                beforeEpochMs = day.atStartOfDay(zone).toInstant().toEpochMilli(),
+                oldestEpochMs = day.minusDays(PENDING_FEEDBACK_LOOKBACK_DAYS)
+                    .atStartOfDay(zone).toInstant().toEpochMilli(),
+            )
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    init {
+        viewModelScope.launch {
+            while (true) {
+                delay(CURRENT_DAY_REFRESH_MS)
+                currentDay.value = LocalDate.now()
+            }
+        }
+    }
 
     fun selectDay(day: LocalDate) {
         selectedDay.value = day
@@ -193,5 +214,10 @@ class CalendarAgentViewModel @Inject constructor(
             .findConflicts(startAtEpochMs, endAtEpochMs, excludeScheduleId, limit = 1)
             .firstOrNull()
             ?.title
+    }
+
+    private companion object {
+        const val PENDING_FEEDBACK_LOOKBACK_DAYS = 90L
+        const val CURRENT_DAY_REFRESH_MS = 60_000L
     }
 }

@@ -141,6 +141,7 @@ fun CalendarTab(
     var deleting by remember { mutableStateOf<ScheduleProjection?>(null) }
     var completing by remember { mutableStateOf<ScheduleProjection?>(null) }
     val schedules by viewModel.schedules.collectAsState()
+    val pendingFeedback by viewModel.pendingFeedback.collectAsState()
     val messageScheduleCandidates by viewModel.messageScheduleCandidates.collectAsState()
     val importState by viewModel.importState.collectAsState()
     val context = LocalContext.current
@@ -252,6 +253,15 @@ fun CalendarTab(
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
+                    Spacer(Modifier.height(18.dp))
+                }
+            }
+            if (selectedDate == LocalDate.now() && pendingFeedback.isNotEmpty()) {
+                item {
+                    PendingScheduleFeedbackCard(
+                        schedules = pendingFeedback,
+                        onOpen = { completing = it },
+                    )
                     Spacer(Modifier.height(18.dp))
                 }
             }
@@ -437,6 +447,40 @@ fun CalendarTab(
             },
             containerColor = CalendarSurface,
         )
+    }
+}
+
+@Composable
+private fun PendingScheduleFeedbackCard(schedules: List<ScheduleProjection>, onOpen: (ScheduleProjection) -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().zhiBanCardSurface(CalendarSurface).padding(horizontal = 16.dp, vertical = 14.dp),
+    ) {
+        Text(
+            "待反馈 ${schedules.size}",
+            color = CalendarInk,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.height(8.dp))
+        schedules.take(3).forEach { schedule ->
+            TextButton(
+                onClick = { onOpen(schedule) },
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(vertical = 4.dp),
+            ) {
+                Text(
+                    schedule.title,
+                    modifier = Modifier.weight(1f),
+                    color = CalendarInk,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                )
+                Text("完成或延期", color = CalendarAccent, style = MaterialTheme.typography.labelMedium)
+            }
+        }
+        if (schedules.size > 3) {
+            Text("另有 ${schedules.size - 3} 项", color = CalendarMuted, style = MaterialTheme.typography.labelSmall)
+        }
     }
 }
 

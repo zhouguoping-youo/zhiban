@@ -28,6 +28,15 @@ interface ScheduleDao {
 
     @Query(
         """SELECT id, title, startAtEpochMs, durationMinutes, note, reminderMinutesBefore, status, outcomeNote, completedAtEpochMs FROM schedules
+           WHERE status = 'PENDING'
+             AND (startAtEpochMs + durationMinutes * 60000) < :beforeEpochMs
+             AND (startAtEpochMs + durationMinutes * 60000) >= :oldestEpochMs
+           ORDER BY startAtEpochMs DESC LIMIT :limit""",
+    )
+    fun observePendingFeedback(beforeEpochMs: Long, oldestEpochMs: Long, limit: Int): Flow<List<ScheduleProjection>>
+
+    @Query(
+        """SELECT id, title, startAtEpochMs, durationMinutes, note, reminderMinutesBefore, status, outcomeNote, completedAtEpochMs FROM schedules
            WHERE startAtEpochMs <= :toEpochMs
              AND (startAtEpochMs + durationMinutes * 60000) > :fromEpochMs
            ORDER BY startAtEpochMs LIMIT :limit""",
