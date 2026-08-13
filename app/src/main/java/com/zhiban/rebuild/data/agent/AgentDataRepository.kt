@@ -88,17 +88,19 @@ data class ContactImportSummary(
 }
 
 class AgentDataRepository internal constructor(
-    private val daos: AgentDataDaos,
-    private val transactions: AgentTransactionRunner,
-    private val factIndex: FactIndex,
-    private val autoWriteSink: AutoWriteSink,
-    private val calendar: CalendarAgentDataRepository,
-    private val crm: CrmAgentDataRepository,
-    private val contacts: ContactAgentDataRepository,
-    private val relationships: RelationshipAgentDataRepository,
+    infrastructure: AgentRepositoryInfrastructure,
+    domains: AgentRepositoryDomains,
     private val externalCalendarConflicts: ExternalCalendarConflictSource = ExternalCalendarConflictSource { _, _, _, _ -> emptyList() },
     private val scheduleReminderSink: ScheduleReminderSink = ScheduleReminderSink { },
 ) {
+    private val daos = infrastructure.daos
+    private val transactions = infrastructure.transactions
+    private val factIndex = infrastructure.factIndex
+    private val autoWriteSink = infrastructure.autoWriteSink
+    private val calendar = domains.calendar
+    private val crm = domains.crm
+    private val contacts = domains.contacts
+    private val relationships = domains.relationships
     fun observeNotificationCandidates(): Flow<List<NotificationCandidateEntity>> = combine(
         daos.notificationCandidateDao.observePending(),
         daos.contactIdentityDao.observeActiveMergeLinks(),

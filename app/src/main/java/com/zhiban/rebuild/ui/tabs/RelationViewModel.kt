@@ -64,18 +64,33 @@ data class ContactImportUiState(
 
 data class ContactMergeSuggestion(val first: ContactEntity, val second: ContactEntity, val reason: String, val confidence: Double)
 
+class RelationContactServices @Inject constructor(
+    val systemContactReader: SystemContactReader,
+    val companyEnrichment: CompanyEnrichmentRefresher,
+    val androidContactSync: AndroidContactSyncRepository,
+)
+
+class RelationCollectionServices @Inject constructor(
+    val messageCollectionPreferences: MessageCollectionPreferences,
+    val callLogRepository: CallLogRepository,
+    val cloudAsrGateway: CloudAsrGateway,
+    val outboundDataPreferences: OutboundDataPreferences,
+)
+
 @HiltViewModel
 class RelationViewModel @Inject constructor(
     private val repository: AgentDataRepository,
-    private val systemContactReader: SystemContactReader,
     private val userProfileStore: UserProfileStore,
-    private val messageCollectionPreferences: MessageCollectionPreferences,
-    private val callLogRepository: CallLogRepository,
-    private val cloudAsrGateway: CloudAsrGateway,
-    private val outboundDataPreferences: OutboundDataPreferences,
-    private val companyEnrichment: CompanyEnrichmentRefresher,
-    private val androidContactSync: AndroidContactSyncRepository,
+    contactServices: RelationContactServices,
+    collectionServices: RelationCollectionServices,
 ) : ViewModel() {
+    private val systemContactReader = contactServices.systemContactReader
+    private val companyEnrichment = contactServices.companyEnrichment
+    private val androidContactSync = contactServices.androidContactSync
+    private val messageCollectionPreferences = collectionServices.messageCollectionPreferences
+    private val callLogRepository = collectionServices.callLogRepository
+    private val cloudAsrGateway = collectionServices.cloudAsrGateway
+    private val outboundDataPreferences = collectionServices.outboundDataPreferences
     val contacts: StateFlow<List<ContactEntity>> = repository.observeContacts()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val rawContacts: StateFlow<List<ContactEntity>> = repository.observeRawContacts()

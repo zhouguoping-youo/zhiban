@@ -55,22 +55,26 @@ class AgentDataRepositoryTest {
             .allowMainThreadQueries()
             .build()
         repository = AgentDataRepository(
-            AgentDataDaos(
-                notificationCandidateDao = database.notificationCandidateDao(),
-                contactDao = database.contactDao(),
-                contactIdentityDao = database.contactIdentityDao(),
-                contactKnowledgeDao = database.contactKnowledgeDao(),
-                contactIntelligenceDao = database.contactIntelligenceDao(),
-                factDao = database.factDao(),
-                changeLogDao = database.changeLogDao(),
+            AgentRepositoryInfrastructure(
+                daos = AgentDataDaos(
+                    notificationCandidateDao = database.notificationCandidateDao(),
+                    contactDao = database.contactDao(),
+                    contactIdentityDao = database.contactIdentityDao(),
+                    contactKnowledgeDao = database.contactKnowledgeDao(),
+                    contactIntelligenceDao = database.contactIntelligenceDao(),
+                    factDao = database.factDao(),
+                    changeLogDao = database.changeLogDao(),
+                ),
+                transactions = RoomAgentTransactionRunner(database),
+                factIndex = FactIndex(database),
+                autoWriteSink = AutoWriteSink { database.insertVisibleAutoWrite(it) },
             ),
-            transactions = RoomAgentTransactionRunner(database),
-            factIndex = FactIndex(database),
-            autoWriteSink = AutoWriteSink { database.insertVisibleAutoWrite(it) },
-            calendar = CalendarAgentDataRepository(database),
-            crm = CrmAgentDataRepository(database),
-            contacts = ContactAgentDataRepository(database),
-            relationships = RelationshipAgentDataRepository(database),
+            AgentRepositoryDomains(
+                calendar = CalendarAgentDataRepository(database),
+                crm = CrmAgentDataRepository(database),
+                contacts = ContactAgentDataRepository(database),
+                relationships = RelationshipAgentDataRepository(database),
+            ),
         )
     }
 

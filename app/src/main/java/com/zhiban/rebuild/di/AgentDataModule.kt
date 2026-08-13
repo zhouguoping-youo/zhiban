@@ -98,25 +98,13 @@ object AgentDataModule {
     @Provides
     @Singleton
     internal fun provideAgentDataRepository(
-        daos: com.zhiban.rebuild.data.agent.AgentDataDaos,
-        transactions: com.zhiban.rebuild.data.agent.AgentTransactionRunner,
-        factIndex: com.zhiban.rebuild.runtime.context.FactIndex,
-        autoWriteSink: com.zhiban.rebuild.data.agent.AutoWriteSink,
-        calendar: com.zhiban.rebuild.data.agent.CalendarAgentDataRepository,
-        crm: com.zhiban.rebuild.data.agent.CrmAgentDataRepository,
-        contacts: com.zhiban.rebuild.data.agent.ContactAgentDataRepository,
-        relationships: com.zhiban.rebuild.data.agent.RelationshipAgentDataRepository,
+        infrastructure: com.zhiban.rebuild.data.agent.AgentRepositoryInfrastructure,
+        domains: com.zhiban.rebuild.data.agent.AgentRepositoryDomains,
         systemCalendarReader: com.zhiban.rebuild.data.calendar.SystemCalendarReader,
         reminderScheduler: com.zhiban.rebuild.data.calendar.ScheduleReminderScheduler,
     ): AgentDataRepository = AgentDataRepository(
-        daos,
-        transactions,
-        factIndex,
-        autoWriteSink,
-        calendar,
-        crm,
-        contacts,
-        relationships,
+        infrastructure,
+        domains,
         externalCalendarConflicts = systemCalendarReader,
         scheduleReminderSink = com.zhiban.rebuild.data.agent.ScheduleReminderSink { schedule ->
             reminderScheduler.replace(
@@ -154,6 +142,15 @@ object AgentDataModule {
         }
 
     @Provides
+    internal fun provideAgentRepositoryInfrastructure(
+        daos: com.zhiban.rebuild.data.agent.AgentDataDaos,
+        transactions: com.zhiban.rebuild.data.agent.AgentTransactionRunner,
+        factIndex: com.zhiban.rebuild.runtime.context.FactIndex,
+        autoWriteSink: com.zhiban.rebuild.data.agent.AutoWriteSink,
+    ): com.zhiban.rebuild.data.agent.AgentRepositoryInfrastructure =
+        com.zhiban.rebuild.data.agent.AgentRepositoryInfrastructure(daos, transactions, factIndex, autoWriteSink)
+
+    @Provides
     internal fun provideCalendarAgentDataRepository(database: AgentDatabase): com.zhiban.rebuild.data.agent.CalendarAgentDataRepository =
         com.zhiban.rebuild.data.agent.CalendarAgentDataRepository(database)
 
@@ -168,6 +165,19 @@ object AgentDataModule {
     @Provides
     internal fun provideRelationshipAgentDataRepository(database: AgentDatabase): com.zhiban.rebuild.data.agent.RelationshipAgentDataRepository =
         com.zhiban.rebuild.data.agent.RelationshipAgentDataRepository(database)
+
+    @Provides
+    internal fun provideAgentRepositoryDomains(
+        calendar: com.zhiban.rebuild.data.agent.CalendarAgentDataRepository,
+        crm: com.zhiban.rebuild.data.agent.CrmAgentDataRepository,
+        contacts: com.zhiban.rebuild.data.agent.ContactAgentDataRepository,
+        relationships: com.zhiban.rebuild.data.agent.RelationshipAgentDataRepository,
+    ): com.zhiban.rebuild.data.agent.AgentRepositoryDomains = com.zhiban.rebuild.data.agent.AgentRepositoryDomains(
+        calendar,
+        crm,
+        contacts,
+        relationships,
+    )
 
     @Provides
     @Singleton
