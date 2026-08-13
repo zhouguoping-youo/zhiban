@@ -165,8 +165,8 @@ done
 # 3c. composition 期间 IO（remember 里做文件操作）
 echo ""
 echo -n "3c. remember 里执行 IO（目标: 0）: "
-# 只找 remember 块内有 read/listFiles/cacheDir/query 等 IO 操作的
-count=$(grep -rn "remember.*{" app/src/main/java/com/zhiban/rebuild/ui --include="*.kt" 2>/dev/null | grep -v "/build/" | grep -c "read\|listFiles\|cacheDir\|query\|\.walk\|File(" || true); count=${count:-0}
+# 只匹配明确的 IO API；避免把 query 状态变量误报为数据库查询。
+count=$(grep -Ern 'remember(\([^)]*\))?[[:space:]]*\{[^}]*(contentResolver\.query|\.read(Bytes|Text)?\(|\.listFiles\(|\.walk(\(|\{)|File\(|cacheDir|filesDir|getDatabasePath)' app/src/main/java/com/zhiban/rebuild/ui --include="*.kt" 2>/dev/null | grep -v "/build/" | wc -l | tr -d ' '); count=${count:-0}
 echo "$count 处"
 
 # ===== 维度4：安全性 =====

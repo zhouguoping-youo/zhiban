@@ -53,6 +53,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -98,10 +99,12 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import java.io.File
 import java.util.Locale
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 private fun SettingsPageFrame(title: String, onBack: () -> Unit, content: @Composable () -> Unit) {
@@ -414,12 +417,25 @@ fun NotificationSettingsPage(onBack: () -> Unit, categoryViewModel: Notification
 @Composable
 fun StorageSettingsPage(onBack: () -> Unit) {
     val context = LocalContext.current
-    var cacheBytes by remember { mutableLongStateOf(regenerableCacheSize(context.cacheDir)) }
+    val scope = rememberCoroutineScope()
+    var cacheBytes by remember { mutableLongStateOf(0L) }
+    var databaseBytes by remember { mutableLongStateOf(0L) }
+    var fileBytes by remember { mutableLongStateOf(0L) }
     var confirmClear by remember { mutableStateOf(false) }
-    val databaseBytes = remember { agentDatabaseSize(context) }
-    val fileBytes = remember { directorySize(context.filesDir) }
     val totalBytes = databaseBytes + fileBytes + cacheBytes
-    val privateDirectory = remember { context.filesDir.parentFile?.absolutePath ?: context.filesDir.absolutePath }
+    val privateDirectory = context.filesDir.parentFile?.absolutePath ?: context.filesDir.absolutePath
+    LaunchedEffect(context) {
+        val usage = withContext(Dispatchers.IO) {
+            StorageUsage(
+                databaseBytes = agentDatabaseSize(context),
+                fileBytes = directorySize(context.filesDir),
+                cacheBytes = regenerableCacheSize(context.cacheDir),
+            )
+        }
+        databaseBytes = usage.databaseBytes
+        fileBytes = usage.fileBytes
+        cacheBytes = usage.cacheBytes
+    }
     SettingsPageFrame("存储", onBack) {
         Column(
             Modifier
@@ -464,9 +480,13 @@ fun StorageSettingsPage(onBack: () -> Unit) {
             confirmButton = {
                 Button(
                     onClick = {
-                        clearRegenerableCache(context.cacheDir)
-                        cacheBytes = regenerableCacheSize(context.cacheDir)
                         confirmClear = false
+                        scope.launch {
+                            cacheBytes = withContext(Dispatchers.IO) {
+                                clearRegenerableCache(context.cacheDir)
+                                regenerableCacheSize(context.cacheDir)
+                            }
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                 ) { Text("清理") }
@@ -474,6 +494,8 @@ fun StorageSettingsPage(onBack: () -> Unit) {
         )
     }
 }
+
+private data class StorageUsage(val databaseBytes: Long, val fileBytes: Long, val cacheBytes: Long)
 
 data class DataExportUiState(val exporting: Boolean = false, val exportedFile: File? = null, val exportFailed: Boolean = false)
 
