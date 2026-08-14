@@ -30,8 +30,9 @@
 
 ## 最终验收
 
-- `./gradlew check`：待最终统一执行。
-- 仓库外签名 `assembleRelease`：待最终统一执行。
-- `SM-W7023 connectedDebugAndroidTest`：待最终统一执行。
-- `scripts/measure.sh`：待最终统一执行并与基线对比。
-- 问问真实链路“明天下午 5 点提醒我跟客户开会”：待最终真机冒烟；若设备测试导致本机凭据失效，只记录阻塞，不写入或导出密钥。
+- `./gradlew check`：通过（最终代码提交 `45ba96b` 前执行）。
+- 仓库外一次性验证签名 `:app:assembleRelease`：通过；R8、资源压缩、lint vital 和 APK 签名链均完成，验证 keystore 随后删除且未进入仓库。
+- `SM-W7023 connectedDebugAndroidTest`：通过；JUnit XML 记录 487 项、0 失败、1 项受控跳过。跳过项为需要真实公网条件的 `liveAndroidHandshakeAcceptsEveryPinnedProviderChain`。
+- JVM：547 项、0 失败（Debug 口径，包含 app 与 agent 子模块）。
+- `scripts/measure.sh`：0 个超过 1000 有效行的生产文件；600–1000 行预警由既有 7 个降到 6 个；测试/生产文件比 0.79；硬编码密钥、未加密日程标题和裸网络调用均为 0。当前 21 条非阻断 Detekt 结构警告均在 app 既有代码，Provider 模块为 0，本轮未新增警告。
+- 真机安装后验证：问问可提交消息；设备测试卸载了原调试包及其本机凭据，发送后正确显示未配置状态与“去设置”，点击可直达“大模型连接”。云端真实提示词链路未在重装后的设备复跑，原因是不能把用户密钥写进 adb 命令、日志或自动化脚本；该项明确为 `NOT VERIFIED`，不伪造通过结论。
