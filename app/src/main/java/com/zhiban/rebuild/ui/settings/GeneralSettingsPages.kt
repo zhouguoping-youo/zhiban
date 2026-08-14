@@ -32,7 +32,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CameraAlt
-import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Contacts
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.NotificationsNone
@@ -92,7 +91,6 @@ import com.zhiban.rebuild.ui.theme.ZhiBanCard
 import com.zhiban.rebuild.ui.theme.ZhiBanRadius
 import com.zhiban.rebuild.ui.theme.ZhiBanSize
 import com.zhiban.rebuild.ui.theme.ZhiBanSpacing
-import com.zhiban.rebuild.ui.theme.ZhiBanTerracotta
 import com.zhiban.rebuild.ui.theme.ZhiBanTextPrimary
 import com.zhiban.rebuild.ui.theme.ZhiBanTextSecondary
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -112,25 +110,6 @@ internal fun SettingsPageFrame(title: String, onBack: () -> Unit, content: @Comp
         Column(Modifier.fillMaxSize()) {
             ZhiBanTopBar(title = title, onBack = onBack)
             content()
-        }
-    }
-}
-
-@Composable
-fun LanguageSettingsPage(onBack: () -> Unit) {
-    SettingsPageFrame("语言", onBack) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = ZhiBanSpacing.PageHorizontal)
-                .padding(bottom = ZhiBanSpacing.PageBottom),
-        ) {
-            SettingsCard {
-                SettingsRow("简体中文", "当前使用", trailing = {
-                    Icon(Icons.Outlined.Check, contentDescription = null, tint = ZhiBanTerracotta)
-                })
-            }
         }
     }
 }

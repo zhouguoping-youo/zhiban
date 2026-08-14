@@ -6,7 +6,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -32,7 +31,6 @@ import com.zhiban.rebuild.ui.settings.AboutZhiBanPage
 import com.zhiban.rebuild.ui.settings.AppearanceSettingsPage
 import com.zhiban.rebuild.ui.settings.AutoWritePage
 import com.zhiban.rebuild.ui.settings.DataSettingsPage
-import com.zhiban.rebuild.ui.settings.LanguageSettingsPage
 import com.zhiban.rebuild.ui.settings.ModelConfigPage
 import com.zhiban.rebuild.ui.settings.NotificationSettingsPage
 import com.zhiban.rebuild.ui.settings.PrivacySecurityPage
@@ -48,7 +46,6 @@ import com.zhiban.rebuild.ui.tabs.CrmOpportunityListPage
 import com.zhiban.rebuild.ui.tabs.EventPlanningDetailPage
 import com.zhiban.rebuild.ui.tabs.EventPlanningListPage
 import com.zhiban.rebuild.ui.tabs.EventPlanningPage
-import com.zhiban.rebuild.ui.tabs.HomeTab
 import com.zhiban.rebuild.ui.tabs.LifeAssistantDetailPage
 import com.zhiban.rebuild.ui.tabs.LifeAssistantListPage
 import com.zhiban.rebuild.ui.tabs.LifeAssistantPage
@@ -59,7 +56,6 @@ import com.zhiban.rebuild.ui.tabs.SkillTab
 @Composable
 fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L, callNoteRequest: Long = 0L, calendarFocusRequest: Long = 0L) {
     val navController = rememberNavController()
-    var internalRelationInboxRequest by remember { mutableLongStateOf(0L) }
     var lastHandledRelationInboxRequest by rememberSaveable { mutableLongStateOf(0L) }
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
@@ -123,10 +119,7 @@ fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L
             enterTransition = { EnterTransition.None },
             exitTransition = { ExitTransition.None },
         ) {
-            // Per architect 818 派单 V: tap 问问 TAB (Home route) → 直接
-            // AssistantChat 主屏 (无 HomeTab 之前置: 晚上好 greeting + ⚡
-            // 大按钮 + "还没有对话" hint). HomeTab 之前是 "chat 引导页",
-            // 老周 A+B 反馈: 直接对话界面, 不需 entry hero.
+            // 问问 TAB 直接进入全屏对话，不经过独立引导页。
             composable<Home> {
                 AgentConversationRoute(
                     initialDraft = "",
@@ -145,9 +138,8 @@ fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L
                 CalendarTab(focusDateEpochMs = route.focusDateEpochMs.takeIf { it > 0L })
             }
             composable<Relation> {
-                val latestInboxRequest = maxOf(relationInboxRequest, internalRelationInboxRequest)
                 RelationTab(
-                    openInboxRequest = latestInboxRequest.takeIf { it > lastHandledRelationInboxRequest } ?: 0L,
+                    openInboxRequest = relationInboxRequest.takeIf { it > lastHandledRelationInboxRequest } ?: 0L,
                     onInboxRequestHandled = { request ->
                         lastHandledRelationInboxRequest = maxOf(lastHandledRelationInboxRequest, request)
                     },
@@ -196,7 +188,6 @@ fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L
             composable<MemoryConfig> { AgentMemoryPage(onBack = { navController.popBackStack() }) }
             composable<AgentTools> { AgentToolsPage(onBack = { navController.popBackStack() }) }
             composable<AgentSkills> { AgentSkillsPage(onBack = { navController.popBackStack() }) }
-            composable<AgentBehaviorSecurity> { AgentPersonalizationPage(onBack = { navController.popBackStack() }) }
             composable<AgentFeedbackImprovement> {
                 AgentFeedbackImprovementPage(onBack = { navController.popBackStack() })
             }
@@ -212,7 +203,6 @@ fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L
                     },
                 )
             }
-            composable<LanguageSettings> { LanguageSettingsPage(onBack = { navController.popBackStack() }) }
             composable<NotificationSettings> { NotificationSettingsPage(onBack = { navController.popBackStack() }) }
             composable<PrivacySecurity> {
                 PrivacySecurityPage(

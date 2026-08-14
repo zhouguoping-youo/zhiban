@@ -60,8 +60,6 @@ import kotlinx.serialization.Serializable
 
 @Serializable data object AgentSkills
 
-@Serializable data object AgentBehaviorSecurity
-
 @Serializable data object AgentFeedbackImprovement
 
 @Serializable data object AgentRunHistory
@@ -77,8 +75,6 @@ import kotlinx.serialization.Serializable
 @Serializable data object PrivacySecurity
 
 @Serializable data object Appearance
-
-@Serializable data object LanguageSettings
 
 @Serializable data object StorageSettings
 
