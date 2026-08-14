@@ -84,4 +84,18 @@ class ObservationContinuationRequirementsTest {
         assertTrue(summary.orEmpty().contains("联系人总数：3 人"))
         assertTrue(summary.orEmpty().contains("已查到 2 条日程"))
     }
+
+    @Test
+    fun `calendar conflict summary names every occupied source instead of claiming no conflict`() {
+        val summary = deterministicToolSummary(
+            "calendar.schedule.conflicts",
+            """{"hasConflict":true,"count":2,"items":[{"title":"客户视频会议","startAtEpochMs":1786802400000,"source":"ZHI_BAN"},{"title":"机场接人","startAtEpochMs":1786802400000,"source":"SYSTEM_CALENDAR"}]}""",
+        )
+
+        assertTrue(summary.contains("客户视频会议"))
+        assertTrue(summary.contains("机场接人"))
+        assertTrue(summary.contains("知伴日历"))
+        assertTrue(summary.contains("手机日历"))
+        assertTrue(summary.contains("会发生冲突"))
+    }
 }

@@ -210,7 +210,11 @@ internal class ProviderExecutionEngine(
     private val events = RuntimeEventAppender(store, ownerId, clock)
     private val deterministicObservation = DeterministicObservationCompleter(store, ownerId, clock, ::perceiveForObservation)
     private val contextAssembler = ProviderContextAssembler(clock, personalization)
-    private val scheduleExecutor = RoomScheduleToolExecutor(database, onScheduleSaved = onScheduleSaved)
+    private val scheduleExecutor = RoomScheduleToolExecutor(
+        database,
+        externalConflicts = externalCalendarConflicts,
+        onScheduleSaved = onScheduleSaved,
+    )
     private val memoryExecutor = RoomMemoryToolExecutor({ database }, clock)
     private val crmExecutor = RoomCrmToolExecutor(database, store)
     private val perceptionPipeline: PerceptionGateway = perception ?: RoomPerceptionPipeline(database, clock)
@@ -390,6 +394,7 @@ internal class ProviderExecutionEngine(
             }
         },
     )
+    private val calendarConflictGuard = CalendarConflictGuard(capabilityRouter)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val activeJobs = ConcurrentHashMap<String, Job>()
     private val activeRequests = ConcurrentHashMap<String, String>()
@@ -603,17 +608,21 @@ internal class ProviderExecutionEngine(
         val perception = perceiveForRun(input)
         val config = dynamicConfig()
         val activatedSkills = activatedSkillsFor(input, perception.context, config, skillSpecs(), toolCatalog.names(), toolEnabled)
-        val localCalendarCall = if (
-            input.mode == "Work" &&
-            input.attachments.isEmpty() &&
+        val localCalendarTool = if (input.mode != "Work" || input.attachments.isNotEmpty()) {
+            null
+        } else if (
             perception.context.intentLabel == com.zhiban.rebuild.runtime.context.IntentLabel.CALENDAR_CREATE &&
             toolEnabled(SchedulePlanValidator.TOOL_NAME)
         ) {
             deterministicCalendarToolCall(input, perception.context, nowEpochMs = clock())
+                ?.let { it to SchedulePlanValidator.TOOL_NAME }
+        } else if (toolEnabled("calendar.schedule.conflicts")) {
+            deterministicCalendarConflictToolCall(input, perception.context, clock())
+                ?.let { it to "calendar.schedule.conflicts" }
         } else {
             null
         }
-        if (localCalendarCall != null) {
+        if (localCalendarTool != null) {
             val attemptId = startRunAttempt(runActiveAttemptId, runId, fencingEpoch)
             events.appendPerception(
                 attemptId,
@@ -624,12 +633,13 @@ internal class ProviderExecutionEngine(
                 perception.durationMs,
                 perception.degraded,
             )
-            return PreparedRun.LocalCalendar(
+            return PreparedRun.LocalCalendarTool(
                 input,
                 perception.context,
                 activatedSkills,
                 attemptId,
-                localCalendarCall,
+                localCalendarTool.first,
+                localCalendarTool.second,
             )
         }
         val currentNetwork = networkQuality()
@@ -673,7 +683,7 @@ internal class ProviderExecutionEngine(
         val prepared = prepareRun(run.activeAttemptId, runId, sessionId, fencingEpoch)
         return when (prepared) {
             is PreparedRun.Failure -> events.failBeforeAttempt(runId, sessionId, fencingEpoch, prepared.code, prepared.retryable)
-            is PreparedRun.LocalCalendar -> runLocalCalendar(prepared, runId, sessionId, fencingEpoch)
+            is PreparedRun.LocalCalendarTool -> runLocalCalendarTool(prepared, runId, sessionId, fencingEpoch)
             is PreparedRun.Ready -> runReActLoop(prepared, runId, sessionId, fencingEpoch)
         }
     }
@@ -809,11 +819,6 @@ internal class ProviderExecutionEngine(
     ): ReActStreamOutcome {
         val input = context.input
         val queryContext = context.queryContext
-        val activatedSkills = context.activatedSkills
-        val attemptId = context.attemptId
-        val runId = ids.runId
-        val sessionId = ids.sessionId
-        val fencingEpoch = ids.fencingEpoch
         val safeEvent =
             normalizeCalendarToolCall(
                 capabilityRouter::canonicalName,
@@ -827,13 +832,11 @@ internal class ProviderExecutionEngine(
         ) {
             throw ProviderFailure("INVALID_TOOL_CALL", retryable = false)
         }
-        requireSkillAllowsTool(safeEvent.name, activatedSkills)
-        if (input.mode !=
-            "Work"
-        ) {
+        requireSkillAllowsTool(safeEvent.name, context.activatedSkills)
+        if (input.mode != "Work") {
             throw ProviderFailure("INVALID_TOOL_CALL", retryable = false)
         }
-        val revision = store.projectionSnapshot(sessionId, "ui").currentRevision
+        val revision = store.projectionSnapshot(ids.sessionId, "ui").currentRevision
         val toolRequest =
             RuntimeToolCallRequest(
                 safeEvent.providerCallId,
@@ -842,11 +845,11 @@ internal class ProviderExecutionEngine(
             )
         val routeContext =
             RuntimeToolRouteContext(
-                runId,
-                sessionId,
-                attemptId,
+                ids.runId,
+                ids.sessionId,
+                context.attemptId,
                 ownerId,
-                fencingEpoch,
+                ids.fencingEpoch,
                 revision,
                 clock(),
             )
@@ -854,13 +857,13 @@ internal class ProviderExecutionEngine(
             ToolDisposition.ReadOnly -> {
                 val result = capabilityRouter.executeReadOnly(toolRequest, routeContext)
                 store.completeReadOnlyTool(
-                    runId, safeEvent.providerCallId, result.canonicalName, 1,
+                    ids.runId, safeEvent.providerCallId, result.canonicalName, 1,
                     sha256(
                         safeEvent.argumentsJson,
                     ),
-                    result.safeResultJson, ownerId, fencingEpoch, clock(),
+                    result.safeResultJson, ownerId, ids.fencingEpoch, clock(),
                 )
-                if (context.providerRequestActive) provider.cancel(attemptId)
+                if (context.providerRequestActive) provider.cancel(context.attemptId)
                 return ReActStreamOutcome.ToolCompleted(result)
             }
 
@@ -869,23 +872,50 @@ internal class ProviderExecutionEngine(
                     toolRequest,
                     routeContext,
                 )
-                if (context.providerRequestActive) provider.cancel(attemptId)
+                if (context.providerRequestActive) provider.cancel(context.attemptId)
                 return ReActStreamOutcome.ToolCompleted(result)
             }
 
-            is ToolDisposition.ConfirmationRequired -> if (!requestToolApproval(
-                    safeEvent,
-                    runId,
-                    sessionId,
-                    attemptId,
-                    fencingEpoch,
-                )
-            ) {
-                throw ProviderFailure("INVALID_TOOL_CALL", retryable = false)
+            is ToolDisposition.ConfirmationRequired -> {
+                calendarConflictBeforeApproval(safeEvent, routeContext, context, ids)?.let {
+                    return ReActStreamOutcome.ToolCompleted(it)
+                }
+                if (!requestToolApproval(
+                        safeEvent,
+                        ids.runId,
+                        ids.sessionId,
+                        context.attemptId,
+                        ids.fencingEpoch,
+                    )
+                ) {
+                    throw ProviderFailure("INVALID_TOOL_CALL", retryable = false)
+                }
             }
         }
-        if (context.providerRequestActive) provider.cancel(attemptId)
+        if (context.providerRequestActive) provider.cancel(context.attemptId)
         return ReActStreamOutcome.PendingApproval
+    }
+
+    private suspend fun calendarConflictBeforeApproval(
+        event: ModelEvent.ToolCall,
+        routeContext: RuntimeToolRouteContext,
+        context: ToolCallContext,
+        ids: RunIdentifiers,
+    ): RoutedToolResult? {
+        val conflict = calendarConflictGuard.inspectScheduleCreate(event, routeContext) ?: return null
+        store.completeReadOnlyTool(
+            ids.runId,
+            conflict.request.providerCallId,
+            conflict.result.canonicalName,
+            1,
+            sha256(conflict.request.argumentsJson),
+            conflict.result.safeResultJson,
+            ownerId,
+            ids.fencingEpoch,
+            clock(),
+        )
+        if (context.providerRequestActive) provider.cancel(context.attemptId)
+        return conflict.result
     }
 
     private suspend fun appendReActDeltaEvent(event: ModelEvent.Delta, attemptId: String, ids: RunIdentifiers) {
@@ -1108,7 +1138,7 @@ internal class ProviderExecutionEngine(
         return completeReactOutcome(outcome, ids)
     }
 
-    private suspend fun runLocalCalendar(prepared: PreparedRun.LocalCalendar, runId: String, sessionId: String, fencingEpoch: Long): Boolean {
+    private suspend fun runLocalCalendarTool(prepared: PreparedRun.LocalCalendarTool, runId: String, sessionId: String, fencingEpoch: Long): Boolean {
         val ids = RunIdentifiers(runId, sessionId, fencingEpoch)
         val outcome = try {
             handleReActToolCall(
@@ -1120,7 +1150,7 @@ internal class ProviderExecutionEngine(
                     providerRequestActive = false,
                 ),
                 prepared.toolCall,
-                SchedulePlanValidator.TOOL_NAME,
+                prepared.forcedCanonicalTool,
                 ids,
             )
         } catch (cancelled: CancellationException) {

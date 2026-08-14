@@ -14,12 +14,13 @@ import com.zhiban.rebuild.runtime.store.SessionConversationContext
 internal sealed class PreparedRun {
     data class Failure(val code: String, val retryable: Boolean) : PreparedRun()
 
-    data class LocalCalendar(
+    data class LocalCalendarTool(
         val input: DecodedInput,
         val queryContext: QueryContext,
         val activatedSkills: List<SkillActivation>,
         val attemptId: String,
         val toolCall: ModelEvent.ToolCall,
+        val forcedCanonicalTool: String?,
     ) : PreparedRun()
 
     data class Ready(

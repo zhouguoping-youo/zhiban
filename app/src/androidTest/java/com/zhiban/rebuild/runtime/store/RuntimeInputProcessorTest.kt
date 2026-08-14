@@ -536,6 +536,126 @@ class RuntimeInputProcessorTest {
         )
     }
 
+    @Test fun exactCalendarConflictQuestionReadsLocalAndDeviceCalendarsWithoutProvider() = runBlocking {
+        val fixedNow = java.time.LocalDateTime.of(2026, 8, 14, 8, 0)
+            .atZone(java.time.ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli()
+        val target = java.time.LocalDateTime.of(2026, 8, 15, 22, 0)
+            .atZone(java.time.ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli()
+        database.scheduleDao().insert(
+            ScheduleEntity(
+                id = "local-meeting",
+                title = "委内瑞拉客户视频会议",
+                startAtEpochMs = target,
+                durationMinutes = 30,
+                note = null,
+                createdByRunId = null,
+                createdAtEpochMs = fixedNow,
+                updatedAtEpochMs = fixedNow,
+            ),
+        )
+        val staged = RoomTextInputGateway(database, { true }, { fixedNow }).stage(
+            """{"schemaVersion":1,"text":"明天有晚上10点的会议冲突吗","mode":"Work","model":"M2.7"}""",
+        )
+        val gateways = RoomRuntimeGateways(database, "test") { fixedNow }
+        gateways.accept(
+            RuntimeUiCommand.Start(
+                "s-calendar-conflict",
+                staged.inputRef,
+                "c-calendar-conflict",
+                "a-calendar-conflict",
+                0,
+                "chat",
+                "r-calendar-conflict",
+            ),
+        )
+        KernelCommandProcessor(database, "processor", { true }, { fixedNow }).processNext()
+        val lease = requireNotNull(database.runtimeSessionDao().find("s-calendar-conflict"))
+        val providerCalls = AtomicInteger()
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile): CapabilitySnapshot = error("provider must not be called")
+            override fun stream(request: ModelRequest) = flow<ModelEvent> {
+                providerCalls.incrementAndGet()
+                error("provider must not be called")
+            }
+            override fun cancel(requestId: String) = false
+        }
+        val external = com.zhiban.rebuild.data.calendar.ExternalCalendarConflictSource { _, _, _, _ ->
+            listOf(
+                com.zhiban.rebuild.data.calendar.ExternalCalendarConflict(
+                    "device-1",
+                    "机场接人",
+                    target,
+                    target + 30 * 60_000L,
+                ),
+            )
+        }
+        val engine = com.zhiban.rebuild.runtime.kernel.ProviderExecutionEngine(
+            database,
+            provider,
+            fixedProfileStore(),
+            "processor",
+            { fixedNow },
+            infrastructure = com.zhiban.rebuild.runtime.kernel.ProviderEngineInfrastructure(
+                externalCalendarConflicts = external,
+            ),
+        )
+
+        assertTrue(engine.execute("r-calendar-conflict", "s-calendar-conflict", lease.leaseEpoch))
+        assertEquals("SUCCEEDED", database.runtimeRunDao().find("r-calendar-conflict")?.status)
+        assertEquals(0, providerCalls.get())
+        val answer = gateways.assistantTurnText("s-calendar-conflict", "r-calendar-conflict").orEmpty()
+        assertTrue(answer.contains("委内瑞拉客户视频会议"))
+        assertTrue(answer.contains("机场接人"))
+        assertTrue(answer.contains("会发生冲突"))
+    }
+
+    @Test fun exactCalendarCreateStopsBeforeApprovalWhenTheTimeIsAlreadyOccupied() = runBlocking {
+        val fixedNow = java.time.LocalDateTime.of(2026, 8, 14, 8, 0)
+            .atZone(java.time.ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli()
+        val target = java.time.LocalDateTime.of(2026, 8, 15, 22, 0)
+            .atZone(java.time.ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli()
+        val staged = RoomTextInputGateway(database, { true }, { fixedNow }).stage(
+            """{"schemaVersion":1,"text":"帮我安排明天晚上10点客户会议，时间30分钟","mode":"Work","model":"M2.7"}""",
+        )
+        val gateways = RoomRuntimeGateways(database, "test") { fixedNow }
+        gateways.accept(
+            RuntimeUiCommand.Start(
+                "s-create-conflict",
+                staged.inputRef,
+                "c-create-conflict",
+                "a-create-conflict",
+                0,
+                "chat",
+                "r-create-conflict",
+            ),
+        )
+        KernelCommandProcessor(database, "processor", { true }, { fixedNow }).processNext()
+        val lease = requireNotNull(database.runtimeSessionDao().find("s-create-conflict"))
+        val external = com.zhiban.rebuild.data.calendar.ExternalCalendarConflictSource { _, _, _, _ ->
+            listOf(com.zhiban.rebuild.data.calendar.ExternalCalendarConflict("device-existing", "机场接人", target, target + 60 * 60_000L))
+        }
+        val engine = com.zhiban.rebuild.runtime.kernel.ProviderExecutionEngine(
+            database,
+            object : ProviderAdapter {
+                override suspend fun probe(profile: ProviderProfile): CapabilitySnapshot = error("provider must not be called")
+                override fun stream(request: ModelRequest) = flow<ModelEvent> { error("provider must not be called") }
+                override fun cancel(requestId: String) = false
+            },
+            fixedProfileStore(),
+            "processor",
+            { fixedNow },
+            infrastructure = com.zhiban.rebuild.runtime.kernel.ProviderEngineInfrastructure(
+                externalCalendarConflicts = external,
+            ),
+        )
+
+        assertTrue(engine.execute("r-create-conflict", "s-create-conflict", lease.leaseEpoch))
+        assertEquals("SUCCEEDED", database.runtimeRunDao().find("r-create-conflict")?.status)
+        assertNull(database.runtimeEventDao().latestByType("r-create-conflict", "ApprovalRequested"))
+        assertEquals(0, database.scheduleDao().count())
+        assertTrue(gateways.assistantTurnText("s-create-conflict", "r-create-conflict").orEmpty().contains("机场接人"))
+    }
+
     @Test fun contactSearchAutoExecutesWithoutApprovalAndFeedsFinalAnswer() = runBlocking {
         database.contactDao().insert(
             ContactEntity(
@@ -2065,7 +2185,7 @@ class RuntimeInputProcessorTest {
 
     @Test fun stalledToolObservationFallsBackAndUnlocksConversation() = runBlocking {
         val staged = RoomTextInputGateway(database, { true }, { now }).stage(
-            """{"schemaVersion":1,"text":"生活助理，检查明天下午三点是否冲突","mode":"Work","model":"M2.7"}""",
+            """{"schemaVersion":1,"text":"查找联系人张三","mode":"Work","model":"M2.7"}""",
         )
         RoomRuntimeGateways(database, "test") { now++ }
             .accept(RuntimeUiCommand.Start("s-observe-timeout", staged.inputRef, "c-observe", "a-observe", 0, "chat", "r-observe-timeout"))
@@ -2078,9 +2198,9 @@ class RuntimeInputProcessorTest {
                 flowOf(
                     ModelEvent.ToolCall(
                         0,
-                        "call-conflicts",
-                        "calendar.schedule.conflicts",
-                        """{"startAtEpochMs":3000000,"durationMinutes":30}""",
+                        "call-contact",
+                        "contact.search",
+                        """{"query":"张三"}""",
                     ),
                     ModelEvent.Final("tool_calls"),
                 )

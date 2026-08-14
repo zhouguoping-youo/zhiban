@@ -3,6 +3,7 @@ import androidx.room.withTransaction
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.ScheduleEntity
 import com.zhiban.rebuild.data.agent.ToolAuditEntity
+import com.zhiban.rebuild.data.calendar.ExternalCalendarConflictSource
 import com.zhiban.rebuild.data.crm.CrmActionStatus
 import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.context.FactIndex
@@ -25,9 +26,24 @@ internal class ToolIdempotencyConflictException(message: String) : IllegalStateE
 internal class RoomScheduleToolExecutor(
     private val database: AgentDatabase,
     private val enabled: () -> Boolean = { true },
+    private val externalConflicts: ExternalCalendarConflictSource? = null,
     private val onScheduleSaved: (ScheduleEntity) -> Unit = {},
 ) {
     suspend fun execute(context: ConfirmedToolExecutionContext, call: ScheduleCreateToolCall, confirmation: ToolConfirmation): SafeToolResult {
+        // Validate the persisted approval before inspecting the user's device calendar. The same
+        // validation runs again in the write transaction so a stale approval cannot win a race.
+        val replay = database.withTransaction {
+            val resolved = validateToolCall(context, call, confirmation)
+            handleIdempotentReplay(context, call, resolved.attemptId)
+        }
+        if (replay != null) {
+            database.scheduleDao().findById(replay.scheduleId)?.let(onScheduleSaved)
+            return replay
+        }
+        val endAt = Math.addExact(call.startAtEpochMs, call.durationMinutes * 60_000L)
+        if (externalConflicts?.findConflicts(call.startAtEpochMs, endAt, call.scheduleId, 1).orEmpty().isNotEmpty()) {
+            throw CalendarScheduleConflictException("CALENDAR_SCHEDULE_CONFLICT")
+        }
         val result = database.withTransaction {
             val resolved = validateToolCall(context, call, confirmation)
             handleIdempotentReplay(context, call, resolved.attemptId)?.let { return@withTransaction it }
@@ -41,12 +57,7 @@ internal class RoomScheduleToolExecutor(
 
     private data class ResolvedExecution(val sessionId: String, val attemptId: String, val attemptStatus: String, val runStatus: String)
 
-    private suspend fun validateToolCall(
-        context: ConfirmedToolExecutionContext,
-        call: ScheduleCreateToolCall,
-        confirmation: ToolConfirmation,
-    ): ResolvedExecution {
-        check(enabled()) { "runtime tool feature is disabled" }
+    private fun requireCallBoundToConfirmation(call: ScheduleCreateToolCall, confirmation: ToolConfirmation) {
         require(
             call.proposalId == confirmation.proposalId && call.payloadRef == confirmation.payloadRef &&
                 call.revision == confirmation.revision &&
@@ -57,6 +68,15 @@ internal class RoomScheduleToolExecutor(
         require(canonicalScheduleDigest(call) == call.canonicalInputDigest) {
             "tool arguments do not match the approved digest"
         }
+    }
+
+    private suspend fun validateToolCall(
+        context: ConfirmedToolExecutionContext,
+        call: ScheduleCreateToolCall,
+        confirmation: ToolConfirmation,
+    ): ResolvedExecution {
+        check(enabled()) { "runtime tool feature is disabled" }
+        requireCallBoundToConfirmation(call, confirmation)
         val run = requireNotNull(database.runtimeRunDao().find(context.runId))
         val attemptId = requireNotNull(run.activeAttemptId) { "tool execution requires an active attempt" }
         val attempt =

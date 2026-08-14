@@ -147,6 +147,33 @@ class CalendarTimeResolutionTest {
         assertEquals(90, toolCall.intArgument("durationMinutes"))
     }
 
+    @Test fun naturalChineseTimeDurationIsNotMistakenForA60MinuteDefault() {
+        val text = "帮我安排明天晚上10点与委内瑞拉的客户的视频会议，时间30分钟，提前10分钟提醒我"
+        val queryContext = extractor.extract(text, "Work", now)
+
+        val toolCall = requireNotNull(deterministicCalendarToolCall(DecodedInput(text, "Work"), queryContext, now))
+
+        assertEquals(30, toolCall.intArgument("durationMinutes"))
+        assertEquals(10, toolCall.intArgument("reminderMinutesBefore"))
+    }
+
+    @Test fun exactConflictQuestionBuildsAReadOnlyCheckForTomorrowAt10pm() {
+        val reportedNow = LocalDateTime.of(2026, 8, 14, 8, 0).atZone(zone).toInstant().toEpochMilli()
+        val text = "明天有晚上10点的会议冲突吗"
+        val queryContext = extractor.extract(text, "Work", reportedNow)
+
+        val toolCall = requireNotNull(
+            deterministicCalendarConflictToolCall(DecodedInput(text, "Work"), queryContext, reportedNow),
+        )
+
+        assertEquals("calendar.schedule.conflicts", toolCall.name)
+        assertEquals(
+            LocalDateTime.of(2026, 8, 15, 22, 0).atZone(zone).toInstant().toEpochMilli(),
+            toolCall.startAt(),
+        )
+        assertEquals(60, toolCall.intArgument("durationMinutes"))
+    }
+
     @Test fun unsupportedExplicitDurationDoesNotTakeTheDeterministicPath() {
         val text = "明晚10点与委内瑞拉客户开会，持续到谈完为止"
         val queryContext = extractor.extract(text, "Work", now)

@@ -241,6 +241,31 @@ class RoomScheduleToolExecutorTest {
         assertEquals("EXECUTING", store.runById("run")?.status)
     }
 
+    @Test fun overlappingDeviceCalendarEventIsRecheckedAfterApprovalBeforeAnyWrite() = runBlocking {
+        val fixture = fixture()
+        executor = RoomScheduleToolExecutor(
+            database,
+            externalConflicts = com.zhiban.rebuild.data.calendar.ExternalCalendarConflictSource { start, end, _, _ ->
+                listOf(
+                    com.zhiban.rebuild.data.calendar.ExternalCalendarConflict(
+                        "device-event",
+                        "手机日历已有会议",
+                        start,
+                        end,
+                    ),
+                )
+            },
+        )
+
+        val failure = runCatching { executor.execute(fixture, call(), confirmation()) }.exceptionOrNull()
+
+        assertTrue(failure is CalendarScheduleConflictException)
+        assertEquals(0, database.scheduleDao().count())
+        assertEquals(0, database.toolAuditDao().count())
+        assertEquals(null, store.toolResult(call().idempotencyKey))
+        assertEquals("EXECUTING", store.runById("run")?.status)
+    }
+
     @Test fun confirmedScheduleFromThePastIsRejectedBeforeAnySideEffect() = runBlocking {
         val unsigned = call().copy(
             startAtEpochMs = 1_000L,

@@ -130,13 +130,17 @@ private val CHINESE_AFTER_TIME_TITLE =
 private val ENGLISH_REMINDER =
     Regex("""\b(\d{1,4})\s*minutes?\s*before\b""", RegexOption.IGNORE_CASE)
 private val CHINESE_REMINDER = Regex("""提前\s*(\d{1,4})\s*分钟""")
-private val CHINESE_DURATION = Regex("""(?:时长|持续)\s*(\d{1,4}(?:\.5)?)\s*(个?小时|分钟)""")
-private val CHINESE_HALF_HOUR_DURATION = Regex("""(?:时长|持续)\s*(?:一|1)?个?半小时""")
+private val CHINESE_DURATION = Regex("""(?:时长(?:为)?|持续(?:时间)?|时间(?:为)?)\s*(\d{1,4}(?:\.5)?)\s*(个?小时|分钟)""")
+private val CHINESE_HALF_HOUR_DURATION = Regex("""(?:时长(?:为)?|持续(?:时间)?|时间(?:为)?)\s*(?:一|1)?个?半小时""")
 private val ENGLISH_DURATION = Regex(
     """\b(?:for|duration\s*)\s*(\d{1,4}(?:\.5)?)\s*(hours?|hrs?|minutes?|mins?)\b""",
     RegexOption.IGNORE_CASE,
 )
-private val EXPLICIT_DURATION_MARKER = Regex("""(?:时长|持续|\b(?:for|duration)\b)""", RegexOption.IGNORE_CASE)
+private val EXPLICIT_DURATION_MARKER = Regex(
+    """(?:时长|持续|时间\s*(?:为\s*)?\d{1,4}(?:\.5)?\s*(?:个?小时|分钟)|\b(?:for|duration)\b)""",
+    RegexOption.IGNORE_CASE,
+)
+private val CALENDAR_CONFLICT_QUERY_MARKERS = listOf("冲突", "撞期", "重叠", "时间撞了", "时间重复")
 
 /**
  * Forced calendar-create suppresses the model's streamed prose so the user sees only the
@@ -239,6 +243,23 @@ internal fun deterministicCalendarToolCall(input: DecodedInput, queryContext: Qu
         providerCallId = "local-${sha256("${input.text}|$startAt|$normalizedTitle").take(24)}",
         name = SchedulePlanValidator.TOOL_NAME,
         argumentsJson = arguments,
+    )
+}
+
+internal fun deterministicCalendarConflictToolCall(input: DecodedInput, queryContext: QueryContext, nowEpochMs: Long): ModelEvent.ToolCall? {
+    if (queryContext.intentLabel != com.zhiban.rebuild.runtime.context.IntentLabel.CALENDAR_QUERY) return null
+    if (CALENDAR_CONFLICT_QUERY_MARKERS.none(input.text::contains)) return null
+    val startAt = resolveCalendarStartEpochMs(input.text, queryContext.timeRange, nowEpochMs = nowEpochMs) ?: return null
+    val durationMinutes = explicitCalendarDurationMinutes(input.text)
+        ?: if (EXPLICIT_DURATION_MARKER.containsMatchIn(input.text)) return null else 60
+    return ModelEvent.ToolCall(
+        ordinal = 0,
+        providerCallId = "local-conflict-${sha256("${input.text}|$startAt|$durationMinutes").take(24)}",
+        name = "calendar.schedule.conflicts",
+        argumentsJson = buildJsonObject {
+            put("startAtEpochMs", startAt)
+            put("durationMinutes", durationMinutes)
+        }.toString(),
     )
 }
 
@@ -440,6 +461,7 @@ internal fun shouldCompleteObservationDeterministically(toolName: String, intent
     toolName == SchedulePlanValidator.TOOL_NAME &&
         intentLabel == com.zhiban.rebuild.runtime.context.IntentLabel.CALENDAR_CREATE
     ) ||
+    toolName in setOf("calendar.conflicts", "calendar.schedule.conflicts") ||
     toolName == CommunicationMessageToolBinding.TOOL_NAME ||
     toolName == CrmMutationToolBinding.LEAD_CREATE
 
@@ -452,13 +474,7 @@ internal fun deterministicToolSummary(toolName: String, safeResultJson: String):
 
         "calendar.search", "calendar.schedule.search" -> if (count == 0) "这个时间范围内没有日程安排。" else "已查到 ${count ?: 0} 条日程。"
 
-        "calendar.conflicts", "calendar.schedule.conflicts" -> if (result?.get("hasConflict")?.jsonPrimitive?.content ==
-            "true"
-        ) {
-            "检测到 ${count ?: 1} 个日程冲突。"
-        } else {
-            "没有检测到日程冲突。"
-        }
+        "calendar.conflicts", "calendar.schedule.conflicts" -> calendarConflictSummary(result, count)
 
         "contacts.search", "contact.search" -> if (count == 0) "没有找到匹配的联系人。" else "已找到 ${count ?: 0} 位联系人。"
 
@@ -505,6 +521,21 @@ internal fun deterministicToolSummary(toolName: String, safeResultJson: String):
 
         else -> "操作已完成。"
     }
+}
+
+private fun calendarConflictSummary(result: kotlinx.serialization.json.JsonObject?, count: Int?): String {
+    if (result?.get("hasConflict")?.jsonPrimitive?.content != "true") return "没有检测到日程冲突。"
+    val formatter = DateTimeFormatter.ofPattern("M月d日 HH:mm")
+    val zone = ZoneId.systemDefault()
+    val items = result["items"]?.jsonArray.orEmpty().take(3).mapNotNull { value ->
+        val item = runCatching { value.jsonObject }.getOrNull() ?: return@mapNotNull null
+        val title = item["title"]?.jsonPrimitive?.content?.takeIf(String::isNotBlank) ?: return@mapNotNull null
+        val startAt = item["startAtEpochMs"]?.jsonPrimitive?.content?.toLongOrNull() ?: return@mapNotNull null
+        val source = if (item["source"]?.jsonPrimitive?.content == "SYSTEM_CALENDAR") "手机日历" else "知伴日历"
+        "“$title” ${Instant.ofEpochMilli(startAt).atZone(zone).format(formatter)}（$source）"
+    }
+    val details = items.takeIf(List<String>::isNotEmpty)?.joinToString(separator = "；", prefix = "：") ?: "。"
+    return "这个时间段已有 ${count ?: items.size.coerceAtLeast(1)} 个日程$details。若再安排新日程会发生冲突。"
 }
 
 /**
