@@ -1,6 +1,7 @@
 package com.zhiban.rebuild.ui.agent.projection
 
 import com.zhiban.rebuild.runtime.spi.CommandReceipt
+import com.zhiban.rebuild.runtime.spi.PendingApprovalProjection
 import com.zhiban.rebuild.runtime.spi.RuntimeAction
 import com.zhiban.rebuild.runtime.spi.RuntimeUiClient
 import com.zhiban.rebuild.runtime.spi.RuntimeUiCommand
@@ -81,12 +82,30 @@ class AgentRuntimeProjectionController(
     // When a card becomes pending carrying only an opaque candidateId, resolve the body from the
     // short-lived staging area in-memory so the live path shows it too — not just on reconnect replay.
     private suspend fun SessionProjection.withResolvedApprovalDetails(): SessionProjection {
-        val approval = pendingApproval ?: return this
-        if (approval.details != null) return this
-        val candidateId = approval.candidateId ?: return this
-        val resolved = client.stagedCandidateContent(candidateId) ?: return this
-        return copy(pendingApproval = approval.copy(details = resolved))
+        var resolvedProjection = this
+        var approval = resolvedProjection.pendingApproval ?: return this
+        val staged = approval.stagedContentRef?.let { client.stagedApprovalContent(it) }
+        if (staged != null) {
+            approval = approval.withStagedContent(staged)
+            resolvedProjection = resolvedProjection.copy(pendingApproval = approval)
+        }
+        if (approval.details != null) return resolvedProjection
+        val candidateId = approval.candidateId ?: return resolvedProjection
+        val resolved = client.stagedCandidateContent(candidateId) ?: return resolvedProjection
+        return resolvedProjection.copy(pendingApproval = approval.copy(details = resolved))
     }
+
+    private fun PendingApprovalProjection.withStagedContent(staged: com.zhiban.rebuild.runtime.spi.StagedApprovalContent): PendingApprovalProjection = copy(
+        title = staged.title ?: title,
+        platform = staged.platform ?: platform,
+        recipient = staged.recipient ?: recipient,
+        message = staged.message ?: message,
+        scheduleStartAtEpochMs = staged.scheduleStartAtEpochMs ?: scheduleStartAtEpochMs,
+        scheduleDurationMinutes = staged.scheduleDurationMinutes ?: scheduleDurationMinutes,
+        scheduleReminderMinutesBefore = staged.scheduleReminderMinutesBefore ?: scheduleReminderMinutesBefore,
+        scheduleNote = staged.scheduleNote ?: scheduleNote,
+        details = staged.details ?: details,
+    )
 
     fun close() {
         observation?.cancel()
@@ -128,7 +147,7 @@ class AgentRuntimeProjectionController(
         mutableProjection.value = snapshot.copy(
             allowedActions = allowedActionsFor(snapshot.runStatus, snapshot.recoveryNeeded) +
                 if (snapshot.undoAvailable) setOf(RuntimeAction.UNDO) else emptySet(),
-        )
+        ).withResolvedApprovalDetails()
     }
 
     private suspend fun dispatchApprovalAction(action: RuntimeAction): CommandReceipt {

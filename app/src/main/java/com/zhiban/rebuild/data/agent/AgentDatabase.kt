@@ -74,6 +74,7 @@ const val AGENT_DATABASE_FILE_NAME = "zhiban-agent.db"
         RuntimeSessionEntity::class, RuntimeRunEntity::class, RuntimeAttemptEntity::class,
         RuntimeCommandInboxEntity::class, RuntimeEventEntity::class, RuntimeConversationTurnEntity::class,
         RuntimeToolExecutionEntity::class, RuntimeProjectionEntity::class, RuntimeInputStagingEntity::class,
+        RuntimeApprovalStagingEntity::class,
         RuntimeRunInputEntity::class, RuntimeSessionWorkspaceEntity::class, RuntimeArtifactEntity::class,
         StagedMemoryCandidateEntity::class,
         MemoryNamespaceEntity::class, MemoryRecordEntity::class, MemoryCurrentVersionEntity::class,
@@ -120,7 +121,7 @@ const val AGENT_DATABASE_FILE_NAME = "zhiban-agent.db"
         EventPlanEntity::class,
         EventPlanParticipantEntity::class,
     ],
-    version = 38,
+    version = 39,
     exportSchema = true,
 )
 internal abstract class AgentDatabase : RoomDatabase() {
@@ -137,6 +138,7 @@ internal abstract class AgentDatabase : RoomDatabase() {
     internal abstract fun runtimeToolExecutionDao(): RuntimeToolExecutionDao
     internal abstract fun runtimeProjectionDao(): RuntimeProjectionDao
     internal abstract fun runtimeInputStagingDao(): RuntimeInputStagingDao
+    internal abstract fun runtimeApprovalStagingDao(): RuntimeApprovalStagingDao
     internal abstract fun runtimeRunInputDao(): RuntimeRunInputDao
     internal abstract fun runtimeSessionWorkspaceDao(): RuntimeSessionWorkspaceDao
     internal abstract fun runtimeArtifactDao(): RuntimeArtifactDao
@@ -197,6 +199,7 @@ internal abstract class AgentDatabase : RoomDatabase() {
         val MIGRATION_35_36 = AgentDatabaseSchema.MIGRATION_35_36
         val MIGRATION_36_37 = AgentDatabaseSchema.MIGRATION_36_37
         val MIGRATION_37_38 = AgentDatabaseSchema.MIGRATION_37_38
+        val MIGRATION_38_39 = AgentDatabaseSchema.MIGRATION_38_39
         val CALLBACK = AgentDatabaseSchema.CALLBACK
     }
 }

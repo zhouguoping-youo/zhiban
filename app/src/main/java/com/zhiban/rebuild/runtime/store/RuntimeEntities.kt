@@ -239,6 +239,27 @@ data class RuntimeInputStagingEntity(
 )
 
 @Entity(
+    tableName = "runtime_approval_staging",
+    foreignKeys = [
+        ForeignKey(
+            entity = RuntimeRunEntity::class,
+            parentColumns = ["runId"],
+            childColumns = ["runId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index(value = ["runId"], unique = true), Index("expiresAtEpochMs")],
+)
+data class RuntimeApprovalStagingEntity(
+    @PrimaryKey val stagedRef: String,
+    val runId: String,
+    val payloadJson: String,
+    val payloadDigest: String,
+    val createdAtEpochMs: Long,
+    val expiresAtEpochMs: Long,
+)
+
+@Entity(
     tableName = "runtime_run_inputs",
     foreignKeys = [
         ForeignKey(

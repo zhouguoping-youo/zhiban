@@ -53,6 +53,7 @@ class AgentSessionReducer {
                     // The ApprovalRequested payload stays redacted; use the snapshot-provided body.
                     event.details ?: previous.pendingDetails,
                     event.candidateId,
+                    event.stagedContentRef,
                 ),
                 pendingDetails = event.details ?: previous.pendingDetails,
                 allowedActions = allowedActionsFor(RuntimeRunStatus.AWAITING_CONFIRMATION),

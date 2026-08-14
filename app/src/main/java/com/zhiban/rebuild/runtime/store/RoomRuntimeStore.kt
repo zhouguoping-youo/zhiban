@@ -30,6 +30,7 @@ import com.zhiban.rebuild.runtime.spi.RuntimeAction
 import com.zhiban.rebuild.runtime.spi.RuntimeCommandStatus
 import com.zhiban.rebuild.runtime.spi.RuntimeRunStatus
 import com.zhiban.rebuild.runtime.spi.RuntimeUiCommand
+import com.zhiban.rebuild.runtime.spi.StagedApprovalContent
 import com.zhiban.rebuild.runtime.tool.CalendarMutationToolBinding
 import com.zhiban.rebuild.runtime.tool.MemoryRememberToolCall
 import com.zhiban.rebuild.runtime.tool.ScheduleCreateToolCall
@@ -463,6 +464,11 @@ internal class RoomRuntimeStore(private val database: AgentDatabase, private val
         )
         check(database.runtimeRunDao().transition(runId, current.name, target.name, event.sequence, nowEpochMs) == 1)
         appendRunStatusUiProjection(command, runId, target, event, nowEpochMs)
+        if (command.commandType == "Reject" ||
+            (command.commandType == "Cancel" && current == RuntimeRunStatus.AWAITING_CONFIRMATION)
+        ) {
+            database.runtimeApprovalStagingDao().deleteByRunId(runId)
+        }
         check(
             database.runtimeCommandInboxDao().complete(command.commandId, "{\"status\":\"APPLIED\"}", nowEpochMs) == 1,
         )
@@ -744,9 +750,12 @@ internal class RoomRuntimeStore(private val database: AgentDatabase, private val
     suspend fun completeApprovedCalendarMutation(plan: JsonObject, ownerId: String, fencingEpoch: Long, nowEpochMs: Long): RuntimeToolExecutionEntity =
         approvals.completeApprovedCalendarMutation(plan, ownerId, fencingEpoch, nowEpochMs)
 
-    suspend fun pendingToolPlan(runId: String): String? = approvals.pendingToolPlan(runId)
+    suspend fun pendingToolPlan(runId: String, nowEpochMs: Long = System.currentTimeMillis()): String? = approvals.pendingToolPlan(runId, nowEpochMs)
 
     suspend fun stagedMemoryContent(candidateId: String, nowEpochMs: Long): String? = approvals.stagedMemoryContent(candidateId, nowEpochMs)
+
+    suspend fun stagedApprovalContent(stagedRef: String, nowEpochMs: Long = System.currentTimeMillis()): StagedApprovalContent? =
+        approvals.stagedApprovalContent(stagedRef, nowEpochMs)
 
     suspend fun latestToolExecution(runId: String): RuntimeToolExecutionEntity? = approvals.latestToolExecution(runId)
 
@@ -1247,6 +1256,7 @@ internal class RoomRuntimeStore(private val database: AgentDatabase, private val
         )
         database.planDao().transitionRunStatus(runId, PLAN_STATUS_ACTIVE, PLAN_STATUS_TERMINAL, nowEpochMs)
         database.runtimeRunInputDao().deleteByRunId(runId)
+        database.runtimeApprovalStagingDao().deleteByRunId(runId)
     }
 
     suspend fun finishExecutingRunFailure(runId: String, safeFailureCode: String, ownerId: String, fencingEpoch: Long, nowEpochMs: Long) =
@@ -1279,6 +1289,7 @@ internal class RoomRuntimeStore(private val database: AgentDatabase, private val
                 ?.let { check(database.runtimeAttemptDao().finish(attemptId, "FAILED", nowEpochMs) == 1) }
             database.planDao().transitionRunStatus(runId, PLAN_STATUS_ACTIVE, PLAN_STATUS_TERMINAL, nowEpochMs)
             database.runtimeRunInputDao().deleteByRunId(runId)
+            database.runtimeApprovalStagingDao().deleteByRunId(runId)
         }
 
     suspend fun transitionRun(

@@ -136,12 +136,16 @@ class RuntimeInputProcessorTest {
         processor.processNext()
         awaitRunStatus("r-prev", "AWAITING_CONFIRMATION")
 
-        // The confirmation card preview rides the single-row snapshot…
+        // Neither the durable event journal nor the persisted projection snapshot carries the body.
         val snapshotPayload = gateways.snapshotAndObserve("s-prev", "ui", 0).snapshot.snapshotJson!!
-        assertTrue(snapshotPayload.contains("用户喜欢简洁回答"))
-        // …but the durable event journal still never carries the memory body.
+        assertFalse(snapshotPayload.contains("用户喜欢简洁回答"))
         assertTrue(
             database.runtimeEventDao().listByRunId("r-prev").none { it.payloadJson.contains("用户喜欢简洁回答") },
+        )
+        val approval = approvalPlan("r-prev")
+        assertEquals(
+            "用户喜欢简洁回答",
+            gateways.stagedCandidateContent(requireNotNull(approval["candidateId"]).jsonPrimitive.content),
         )
     }
 
@@ -351,8 +355,7 @@ class RuntimeInputProcessorTest {
         assertEquals(KernelCommandProcessor.Outcome.PROCESSED, processor.processNext())
         awaitRunStatus("r-work", "AWAITING_CONFIRMATION")
         assertNull(database.scheduleDao().findById("schedule-placeholder"))
-        val approval = database.runtimeEventDao().latestByType("r-work", "ApprovalRequested")!!
-        val payload = Json.parseToJsonElement(approval.payloadJson).jsonObject
+        val payload = approvalPlan("r-work")
         assertEquals(10, payload["reminderMinutesBefore"]!!.jsonPrimitive.content.toInt())
         val normalizedStart = payload["startAtEpochMs"]!!.jsonPrimitive.content.toLong()
         assertNotEquals(2_000_000L, normalizedStart)
@@ -435,9 +438,7 @@ class RuntimeInputProcessorTest {
 
         processor.processNext()
         awaitRunStatus("r-local-fallback", "AWAITING_CONFIRMATION")
-        val approval = Json.parseToJsonElement(
-            database.runtimeEventDao().latestByType("r-local-fallback", "ApprovalRequested")!!.payloadJson,
-        ).jsonObject
+        val approval = approvalPlan("r-local-fallback")
         assertEquals("Local fallback", approval["title"]!!.jsonPrimitive.content)
         assertEquals(10, approval["reminderMinutesBefore"]!!.jsonPrimitive.content.toInt())
         assertEquals(
@@ -928,7 +929,7 @@ class RuntimeInputProcessorTest {
         val approval = database.runtimeEventDao().latestByType("r-contact-write", "ApprovalRequested")!!
         assertFalse(approval.payloadJson.contains("13900139000"))
         assertFalse(approval.payloadJson.contains("星河公司"))
-        val payload = Json.parseToJsonElement(approval.payloadJson).jsonObject
+        val payload = approvalPlan("r-contact-write")
         val revision = database.runtimeSessionDao().find("s-contact-write")!!.nextSequence - 1
         gateway.accept(
             RuntimeUiCommand.RunAction(
@@ -1020,7 +1021,7 @@ class RuntimeInputProcessorTest {
         awaitRunStatus("r-owner-employment", "AWAITING_CONFIRMATION")
         assertNull(database.contactIntelligenceDao().findCurrentUserEmployment(RelationshipPersonIds.SELF))
         val approval = requireNotNull(database.runtimeEventDao().latestByType("r-owner-employment", "ApprovalRequested"))
-        val payload = Json.parseToJsonElement(approval.payloadJson).jsonObject
+        val payload = approvalPlan("r-owner-employment")
         assertEquals("确认本人当前任职", payload["title"]?.jsonPrimitive?.content)
         assertTrue(payload["details"]?.jsonPrimitive?.content?.contains("公司全称：") == true)
         assertNull(payload["message"])
@@ -1116,7 +1117,7 @@ class RuntimeInputProcessorTest {
         processor.processNext()
         awaitRunStatus("r-profile-company", "AWAITING_CONFIRMATION")
         val approval = requireNotNull(database.runtimeEventDao().latestByType("r-profile-company", "ApprovalRequested"))
-        val approvalPayload = Json.parseToJsonElement(approval.payloadJson).jsonObject
+        val approvalPayload = approvalPlan("r-profile-company")
         val revision = requireNotNull(database.runtimeSessionDao().find("s-profile-company")).nextSequence - 1
         gateway.accept(
             RuntimeUiCommand.RunAction(
@@ -1225,7 +1226,7 @@ class RuntimeInputProcessorTest {
         awaitRunStatus("r-rel-write", "AWAITING_CONFIRMATION")
         val approval = database.runtimeEventDao().latestByType("r-rel-write", "ApprovalRequested")!!
         assertFalse(approval.payloadJson.contains(privateEvidence))
-        val payload = Json.parseToJsonElement(approval.payloadJson).jsonObject
+        val payload = approvalPlan("r-rel-write")
         assertTrue(payload["evidenceDigest"]!!.jsonPrimitive.content.isNotBlank())
         val revision = database.runtimeSessionDao().find("s-rel-write")!!.nextSequence - 1
         gateway.accept(
@@ -2862,4 +2863,8 @@ class RuntimeInputProcessorTest {
         val events = database.runtimeEventDao().listByRunId(runId).joinToString { "${it.eventType}:${it.payloadJson}" }
         assertEquals(events, expected, database.runtimeRunDao().find(runId)?.status)
     }
+
+    private suspend fun approvalPlan(runId: String): JsonObject = Json.parseToJsonElement(
+        requireNotNull(RoomRuntimeStore(database, "test").pendingToolPlan(runId, now)),
+    ).jsonObject
 }

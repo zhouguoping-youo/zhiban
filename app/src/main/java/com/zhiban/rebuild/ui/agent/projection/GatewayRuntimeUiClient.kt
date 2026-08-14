@@ -77,6 +77,7 @@ class GatewayRuntimeUiClient(
                                 // transient snapshot via pendingDetails.
                                 event.details ?: projection.pendingDetails,
                                 event.candidateId,
+                                event.stagedContentRef,
                             )
                         } else {
                             projection.pendingApproval
@@ -110,6 +111,8 @@ class GatewayRuntimeUiClient(
     }
 
     override suspend fun stagedCandidateContent(candidateId: String): String? = projectionGateway.stagedCandidateContent(candidateId)
+
+    override suspend fun stagedApprovalContent(stagedRef: String) = projectionGateway.stagedApprovalContent(stagedRef)
 
     private fun decodeSnapshot(snapshot: StoredProjectionSnapshot): SessionProjection {
         val payload = snapshot.snapshotJson
@@ -274,6 +277,7 @@ class GatewayRuntimeUiClient(
         scheduleNote = payload.string("note"),
         details = payload.string("details"),
         candidateId = payload.string("candidateId"),
+        stagedContentRef = payload.string("stagedApprovalRef"),
     )
 
     private fun StoredRuntimeEvent.toAssistantDeltaEvent(payload: JsonObject): RuntimeUiEvent = attemptId?.let { attempt ->

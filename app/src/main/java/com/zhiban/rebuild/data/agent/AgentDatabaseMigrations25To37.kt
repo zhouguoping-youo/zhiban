@@ -543,4 +543,30 @@ internal object AgentDatabaseMigrations25To37 {
             db.execSQL("ALTER TABLE `schedules` ADD COLUMN `completedAtEpochMs` INTEGER")
         }
     }
+
+    val MIGRATION_38_39 = object : Migration(38, 39) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS `runtime_approval_staging` (
+                    `stagedRef` TEXT NOT NULL,
+                    `runId` TEXT NOT NULL,
+                    `payloadJson` TEXT NOT NULL,
+                    `payloadDigest` TEXT NOT NULL,
+                    `createdAtEpochMs` INTEGER NOT NULL,
+                    `expiresAtEpochMs` INTEGER NOT NULL,
+                    PRIMARY KEY(`stagedRef`),
+                    FOREIGN KEY(`runId`) REFERENCES `runtime_runs`(`runId`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )""",
+            )
+            db.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS `index_runtime_approval_staging_runId` " +
+                    "ON `runtime_approval_staging` (`runId`)",
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_runtime_approval_staging_expiresAtEpochMs` " +
+                    "ON `runtime_approval_staging` (`expiresAtEpochMs`)",
+            )
+        }
+    }
 }

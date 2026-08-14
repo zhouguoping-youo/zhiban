@@ -8,10 +8,16 @@ import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.runtime.kernel.PersistentRuntimeKernel
 import com.zhiban.rebuild.runtime.kernel.RuntimeSignal
 import com.zhiban.rebuild.runtime.spi.RuntimeRunStatus
+import com.zhiban.rebuild.runtime.spi.RuntimeAction
+import com.zhiban.rebuild.runtime.spi.RuntimeUiCommand
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -120,6 +126,59 @@ class RoomRuntimeStoreTest {
             first.leaseEpoch,
             60,
         )
+    }
+
+    @Test
+    fun sensitiveApprovalUsesEncryptedStagingAndRejectRemovesIt() = runBlocking {
+        store.acceptStart("approval-start", "approval-session", "approval-run", "{}", 10)
+        val lease = store.claimSession("approval-session", "owner", 20, 1_000)
+        store.startAttempt(
+            AttemptStartRequest("approval-attempt", "approval-run", 1, "owner", lease.leaseEpoch, 21),
+        )
+        val fullPlan =
+            """{"toolName":"communication.message.compose","providerCallId":"call-1","logicalStepId":"step-1","proposalId":"proposal-1","payloadRef":"payload-1","revision":1,"canonicalInputDigest":"digest-1","idempotencyKey":"key-1","platform":"SMS","recipient":"13800000000","message":"隐私正文","title":"给张三发短信"}"""
+
+        assertTrue(
+            store.requestCommunicationApproval(
+                fullPlan,
+                "call-1",
+                "approval-session",
+                "approval-run",
+                "approval-attempt",
+                "owner",
+                lease.leaseEpoch,
+                22,
+            ),
+        )
+
+        val event = requireNotNull(database.runtimeEventDao().latestByType("approval-run", "ApprovalRequested"))
+        assertFalse(event.payloadJson.contains("13800000000"))
+        assertFalse(event.payloadJson.contains("隐私正文"))
+        assertFalse(event.payloadJson.contains("张三"))
+        val journal = Json.parseToJsonElement(event.payloadJson).jsonObject
+        val stagedRef = requireNotNull(journal["stagedApprovalRef"]?.jsonPrimitive?.content)
+        assertEquals(fullPlan, store.pendingToolPlan("approval-run", 23))
+        assertEquals("13800000000", store.stagedApprovalContent(stagedRef, 23)?.recipient)
+        assertEquals("隐私正文", store.stagedApprovalContent(stagedRef, 23)?.message)
+
+        val revision = event.sequence
+        val command = RuntimeUiCommand.RunAction(
+            action = RuntimeAction.REJECT,
+            sessionId = "approval-session",
+            runId = "approval-run",
+            commandId = "reject-command",
+            clientActionId = "reject-action",
+            expectedRevision = revision,
+            surfaceId = "test",
+            proposalId = "proposal-1",
+            payloadRef = "payload-1",
+        )
+        store.acceptExternalCommand(command, 24)
+        assertTrue(store.claimCommand("reject-command", "owner", lease.leaseEpoch, 25))
+        assertTrue(store.processClaimedCommand("reject-command", "owner", lease.leaseEpoch, 26))
+
+        assertNull(store.pendingToolPlan("approval-run", 27))
+        assertNull(store.stagedApprovalContent(stagedRef, 27))
     }
 
     @Test

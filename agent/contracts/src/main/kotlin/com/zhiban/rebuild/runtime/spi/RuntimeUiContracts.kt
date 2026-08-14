@@ -69,6 +69,19 @@ data class PendingApprovalProjection(
     // Opaque staged-content reference (memory candidate id). Never carries the content itself; the UI
     // resolves it against the short-lived staging area at display time so the body stays out of the journal.
     val candidateId: String? = null,
+    val stagedContentRef: String? = null,
+)
+
+data class StagedApprovalContent(
+    val title: String? = null,
+    val platform: String? = null,
+    val recipient: String? = null,
+    val message: String? = null,
+    val scheduleStartAtEpochMs: Long? = null,
+    val scheduleDurationMinutes: Int? = null,
+    val scheduleReminderMinutesBefore: Int? = null,
+    val scheduleNote: String? = null,
+    val details: String? = null,
 )
 data class BudgetProjection(val usedTokens: Int, val maxTokens: Int)
 data class SourceProjection(val sourceId: String, val label: String)
@@ -161,6 +174,7 @@ sealed interface RuntimeUiEvent {
         val scheduleNote: String? = null,
         val details: String? = null,
         val candidateId: String? = null,
+        val stagedContentRef: String? = null,
     ) : RuntimeUiEvent
 
     data class BudgetChanged(
@@ -242,4 +256,7 @@ interface RuntimeUiClient {
 
     /** See [RuntimeProjectionGateway.stagedCandidateContent]; resolved in-memory, never journaled. */
     suspend fun stagedCandidateContent(candidateId: String): String? = null
+
+    /** See [RuntimeProjectionGateway.stagedApprovalContent]. */
+    suspend fun stagedApprovalContent(stagedRef: String): StagedApprovalContent? = null
 }

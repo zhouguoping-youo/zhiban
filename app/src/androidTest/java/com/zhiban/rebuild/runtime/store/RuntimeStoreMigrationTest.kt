@@ -86,6 +86,30 @@ class RuntimeStoreMigrationTest {
     }
 
     @Test
+    fun migrate38To39AddsRunBoundApprovalStaging() {
+        val name = "runtime-approval-staging-38-39"
+        helper.createDatabase(name, 38).close()
+
+        helper.runMigrationsAndValidate(name, 39, true, AgentDatabase.MIGRATION_38_39).use { db ->
+            assertEquals(
+                1,
+                scalarLong(
+                    db,
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='runtime_approval_staging'",
+                ),
+            )
+            assertEquals(
+                1,
+                scalarLong(
+                    db,
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type='index' " +
+                        "AND name='index_runtime_approval_staging_runId'",
+                ),
+            )
+        }
+    }
+
+    @Test
     fun migrate4To5PreservesExistingScheduleAuditAndToolExecutionRows() {
         val name = "runtime-v4-v5-data-preservation"
         helper.createDatabase(name, 4).apply {

@@ -254,6 +254,30 @@ internal interface RuntimeInputStagingDao {
 }
 
 @Dao
+internal interface RuntimeApprovalStagingDao {
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insert(entity: RuntimeApprovalStagingEntity)
+
+    @Query("SELECT * FROM runtime_approval_staging WHERE stagedRef = :stagedRef")
+    suspend fun find(stagedRef: String): RuntimeApprovalStagingEntity?
+
+    @Query("SELECT * FROM runtime_approval_staging WHERE runId = :runId")
+    suspend fun findByRunId(runId: String): RuntimeApprovalStagingEntity?
+
+    @Query("DELETE FROM runtime_approval_staging WHERE stagedRef = :stagedRef")
+    suspend fun delete(stagedRef: String): Int
+
+    @Query("DELETE FROM runtime_approval_staging WHERE runId = :runId")
+    suspend fun deleteByRunId(runId: String): Int
+
+    @Query("DELETE FROM runtime_approval_staging WHERE expiresAtEpochMs <= :nowEpochMs")
+    suspend fun deleteExpired(nowEpochMs: Long): Int
+
+    @Query("SELECT COUNT(*) FROM runtime_approval_staging")
+    suspend fun count(): Int
+}
+
+@Dao
 internal interface RuntimeRunInputDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(entity: RuntimeRunInputEntity)

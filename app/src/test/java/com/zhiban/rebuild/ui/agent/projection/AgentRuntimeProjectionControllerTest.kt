@@ -9,6 +9,7 @@ import com.zhiban.rebuild.runtime.spi.RuntimeUiClient
 import com.zhiban.rebuild.runtime.spi.RuntimeUiCommand
 import com.zhiban.rebuild.runtime.spi.RuntimeUiEvent
 import com.zhiban.rebuild.runtime.spi.SessionProjection
+import com.zhiban.rebuild.runtime.spi.StagedApprovalContent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -144,6 +145,43 @@ class AgentRuntimeProjectionControllerTest {
         runCurrent()
 
         assertEquals("用户喜欢简洁回答", controller.projection.value.pendingApproval?.details)
+        controller.close()
+    }
+
+    @Test
+    fun `pending card resolves sensitive fields from encrypted approval staging`() = runTest {
+        val approval = PendingApprovalProjection(
+            proposalId = "proposal-1",
+            payloadRef = "payload-ref-1",
+            title = "确认发送内容",
+            stagedContentRef = "staged-approval-1",
+        )
+        val client = FakeRuntimeUiClient(
+            SessionProjection(
+                sessionId = "session-1",
+                runId = "run-1",
+                revision = 5,
+                runStatus = RuntimeRunStatus.AWAITING_CONFIRMATION,
+                pendingApproval = approval,
+                allowedActions = setOf(RuntimeAction.APPROVE, RuntimeAction.REJECT),
+            ),
+        ).apply {
+            stagedApprovals["staged-approval-1"] = StagedApprovalContent(
+                title = "打开短信发送消息",
+                platform = "SMS",
+                recipient = "13800000000",
+                message = "请确认明天的会议",
+            )
+        }
+        val controller = AgentRuntimeProjectionController(client, "session-1", "compose", this)
+
+        controller.initialize()
+        runCurrent()
+
+        val resolved = requireNotNull(controller.projection.value.pendingApproval)
+        assertEquals("打开短信发送消息", resolved.title)
+        assertEquals("13800000000", resolved.recipient)
+        assertEquals("请确认明天的会议", resolved.message)
         controller.close()
     }
 
@@ -300,6 +338,7 @@ private class FakeRuntimeUiClient(private val initial: SessionProjection) : Runt
     val commands = mutableListOf<RuntimeUiCommand>()
     val events = MutableSharedFlow<RuntimeUiEvent>(extraBufferCapacity = 8)
     val stagedContent = mutableMapOf<String, String>()
+    val stagedApprovals = mutableMapOf<String, StagedApprovalContent>()
     var observedAfterSequence: Long? = null
     var remainingSnapshotFailures = 0
     var snapshotReads = 0
@@ -321,4 +360,6 @@ private class FakeRuntimeUiClient(private val initial: SessionProjection) : Runt
     }
 
     override suspend fun stagedCandidateContent(candidateId: String): String? = stagedContent[candidateId]
+
+    override suspend fun stagedApprovalContent(stagedRef: String): StagedApprovalContent? = stagedApprovals[stagedRef]
 }

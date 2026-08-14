@@ -46,4 +46,10 @@ interface RuntimeProjectionGateway {
      * event journal; it lives only in the short-lived staging area until the decision clears it.
      */
     suspend fun stagedCandidateContent(candidateId: String): String? = null
+
+    /**
+     * User-visible fields for a confirmation-gated plan, resolved from encrypted short-lived staging.
+     * Sensitive values never need to be copied into the append-only runtime event journal.
+     */
+    suspend fun stagedApprovalContent(stagedRef: String): StagedApprovalContent? = null
 }

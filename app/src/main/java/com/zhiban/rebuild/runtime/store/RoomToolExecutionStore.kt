@@ -137,6 +137,7 @@ internal class RoomToolExecutionStore(
             ) ==
                 1,
         )
+        database.runtimeApprovalStagingDao().deleteByRunId(runId)
         execution
     }
 

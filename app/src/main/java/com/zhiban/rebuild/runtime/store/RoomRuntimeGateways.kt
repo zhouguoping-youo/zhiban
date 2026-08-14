@@ -58,6 +58,8 @@ internal class RoomRuntimeGateways(
 
     override suspend fun stagedCandidateContent(candidateId: String): String? = store.stagedCandidateContent(candidateId)
 
+    override suspend fun stagedApprovalContent(stagedRef: String) = store.stagedApprovalContent(stagedRef)
+
     private fun RuntimeEventEntity.toStoredEvent() = StoredRuntimeEvent(
         eventId = eventId,
         eventType = eventType,

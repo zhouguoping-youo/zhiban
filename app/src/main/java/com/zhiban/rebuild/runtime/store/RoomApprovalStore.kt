@@ -31,6 +31,7 @@ import com.zhiban.rebuild.runtime.spi.RuntimeAction
 import com.zhiban.rebuild.runtime.spi.RuntimeCommandStatus
 import com.zhiban.rebuild.runtime.spi.RuntimeRunStatus
 import com.zhiban.rebuild.runtime.spi.RuntimeUiCommand
+import com.zhiban.rebuild.runtime.spi.StagedApprovalContent
 import com.zhiban.rebuild.runtime.tool.CalendarMutationToolBinding
 import com.zhiban.rebuild.runtime.tool.MemoryRememberToolCall
 import com.zhiban.rebuild.runtime.tool.ScheduleCreateToolCall
@@ -611,10 +612,12 @@ internal class RoomApprovalStore(
         }
         val sourceStatus = run.status
         recordPlanNodeInTransaction(payloadJson, runId, attemptId, nowEpochMs)
+        val staged = stageApprovalPlan(payloadJson, runId, attemptId, providerCallId, nowEpochMs)
+        val journalPayload = approvalJournalPayload(payloadJson, staged)
         val proposed = appendEventInTransaction(
             RuntimeEventDraft(
                 "event-plan-$attemptId-$providerCallId", "PlanProposed", sessionId, runId, attemptId,
-                providerCallId, runId, payloadJson, nowEpochMs,
+                providerCallId, runId, journalPayload, nowEpochMs,
             ),
             fencingEpoch,
         )
@@ -631,7 +634,7 @@ internal class RoomApprovalStore(
         val requested = appendEventInTransaction(
             RuntimeEventDraft(
                 "event-approval-$attemptId-$providerCallId", "ApprovalRequested", sessionId, runId, attemptId,
-                providerCallId, runId, payloadJson, nowEpochMs,
+                providerCallId, runId, journalPayload, nowEpochMs,
             ),
             fencingEpoch,
         )
@@ -645,20 +648,11 @@ internal class RoomApprovalStore(
             ) ==
                 1,
         )
-        // The confirmation card should show what is about to be remembered. The content never enters
-        // the durable event journal (MemoryRememberPlanValidator forbids it); the snapshot is a single
-        // overwritten row, so surfacing the staged content here — only while awaiting confirmation —
-        // is transient. After the decision the run leaves AWAITING_CONFIRMATION and this stops applying.
-        val candidateId = runSuspendCatching {
-            Json.parseToJsonElement(payloadJson).jsonObject["candidateId"]?.jsonPrimitive?.content
-        }.getOrNull()
-        val stagedContent = candidateId?.let { database.stagedMemoryCandidateDao().find(it) }?.content
         val envelope =
             encodeProjectionEnvelope(
                 buildJsonObject {
                     put("runId", runId)
                     put("status", RuntimeRunStatus.AWAITING_CONFIRMATION.name)
-                    stagedContent?.let { put("details", it.take(MAX_APPROVAL_DETAILS_CHARS)) }
                 }.toString(),
             )
         val inserted =
@@ -673,7 +667,42 @@ internal class RoomApprovalStore(
         return true
     }
 
-    suspend fun pendingToolPlan(runId: String): String? = database.runtimeEventDao().latestByType(runId, "ApprovalRequested")?.payloadJson
+    suspend fun pendingToolPlan(runId: String, nowEpochMs: Long = System.currentTimeMillis()): String? = database.withTransaction {
+        database.runtimeApprovalStagingDao().deleteExpired(nowEpochMs)
+        val event = database.runtimeEventDao().latestByType(runId, "ApprovalRequested") ?: return@withTransaction null
+        val journal = runSuspendCatching { Json.parseToJsonElement(event.payloadJson).jsonObject }.getOrNull()
+            ?: return@withTransaction null
+        val stagedRef = journal[STAGED_APPROVAL_REF]?.jsonPrimitive?.content
+            ?: return@withTransaction event.payloadJson // Compatibility with approvals created before schema 39.
+        val expectedDigest = journal[STAGED_APPROVAL_DIGEST]?.jsonPrimitive?.content ?: return@withTransaction null
+        val staged = database.runtimeApprovalStagingDao().find(stagedRef)
+            ?.takeIf { it.runId == runId && it.expiresAtEpochMs > nowEpochMs }
+            ?: return@withTransaction null
+        staged.payloadJson.takeIf {
+            staged.payloadDigest == expectedDigest && sha256(it) == expectedDigest
+        }
+    }
+
+    suspend fun stagedApprovalContent(stagedRef: String, nowEpochMs: Long = System.currentTimeMillis()): StagedApprovalContent? = database.withTransaction {
+        database.runtimeApprovalStagingDao().deleteExpired(nowEpochMs)
+        val staged = database.runtimeApprovalStagingDao().find(stagedRef)
+            ?.takeIf { it.expiresAtEpochMs > nowEpochMs && sha256(it.payloadJson) == it.payloadDigest }
+            ?: return@withTransaction null
+        val plan = runSuspendCatching { Json.parseToJsonElement(staged.payloadJson).jsonObject }.getOrNull()
+            ?: return@withTransaction null
+        StagedApprovalContent(
+            title = plan["titleForApproval"]?.jsonPrimitive?.content
+                ?: plan["title"]?.jsonPrimitive?.content,
+            platform = plan["platform"]?.jsonPrimitive?.content,
+            recipient = plan["recipient"]?.jsonPrimitive?.content,
+            message = plan["message"]?.jsonPrimitive?.content,
+            scheduleStartAtEpochMs = plan["startAtEpochMs"]?.jsonPrimitive?.content?.toLongOrNull(),
+            scheduleDurationMinutes = plan["durationMinutes"]?.jsonPrimitive?.content?.toIntOrNull(),
+            scheduleReminderMinutesBefore = plan["reminderMinutesBefore"]?.jsonPrimitive?.content?.toIntOrNull(),
+            scheduleNote = plan["note"]?.jsonPrimitive?.content,
+            details = plan["details"]?.jsonPrimitive?.content,
+        )
+    }
 
     suspend fun stagedMemoryContent(candidateId: String, nowEpochMs: Long): String? = database.withTransaction {
         database.stagedMemoryCandidateDao().purgeExpired(nowEpochMs)
@@ -797,10 +826,20 @@ internal class RoomApprovalStore(
 
     private companion object {
         const val MAX_SESSION_SUMMARY_CHARS = 6_000
-
-        // The confirmation-card body lives only in the single-row snapshot (never the event journal);
-        // keep it bounded.
-        const val MAX_APPROVAL_DETAILS_CHARS = 500
+        const val APPROVAL_TTL_MS = 24 * 60 * 60 * 1_000L
+        const val STAGED_APPROVAL_REF = "stagedApprovalRef"
+        const val STAGED_APPROVAL_DIGEST = "stagedApprovalDigest"
+        val JOURNAL_PROTOCOL_FIELDS = setOf(
+            "toolName",
+            "providerCallId",
+            "logicalStepId",
+            "proposalId",
+            "payloadRef",
+            "revision",
+            "canonicalInputDigest",
+            "idempotencyKey",
+            "candidateId",
+        )
         val CRM_MUTATION_TOOLS = setOf(
             "crm.lead.createCandidate",
             "crm.opportunity.create",
@@ -811,6 +850,51 @@ internal class RoomApprovalStore(
             "crm.nextAction.update",
             "crm.nextAction.complete",
         )
+    }
+
+    private suspend fun stageApprovalPlan(
+        payloadJson: String,
+        runId: String,
+        attemptId: String,
+        providerCallId: String,
+        nowEpochMs: Long,
+    ): RuntimeApprovalStagingEntity {
+        val digest = sha256(payloadJson)
+        val ref = "approval-${sha256("$runId|$attemptId|$providerCallId|$digest").take(32)}"
+        val entity = RuntimeApprovalStagingEntity(
+            stagedRef = ref,
+            runId = runId,
+            payloadJson = payloadJson,
+            payloadDigest = digest,
+            createdAtEpochMs = nowEpochMs,
+            expiresAtEpochMs = Math.addExact(nowEpochMs, APPROVAL_TTL_MS),
+        )
+        database.runtimeApprovalStagingDao().deleteExpired(nowEpochMs)
+        database.runtimeApprovalStagingDao().deleteByRunId(runId)
+        database.runtimeApprovalStagingDao().insert(entity)
+        return entity
+    }
+
+    private fun approvalJournalPayload(payloadJson: String, staged: RuntimeApprovalStagingEntity): String {
+        val plan = Json.parseToJsonElement(payloadJson).jsonObject
+        val toolName = requireNotNull(plan["toolName"]?.jsonPrimitive?.content)
+        return buildJsonObject {
+            JOURNAL_PROTOCOL_FIELDS.forEach { field -> plan[field]?.let { put(field, it) } }
+            put("title", genericApprovalTitle(toolName))
+            put(STAGED_APPROVAL_REF, staged.stagedRef)
+            put(STAGED_APPROVAL_DIGEST, staged.payloadDigest)
+        }.toString()
+    }
+
+    private fun genericApprovalTitle(toolName: String): String = when {
+        toolName == "communication.message.compose" -> "确认发送内容"
+        toolName.startsWith("calendar.") -> "确认日程变更"
+        toolName.startsWith("contact.") -> "确认联系人变更"
+        toolName.startsWith("relationship.") -> "确认联系人关系"
+        toolName.startsWith("crm.") -> "确认个人 CRM 变更"
+        toolName.startsWith("memory.") -> "确认记忆变更"
+        toolName.startsWith("mcp.") -> "确认外部工具操作"
+        else -> "确认操作"
     }
 
     private fun memoryApprovalPayload(call: MemoryRememberToolCall): String = buildJsonObject {
