@@ -183,6 +183,34 @@ class OutboundDataPolicyTest {
         assertFalse(OutboundPiiDetector.containsDirectIdentifier("张三在示例科技担任销售经理"))
     }
 
+    @Test fun automaticContextRedactsLandlinesServiceNumbersAndBankCards() = runTest {
+        val delegate = CapturingAdapter()
+        PolicyEnforcingProviderAdapter(delegate, DefaultOutboundDataPolicy()).stream(
+            request(
+                message(
+                    "座机 021-12345678，客服 400-123-4567 或 95588，银行卡 6222021234567890123",
+                    OutboundSensitivity.PERSONAL,
+                    OutboundPurpose.AUTO_RETRIEVED,
+                ),
+            ),
+        ).toList()
+
+        val sent = delegate.requests.single().messages.single().content
+        assertFalse(sent.contains("021-12345678"))
+        assertFalse(sent.contains("400-123-4567"))
+        assertFalse(sent.contains("95588"))
+        assertFalse(sent.contains("6222021234567890123"))
+        assertEquals(4, Regex("\\[已省略敏感内容]").findAll(sent).count())
+    }
+
+    @Test fun identifierDetectorAvoidsOrdinaryShortAndOverlongNumbers() {
+        assertTrue(OutboundPiiDetector.containsDirectIdentifier("座机 0755-12345678"))
+        assertTrue(OutboundPiiDetector.containsDirectIdentifier("银行客服 95588"))
+        assertTrue(OutboundPiiDetector.containsDirectIdentifier("卡号 6222021234567890"))
+        assertFalse(OutboundPiiDetector.containsDirectIdentifier("会议号 12345678"))
+        assertFalse(OutboundPiiDetector.containsDirectIdentifier("流水号 12345678901234567890"))
+    }
+
     private fun request(vararg messages: ModelMessage, attachments: List<ModelAttachment> = emptyList()) = ModelRequest(
         requestId = "request-1",
         channel = OutboundChannel.LLM_INFERENCE,

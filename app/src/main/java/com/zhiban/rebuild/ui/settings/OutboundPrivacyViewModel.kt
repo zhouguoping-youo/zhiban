@@ -8,6 +8,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -18,8 +19,8 @@ data class OutboundPrivacyState(
     val allowRemoteEmbedding: Boolean = false,
     val auditCount: Int = 0,
     val blockedCount: Int = 0,
-    val redactedCount: Int = 0,
-    val omittedCount: Int = 0,
+    val monthlyRedactedCount: Int = 0,
+    val monthlyOmittedCount: Int = 0,
 )
 
 @HiltViewModel
@@ -38,16 +39,17 @@ class OutboundPrivacyViewModel @Inject constructor(private val preferences: Outb
 
     init {
         viewModelScope.launch {
-            auditStore.records.collect { records ->
-                _state.update {
-                    it.copy(
-                        auditCount = records.size,
-                        blockedCount = records.count { record -> record.outcome.startsWith("BLOCKED_") },
-                        redactedCount = records.sumOf { record -> record.redactedMessageCount },
-                        omittedCount = records.sumOf { record -> record.omittedMessageCount },
-                    )
+            auditStore.records.combine(auditStore.monthlyProtectionCounts) { records, monthly -> records to monthly }
+                .collect { (records, monthly) ->
+                    _state.update {
+                        it.copy(
+                            auditCount = records.size,
+                            blockedCount = records.count { record -> record.outcome.startsWith("BLOCKED_") },
+                            monthlyRedactedCount = monthly.redacted,
+                            monthlyOmittedCount = monthly.omitted,
+                        )
+                    }
                 }
-            }
         }
     }
 

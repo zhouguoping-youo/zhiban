@@ -199,6 +199,9 @@ internal object OutboundPiiRedactor {
     private val bearer = Regex("(?i)bearer\\s+[A-Za-z0-9._~+/=-]{8,}")
     private val credentialLike = Regex("(?i)(api[_-]?key|token|secret)\\s*[:=]\\s*[^\\s,;}]{4,}")
     private val mainlandPhone = Regex("(?<!\\d)(?:\\+?86[- ]?)?(1[3-9]\\d)[- ]?\\d{4}[- ]?(\\d{4})(?!\\d)")
+    private val mainlandLandline = Regex("(?<![0-9A-Za-z])0\\d{2,3}[- ]?\\d{7,8}(?![0-9A-Za-z])")
+    private val serviceNumber = Regex("(?<![0-9A-Za-z])(?:(?:400|800)[- ]?\\d{3}[- ]?\\d{4}|95\\d{3,6})(?![0-9A-Za-z])")
+    private val bankCard = Regex("(?<![0-9A-Za-z])\\d{16,19}(?![0-9A-Za-z])")
     private val email =
         Regex("(?i)(?<![A-Z0-9._%+-])([A-Z0-9._%+-])([A-Z0-9._%+-]*)@([A-Z0-9.-]+\\.[A-Z]{2,})(?![A-Z0-9._%+-])")
     private val mainlandId = Regex("(?<![0-9A-Za-z])(\\d{6})\\d{8}(\\d{3}[0-9Xx])(?![0-9A-Za-z])")
@@ -214,6 +217,9 @@ internal object OutboundPiiRedactor {
         safe = mainlandPhone.replace(safe) { match -> "${match.groupValues[1]}****${match.groupValues[2]}" }
         safe = email.replace(safe) { match -> "${match.groupValues[1]}***@${match.groupValues[3]}" }
         safe = mainlandId.replace(safe) { match -> "${match.groupValues[1]}********${match.groupValues[2]}" }
+        safe = bankCard.replace(safe, OMITTED_DIRECT_IDENTIFIER)
+        safe = mainlandLandline.replace(safe, OMITTED_DIRECT_IDENTIFIER)
+        safe = serviceNumber.replace(safe, OMITTED_DIRECT_IDENTIFIER)
         if (redactStructuredPrivateFields) {
             safe = structuredPrivateField.replace(safe) { match ->
                 "${match.groupValues[1]}[REDACTED]${match.groupValues[3]}"
@@ -221,6 +227,8 @@ internal object OutboundPiiRedactor {
         }
         return safe
     }
+
+    private const val OMITTED_DIRECT_IDENTIFIER = "[已省略敏感内容]"
 }
 
 /** Detection-only guard for channels where masked identifiers would create invalid semantics. */
@@ -228,12 +236,18 @@ object OutboundPiiDetector {
     private val bearer = Regex("(?i)bearer\\s+[A-Za-z0-9._~+/=-]{8,}")
     private val credentialLike = Regex("(?i)(api[_-]?key|token|secret)\\s*[:=]\\s*[^\\s,;}]{4,}")
     private val mainlandPhone = Regex("(?<!\\d)(?:\\+?86[- ]?)?1[3-9]\\d[- ]?\\d{4}[- ]?\\d{4}(?!\\d)")
+    private val mainlandLandline = Regex("(?<![0-9A-Za-z])0\\d{2,3}[- ]?\\d{7,8}(?![0-9A-Za-z])")
+    private val serviceNumber = Regex("(?<![0-9A-Za-z])(?:(?:400|800)[- ]?\\d{3}[- ]?\\d{4}|95\\d{3,6})(?![0-9A-Za-z])")
+    private val bankCard = Regex("(?<![0-9A-Za-z])\\d{16,19}(?![0-9A-Za-z])")
     private val email = Regex("(?i)(?<![A-Z0-9._%+-])[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}(?![A-Z0-9._%+-])")
     private val mainlandId = Regex("(?<![0-9A-Za-z])\\d{6}\\d{8}\\d{3}[0-9Xx](?![0-9A-Za-z])")
 
     fun containsDirectIdentifier(value: String): Boolean = bearer.containsMatchIn(value) ||
         credentialLike.containsMatchIn(value) ||
         mainlandPhone.containsMatchIn(value) ||
+        mainlandLandline.containsMatchIn(value) ||
+        serviceNumber.containsMatchIn(value) ||
+        bankCard.containsMatchIn(value) ||
         email.containsMatchIn(value) ||
         mainlandId.containsMatchIn(value)
 }

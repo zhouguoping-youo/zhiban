@@ -280,9 +280,11 @@ fun PrivacySecurityPage(
                     SettingsRow("语音输入", if (outboundState.allowCloudSpeech) "可用 · 仅主动使用时处理" else "首次使用时开启")
                     Divider()
                     SettingsRow(
-                        "隐私保护记录",
-                        "${outboundState.auditCount} 次 · 已拦截 ${outboundState.blockedCount} 次 · 已脱敏 ${outboundState.redactedCount} 条",
+                        "本月自动保护",
+                        "脱敏 ${outboundState.monthlyRedactedCount} 条 · 省略 ${outboundState.monthlyOmittedCount} 条",
                     )
+                    Divider()
+                    SettingsRow("发送记录", "${outboundState.auditCount} 次 · 已拦截 ${outboundState.blockedCount} 次")
                     if (outboundState.auditCount > 0) {
                         Divider()
                         SettingsActionRow("清除发送记录", outboundViewModel::clearAudit)

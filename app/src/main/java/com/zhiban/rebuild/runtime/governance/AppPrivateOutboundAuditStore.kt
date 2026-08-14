@@ -2,6 +2,7 @@ package com.zhiban.rebuild.runtime.governance
 
 import android.content.Context
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.zhiban.rebuild.runtime.provider.OutboundAuditEvent
@@ -9,6 +10,9 @@ import com.zhiban.rebuild.runtime.provider.OutboundAuditOutcome
 import com.zhiban.rebuild.runtime.provider.OutboundAuditSink
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.security.MessageDigest
+import java.time.Instant
+import java.time.YearMonth
+import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
@@ -42,12 +46,43 @@ data class OutboundAuditRecord(
     val byteCount: Long,
 )
 
+data class OutboundMonthlyProtectionCounts(val redacted: Int = 0, val omitted: Int = 0)
+
+internal data class StoredMonthlyProtection(val month: String, val redacted: Int, val omitted: Int)
+
+internal fun updateMonthlyProtection(
+    current: StoredMonthlyProtection?,
+    event: OutboundAuditEvent,
+    zoneId: ZoneId = ZoneId.systemDefault(),
+): StoredMonthlyProtection {
+    val eventMonth = YearMonth.from(Instant.ofEpochMilli(event.occurredAtEpochMs).atZone(zoneId)).toString()
+    val baseline = current?.takeIf { it.month == eventMonth } ?: StoredMonthlyProtection(eventMonth, 0, 0)
+    return baseline.copy(
+        redacted = baseline.redacted + event.redactedMessageCount,
+        omitted = baseline.omitted + event.omittedMessageCount,
+    )
+}
+
 @Singleton
 class AppPrivateOutboundAuditStore @Inject constructor(@ApplicationContext private val context: Context) : OutboundAuditSink {
     private val eventsKey = stringPreferencesKey("events_v1")
+    private val protectionMonthKey = stringPreferencesKey("protection_month_v1")
+    private val monthlyRedactedKey = intPreferencesKey("monthly_redacted_v1")
+    private val monthlyOmittedKey = intPreferencesKey("monthly_omitted_v1")
 
     val records: Flow<List<OutboundAuditRecord>> = context.outboundAuditDataStore.data.map { values ->
         decode(values[eventsKey])
+    }
+    val monthlyProtectionCounts: Flow<OutboundMonthlyProtectionCounts> = context.outboundAuditDataStore.data.map { values ->
+        val currentMonth = YearMonth.now().toString()
+        if (values[protectionMonthKey] == currentMonth) {
+            OutboundMonthlyProtectionCounts(
+                redacted = values[monthlyRedactedKey] ?: 0,
+                omitted = values[monthlyOmittedKey] ?: 0,
+            )
+        } else {
+            OutboundMonthlyProtectionCounts()
+        }
     }
 
     override suspend fun record(event: OutboundAuditEvent) {
@@ -66,11 +101,29 @@ class AppPrivateOutboundAuditStore @Inject constructor(@ApplicationContext priva
         )
         context.outboundAuditDataStore.edit { values ->
             values[eventsKey] = encode((decode(values[eventsKey]) + record).takeLast(MAX_RECORDS))
+            val monthly = updateMonthlyProtection(
+                current = values[protectionMonthKey]?.let { month ->
+                    StoredMonthlyProtection(
+                        month = month,
+                        redacted = values[monthlyRedactedKey] ?: 0,
+                        omitted = values[monthlyOmittedKey] ?: 0,
+                    )
+                },
+                event = event,
+            )
+            values[protectionMonthKey] = monthly.month
+            values[monthlyRedactedKey] = monthly.redacted
+            values[monthlyOmittedKey] = monthly.omitted
         }
     }
 
     suspend fun clear() {
-        context.outboundAuditDataStore.edit { it.remove(eventsKey) }
+        context.outboundAuditDataStore.edit { values ->
+            values.remove(eventsKey)
+            values.remove(protectionMonthKey)
+            values.remove(monthlyRedactedKey)
+            values.remove(monthlyOmittedKey)
+        }
     }
 
     private fun encode(records: List<OutboundAuditRecord>): String = buildJsonArray {
