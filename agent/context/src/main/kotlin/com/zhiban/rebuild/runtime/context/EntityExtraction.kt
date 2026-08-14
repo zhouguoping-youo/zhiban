@@ -194,68 +194,86 @@ class LocalEntityExtractor(private val zoneId: ZoneId = ZoneId.systemDefault()) 
     private fun resolveTimeRange(text: String, nowEpochMs: Long): QueryTimeRange? {
         val today = Instant.ofEpochMilli(nowEpochMs).atZone(zoneId).toLocalDate()
         val lower = text.lowercase()
-        // Weekday expressions (周三 / 星期三 / 下周三 / 本周三) resolve to a single local day so the
-        // deterministic calendar path can validate them instead of trusting provider relative-date math.
-        WEEKDAY.find(text)?.let { match ->
-            val target = chineseWeekday(match.groupValues[1]) ?: return@let
-            val currentMonday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-            val resolvedDay = when {
-                text.contains("下周") || text.contains("下星期") ->
-                    currentMonday.plusWeeks(1).plusDays((target.value - 1).toLong())
-
-                text.contains("本周") || text.contains("这周") ->
-                    currentMonday.plusDays((target.value - 1).toLong())
-
-                else -> today.with(TemporalAdjusters.nextOrSame(target))
-            }
-            return QueryTimeRange(
-                resolvedDay.atStartOfDay(zoneId).toInstant().toEpochMilli(),
-                resolvedDay.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli(),
-                match.groupValues[0],
-            )
-        }
-        val pair = when {
-            text.contains("今天") || lower.contains("today") -> today to today.plusDays(1)
-
-            text.contains("后天") || lower.contains("day after tomorrow") -> today.plusDays(2) to today.plusDays(3)
-
-            text.contains("明天") || lower.contains("tomorrow") -> today.plusDays(1) to today.plusDays(2)
-
-            text.contains("本周") || text.contains("这周") -> today.minusDays((today.dayOfWeek.value - 1).toLong()) to
-                today.plusDays((8 - today.dayOfWeek.value).toLong())
-
-            text.contains("最近") || text.contains("上次") -> today.minusDays(30) to today.plusDays(1)
-
-            else -> ISO_DATE.find(text)?.value?.let { value ->
-                runCatching { LocalDate.parse(value.replace('/', '-')) }.getOrNull()?.let { it to it.plusDays(1) }
-            }
-        } ?: return null
+        resolveWeekdayRange(text, today)?.let { return it }
+        val relativeDay = resolveRelativeDay(text, lower)
+        val pair = relativeDay?.let { anchor ->
+            today.plusDays(anchor.daysFromToday) to today.plusDays(anchor.daysFromToday + 1)
+        } ?: resolveLooseDatePair(text, today) ?: return null
         return QueryTimeRange(
             pair.first.atStartOfDay(zoneId).toInstant().toEpochMilli(),
             pair.second.atStartOfDay(zoneId).toInstant().toEpochMilli(),
-            when {
-                text.contains("今天") || lower.contains("today") -> if (text.contains("今天")) "今天" else "today"
-
-                text.contains(
-                    "后天",
-                ) || lower.contains("day after tomorrow") -> if (text.contains("后天")) "后天" else "day after tomorrow"
-
-                text.contains("明天") || lower.contains("tomorrow") -> if (text.contains("明天")) "明天" else "tomorrow"
-
-                text.contains("本周") -> "本周"
-
-                text.contains("这周") -> "这周"
-
-                text.contains("上次") -> "上次"
-
-                text.contains("最近") -> "最近"
-
-                else -> ISO_DATE.find(text)?.value.orEmpty()
-            },
+            relativeDay?.expression ?: looseDateExpression(text),
         )
     }
 
+    private fun resolveWeekdayRange(text: String, today: LocalDate): QueryTimeRange? {
+        // Weekday expressions (周三 / 星期三 / 下周三 / 本周三) resolve to a single local day so the
+        // deterministic calendar path can validate them instead of trusting provider relative-date math.
+        val match = WEEKDAY.find(text) ?: return null
+        val target = chineseWeekday(match.groupValues[1]) ?: return null
+        val currentMonday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        val resolvedDay = when {
+            text.contains("下周") || text.contains("下星期") ->
+                currentMonday.plusWeeks(1).plusDays((target.value - 1).toLong())
+
+            text.contains("本周") || text.contains("这周") ->
+                currentMonday.plusDays((target.value - 1).toLong())
+
+            else -> today.with(TemporalAdjusters.nextOrSame(target))
+        }
+        return QueryTimeRange(
+            resolvedDay.atStartOfDay(zoneId).toInstant().toEpochMilli(),
+            resolvedDay.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli(),
+            match.groupValues[0],
+        )
+    }
+
+    private fun resolveRelativeDay(text: String, lower: String): RelativeDayAnchor? = when {
+        text.contains("大后天") -> RelativeDayAnchor(3, "大后天")
+
+        text.contains("后天") || lower.contains("day after tomorrow") ->
+            RelativeDayAnchor(2, if (text.contains("后天")) "后天" else "day after tomorrow")
+
+        text.contains("明天") || text.contains("明早") || text.contains("明晚") || lower.contains("tomorrow") ->
+            RelativeDayAnchor(1, compactRelativeDayExpression(text, "明天", "tomorrow"))
+
+        text.contains("今天") || text.contains("今早") || text.contains("今晚") || text.contains("今夜") ||
+            lower.contains("today") || lower.contains("tonight") ->
+            RelativeDayAnchor(0, compactRelativeDayExpression(text, "今天", if (lower.contains("tonight")) "tonight" else "today"))
+
+        else -> null
+    }
+
+    private fun resolveLooseDatePair(text: String, today: LocalDate): Pair<LocalDate, LocalDate>? = when {
+        text.contains("本周") || text.contains("这周") -> today.minusDays((today.dayOfWeek.value - 1).toLong()) to
+            today.plusDays((8 - today.dayOfWeek.value).toLong())
+
+        text.contains("最近") || text.contains("上次") -> today.minusDays(30) to today.plusDays(1)
+
+        else -> ISO_DATE.find(text)?.value?.let { value ->
+            runCatching { LocalDate.parse(value.replace('/', '-')) }.getOrNull()?.let { it to it.plusDays(1) }
+        }
+    }
+
+    private fun looseDateExpression(text: String): String = when {
+        text.contains("本周") -> "本周"
+        text.contains("这周") -> "这周"
+        text.contains("上次") -> "上次"
+        text.contains("最近") -> "最近"
+        else -> ISO_DATE.find(text)?.value.orEmpty()
+    }
+
     private fun String.containsAny(vararg values: String) = values.any(::contains)
+
+    private fun compactRelativeDayExpression(text: String, canonical: String, english: String): String = when {
+        text.contains(canonical) -> canonical
+        canonical == "明天" && text.contains("明早") -> "明早"
+        canonical == "明天" && text.contains("明晚") -> "明晚"
+        canonical == "今天" && text.contains("今早") -> "今早"
+        canonical == "今天" && text.contains("今晚") -> "今晚"
+        canonical == "今天" && text.contains("今夜") -> "今夜"
+        else -> english
+    }
 
     private companion object {
         val PHONE = Regex("(?<!\\d)(?:\\+?86[- ]?)?1[3-9]\\d{9}(?!\\d)")
@@ -298,42 +316,45 @@ fun resolveCalendarStartEpochMs(text: String, timeRange: QueryTimeRange?, zoneId
 }
 
 /** Parses the explicit wall-clock (English or Chinese) in [text], or null when absent/invalid. */
-private fun parseWallClock(text: String): LocalTime? {
-    val english = ENGLISH_CLOCK.find(text)?.let { match ->
-        val rawHour = match.groupValues[1].toIntOrNull() ?: return@let null
-        val minute = match.groupValues[2].takeIf(String::isNotBlank)?.toIntOrNull() ?: 0
-        val marker = match.groupValues[3].lowercase().replace(".", "")
-        if (rawHour !in 1..12 || minute !in 0..59) return@let null
-        val hour = when {
-            marker == "am" && rawHour == 12 -> 0
-            marker == "pm" && rawHour != 12 -> rawHour + 12
-            else -> rawHour
-        }
-        LocalTime.of(hour, minute)
+private fun parseWallClock(text: String): LocalTime? = parseEnglishClock(text) ?: parseChineseClock(text)
+
+private fun parseEnglishClock(text: String): LocalTime? {
+    val match = ENGLISH_CLOCK.find(text) ?: return null
+    val rawHour = match.groupValues[1].toIntOrNull() ?: return null
+    val minute = match.groupValues[2].takeIf(String::isNotBlank)?.toIntOrNull() ?: 0
+    if (rawHour !in 1..12 || minute !in 0..59) return null
+    val marker = match.groupValues[3].lowercase().replace(".", "")
+    val hour = when {
+        marker == "am" && rawHour == 12 -> 0
+        marker == "pm" && rawHour != 12 -> rawHour + 12
+        else -> rawHour
     }
-    val chinese = (CHINESE_COLON_CLOCK.find(text) ?: CHINESE_HOUR_CLOCK.find(text))?.let { match ->
-        val rawHour = match.groupValues[2].toIntOrNull() ?: return@let null
-        val rawMinute = match.groupValues[3]
-        val minute = when {
-            rawMinute == "半" -> 30
-            rawMinute.isBlank() -> 0
-            else -> rawMinute.toIntOrNull() ?: return@let null
-        }
-        if (rawHour !in 0..23 || minute !in 0..59) return@let null
-        val marker = match.groupValues[1]
-        val hour = when {
-            // 中午 pins to the 12:00 block: 中午12点→12:00, 中午1点→13:00 (not 24:00 / mis-added).
-            marker == "中午" -> if (rawHour == 12) 12 else rawHour + 12
+    return LocalTime.of(hour, minute)
+}
 
-            marker in setOf("下午", "晚上") && rawHour in 1..11 -> rawHour + 12
+private fun parseChineseClock(text: String): LocalTime? {
+    val match = CHINESE_COLON_CLOCK.find(text) ?: CHINESE_HOUR_CLOCK.find(text) ?: return null
+    val rawHour = match.groupValues[2].toIntOrNull() ?: return null
+    val minute = parseChineseMinute(match.groupValues[3]) ?: return null
+    if (rawHour !in 0..23 || minute !in 0..59) return null
+    return LocalTime.of(applyChineseDayPeriod(match.groupValues[1], rawHour), minute)
+}
 
-            marker == "凌晨" && rawHour == 12 -> 0
+private fun parseChineseMinute(rawMinute: String): Int? = when {
+    rawMinute == "半" -> 30
+    rawMinute.isBlank() -> 0
+    else -> rawMinute.toIntOrNull()
+}
 
-            else -> rawHour
-        }
-        LocalTime.of(hour, minute)
-    }
-    return english ?: chinese
+private fun applyChineseDayPeriod(marker: String, rawHour: Int): Int = when {
+    // 中午 pins to the 12:00 block: 中午12点→12:00, 中午1点→13:00 (not 24:00 / mis-added).
+    marker == "中午" -> if (rawHour == 12) 12 else rawHour + 12
+
+    marker in setOf("下午", "晚上", "晚", "夜") && rawHour in 1..11 -> rawHour + 12
+
+    marker == "凌晨" && rawHour == 12 -> 0
+
+    else -> rawHour
 }
 
 /** Resolves the wall-clock in [text] onto [date] in [zoneId], or null when no clock is present. */
@@ -347,14 +368,15 @@ private val ENGLISH_CLOCK = Regex(
     RegexOption.IGNORE_CASE,
 )
 private val CHINESE_COLON_CLOCK =
-    Regex("""(凌晨|早上|上午|中午|下午|晚上)?\s*(\d{1,2})\s*(?::|：)\s*(\d{1,2})""")
+    Regex("""(凌晨|早上|上午|中午|下午|晚上|早|晚|夜)?\s*(\d{1,2})\s*(?::|：)\s*(\d{1,2})""")
 private val CHINESE_HOUR_CLOCK =
-    Regex("""(凌晨|早上|上午|中午|下午|晚上)?\s*(\d{1,2})\s*点(?:\s*(\d{1,2}|半)\s*分?)?""")
+    Regex("""(凌晨|早上|上午|中午|下午|晚上|早|晚|夜)?\s*(\d{1,2})\s*点(?:\s*(\d{1,2}|半)\s*分?)?""")
 
 private val WEEKDAY = Regex("""(?:本周|这周|下周|下星期|星期|周)\s*([一二三四五六日天])""")
 
 // A future date anchor: relative day words or weekday expressions.
-private val FUTURE_DAY = Regex("""今天|今晚|明早|明天|明晚|后天|大后天|下周|下星期|本周|这周|周[一二三四五六日天]|星期[一二三四五六日天]|tonight|tomorrow""")
+private val FUTURE_DAY =
+    Regex("""今天|今早|今晚|今夜|明早|明天|明晚|后天|大后天|下周|下星期|本周|这周|周[一二三四五六日天]|星期[一二三四五六日天]|tonight|tomorrow""")
 
 // A concrete clock time: "8点", "下午3点半", "20:30", "8 PM".
 private val CLOCK_PRESENT = Regex("""\d{1,2}\s*(?::|：)\s*\d{1,2}|\d{1,2}\s*点|\b\d{1,2}\s*(?:a\.?m\.?|p\.?m\.?)\b""", RegexOption.IGNORE_CASE)
@@ -381,6 +403,8 @@ private fun chineseWeekday(value: String): DayOfWeek? = when (value) {
     "日", "天" -> DayOfWeek.SUNDAY
     else -> null
 }
+
+private data class RelativeDayAnchor(val daysFromToday: Long, val expression: String)
 
 private const val DICTIONARY_ENTITY_CONFIDENCE = 0.98
 private const val RELATIONSHIP_WRITE_CONFIDENCE = 0.94

@@ -101,6 +101,7 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
 |---|---|---|---|---|---|---|
 | 5.1 | 时间解析错误("明天下午3点") | ⚪ | — | 未复现：本地实体提取按设备时区解析“明天+下午”为次日 15:00；即使模型返回 03:00，最终工具调用也被本地时间覆盖纠正 | — | `CalendarTimeResolutionTest.deterministicFallbackComputesLocalTomorrow3pm`、`normalizeOverridesWrongProviderEpochWithLocalTomorrow3pm` |
+| 5.1a | 紧凑日期时段“今晚/明晚/明早/大后天”解析错误 | ✅ | 数据正确性 | 日期锚点和时段标记被分开解析：“明晚8点”只命中“8点”并落成次日 08:00；“大后天”又被“后天”优先命中。现按最长日期词优先，并把紧凑时段与时钟一起解析 | 本提交 `fix(P0-1)` | `EntityExtractionTest.compactDayPeriodAnchorsResolveDateAndClockTogether`、`bigDayAfterTomorrowIsNotCollapsedIntoDayAfterTomorrow` |
 | 5.2 | 改期后旧提醒仍触发 | ⚪ | — | 未复现：唯一 Work 采用 REPLACE，Worker 到点重新读取加密库并核对 start/reminder 快照；删除、改期或提醒设置改变都会静默退出 | — | `ScheduleReminderValidationTest.rescheduledOrChangedReminderInvalidatesOldWorkerSnapshot`、`deletedOrRescheduledWorkerSnapshotNeverDispatchesNotification` |
 | 5.3 | 系统日历和本地日程冲突误报 | ⚪ | — | 未复现：本地冲突使用严格重叠边界；已导入系统实例按 sourceId 从外部冲突结果排除，不会本地+系统重复计数 | — | `CalendarSearchToolBindingTest.conflict tool does not duplicate an imported system event`、`RoomScheduleToolExecutorTest.overlappingScheduleIsRejectedBeforeAnyAgentSideEffect` |
 | 5.4 | 重复事件最后一天取消误报冲突 | ⚪ | — | 未复现：Instances 查询同时要求 VISIBLE=1 且 STATUS!=STATUS_CANCELED，已取消的单个重复实例不会进入导入或冲突结果 | — | `SystemCalendarReaderSelectionTest` |

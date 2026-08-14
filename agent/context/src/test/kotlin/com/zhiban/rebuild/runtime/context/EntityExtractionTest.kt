@@ -104,6 +104,31 @@ class EntityExtractionTest {
         assertEquals(IntentLabel.CALENDAR_CREATE, extractor.extract("今晚7点跟客户吃饭", "Work", now).intentLabel)
     }
 
+    @Test fun compactDayPeriodAnchorsResolveDateAndClockTogether() {
+        val cases = listOf(
+            "今晚7点跟客户吃饭" to LocalDateTime.of(2026, 7, 21, 19, 0),
+            "明晚8点健身" to LocalDateTime.of(2026, 7, 22, 20, 0),
+            "明早8点出发" to LocalDateTime.of(2026, 7, 22, 8, 0),
+            "明晚8:30接孩子" to LocalDateTime.of(2026, 7, 22, 20, 30),
+        )
+
+        cases.forEach { (text, expected) ->
+            val context = extractor.extract(text, "Work", now)
+            assertEquals(expected.atZone(zone).toInstant().toEpochMilli(), resolveCalendarStartEpochMs(text, context.timeRange, zone))
+        }
+    }
+
+    @Test fun bigDayAfterTomorrowIsNotCollapsedIntoDayAfterTomorrow() {
+        val text = "大后天晚上9点复盘"
+        val context = extractor.extract(text, "Work", now)
+
+        assertEquals("大后天", context.timeRange?.expression)
+        assertEquals(
+            LocalDateTime.of(2026, 7, 24, 21, 0).atZone(zone).toInstant().toEpochMilli(),
+            resolveCalendarStartEpochMs(text, context.timeRange, zone),
+        )
+    }
+
     // The same future-day + time shape must NOT be hijacked when the user is clearly asking a question.
     @Test fun futureTimeQuestionsAreNotCalendarCreate() {
         // Query phrasing excludes the casual-create signal; without create keywords it stays GENERAL_WORK.
