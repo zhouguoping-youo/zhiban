@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -100,6 +101,47 @@ class ProviderConfigurationManagerTest {
         assertTrue(runCatching { failing.configureStepFun("bad-key".encodeToByteArray(), "step-3.5-flash") }.isFailure)
         assertTrue(failing.isConfigured())
         assertEquals(1, profiles.profile?.keyVersion)
+    }
+
+    @Test fun `failed health cache never masks a recovered provider`() = runTest {
+        val configuration = ProviderConfigurationManager(FakeCredentialProvisioner(), FakeProviderProfileStore())
+        configuration.provisionStepFun("test-only-key".encodeToByteArray(), "step-3.5-flash")
+        val staleFailure = ProviderHealth(false, 10, null, "NETWORK_OFFLINE")
+        val cache = FakeProviderHealthCache(staleFailure)
+        var probes = 0
+        val environment = ProviderEnvironmentManager(
+            configuration,
+            healthyAdapter { probes += 1 },
+            healthCache = cache,
+            clock = { 20 },
+        )
+
+        val health = environment.healthCheck()
+
+        assertTrue(health.available)
+        assertEquals(1, probes)
+        assertNotEquals(staleFailure, cache.saved)
+        assertTrue(requireNotNull(cache.saved).available)
+    }
+
+    @Test fun `explicit health refresh bypasses a positive snapshot`() = runTest {
+        val configuration = ProviderConfigurationManager(FakeCredentialProvisioner(), FakeProviderProfileStore())
+        val profile = configuration.provisionStepFun("test-only-key".encodeToByteArray(), "step-3.5-flash")
+        val digest = TrustedProviderRegistry().digest(profile)
+        val cached = ProviderHealth(true, 10, capability(digest, 10), null)
+        var probes = 0
+        val environment = ProviderEnvironmentManager(
+            configuration,
+            healthyAdapter { probes += 1 },
+            healthCache = FakeProviderHealthCache(cached),
+            clock = { 20 },
+        )
+
+        val health = environment.healthCheck(forceRefresh = true)
+
+        assertTrue(health.available)
+        assertEquals(20, health.checkedAtEpochMs)
+        assertEquals(1, probes)
     }
 
     @Test fun `provision binds secret to trusted profile without retaining caller bytes`() = runTest {
@@ -208,3 +250,40 @@ private class FakeProviderProfileStore(private val operations: MutableList<Strin
         profile = null
     }
 }
+
+private class FakeProviderHealthCache(initial: ProviderHealth?) : ProviderHealthCache {
+    private var loaded = initial
+    var saved: ProviderHealth? = null
+
+    override fun load(profileDigest: String, nowEpochMs: Long): ProviderHealth? = loaded
+
+    override fun save(profileDigest: String, health: ProviderHealth) {
+        saved = health
+        loaded = health
+    }
+
+    override fun clear() {
+        loaded = null
+    }
+}
+
+private fun healthyAdapter(onProbe: () -> Unit): ProviderAdapter = object : ProviderAdapter {
+    override suspend fun probe(profile: ProviderProfile): CapabilitySnapshot {
+        onProbe()
+        return capability(TrustedProviderRegistry().digest(profile), 20)
+    }
+
+    override fun stream(request: ModelRequest) = emptyFlow<ModelEvent>()
+
+    override fun cancel(requestId: String) = true
+}
+
+private fun capability(profileDigest: String, checkedAtEpochMs: Long) = CapabilitySnapshot(
+    profileDigest,
+    setOf("text"),
+    setOf("stream"),
+    100_000,
+    2_048,
+    checkedAtEpochMs,
+    checkedAtEpochMs + 60_000,
+)

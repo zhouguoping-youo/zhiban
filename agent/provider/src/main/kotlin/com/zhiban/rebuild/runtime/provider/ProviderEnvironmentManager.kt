@@ -41,15 +41,19 @@ class ProviderEnvironmentManager(
         }
     }
 
-    suspend fun healthCheck(): ProviderHealth {
+    suspend fun healthCheck(forceRefresh: Boolean = false): ProviderHealth {
         val profile = configuration.activeProfile()
             ?: return ProviderHealth(false, clock(), null, "CREDENTIAL_MISSING")
         val now = clock()
         val digest = TrustedProviderRegistry().digest(profile)
-        healthCache.load(digest, now)?.let { return it }
+        if (!forceRefresh) {
+            healthCache.load(digest, now)?.takeIf(ProviderHealth::available)?.let { return it }
+        }
         return runSuspendCatching { requireHealthy(profile) }.getOrElse { failure ->
             ProviderHealth(false, clock(), null, safeFailureCode(failure))
-        }.also { healthCache.save(digest, it) }
+        }.also { health ->
+            if (health.available) healthCache.save(digest, health)
+        }
     }
 
     suspend fun activeProfile(): ProviderProfile? = configuration.activeProfile()

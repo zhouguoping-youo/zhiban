@@ -169,7 +169,7 @@ class ModelConfigViewModel @Inject constructor(
         if (_uiState.value.isChecking) return
         _uiState.update { it.copy(isChecking = true, healthMessage = null, errorMessage = null) }
         viewModelScope.launch {
-            val health = providerEnvironment.healthCheck()
+            val health = providerEnvironment.healthCheck(forceRefresh = true)
             _uiState.update {
                 it.copy(
                     isChecking = false,
