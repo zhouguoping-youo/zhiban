@@ -113,7 +113,9 @@ class OpenAiCompatibleProviderAdapter(
                     throw mapResponseFailure(response)
                 }
                 val decoder = StreamDecoder(request.requestId)
-                response.body?.source()?.use { source ->
+                val source = response.body?.source()
+                    ?: throw ProviderFailure("PROVIDER_PROTOCOL_ERROR", retryable = true)
+                source.use {
                     while (!source.exhausted()) {
                         val data = decoder.readData(source, call) ?: continue
                         val decoded = decoder.accept(data)
@@ -121,6 +123,7 @@ class OpenAiCompatibleProviderAdapter(
                         if (decoded.isDone) break
                     }
                 }
+                decoder.finishAtCleanEof().forEach { emit(it) }
             }
         } catch (_: SSLPeerUnverifiedException) {
             throw ProviderFailure("TLS_VERIFICATION_FAILED", retryable = false)
@@ -356,6 +359,12 @@ class OpenAiCompatibleProviderAdapter(
                 if (!finalEmitted) events += finalize(reason)
             }
             return DecodedStreamChunk(events, isDone = false)
+        }
+
+        fun finishAtCleanEof(): List<ModelEvent> = if (finalEmitted) {
+            emptyList()
+        } else {
+            finalize(if (pendingTools.isEmpty()) "stop" else "tool_calls")
         }
 
         private fun parseChunk(data: String): JsonObject = try {

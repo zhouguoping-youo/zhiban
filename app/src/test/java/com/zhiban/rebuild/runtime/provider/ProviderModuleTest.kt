@@ -354,6 +354,41 @@ class ProviderModuleTest {
         )
     }
 
+    @Test fun completeToolCallIsFlushedWhenStreamEndsAtCleanEofWithoutDone() = runBlocking {
+        val stream =
+            "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call-eof\",\"function\":{\"name\":\"calendar.create\",\"arguments\":\"{\\\"title\\\":\\\"demo\\\"}\"}}]}}]}\n"
+        val adapter =
+            OpenAiCompatibleProviderAdapter(QueueCallFactory(response(200, stream)), resolver, registry, clock = { 10 })
+
+        val events = adapter.stream(
+            ModelRequest("tool-eof", OutboundChannel.LLM_INFERENCE, profile, listOf(userMessage("x")), capability(100), 10),
+        ).toList()
+
+        assertEquals(
+            listOf(
+                ModelEvent.ToolCall(0, "call-eof", "calendar.create", "{\"title\":\"demo\"}"),
+                ModelEvent.Final("tool_calls"),
+            ),
+            events,
+        )
+    }
+
+    @Test fun plainContentAtCleanEofEmitsExactlyOneFinal() = runBlocking {
+        val adapter = OpenAiCompatibleProviderAdapter(
+            QueueCallFactory(response(200, "data: {\"choices\":[{\"delta\":{\"content\":\"done\"}}]}\n")),
+            resolver,
+            registry,
+            clock = { 10 },
+        )
+
+        val events = adapter.stream(
+            ModelRequest("plain-eof", OutboundChannel.LLM_INFERENCE, profile, listOf(userMessage("x")), capability(100), 10),
+        ).toList()
+
+        assertEquals(listOf(ModelEvent.Delta(0, "done"), ModelEvent.Final("stop")), events)
+        assertEquals(1, events.count { it is ModelEvent.Final })
+    }
+
     @Test fun doneWithoutFinishReasonEmitsExactlyOneFinal() = runBlocking {
         val stream = listOf(
             "data: {\"choices\":[{\"delta\":{\"content\":\"done\"}}]}",
