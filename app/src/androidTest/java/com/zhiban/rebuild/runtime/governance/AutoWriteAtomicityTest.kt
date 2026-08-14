@@ -10,6 +10,7 @@ import com.zhiban.rebuild.data.contact.ContactEntity
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
@@ -73,4 +74,42 @@ class AutoWriteAtomicityTest {
         assertNull(database.changeLogDao().find("change-atomic"))
         assertNull(database.changeLogDao().findAutoWriteReceipt("change-atomic"))
     }
+
+    @Test
+    fun receiptFailureRollsBackTheAuditWhenCalledWithoutAnOuterTransaction() = runBlocking {
+        val failure = runCatching {
+            database.insertVisibleAutoWrite(
+                auditDraft(
+                    changeId = "change-receipt-failure",
+                    subjectContactId = "missing-contact",
+                ),
+            )
+        }.exceptionOrNull()
+
+        assertNotNull(failure)
+        assertNull(database.changeLogDao().find("change-receipt-failure"))
+        assertNull(database.changeLogDao().findAutoWriteReceipt("change-receipt-failure"))
+    }
+
+    private fun auditDraft(changeId: String, subjectContactId: String = "contact-atomic") =
+        AutoWriteAuditDraft(
+            changeId = changeId,
+            runtimeRunId = null,
+            toolName = AutoWriteToolNames.CONTACT_TAG_ADD,
+            idempotencyKey = "idempotency-$changeId",
+            targetDomain = "CONTACT",
+            targetId = "contact-atomic",
+            operation = "UPDATE",
+            beforeDigest = "before",
+            afterDigest = "after",
+            inversePayloadJson = "{\"removeTag\":\"客户\"}",
+            originType = "SYSTEM_PERCEPTION",
+            subjectContactId = subjectContactId,
+            sourceType = "TEST",
+            sourceRef = "test-source",
+            confidence = 1.0,
+            presentationType = "CONTACT_TAG",
+            correctionRoute = "CONTACT_TAG_EDITOR",
+            createdAtEpochMs = 2,
+        )
 }

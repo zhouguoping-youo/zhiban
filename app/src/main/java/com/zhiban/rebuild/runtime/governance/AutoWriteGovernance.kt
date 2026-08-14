@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.runtime.governance
 
+import androidx.room.withTransaction
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.runtime.tool.sha256
 
@@ -59,35 +60,37 @@ internal data class AutoWriteAuditDraft(
 internal suspend fun AgentDatabase.insertVisibleAutoWrite(draft: AutoWriteAuditDraft) {
     require(draft.toolName in AutoWriteToolNames.all)
     require(draft.inversePayloadJson != "{}" && draft.inversePayloadJson.isNotBlank())
-    changeLogDao().insert(
-        ChangeLogEntity(
-            changeId = draft.changeId,
-            runtimeRunId = draft.runtimeRunId,
-            toolName = draft.toolName,
-            idempotencyKey = draft.idempotencyKey,
-            targetDomain = draft.targetDomain,
-            targetId = draft.targetId,
-            operation = draft.operation,
-            beforeDigest = draft.beforeDigest,
-            afterDigest = draft.afterDigest,
-            inversePayloadJson = draft.inversePayloadJson,
-            undoState = "AVAILABLE",
-            createdAtEpochMs = draft.createdAtEpochMs,
-            undoneAtEpochMs = null,
-            originType = draft.originType,
-        ),
-    )
-    changeLogDao().insertAutoWriteReceipt(
-        AutoWriteReceiptEntity(
-            changeId = draft.changeId,
-            subjectContactId = draft.subjectContactId,
-            sourceType = draft.sourceType,
-            sourceRefDigest = sha256(draft.sourceRef),
-            confidence = draft.confidence,
-            presentationType = draft.presentationType,
-            correctionRoute = draft.correctionRoute,
-            reviewState = "UNREVIEWED",
-            createdAtEpochMs = draft.createdAtEpochMs,
-        ),
-    )
+    withTransaction {
+        changeLogDao().insert(
+            ChangeLogEntity(
+                changeId = draft.changeId,
+                runtimeRunId = draft.runtimeRunId,
+                toolName = draft.toolName,
+                idempotencyKey = draft.idempotencyKey,
+                targetDomain = draft.targetDomain,
+                targetId = draft.targetId,
+                operation = draft.operation,
+                beforeDigest = draft.beforeDigest,
+                afterDigest = draft.afterDigest,
+                inversePayloadJson = draft.inversePayloadJson,
+                undoState = "AVAILABLE",
+                createdAtEpochMs = draft.createdAtEpochMs,
+                undoneAtEpochMs = null,
+                originType = draft.originType,
+            ),
+        )
+        changeLogDao().insertAutoWriteReceipt(
+            AutoWriteReceiptEntity(
+                changeId = draft.changeId,
+                subjectContactId = draft.subjectContactId,
+                sourceType = draft.sourceType,
+                sourceRefDigest = sha256(draft.sourceRef),
+                confidence = draft.confidence,
+                presentationType = draft.presentationType,
+                correctionRoute = draft.correctionRoute,
+                reviewState = "UNREVIEWED",
+                createdAtEpochMs = draft.createdAtEpochMs,
+            ),
+        )
+    }
 }
