@@ -4,6 +4,7 @@ import com.zhiban.rebuild.runtime.mcp.McpRemoteEnvironment
 import com.zhiban.rebuild.runtime.mcp.McpRemoteTool
 import com.zhiban.rebuild.runtime.provider.ProviderFailure
 import com.zhiban.rebuild.runtime.runSuspendCatching
+import com.zhiban.rebuild.runtime.store.ApprovedToolExecutionRequest
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -105,9 +106,19 @@ internal class RemoteMcpToolBinding(private val remote: McpRemoteTool, private v
         if (safeResult.toByteArray().size > MAX_RESULT_BYTES) throw ProviderFailure("MCP_RESULT_TOO_LARGE", false)
         val providerCallId = plan.getValue("providerCallId").jsonPrimitive.content
         store.completeApprovedRemoteTool(
-            context.runId, providerCallId, plan.getValue("logicalStepId").jsonPrimitive.content,
-            spec.name, spec.version, expected, idempotencyKey, safeResult,
-            context.ownerId, context.fencingEpoch, context.nowEpochMs,
+            ApprovedToolExecutionRequest(
+                context.runId,
+                providerCallId,
+                plan.getValue("logicalStepId").jsonPrimitive.content,
+                spec.name,
+                spec.version,
+                expected,
+                idempotencyKey,
+                safeResult,
+                context.ownerId,
+                context.fencingEpoch,
+                context.nowEpochMs,
+            ),
         )
         return RoutedToolResult(spec.name, providerCallId, safeResult)
     }

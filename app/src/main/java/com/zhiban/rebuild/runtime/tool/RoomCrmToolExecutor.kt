@@ -18,6 +18,7 @@ import com.zhiban.rebuild.runtime.governance.canonicalChangeDigest
 import com.zhiban.rebuild.runtime.governance.insertVisibleAutoWrite
 import com.zhiban.rebuild.runtime.runSuspendCatching
 import com.zhiban.rebuild.runtime.spi.RuntimeRunStatus
+import com.zhiban.rebuild.runtime.store.ApprovedToolExecutionRequest
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -84,17 +85,19 @@ internal class RoomCrmToolExecutor(private val database: AgentDatabase, private 
             ),
         )
         val execution = store.completeApprovedRemoteTool(
-            runId = runId,
-            providerCallId = plan.requiredText("providerCallId"),
-            logicalStepId = plan.requiredText("logicalStepId"),
-            toolName = toolName,
-            toolSpecVersion = 1,
-            canonicalInputDigest = digest,
-            idempotencyKey = idempotencyKey,
-            safeResultJson = safeResult,
-            ownerId = context.ownerId,
-            fencingEpoch = context.fencingEpoch,
-            nowEpochMs = context.nowEpochMs,
+            ApprovedToolExecutionRequest(
+                runId = runId,
+                providerCallId = plan.requiredText("providerCallId"),
+                logicalStepId = plan.requiredText("logicalStepId"),
+                toolName = toolName,
+                toolSpecVersion = 1,
+                canonicalInputDigest = digest,
+                idempotencyKey = idempotencyKey,
+                safeResultJson = safeResult,
+                ownerId = context.ownerId,
+                fencingEpoch = context.fencingEpoch,
+                nowEpochMs = context.nowEpochMs,
+            ),
         )
         CrmMutationResult(requireNotNull(execution.resultRef), safeResult)
     }

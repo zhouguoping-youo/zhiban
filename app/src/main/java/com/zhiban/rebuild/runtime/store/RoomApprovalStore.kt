@@ -55,19 +55,7 @@ internal class RoomApprovalStore(
     private val appendEventInTransaction: suspend (RuntimeEventDraft, Long) -> RuntimeEventEntity,
     private val scheduleJson: (ScheduleEntity) -> String,
     private val putScheduleFact: suspend (ScheduleEntity, String, Long) -> Unit,
-    private val completeApprovedRemoteTool: suspend (
-        String,
-        String,
-        String,
-        String,
-        Int,
-        String,
-        String,
-        String,
-        String,
-        Long,
-        Long,
-    ) -> RuntimeToolExecutionEntity,
+    private val completeApprovedRemoteTool: suspend (ApprovedToolExecutionRequest) -> RuntimeToolExecutionEntity,
 ) {
     suspend fun requestScheduleApproval(
         call: ScheduleCreateToolCall,
@@ -176,8 +164,10 @@ internal class RoomApprovalStore(
                 ),
             )
             completeApprovedRemoteTool(
-                runId, text("providerCallId"), text("logicalStepId"), "memory.delete", 1,
-                digest, idempotencyKey, safeResult, ownerId, fencingEpoch, nowEpochMs,
+                ApprovedToolExecutionRequest(
+                    runId, text("providerCallId"), text("logicalStepId"), "memory.delete", 1, digest,
+                    idempotencyKey, safeResult, ownerId, fencingEpoch, nowEpochMs,
+                ),
             )
         }
 
@@ -588,8 +578,10 @@ internal class RoomApprovalStore(
                 ),
             )
             completeApprovedRemoteTool(
-                runId, text("providerCallId"), text("logicalStepId"), toolName, 1, digest,
-                idempotencyKey, safeResult, ownerId, fencingEpoch, nowEpochMs,
+                ApprovedToolExecutionRequest(
+                    runId, text("providerCallId"), text("logicalStepId"), toolName, 1, digest,
+                    idempotencyKey, safeResult, ownerId, fencingEpoch, nowEpochMs,
+                ),
             )
         }
 

@@ -43,6 +43,20 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+internal data class ApprovedToolExecutionRequest(
+    val runId: String,
+    val providerCallId: String,
+    val logicalStepId: String,
+    val toolName: String,
+    val toolSpecVersion: Int,
+    val canonicalInputDigest: String,
+    val idempotencyKey: String,
+    val safeResultJson: String,
+    val ownerId: String,
+    val fencingEpoch: Long,
+    val nowEpochMs: Long,
+)
+
 internal class RoomToolExecutionStore(
     private val database: AgentDatabase,
     private val requireActiveLease: suspend (String, String, Long, Long) -> Unit,
@@ -81,51 +95,42 @@ internal class RoomToolExecutionStore(
     suspend fun toolResult(idempotencyKey: String): RuntimeToolExecutionEntity? = database.runtimeToolExecutionDao().findByKey(idempotencyKey)
 
     /** Atomically records a confirmation-gated remote result and enters the common observation loop. */
-    suspend fun completeApprovedRemoteTool(
-        runId: String,
-        providerCallId: String,
-        logicalStepId: String,
-        toolName: String,
-        toolSpecVersion: Int,
-        canonicalInputDigest: String,
-        idempotencyKey: String,
-        safeResultJson: String,
-        ownerId: String,
-        fencingEpoch: Long,
-        nowEpochMs: Long,
-    ): RuntimeToolExecutionEntity = database.withTransaction {
+    suspend fun completeApprovedRemoteTool(request: ApprovedToolExecutionRequest): RuntimeToolExecutionEntity = database.withTransaction {
+        val runId = request.runId
         val run = requireNotNull(database.runtimeRunDao().find(runId))
-        requireActiveLease(run.sessionId, ownerId, fencingEpoch, nowEpochMs)
-        database.runtimeToolExecutionDao().findByKey(idempotencyKey)?.let { existing ->
-            check(existing.canonicalInputDigest == canonicalInputDigest) { "idempotency key payload conflict" }
+        requireActiveLease(run.sessionId, request.ownerId, request.fencingEpoch, request.nowEpochMs)
+        database.runtimeToolExecutionDao().findByKey(request.idempotencyKey)?.let { existing ->
+            check(existing.canonicalInputDigest == request.canonicalInputDigest) { "idempotency key payload conflict" }
             return@withTransaction existing
         }
         check(run.status == RuntimeRunStatus.EXECUTING.name) { "REMOTE_TOOL_RUN_NOT_EXECUTING" }
         val attemptId = requireNotNull(run.activeAttemptId)
         val execution = RuntimeToolExecutionEntity(
-            executionId = "exec-${sha256(idempotencyKey).take(32)}", runId = runId,
-            logicalStepId = logicalStepId, toolName = toolName, toolSpecVersion = toolSpecVersion,
-            canonicalInputDigest = canonicalInputDigest, idempotencyKey = idempotencyKey,
-            providerCallId = providerCallId, attemptId = attemptId, status = "SUCCEEDED",
-            resultRef = "result-${sha256(safeResultJson).take(24)}", safeResultJson = safeResultJson,
-            fencingEpoch = fencingEpoch, createdAtEpochMs = nowEpochMs, updatedAtEpochMs = nowEpochMs,
+            executionId = "exec-${sha256(request.idempotencyKey).take(32)}", runId = runId,
+            logicalStepId = request.logicalStepId, toolName = request.toolName, toolSpecVersion = request.toolSpecVersion,
+            canonicalInputDigest = request.canonicalInputDigest, idempotencyKey = request.idempotencyKey,
+            providerCallId = request.providerCallId, attemptId = attemptId, status = "SUCCEEDED",
+            resultRef = "result-${sha256(request.safeResultJson).take(24)}", safeResultJson = request.safeResultJson,
+            fencingEpoch = request.fencingEpoch,
+            createdAtEpochMs = request.nowEpochMs,
+            updatedAtEpochMs = request.nowEpochMs,
         )
         database.runtimeToolExecutionDao().insert(execution)
         database.runtimeAttemptDao().listByRunId(runId).firstOrNull {
             it.attemptId == attemptId && it.status == "ACTIVE"
         }
-            ?.let { check(database.runtimeAttemptDao().finish(attemptId, "SUCCEEDED", nowEpochMs) == 1) }
+            ?.let { check(database.runtimeAttemptDao().finish(attemptId, "SUCCEEDED", request.nowEpochMs) == 1) }
         val event = appendEventInTransaction(
             RuntimeEventDraft(
-                "event-remote-tool-${sha256("$runId:$providerCallId").take(24)}", "ToolSucceeded",
-                run.sessionId, runId, attemptId, providerCallId, runId,
+                "event-remote-tool-${sha256("$runId:${request.providerCallId}").take(24)}", "ToolSucceeded",
+                run.sessionId, runId, attemptId, request.providerCallId, runId,
                 buildJsonObject {
-                    put("toolName", toolName)
-                    put("resultDigest", sha256(safeResultJson))
+                    put("toolName", request.toolName)
+                    put("resultDigest", sha256(request.safeResultJson))
                 }.toString(),
-                nowEpochMs,
+                request.nowEpochMs,
             ),
-            fencingEpoch,
+            request.fencingEpoch,
         )
         check(
             database.runtimeRunDao().transition(
@@ -133,7 +138,7 @@ internal class RoomToolExecutionStore(
                 RuntimeRunStatus.EXECUTING.name,
                 RuntimeRunStatus.OBSERVING.name,
                 event.sequence,
-                nowEpochMs,
+                request.nowEpochMs,
             ) ==
                 1,
         )

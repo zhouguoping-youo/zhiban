@@ -1438,22 +1438,7 @@ internal class RoomRuntimeStore(private val database: AgentDatabase, private val
 
     suspend fun toolResult(idempotencyKey: String): RuntimeToolExecutionEntity? = tools.toolResult(idempotencyKey)
 
-    suspend fun completeApprovedRemoteTool(
-        runId: String,
-        providerCallId: String,
-        logicalStepId: String,
-        toolName: String,
-        toolSpecVersion: Int,
-        canonicalInputDigest: String,
-        idempotencyKey: String,
-        safeResultJson: String,
-        ownerId: String,
-        fencingEpoch: Long,
-        nowEpochMs: Long,
-    ): RuntimeToolExecutionEntity = tools.completeApprovedRemoteTool(
-        runId, providerCallId, logicalStepId, toolName, toolSpecVersion, canonicalInputDigest,
-        idempotencyKey, safeResultJson, ownerId, fencingEpoch, nowEpochMs,
-    )
+    suspend fun completeApprovedRemoteTool(request: ApprovedToolExecutionRequest): RuntimeToolExecutionEntity = tools.completeApprovedRemoteTool(request)
 
     suspend fun completeReadOnlyTool(
         runId: String,

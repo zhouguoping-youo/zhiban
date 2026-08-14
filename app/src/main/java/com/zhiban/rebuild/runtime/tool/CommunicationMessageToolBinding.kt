@@ -3,6 +3,7 @@ package com.zhiban.rebuild.runtime.tool
 import com.zhiban.rebuild.data.communication.CommunicationHandoffLauncher
 import com.zhiban.rebuild.runtime.provider.ProviderFailure
 import com.zhiban.rebuild.runtime.runSuspendCatching
+import com.zhiban.rebuild.runtime.store.ApprovedToolExecutionRequest
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -84,17 +85,19 @@ internal class CommunicationMessageToolBinding(
         // replay finds no record at the toolResult check above and launches the app a second time.
         withContext(NonCancellable) {
             store.completeApprovedRemoteTool(
-                context.runId,
-                value("providerCallId"),
-                value("logicalStepId"),
-                TOOL_NAME,
-                spec.version,
-                expectedDigest,
-                idempotencyKey,
-                safeResult,
-                context.ownerId,
-                context.fencingEpoch,
-                context.nowEpochMs,
+                ApprovedToolExecutionRequest(
+                    context.runId,
+                    value("providerCallId"),
+                    value("logicalStepId"),
+                    TOOL_NAME,
+                    spec.version,
+                    expectedDigest,
+                    idempotencyKey,
+                    safeResult,
+                    context.ownerId,
+                    context.fencingEpoch,
+                    context.nowEpochMs,
+                ),
             )
         }
         return RoutedToolResult(TOOL_NAME, value("providerCallId"), safeResult)

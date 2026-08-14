@@ -8,6 +8,7 @@ import com.zhiban.rebuild.runtime.governance.ReversibleWriteReadiness
 import com.zhiban.rebuild.runtime.governance.insertVisibleAutoWrite
 import com.zhiban.rebuild.runtime.provider.ProviderFailure
 import com.zhiban.rebuild.runtime.runSuspendCatching
+import com.zhiban.rebuild.runtime.store.ApprovedToolExecutionRequest
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -161,10 +162,19 @@ internal class ContactTagDomainWriter(private val database: AgentDatabase, priva
         require(approval.payloadJson.contains(plan.requiredText("proposalId")))
         val result = mutate(plan, context.nowEpochMs, auto = false, runtimeRunId = context.runId)
         store.completeApprovedRemoteTool(
-            context.runId, plan.requiredText("providerCallId"), plan.requiredText("logicalStepId"),
-            ContactTagToolBinding.TOOL_NAME, 1, plan.requiredText("canonicalInputDigest"),
-            plan.requiredText("idempotencyKey"), result.safeResultJson,
-            context.ownerId, context.fencingEpoch, context.nowEpochMs,
+            ApprovedToolExecutionRequest(
+                context.runId,
+                plan.requiredText("providerCallId"),
+                plan.requiredText("logicalStepId"),
+                ContactTagToolBinding.TOOL_NAME,
+                1,
+                plan.requiredText("canonicalInputDigest"),
+                plan.requiredText("idempotencyKey"),
+                result.safeResultJson,
+                context.ownerId,
+                context.fencingEpoch,
+                context.nowEpochMs,
+            ),
         )
         result
     }
