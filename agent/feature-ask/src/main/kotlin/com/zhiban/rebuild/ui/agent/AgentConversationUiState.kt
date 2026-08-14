@@ -37,6 +37,8 @@ data class AgentArtifactUi(val artifactId: String, val title: String, val mimeTy
 
 data class AgentConversationUiState(
     val stage: AgentConversationStage = AgentConversationStage.EMPTY,
+    /** Runtime identity of the active turn; used to reconcile optimistic and persisted rows. */
+    val runtimeRunId: String? = null,
     val userMessage: String? = null,
     val assistantMessage: String? = null,
     val messages: List<AgentConversationMessageUi> = emptyList(),

@@ -37,6 +37,7 @@ class AgentProjectionUiMapperTest {
         )
 
         assertEquals(AgentConversationStage.AWAITING_CONFIRMATION, result.stage)
+        assertEquals("run-1", result.runtimeRunId)
         assertEquals("proposal-1", result.pendingProposalId)
         assertEquals(120, result.usedTokens)
         assertEquals(listOf("日历"), result.sourceLabels)

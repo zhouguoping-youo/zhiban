@@ -21,6 +21,7 @@ object AgentProjectionUiMapper {
         if (projection.readOnly) {
             return AgentConversationUiState(
                 stage = AgentConversationStage.FAILED_FINAL,
+                runtimeRunId = projection.runId,
                 assistantMessage = projection.assistantText.ifBlank { null },
                 safeMessage = "当前版本无法安全读取这段会话，请升级后重试。",
                 sourceLabels = projection.sources.map { it.label },
@@ -31,6 +32,7 @@ object AgentProjectionUiMapper {
         val cancelling = projection.runStatus == RuntimeRunStatus.CANCEL_REQUESTED
         return AgentConversationUiState(
             stage = stage,
+            runtimeRunId = projection.runId,
             assistantMessage = projection.assistantText.trim().ifBlank { null },
             safeMessage = when {
                 cancelling -> "正在取消，请稍候…"

@@ -388,6 +388,7 @@ class AgentConversationViewModel @Inject constructor(
             val persisted = persistence.historyGateway.recordRealtimeExchange(sessionId, exchangeId, transcript, reply)
             _uiState.value = AgentConversationUiState(
                 stage = AgentConversationStage.SUCCEEDED,
+                runtimeRunId = "realtime-$exchangeId",
                 userMessage = transcript.ifBlank { null },
                 assistantMessage = reply.ifBlank { null },
                 safeMessage = if (persisted) null else "实时语音结果未能保存，请重试。",

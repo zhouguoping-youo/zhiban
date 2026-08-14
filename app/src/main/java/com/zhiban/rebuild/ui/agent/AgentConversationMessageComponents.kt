@@ -53,6 +53,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -214,6 +215,7 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
 ) {
     val listState = rememberLazyListState()
     val scrollScope = androidx.compose.runtime.rememberCoroutineScope()
+    val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     val isNearBottom by remember {
         derivedStateOf {
             val layout = listState.layoutInfo
@@ -222,8 +224,37 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
         }
     }
     val generatedArtifacts = state.artifacts.filter(AgentArtifactUi::isUserVisibleOutput)
+    val persistedCurrentUserTurn = state.hasPersistedCurrentTurn("user")
+    val persistedCurrentAssistantTurn = state.hasPersistedCurrentTurn("assistant")
+    val pendingUserMessage = state.userMessage?.takeUnless { persistedCurrentUserTurn }
+    val latestAssistant = state.messages.lastOrNull { it.role == "assistant" }?.text
+    val pendingAssistantMessage = state.assistantMessage?.takeUnless {
+        persistedCurrentAssistantTurn || it == latestAssistant
+    }
+    val showPlanningRow = state.stage == AgentConversationStage.PLANNING
+    val showExecutingRow = state.stage == AgentConversationStage.EXECUTING &&
+        !state.showPlan && state.assistantMessage.isNullOrBlank()
+    val latestConversationItemIndex = state.messages.lastIndex +
+        listOfNotNull(
+            pendingUserMessage,
+            true.takeIf { showPlanningRow || showExecutingRow },
+            pendingAssistantMessage,
+        ).size
+    var readerWasNearBottomBeforeIme by remember {
+        androidx.compose.runtime.mutableStateOf(true)
+    }
     var feedbackSelection by remember(state.assistantMessage, state.messages.lastOrNull()?.turnId) {
         androidx.compose.runtime.mutableStateOf<Boolean?>(null)
+    }
+    LaunchedEffect(isNearBottom, imeVisible) {
+        if (!imeVisible) readerWasNearBottomBeforeIme = isNearBottom
+    }
+    LaunchedEffect(imeVisible) {
+        if (imeVisible && readerWasNearBottomBeforeIme && latestConversationItemIndex >= 0) {
+            // Let the IME inset resize the list before anchoring the newest content.
+            repeat(2) { androidx.compose.runtime.withFrameNanos { } }
+            listState.scrollToItem(latestConversationItemIndex)
+        }
     }
     LaunchedEffect(
         state.messages.size,
@@ -255,12 +286,10 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
                     AssistantMessageBubble(message.text)
                 }
             }
-            val latestUser = state.messages.lastOrNull { it.role == "user" }?.text
-            val latestAssistant = state.messages.lastOrNull { it.role == "assistant" }?.text
-            state.userMessage?.takeIf { it != latestUser }?.let {
+            pendingUserMessage?.let {
                 item { UserMessageBubble(it, userAvatarBytes, userAvatarLabel) }
             }
-            if (state.stage == AgentConversationStage.PLANNING) {
+            if (showPlanningRow) {
                 item {
                     Column {
                         AssistantMessageBubble("知伴正在思考…")
@@ -271,7 +300,7 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
                     }
                 }
             }
-            if (state.stage == AgentConversationStage.EXECUTING && !state.showPlan && state.assistantMessage.isNullOrBlank()) {
+            if (showExecutingRow) {
                 item {
                     Column {
                         AssistantMessageBubble("知伴正在完成操作…")
@@ -282,7 +311,7 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
                     }
                 }
             }
-            state.assistantMessage?.takeIf { it != latestAssistant }?.let { item { AssistantMessageBubble(it) } }
+            pendingAssistantMessage?.let { item { AssistantMessageBubble(it) } }
             if (state.showPlan) {
                 state.plan?.let {
                     item { AgentPlanCard(it, state.stage, onConfirm, onReject, onCancel) }
@@ -388,6 +417,12 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
             },
         )
     }
+}
+
+private fun AgentConversationUiState.hasPersistedCurrentTurn(role: String): Boolean {
+    val runId = runtimeRunId ?: return false
+    val expectedTurnId = "turn-$runId-$role"
+    return messages.any { message -> message.role == role && message.turnId == expectedTurnId }
 }
 
 @Composable

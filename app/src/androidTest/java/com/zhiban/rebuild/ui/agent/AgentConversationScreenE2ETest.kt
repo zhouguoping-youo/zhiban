@@ -94,6 +94,59 @@ class AgentConversationScreenE2ETest {
         compose.onNodeWithText("取消").assertDoesNotExist()
     }
 
+    @Test fun persistedUserTurnDoesNotRenderASecondOptimisticBubbleWhenWhitespaceWasNormalized() {
+        val content = "张雪松-联强国际 15802727406 你会怎么操作"
+        compose.setContent {
+            ZhiBanTheme {
+                AgentConversationScreen(
+                    state = AgentConversationUiState(
+                        stage = AgentConversationStage.SUCCEEDED,
+                        runtimeRunId = "run-duplicate",
+                        userMessage = "张雪松-联强国际 15802727406\n\n你会怎么操作",
+                        messages = listOf(
+                            AgentConversationMessageUi(
+                                turnId = "turn-run-duplicate-user",
+                                role = "user",
+                                text = content,
+                            ),
+                        ),
+                    ),
+                )
+            }
+        }
+
+        compose.onAllNodesWithText("张雪松", substring = true).assertCountEquals(1)
+    }
+
+    @Test fun openingKeyboardKeepsLatestConversationContentVisible() {
+        val messages = (1..24).flatMap { index ->
+            listOf(
+                AgentConversationMessageUi("turn-$index-user", "user", "第 $index 个问题"),
+                AgentConversationMessageUi("turn-$index-assistant", "assistant", "第 $index 个回答"),
+            )
+        }
+        compose.setContent {
+            ZhiBanTheme {
+                AgentConversationScreen(
+                    state = AgentConversationUiState(
+                        stage = AgentConversationStage.SUCCEEDED,
+                        messages = messages,
+                    ),
+                )
+            }
+        }
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("滚动到最新").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("第 24 个回答").assertIsDisplayed()
+
+        compose.onNodeWithContentDescription("消息输入框").performClick()
+        compose.onNodeWithContentDescription("消息输入框").performTextInput("继续输入")
+        compose.waitForIdle()
+
+        compose.onNodeWithText("第 24 个回答").assertIsDisplayed()
+    }
+
     @Test fun completedReplyActionsAreCompactWithoutDuplicateLongPressMenu() {
         val state = AgentConversationUiState(
             stage = AgentConversationStage.SUCCEEDED,
