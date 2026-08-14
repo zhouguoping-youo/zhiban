@@ -333,6 +333,61 @@ class ProviderModuleTest {
         )
     }
 
+    @Test fun toolCallIsFlushedWhenDoneArrivesWithoutFinishReason() = runBlocking {
+        val stream = listOf(
+            "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call-done\",\"function\":{\"name\":\"calendar.create\",\"arguments\":\"{\\\"title\\\":\\\"demo\\\"}\"}}]}}]}",
+            "data: [DONE]",
+        ).joinToString("\n\n", postfix = "\n")
+        val adapter =
+            OpenAiCompatibleProviderAdapter(QueueCallFactory(response(200, stream)), resolver, registry, clock = { 10 })
+
+        val events = adapter.stream(
+            ModelRequest("tool-done", OutboundChannel.LLM_INFERENCE, profile, listOf(userMessage("x")), capability(100), 10),
+        ).toList()
+
+        assertEquals(
+            listOf(
+                ModelEvent.ToolCall(0, "call-done", "calendar.create", "{\"title\":\"demo\"}"),
+                ModelEvent.Final("tool_calls"),
+            ),
+            events,
+        )
+    }
+
+    @Test fun doneWithoutFinishReasonEmitsExactlyOneFinal() = runBlocking {
+        val stream = listOf(
+            "data: {\"choices\":[{\"delta\":{\"content\":\"done\"}}]}",
+            "data: [DONE]",
+        ).joinToString("\n\n", postfix = "\n")
+        val adapter =
+            OpenAiCompatibleProviderAdapter(QueueCallFactory(response(200, stream)), resolver, registry, clock = { 10 })
+
+        val events = adapter.stream(
+            ModelRequest("plain-done", OutboundChannel.LLM_INFERENCE, profile, listOf(userMessage("x")), capability(100), 10),
+        ).toList()
+
+        assertEquals(listOf(ModelEvent.Delta(0, "done"), ModelEvent.Final("stop")), events)
+        assertEquals(1, events.count { it is ModelEvent.Final })
+    }
+
+    @Test fun malformedSseChunkReturnsFixedProtocolFailure() = runBlocking {
+        val adapter = OpenAiCompatibleProviderAdapter(
+            QueueCallFactory(response(200, "data: {not-json}\n\ndata: [DONE]\n")),
+            resolver,
+            registry,
+            clock = { 10 },
+        )
+
+        val failure = runCatching {
+            adapter.stream(
+                ModelRequest("malformed", OutboundChannel.LLM_INFERENCE, profile, listOf(userMessage("x")), capability(100), 10),
+            ).toList()
+        }.exceptionOrNull() as ProviderFailure
+
+        assertEquals("PROVIDER_PROTOCOL_ERROR", failure.code)
+        assertTrue(failure.retryable)
+    }
+
     @Test fun stepFunStopFinishReasonDoesNotDiscardAValidToolCall() = runBlocking {
         val stream = listOf(
             "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call-step\",\"function\":{\"name\":\"calendar.create\",\"arguments\":\"{\\\"title\\\":\\\"demo\\\"}\"}}]}}]}",

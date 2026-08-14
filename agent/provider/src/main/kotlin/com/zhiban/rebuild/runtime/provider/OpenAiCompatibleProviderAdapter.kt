@@ -19,6 +19,7 @@ import okhttp3.Call
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okio.BufferedSource
 
 class OpenAiCompatibleProviderAdapter(
     private val calls: Call.Factory,
@@ -111,112 +112,13 @@ class OpenAiCompatibleProviderAdapter(
                 if (!response.isSuccessful) {
                     throw mapResponseFailure(response)
                 }
-                var ordinal = 0L
-                val pendingTools = linkedMapOf<Int, PendingToolCall>()
-                val toolIdIndexes = mutableMapOf<String, Int>()
-                var usageEmitted = false
-                var finalEmitted = false
-                var totalResponseBytes = 0L
-                val reasoningFilter = ReasoningTagFilter()
+                val decoder = StreamDecoder(request.requestId)
                 response.body?.source()?.use { source ->
                     while (!source.exhausted()) {
-                        val line = try {
-                            source.readUtf8LineStrict(MAX_SSE_FRAME_BYTES)
-                        } catch (_: java.io.EOFException) {
-                            call.cancel()
-                            throw ProviderFailure("PROVIDER_FRAME_TOO_LARGE", retryable = false)
-                        }
-                        totalResponseBytes += line.toByteArray(Charsets.UTF_8).size + 1L
-                        if (totalResponseBytes > MAX_STREAM_RESPONSE_BYTES) {
-                            call.cancel()
-                            throw ProviderFailure("PROVIDER_RESPONSE_TOO_LARGE", retryable = false)
-                        }
-                        if (!line.startsWith("data:")) continue
-                        val data = line.removePrefix("data:").trim()
-                        if (data == "[DONE]") break
-                        val chunk = runCatching { json.parseToJsonElement(data) as? JsonObject }.getOrNull() ?: continue
-                        val choice = (chunk["choices"] as? JsonArray)?.firstOrNull() as? JsonObject
-                        val delta = choice?.get("delta") as? JsonObject
-                        (delta?.get("content") as? JsonPrimitive)?.content
-                            ?.takeIf { it.isNotEmpty() }
-                            ?.let(reasoningFilter::accept)
-                            ?.takeIf { it.isNotEmpty() }
-                            ?.let { emit(ModelEvent.Delta(ordinal++, it)) }
-                        val toolCalls = delta?.get("tool_calls") as? JsonArray
-                        toolCalls?.forEach { item ->
-                            val objectItem = item as? JsonObject ?: return@forEach
-                            val index =
-                                (objectItem["index"] as? JsonPrimitive)?.content?.toIntOrNull() ?: return@forEach
-                            if (index < 0 ||
-                                index >= MAX_TOOL_CALLS
-                            ) {
-                                throw ProviderFailure("INVALID_TOOL_CALL_INDEX", retryable = false)
-                            }
-                            val fn = objectItem["function"] as? JsonObject ?: return@forEach
-                            val pending = pendingTools.getOrPut(index) { PendingToolCall(index) }
-                            (objectItem["id"] as? JsonPrimitive)?.content?.takeIf(
-                                String::isNotEmpty,
-                            )?.let { providerCallId ->
-                                if (!SAFE_PROVIDER_CALL_ID.matches(
-                                        providerCallId,
-                                    )
-                                ) {
-                                    throw ProviderFailure("INVALID_TOOL_CALL_ID", retryable = false)
-                                }
-                                if (pending.providerCallId != null && pending.providerCallId != providerCallId) {
-                                    throw ProviderFailure("TOOL_CALL_ID_CONFLICT", retryable = false)
-                                }
-                                val previousIndex = toolIdIndexes.putIfAbsent(providerCallId, index)
-                                if (previousIndex != null && previousIndex != index) {
-                                    throw ProviderFailure("TOOL_CALL_ID_CONFLICT", retryable = false)
-                                }
-                                pending.providerCallId = providerCallId
-                            }
-                            (fn["name"] as? JsonPrimitive)?.content?.takeIf(String::isNotEmpty)?.let { name ->
-                                if (pending.name != null &&
-                                    pending.name != name
-                                ) {
-                                    throw ProviderFailure("TOOL_CALL_NAME_CONFLICT", retryable = false)
-                                }
-                                pending.name = name
-                            }
-                            (fn["arguments"] as? JsonPrimitive)?.content?.let { fragment ->
-                                if (pending.arguments.length + fragment.length > MAX_TOOL_ARGUMENT_CHARS) {
-                                    throw ProviderFailure("TOOL_ARGUMENTS_TOO_LARGE", retryable = false)
-                                }
-                                pending.arguments.append(fragment)
-                            }
-                        }
-                        val usage = chunk["usage"] as? JsonObject
-                        if (usage != null && !usageEmitted) {
-                            emit(ModelEvent.Usage(usage.int("prompt_tokens"), usage.int("completion_tokens")))
-                            usageEmitted = true
-                        }
-                        (choice?.get("finish_reason") as? JsonPrimitive)?.content?.let { finishReason ->
-                            if (finalEmitted) return@let
-                            reasoningFilter.finish().takeIf { it.isNotEmpty() }?.let {
-                                emit(ModelEvent.Delta(ordinal++, it))
-                            }
-                            // StepFun may finish a valid tool call with "stop" rather than
-                            // OpenAI's "tool_calls". Pending structured calls are authoritative;
-                            // never discard them solely because the provider uses that finish reason.
-                            if (pendingTools.isNotEmpty()) {
-                                pendingTools.toSortedMap().values.forEach { pending ->
-                                    val name =
-                                        pending.name ?: throw ProviderFailure("INVALID_TOOL_CALL", retryable = false)
-                                    val args = pending.arguments.toString()
-                                    runCatching {
-                                        json.parseToJsonElement(args)
-                                    }.getOrElse { throw ProviderFailure("INVALID_TOOL_ARGUMENTS", retryable = false) }
-                                    val providerCallId =
-                                        pending.providerCallId ?: canonicalToolCallId(request.requestId, pending.index)
-                                    emit(ModelEvent.ToolCall(ordinal++, providerCallId, name, args))
-                                }
-                                pendingTools.clear()
-                            }
-                            emit(ModelEvent.Final(finishReason))
-                            finalEmitted = true
-                        }
+                        val data = decoder.readData(source, call) ?: continue
+                        val decoded = decoder.accept(data)
+                        decoded.events.forEach { emit(it) }
+                        if (decoded.isDone) break
                     }
                 }
             }
@@ -406,6 +308,143 @@ class OpenAiCompatibleProviderAdapter(
         var name: String? = null
         val arguments = StringBuilder()
     }
+
+    private inner class StreamDecoder(private val requestId: String) {
+        private val pendingTools = linkedMapOf<Int, PendingToolCall>()
+        private val toolIdIndexes = mutableMapOf<String, Int>()
+        private val reasoningFilter = ReasoningTagFilter()
+        private var usageEmitted = false
+        private var finalEmitted = false
+        private var totalResponseBytes = 0L
+        private var ordinal = 0L
+
+        fun readData(source: BufferedSource, call: Call): String? {
+            val line = try {
+                source.readUtf8LineStrict(MAX_SSE_FRAME_BYTES)
+            } catch (_: java.io.EOFException) {
+                call.cancel()
+                throw ProviderFailure("PROVIDER_FRAME_TOO_LARGE", retryable = false)
+            }
+            totalResponseBytes += line.toByteArray(Charsets.UTF_8).size + 1L
+            if (totalResponseBytes > MAX_STREAM_RESPONSE_BYTES) {
+                call.cancel()
+                throw ProviderFailure("PROVIDER_RESPONSE_TOO_LARGE", retryable = false)
+            }
+            return line.takeIf { it.startsWith("data:") }
+                ?.removePrefix("data:")
+                ?.trim()
+                ?.takeIf(String::isNotEmpty)
+        }
+
+        fun accept(data: String): DecodedStreamChunk {
+            if (data == "[DONE]") {
+                val events = if (finalEmitted) {
+                    emptyList()
+                } else {
+                    finalize(if (pendingTools.isEmpty()) "stop" else "tool_calls")
+                }
+                return DecodedStreamChunk(events, isDone = true)
+            }
+            val chunk = parseChunk(data)
+            val choice = (chunk["choices"] as? JsonArray)?.firstOrNull() as? JsonObject
+            val delta = choice?.get("delta") as? JsonObject
+            val events = mutableListOf<ModelEvent>()
+            contentEvent(delta)?.let(events::add)
+            accumulateTools(delta)
+            usageEvent(chunk)?.let(events::add)
+            (choice?.get("finish_reason") as? JsonPrimitive)?.content?.let { reason ->
+                if (!finalEmitted) events += finalize(reason)
+            }
+            return DecodedStreamChunk(events, isDone = false)
+        }
+
+        private fun parseChunk(data: String): JsonObject = try {
+            json.parseToJsonElement(data) as? JsonObject
+                ?: throw ProviderFailure("PROVIDER_PROTOCOL_ERROR", retryable = true)
+        } catch (failure: ProviderFailure) {
+            throw failure
+        } catch (_: Throwable) {
+            throw ProviderFailure("PROVIDER_PROTOCOL_ERROR", retryable = true)
+        }
+
+        private fun contentEvent(delta: JsonObject?): ModelEvent.Delta? = (delta?.get("content") as? JsonPrimitive)?.content
+            ?.takeIf(String::isNotEmpty)
+            ?.let(reasoningFilter::accept)
+            ?.takeIf(String::isNotEmpty)
+            ?.let { ModelEvent.Delta(ordinal++, it) }
+
+        private fun accumulateTools(delta: JsonObject?) {
+            val calls = delta?.get("tool_calls") as? JsonArray ?: return
+            calls.forEach { item -> accumulateTool(item as? JsonObject ?: return@forEach) }
+        }
+
+        private fun accumulateTool(item: JsonObject) {
+            val index = (item["index"] as? JsonPrimitive)?.content?.toIntOrNull() ?: return
+            if (index !in 0 until MAX_TOOL_CALLS) {
+                throw ProviderFailure("INVALID_TOOL_CALL_INDEX", retryable = false)
+            }
+            val function = item["function"] as? JsonObject ?: return
+            val pending = pendingTools.getOrPut(index) { PendingToolCall(index) }
+            (item["id"] as? JsonPrimitive)?.content?.takeIf(String::isNotEmpty)?.let { id ->
+                validateToolId(id, index, pending)
+                pending.providerCallId = id
+            }
+            (function["name"] as? JsonPrimitive)?.content?.takeIf(String::isNotEmpty)?.let { name ->
+                if (pending.name != null && pending.name != name) {
+                    throw ProviderFailure("TOOL_CALL_NAME_CONFLICT", retryable = false)
+                }
+                pending.name = name
+            }
+            (function["arguments"] as? JsonPrimitive)?.content?.let { fragment ->
+                if (pending.arguments.length + fragment.length > MAX_TOOL_ARGUMENT_CHARS) {
+                    throw ProviderFailure("TOOL_ARGUMENTS_TOO_LARGE", retryable = false)
+                }
+                pending.arguments.append(fragment)
+            }
+        }
+
+        private fun validateToolId(id: String, index: Int, pending: PendingToolCall) {
+            if (!SAFE_PROVIDER_CALL_ID.matches(id)) {
+                throw ProviderFailure("INVALID_TOOL_CALL_ID", retryable = false)
+            }
+            if (pending.providerCallId != null && pending.providerCallId != id) {
+                throw ProviderFailure("TOOL_CALL_ID_CONFLICT", retryable = false)
+            }
+            val previousIndex = toolIdIndexes.putIfAbsent(id, index)
+            if (previousIndex != null && previousIndex != index) {
+                throw ProviderFailure("TOOL_CALL_ID_CONFLICT", retryable = false)
+            }
+        }
+
+        private fun usageEvent(chunk: JsonObject): ModelEvent.Usage? {
+            val usage = chunk["usage"] as? JsonObject ?: return null
+            if (usageEmitted) return null
+            usageEmitted = true
+            return ModelEvent.Usage(usage.int("prompt_tokens"), usage.int("completion_tokens"))
+        }
+
+        private fun finalize(finishReason: String): List<ModelEvent> = buildList {
+            reasoningFilter.finish().takeIf(String::isNotEmpty)?.let {
+                add(ModelEvent.Delta(ordinal++, it))
+            }
+            // Pending structured calls are authoritative even when StepFun reports "stop".
+            pendingTools.toSortedMap().values.forEach { pending -> add(finalizeTool(pending)) }
+            pendingTools.clear()
+            add(ModelEvent.Final(finishReason))
+            finalEmitted = true
+        }
+
+        private fun finalizeTool(pending: PendingToolCall): ModelEvent.ToolCall {
+            val name = pending.name ?: throw ProviderFailure("INVALID_TOOL_CALL", retryable = false)
+            val arguments = pending.arguments.toString()
+            runCatching { json.parseToJsonElement(arguments) }
+                .getOrElse { throw ProviderFailure("INVALID_TOOL_ARGUMENTS", retryable = false) }
+            val id = pending.providerCallId ?: canonicalToolCallId(requestId, pending.index)
+            return ModelEvent.ToolCall(ordinal++, id, name, arguments)
+        }
+    }
+
+    private data class DecodedStreamChunk(val events: List<ModelEvent>, val isDone: Boolean)
 
     private class ReasoningTagFilter {
         private enum class Mode { UNDECIDED, SUPPRESSING, VISIBLE }
