@@ -38,8 +38,6 @@ internal class RuntimeCommandRunner @Inject constructor(private val processor: K
         scope.launch {
             while (true) {
                 try {
-                    signals.send(Unit)
-                    signals.receive()
                     var backoffMs = 100L
                     while (true) {
                         val outcome = processNextSafely(processor::processNext)
@@ -57,7 +55,8 @@ internal class RuntimeCommandRunner @Inject constructor(private val processor: K
                     val wakeInMs = processor.millisUntilNextLeaseExpiry()
                     if (wakeInMs != null) {
                         withTimeoutOrNull(wakeInMs) { signals.receive() }
-                        signals.trySend(Unit)
+                    } else {
+                        signals.receive()
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled

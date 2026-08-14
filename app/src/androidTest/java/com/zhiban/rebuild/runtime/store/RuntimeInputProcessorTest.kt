@@ -2706,6 +2706,27 @@ class RuntimeInputProcessorTest {
         assertEquals("COMPLETED", database.runtimeCommandInboxDao().find("c1")?.status)
     }
 
+    @Test fun idleRunnerWaitsForAWorkSignalInsteadOfHotSpinning() = runBlocking {
+        val clockReads = AtomicInteger(0)
+        val runner = RuntimeCommandRunner(
+            KernelCommandProcessor(
+                database,
+                "idle-runner",
+                { true },
+                {
+                    clockReads.incrementAndGet()
+                    now
+                },
+            ),
+        )
+
+        runner.start()
+        delay(2_000)
+        runner.stopForTest()
+
+        assertTrue("idle runner read the clock ${clockReads.get()} times", clockReads.get() <= 8)
+    }
+
     @Test fun runnerWakesForCompletedCommandWhoseRunLeaseExpiresAfterProcessDeath() = runBlocking {
         val staged = RoomTextInputGateway(database, { true }).stage("recover completed command")
         RoomRuntimeGateways(database, "test")
