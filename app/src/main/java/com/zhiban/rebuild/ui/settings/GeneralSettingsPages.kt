@@ -107,7 +107,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-private fun SettingsPageFrame(title: String, onBack: () -> Unit, content: @Composable () -> Unit) {
+internal fun SettingsPageFrame(title: String, onBack: () -> Unit, content: @Composable () -> Unit) {
     ZhiBanPage {
         Column(Modifier.fillMaxSize()) {
             ZhiBanTopBar(title = title, onBack = onBack)
@@ -566,11 +566,14 @@ fun DataSettingsPage(onBack: () -> Unit, onMemory: () -> Unit, onRunHistory: () 
             }
             item {
                 Text(
-                    "诊断与导出",
+                    "备份与导出",
                     style = MaterialTheme.typography.labelMedium,
                     color = ZhiBanTextSecondary,
                     modifier = Modifier.padding(horizontal = ZhiBanSpacing.Xs, vertical = ZhiBanSpacing.Sm),
                 )
+            }
+            item {
+                PortableBackupSection()
             }
             item {
                 SettingsCard {
@@ -800,7 +803,7 @@ private fun ThemeOptionRow(title: String, subtitle: String, selected: Boolean, o
 }
 
 @Composable
-private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
+internal fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -844,7 +847,7 @@ private fun SettingsToggleRow(title: String, subtitle: String, checked: Boolean,
 }
 
 @Composable
-private fun SettingsActionRow(title: String, onClick: () -> Unit, isDanger: Boolean = false) {
+internal fun SettingsActionRow(title: String, onClick: () -> Unit, isDanger: Boolean = false) {
     Row(
         Modifier.fillMaxWidth().defaultMinSize(
             minHeight = ZhiBanSize.ListRow,

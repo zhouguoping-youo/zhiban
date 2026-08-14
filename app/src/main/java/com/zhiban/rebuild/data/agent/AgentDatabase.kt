@@ -67,6 +67,7 @@ import com.zhiban.rebuild.runtime.store.*
 
 /** 知伴本机数据库文件名，供数据层以外的只读场景（如存储页显示大小）使用，避免引用 internal 的 AgentDatabase。 */
 const val AGENT_DATABASE_FILE_NAME = "zhiban-agent.db"
+const val AGENT_DATABASE_SCHEMA_VERSION = 39
 
 @Database(
     entities = [
@@ -121,7 +122,7 @@ const val AGENT_DATABASE_FILE_NAME = "zhiban-agent.db"
         EventPlanEntity::class,
         EventPlanParticipantEntity::class,
     ],
-    version = 39,
+    version = AGENT_DATABASE_SCHEMA_VERSION,
     exportSchema = true,
 )
 internal abstract class AgentDatabase : RoomDatabase() {

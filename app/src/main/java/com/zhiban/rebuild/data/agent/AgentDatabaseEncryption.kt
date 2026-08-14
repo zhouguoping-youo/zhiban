@@ -245,6 +245,10 @@ private class MigratingSqlCipherOpenHelper(
         synchronized(this) {
             if (migrated) return
             targetDatabaseName?.let {
+                AgentDatabasePortableBackup.installPendingRestoreIfPresent(
+                    context.getDatabasePath(it),
+                    migrationPassphrase,
+                )
                 AgentDatabaseEncryption.migratePlaintextIfNeeded(context, it, migrationPassphrase)
             }
             migrated = true

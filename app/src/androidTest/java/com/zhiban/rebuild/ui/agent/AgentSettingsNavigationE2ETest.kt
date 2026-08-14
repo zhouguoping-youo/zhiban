@@ -3,12 +3,12 @@ package com.zhiban.rebuild.ui.agent
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
-import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
@@ -78,6 +78,17 @@ class AgentSettingsNavigationE2ETest {
         compose.onNodeWithText("语言").assertDoesNotExist()
         compose.onNodeWithText("重置知伴").assertDoesNotExist()
         compose.onNodeWithText("数据管理").assertExists()
+    }
+
+    @Test fun dataManagementExposesPortableBackupAndExplainsCredentialBoundary() {
+        compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("我的").performClick()
+        compose.onNodeWithText("数据管理").performScrollTo().performClick()
+
+        compose.onNodeWithText("创建加密备份").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("从加密备份恢复").assertIsDisplayed()
+        compose.onNodeWithText("含联系人、关系、日程、记忆和 CRM；不含 API Key").assertIsDisplayed()
     }
 
     @Test fun everyProfileSettingsEntryOpensAndBackReturns() {

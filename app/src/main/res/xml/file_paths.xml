@@ -5,4 +5,5 @@
     <cache-path name="voice" path="voice/" />
     <cache-path name="diagnostics" path="diagnostics/" />
     <cache-path name="data-export" path="data-export/" />
+    <cache-path name="portable-backup" path="portable-backup/" />
 </paths>
