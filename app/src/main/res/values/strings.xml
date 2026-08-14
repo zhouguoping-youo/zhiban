@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">知伴</string>
+    <string name="permission_contacts_rationale">用于导入、整理和回写你选择的联系人资料。回写前会展示变更内容。</string>
+    <string name="permission_calllog_rationale">用于读取通话时间、方向和号码，便于关联联系人和记录跟进；不会录制通话内容。</string>
+    <string name="permission_phone_state_rationale">用于感知通话结束，便于提示你补充通话备注。</string>
+    <string name="permission_calendar_rationale">用于导入系统日历并检查时间冲突；写入前会展示变更内容。</string>
+    <string name="notification_listener_service_label">知伴收到消息感知</string>
+    <string name="notification_listener_description">开启后识别白名单社交应用的新消息通知，并在本机整理为待核实信息。需要模型处理时，按你的隐私设置和数据出站规则执行。不读取应用历史消息，不代发消息。</string>
+    <string name="outgoing_accessibility_service_label">知伴发出消息感知</string>
     <string name="outgoing_message_accessibility_description">仅在你明确开启后识别刚刚发出的消息。应用隐藏文字时，只在知伴发起的发送流程中截取当前页做本机 OCR，截图不保存。不会点击、代发或读取历史记录。</string>
+    <string name="privacy_policy_summary">个人资料默认保存在本机；需要已连接模型处理时，会按隐私设置和数据出站规则执行。</string>
+    <string name="user_agreement_summary">使用前请了解知伴需要的系统权限、数据用途与可撤销范围。</string>
 </resources>
