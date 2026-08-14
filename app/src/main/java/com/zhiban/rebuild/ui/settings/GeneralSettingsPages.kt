@@ -31,7 +31,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Contacts
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.NotificationsNone
@@ -188,12 +187,6 @@ fun PrivacySecurityPage(
                         "麦克风",
                         permissions.microphone.withPurpose("语音输入和通话备注"),
                     ) { requestOrOpen(Manifest.permission.RECORD_AUDIO, permissions.microphone.isGranted) }
-                    Divider()
-                    SettingsPermissionRow(
-                        Icons.Outlined.CameraAlt,
-                        "相机",
-                        permissions.camera.withPurpose("拍照识别信息"),
-                    ) { requestOrOpen(Manifest.permission.CAMERA, permissions.camera.isGranted) }
                     Divider()
                     SettingsPermissionRow(
                         Icons.Outlined.Phone,
@@ -901,7 +894,6 @@ private data class PermissionStatus(val isGranted: Boolean) {
 
 private data class PermissionSnapshot(
     val microphone: PermissionStatus,
-    val camera: PermissionStatus,
     val contacts: PermissionStatus,
     val calendar: PermissionStatus,
     val callLog: PermissionStatus,
@@ -911,7 +903,6 @@ private data class PermissionSnapshot(
     companion object {
         val Defaults = PermissionSnapshot(
             microphone = PermissionStatus(false),
-            camera = PermissionStatus(false),
             contacts = PermissionStatus(false),
             calendar = PermissionStatus(false),
             callLog = PermissionStatus(false),
@@ -921,7 +912,6 @@ private data class PermissionSnapshot(
 
         fun read(context: android.content.Context): PermissionSnapshot = PermissionSnapshot(
             microphone = context.permissionStatus(Manifest.permission.RECORD_AUDIO),
-            camera = context.permissionStatus(Manifest.permission.CAMERA),
             contacts = context.permissionStatus(Manifest.permission.READ_CONTACTS),
             calendar = context.permissionStatus(Manifest.permission.READ_CALENDAR),
             callLog = context.permissionStatus(Manifest.permission.READ_CALL_LOG),

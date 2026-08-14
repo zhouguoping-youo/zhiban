@@ -107,7 +107,6 @@ private fun multimodalFixture(key: String): MultimodalUiState {
         )
     }
     return MultimodalUiState(
-        cameraPermission = permission,
         microphonePermission = permission,
         capability = if (key.startsWith("capability_")) {
             InputModality.entries.associateWith {

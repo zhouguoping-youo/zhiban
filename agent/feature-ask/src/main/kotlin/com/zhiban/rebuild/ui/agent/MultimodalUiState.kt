@@ -65,7 +65,6 @@ data class TranscriptionUiState(
 }
 
 data class MultimodalUiState(
-    val cameraPermission: DevicePermissionState = DevicePermissionState.UNKNOWN,
     val microphonePermission: DevicePermissionState = DevicePermissionState.UNKNOWN,
     val capability: Map<InputModality, ProviderCapabilityState> = InputModality.entries.associateWith {
         ProviderCapabilityState.PROBING

@@ -1,5 +1,6 @@
 package com.zhiban.rebuild
 
+import android.Manifest
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
@@ -15,6 +16,16 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class ManifestComplianceDeviceTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
+
+    @Suppress("DEPRECATION")
+    @Test fun systemCameraCaptureDoesNotRequireDirectCameraPermission() {
+        val permissions = context.packageManager.getPackageInfo(
+            context.packageName,
+            PackageManager.GET_PERMISSIONS,
+        ).requestedPermissions.orEmpty()
+
+        assertTrue(Manifest.permission.CAMERA !in permissions)
+    }
 
     @Suppress("DEPRECATION")
     @Test fun sensitiveServicesExposeAccurateLabelsAndDescriptions() {

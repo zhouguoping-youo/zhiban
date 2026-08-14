@@ -67,7 +67,7 @@ fun AgentConversationRoute(
     var pendingCaptureUri by remember { mutableStateOf<Uri?>(null) }
     var pendingCaptureFile by remember { mutableStateOf<File?>(null) }
     val capturedFiles = remember { mutableMapOf<String, File>() }
-    var pendingPermissionAction by remember { mutableStateOf<CaptureAction?>(null) }
+    var microphonePermissionPending by remember { mutableStateOf(false) }
     var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
     var recordingFile by remember { mutableStateOf<File?>(null) }
     var speechRecognizer by remember { mutableStateOf<SpeechRecognizer?>(null) }
@@ -424,28 +424,21 @@ fun AgentConversationRoute(
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        val action = pendingPermissionAction
-        pendingPermissionAction = null
-        val permanentlyDenied = !granted && action != null && context.findActivity()?.let { activity ->
-            !androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(activity, action.permission)
+        val requested = microphonePermissionPending
+        microphonePermissionPending = false
+        val permanentlyDenied = !granted && requested && context.findActivity()?.let { activity ->
+            !androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(
+                activity,
+                Manifest.permission.RECORD_AUDIO,
+            )
         } == true
         val permissionState = when {
             granted -> DevicePermissionState.GRANTED
             permanentlyDenied -> DevicePermissionState.PERMANENTLY_DENIED
             else -> DevicePermissionState.DENIED
         }
-        multimodal = when (action) {
-            CaptureAction.PHOTO -> multimodal.copy(cameraPermission = permissionState)
-            CaptureAction.AUDIO -> multimodal.copy(microphonePermission = permissionState)
-            null -> multimodal
-        }
-        if (granted) {
-            when (action) {
-                CaptureAction.PHOTO -> startPhotoCapture()
-                CaptureAction.AUDIO -> startRecording()
-                null -> Unit
-            }
-        }
+        multimodal = multimodal.copy(microphonePermission = permissionState)
+        if (granted && requested) startRecording()
     }
 
     // Stops any in-flight voice capture and clears the transcription status strip.
@@ -462,23 +455,14 @@ fun AgentConversationRoute(
         multimodal = multimodal.copy(transcription = TranscriptionUiState())
     }
 
-    fun requestOrRun(action: CaptureAction) {
-        if (ContextCompat.checkSelfPermission(context, action.permission) == PackageManager.PERMISSION_GRANTED) {
-            multimodal = when (action) {
-                CaptureAction.PHOTO -> multimodal.copy(cameraPermission = DevicePermissionState.GRANTED)
-                CaptureAction.AUDIO -> multimodal.copy(microphonePermission = DevicePermissionState.GRANTED)
-            }
-            when (action) {
-                CaptureAction.PHOTO -> startPhotoCapture()
-                CaptureAction.AUDIO -> startRecording()
-            }
+    fun requestOrStartRecording() {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            multimodal = multimodal.copy(microphonePermission = DevicePermissionState.GRANTED)
+            startRecording()
         } else {
-            multimodal = when (action) {
-                CaptureAction.PHOTO -> multimodal.copy(cameraPermission = DevicePermissionState.REQUESTABLE)
-                CaptureAction.AUDIO -> multimodal.copy(microphonePermission = DevicePermissionState.REQUESTABLE)
-            }
-            pendingPermissionAction = action
-            permissionLauncher.launch(action.permission)
+            multimodal = multimodal.copy(microphonePermission = DevicePermissionState.REQUESTABLE)
+            microphonePermissionPending = true
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 
@@ -564,7 +548,9 @@ fun AgentConversationRoute(
         onPickImage = {
             imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         },
-        onCapturePhoto = { requestOrRun(CaptureAction.PHOTO) },
+        // TakePicture delegates to the system camera through FileProvider, so the
+        // app does not need direct CAMERA permission.
+        onCapturePhoto = ::startPhotoCapture,
         // The runtime currently validates and sends PDF documents end to end.
         // Do not offer unsupported types that would only fail after selection.
         onPickFile = { filePicker.launch(arrayOf("application/pdf")) },
@@ -572,14 +558,14 @@ fun AgentConversationRoute(
             if (multimodal.transcription.phase == TranscriptionPhase.RECORDING) {
                 stopRecording()
             } else {
-                requestOrRun(CaptureAction.AUDIO)
+                requestOrStartRecording()
             }
         },
         onVoiceCancel = { dismissVoiceFeedback() },
         onVoiceRetry = {
             recordingFile?.let(::transcribeRecordedAudio) ?: run {
                 dismissVoiceFeedback()
-                requestOrRun(CaptureAction.AUDIO)
+                requestOrStartRecording()
             }
         },
         // Slice 1 (#t41): mic permission flow — when banner shows
@@ -655,11 +641,6 @@ private fun cloudAsrFailureMessage(code: String): String = when (code) {
     "ASR_PROVIDER_NOT_CONFIGURED" -> "前往 我的 → 智能体设置 → 大模型连接 完成配置"
     "ASR_PROVIDER_UNSUPPORTED" -> "当前 AI 服务暂不支持语音转文字"
     else -> "没有完成转写，录音已保留"
-}
-
-private enum class CaptureAction(val permission: String) {
-    PHOTO(Manifest.permission.CAMERA),
-    AUDIO(Manifest.permission.RECORD_AUDIO),
 }
 
 internal const val RECORDING_INTERRUPTED_MESSAGE = "录音已中断，请重新授权后再试"

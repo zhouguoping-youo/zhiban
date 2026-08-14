@@ -24,7 +24,6 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
@@ -87,7 +86,7 @@ internal fun PermissionSettingsDialog(permissionName: String, onDismiss: () -> U
 }
 
 /**
- * Renders the persistent mic/camera status banner above the input area.
+ * Renders the persistent microphone status banner above the input area.
  *
  * Slice 1 (#t41): when a capture permission is PERMANENTLY_DENIED, the
  * banner becomes actionable — tapping the "前往设置" suffix routes the
@@ -97,15 +96,10 @@ internal fun PermissionSettingsDialog(permissionName: String, onDismiss: () -> U
  */
 @Composable fun MultimodalStatusBanner(state: MultimodalUiState, onOpenAppSettings: () -> Unit = {}) {
     val micDenied = state.microphonePermission == DevicePermissionState.PERMANENTLY_DENIED
-    val camDenied = state.cameraPermission == DevicePermissionState.PERMANENTLY_DENIED
     val message = when {
         micDenied -> "麦克风权限已被永久拒绝，请前往系统设置开启"
 
-        camDenied -> "相机权限已被永久拒绝，请前往系统设置开启"
-
         state.microphonePermission == DevicePermissionState.DENIED -> "未授予麦克风权限，仍可继续文字对话"
-
-        state.cameraPermission == DevicePermissionState.DENIED -> "未授予相机权限，仍可从文件中选择附件"
 
         state.capability.values.any { it == ProviderCapabilityState.EXPIRED } -> "多模态能力已过期，请重新验证服务能力"
 
@@ -122,7 +116,7 @@ internal fun PermissionSettingsDialog(permissionName: String, onDismiss: () -> U
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(it, Modifier.weight(1f), color = ZhiBanTextPrimary, style = MaterialTheme.typography.bodySmall)
-            if (micDenied || camDenied) {
+            if (micDenied) {
                 TextButton(
                     onClick = onOpenAppSettings,
                     modifier = Modifier.defaultMinSize(minHeight = ZhiBanSize.TouchTarget),
