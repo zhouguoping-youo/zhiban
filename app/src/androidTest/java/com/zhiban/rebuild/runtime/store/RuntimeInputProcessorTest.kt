@@ -1547,6 +1547,83 @@ class RuntimeInputProcessorTest {
         assertFalse(deleteTrace.toString().contains(deletePayload["idempotencyKey"]!!.jsonPrimitive.content))
     }
 
+    @Test fun memoryCommitRollsBackWhenRuntimeFinalizationFails() = runBlocking {
+        val staged = RoomTextInputGateway(database, { true }, { now }).stage(
+            """{"schemaVersion":1,"text":"记住我喜欢简洁回答","mode":"Work","model":"M2.7","level":"高"}""",
+        )
+        val gateway = RoomRuntimeGateways(database, "test") { now++ }
+        gateway.accept(
+            RuntimeUiCommand.Start(
+                "s-memory-rollback",
+                staged.inputRef,
+                "c-memory-rollback",
+                "a-memory-rollback",
+                0,
+                "chat",
+                "r-memory-rollback",
+            ),
+        )
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile) = capability(profile)
+            override fun stream(request: ModelRequest) = flowOf(
+                ModelEvent.ToolCall(
+                    0,
+                    "call-memory-rollback",
+                    "memory.remember",
+                    """{"content":"用户喜欢简洁回答","memoryType":"PREFERENCE","subjectKey":"user","predicateKey":"response_style"}""",
+                ),
+                ModelEvent.Final("tool_calls"),
+            )
+            override fun cancel(requestId: String) = true
+        }
+        val processor = KernelCommandProcessor(
+            database,
+            "processor",
+            { true },
+            { now++ },
+            provider = provider,
+            profiles = fixedProfileStore(),
+        )
+
+        processor.processNext()
+        awaitRunStatus("r-memory-rollback", "AWAITING_CONFIRMATION")
+        val approval = approvalPlan("r-memory-rollback")
+        val candidateId = approval.getValue("candidateId").jsonPrimitive.content
+        database.openHelper.writableDatabase.execSQL(
+            """
+            CREATE TRIGGER fail_memory_runtime_finalization
+            BEFORE INSERT ON runtime_tool_executions
+            WHEN NEW.toolName = 'memory.remember'
+            BEGIN
+                SELECT RAISE(ABORT, 'forced runtime finalization failure');
+            END
+            """.trimIndent(),
+        )
+        val revision = database.runtimeSessionDao().find("s-memory-rollback")!!.nextSequence - 1
+        gateway.accept(
+            RuntimeUiCommand.RunAction(
+                RuntimeAction.APPROVE,
+                "s-memory-rollback",
+                "r-memory-rollback",
+                "approve-memory-rollback",
+                "approve-memory-rollback-action",
+                revision,
+                "chat",
+                approval.getValue("proposalId").jsonPrimitive.content,
+                approval.getValue("payloadRef").jsonPrimitive.content,
+            ),
+        )
+
+        processor.processNext()
+        awaitRunStatus("r-memory-rollback", "FAILED_FINAL")
+        assertNull(database.memoryPersistenceDao().namespace("runtime-global"))
+        assertEquals("PENDING", database.stagedMemoryCandidateDao().find(candidateId)?.state)
+        assertTrue(database.runtimeToolExecutionDao().listByRunId("r-memory-rollback").isEmpty())
+        assertFalse(
+            database.runtimeEventDao().listByRunId("r-memory-rollback").any { it.eventType == "MemoryCommitted" },
+        )
+    }
+
     @Test fun remoteMcpToolIsDiscoveredByRouterRequiresConfirmationAndExecutesAtSameLayer() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         context.getSharedPreferences("runtime_mcp_servers", Context.MODE_PRIVATE).edit().clear().commit()

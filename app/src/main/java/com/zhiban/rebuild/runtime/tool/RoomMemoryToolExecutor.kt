@@ -68,10 +68,6 @@ internal class RoomMemoryToolExecutor(
         require(approved["proposalId"]?.jsonPrimitive?.content == call.proposalId)
         require(approved["payloadRef"]?.jsonPrimitive?.content == call.payloadRef)
 
-        database().runtimeToolExecutionDao().findByKey(call.idempotencyKey)?.let { existing ->
-            return SafeToolResult(requireNotNull(existing.resultRef), requireNotNull(existing.safeResultJson))
-        }
-
         val now = context.nowEpochMs
         val candidateId = call.candidateId
         val memoryId = "memory-${sha256(call.idempotencyKey).take(24)}"
@@ -79,22 +75,13 @@ internal class RoomMemoryToolExecutor(
         val approvalRef = "approval-${sha256(call.proposalId).take(24)}"
         val source = "runtime:${context.runId}"
         val canonical = call.content.trim().replace(Regex("\\s+"), " ")
-        val persisted = requireNotNull(database().stagedMemoryCandidateDao().find(candidateId))
-        if (persisted.state == "PENDING") {
-            check(database().stagedMemoryCandidateDao().approve(candidateId, approvalRef, persisted.revision, now) == 1)
-        }
-        memory.ensureNamespace(MemoryNamespace(GLOBAL_NAMESPACE, "local-user", "default", "GLOBAL", "", now))
-        val commit = memory.commit(
-            MemoryCommit(
-                GLOBAL_NAMESPACE, candidateId, approvalRef, 1, memoryId, logicalMemoryId,
-                call.memoryType, call.subjectKey, call.predicateKey, canonical, sha256(canonical), sha256(source),
-            ),
-        )
-        val safeResult = buildJsonObject {
-            put("memoryId", commit.memoryId)
-            put("status", "remembered")
-        }.toString()
-        database().withTransaction {
+        return database().withTransaction {
+            database().runtimeToolExecutionDao().findByKey(call.idempotencyKey)?.let { existing ->
+                return@withTransaction SafeToolResult(
+                    requireNotNull(existing.resultRef),
+                    requireNotNull(existing.safeResultJson),
+                )
+            }
             val freshRun = requireNotNull(database().runtimeRunDao().find(context.runId))
             check(freshRun.status == RuntimeRunStatus.EXECUTING.name && freshRun.activeAttemptId == attemptId)
             val session = requireNotNull(database().runtimeSessionDao().find(freshRun.sessionId))
@@ -102,6 +89,18 @@ internal class RoomMemoryToolExecutor(
                 session.leaseOwnerId == context.ownerId && session.leaseEpoch == context.fencingEpoch &&
                     (session.leaseExpiresAtEpochMs ?: 0) > now,
             )
+            val persisted = requireNotNull(database().stagedMemoryCandidateDao().find(candidateId))
+            if (persisted.state == "PENDING") {
+                check(database().stagedMemoryCandidateDao().approve(candidateId, approvalRef, persisted.revision, now) == 1)
+            }
+            memory.ensureNamespace(MemoryNamespace(GLOBAL_NAMESPACE, "local-user", "default", "GLOBAL", "", now))
+            val commit = memory.commit(
+                MemoryCommit(
+                    GLOBAL_NAMESPACE, candidateId, approvalRef, 1, memoryId, logicalMemoryId,
+                    call.memoryType, call.subjectKey, call.predicateKey, canonical, sha256(canonical), sha256(source),
+                ),
+            )
+            val safeResult = memorySafeResult(commit.memoryId)
             database().runtimeToolExecutionDao().insert(
                 RuntimeToolExecutionEntity(
                     "exec-${sha256(call.idempotencyKey).take(32)}", context.runId, call.logicalStepId,
@@ -130,14 +129,19 @@ internal class RoomMemoryToolExecutor(
                 ) ==
                     1,
             )
+            SafeToolResult(commit.memoryId, safeResult)
         }
-        return SafeToolResult(commit.memoryId, safeResult)
     }
 
     companion object {
         const val GLOBAL_NAMESPACE = "runtime-global"
     }
 }
+
+private fun memorySafeResult(memoryId: String) = buildJsonObject {
+    put("memoryId", memoryId)
+    put("status", "remembered")
+}.toString()
 
 internal data class ApprovedMemoryRecallResult(val items: List<String>, val degradationReasons: List<String> = emptyList())
 
