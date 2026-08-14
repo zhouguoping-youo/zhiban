@@ -5,6 +5,7 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.net.ssl.SSLPeerUnverifiedException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
@@ -88,6 +89,19 @@ class OpenAiCompatibleProviderAdapter(
 
     override fun stream(request: ModelRequest): Flow<ModelEvent> = flow {
         val endpoint = registry.resolve(request.profile)
+        validateStreamRequest(request)
+        val call = createStreamingCall(request, endpoint)
+        check(active.putIfAbsent(request.requestId, call) == null) { "REQUEST_ALREADY_ACTIVE" }
+        try {
+            emitStreamingResponse(call, request.requestId)
+        } catch (_: SSLPeerUnverifiedException) {
+            throw ProviderFailure("TLS_VERIFICATION_FAILED", retryable = false)
+        } finally {
+            active.remove(request.requestId, call)
+        }
+    }.flowOn(Dispatchers.IO)
+
+    private fun validateStreamRequest(request: ModelRequest) {
         request.capability.requireFresh(clock(), registry.digest(request.profile))
         check(request.maxTokens in 1..request.capability.maxOutputTokens) { "OUTPUT_TOKEN_LIMIT_EXCEEDED" }
         check(
@@ -97,8 +111,11 @@ class OpenAiCompatibleProviderAdapter(
         }
         if (request.jsonSchema != null) check("json_schema" in request.capability.features) { "SCHEMA_UNSUPPORTED" }
         if (request.toolsJson != null) check("tools" in request.capability.features) { "TOOLS_UNSUPPORTED" }
+    }
+
+    private suspend fun createStreamingCall(request: ModelRequest, endpoint: TrustedProviderEndpoint): Call {
         val body = buildBody(request, endpoint)
-        val call = credentials.withCredential(request.profile.credentialRef, request.profile.keyVersion) { secret ->
+        return credentials.withCredential(request.profile.credentialRef, request.profile.keyVersion) { secret ->
             calls.newCall(
                 Request.Builder().url(endpoint.chatUrl)
                     .header("Authorization", bearer(secret))
@@ -106,31 +123,29 @@ class OpenAiCompatibleProviderAdapter(
                     .post(body.toRequestBody("application/json".toMediaType())).build(),
             )
         }
-        check(active.putIfAbsent(request.requestId, call) == null) { "REQUEST_ALREADY_ACTIVE" }
-        try {
-            call.execute().use { response ->
-                if (!response.isSuccessful) {
-                    throw mapResponseFailure(response)
-                }
-                val decoder = StreamDecoder(request.requestId)
-                val source = response.body?.source()
-                    ?: throw ProviderFailure("PROVIDER_PROTOCOL_ERROR", retryable = true)
-                source.use {
-                    while (!source.exhausted()) {
-                        val data = decoder.readData(source, call) ?: continue
-                        val decoded = decoder.accept(data)
-                        decoded.events.forEach { emit(it) }
-                        if (decoded.isDone) break
-                    }
-                }
-                decoder.finishAtCleanEof().forEach { emit(it) }
+    }
+
+    private suspend fun FlowCollector<ModelEvent>.emitStreamingResponse(call: Call, requestId: String) {
+        call.execute().use { response ->
+            if (!response.isSuccessful) throw mapResponseFailure(response)
+            val decoder = StreamDecoder(requestId)
+            val source = response.body?.source()
+                ?: throw ProviderFailure("PROVIDER_PROTOCOL_ERROR", retryable = true)
+            source.use {
+                emitDecodedStream(source, call, decoder)
             }
-        } catch (_: SSLPeerUnverifiedException) {
-            throw ProviderFailure("TLS_VERIFICATION_FAILED", retryable = false)
-        } finally {
-            active.remove(request.requestId, call)
+            decoder.finishAtCleanEof().forEach { emit(it) }
         }
-    }.flowOn(Dispatchers.IO)
+    }
+
+    private suspend fun FlowCollector<ModelEvent>.emitDecodedStream(source: BufferedSource, call: Call, decoder: StreamDecoder) {
+        while (!source.exhausted()) {
+            val data = decoder.readData(source, call) ?: continue
+            val decoded = decoder.accept(data)
+            decoded.events.forEach { emit(it) }
+            if (decoded.isDone) break
+        }
+    }
 
     override fun cancel(requestId: String): Boolean = active.remove(requestId)?.let {
         it.cancel()
