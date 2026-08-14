@@ -85,7 +85,7 @@ internal fun shouldAutoScrollToLatest(totalItems: Int, lastVisibleIndex: Int): B
     onToggleRecording: () -> Unit = {},
     // Per architect 695: inline model label between text input and mic
     // that opens a single-section popup (models + levels).
-    inlineModelLabel: String = "M2.7 智能/高",
+    inlineModelLabel: String = "M2.7 智能/深入",
     onModelLabelClick: () -> Unit = {},
     onLevelSelect: (String) -> Unit = {},
     onManagePlugins: () -> Unit = {},
@@ -283,6 +283,7 @@ internal fun shouldAutoScrollToLatest(totalItems: Int, lastVisibleIndex: Int): B
     }
     if (attachmentSheetOpen) {
         AttachmentPickerSheet(
+            deepReasoningSelected = visibleModelLabel == "深入",
             onDismiss = { attachmentSheetOpen = false },
             onPickImage = {
                 attachmentSheetOpen = false
@@ -300,7 +301,7 @@ internal fun shouldAutoScrollToLatest(totalItems: Int, lastVisibleIndex: Int): B
                 attachmentSheetOpen = false
                 onManagePlugins()
             },
-            onEnableSmart = {
+            onEnableDeepReasoning = {
                 attachmentSheetOpen = false
                 onLevelSelect("深入")
             },
@@ -334,12 +335,13 @@ internal fun compactInlineModelLabel(label: String): String {
 
 @Composable
 private fun AttachmentPickerSheet(
+    deepReasoningSelected: Boolean,
     onDismiss: () -> Unit,
     onPickImage: () -> Unit,
     onCapturePhoto: () -> Unit,
     onPickFile: () -> Unit,
     onOpenPlugins: () -> Unit,
-    onEnableSmart: () -> Unit,
+    onEnableDeepReasoning: () -> Unit,
 ) {
     com.zhiban.rebuild.ui.components.ZhiBanPopoverDialog(
         onDismissRequest = onDismiss,
@@ -352,7 +354,12 @@ private fun AttachmentPickerSheet(
             PickerMenuRow("照片", Icons.Outlined.Image) { onPickImage() }
             PickerMenuRow("文件", Icons.Outlined.AttachFile) { onPickFile() }
             PickerMenuRow("插件", Icons.Outlined.Extension, onClick = onOpenPlugins)
-            PickerMenuRow("智能", Icons.Outlined.AutoAwesome, selected = true, onClick = onEnableSmart)
+            PickerMenuRow(
+                label = "深入思考",
+                icon = Icons.Outlined.AutoAwesome,
+                selected = deepReasoningSelected,
+                onClick = onEnableDeepReasoning,
+            )
         }
     }
 }

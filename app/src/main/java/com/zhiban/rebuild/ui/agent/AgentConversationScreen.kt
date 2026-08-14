@@ -118,7 +118,7 @@ fun AgentConversationScreen(
     // Per architect 695: model selection moved into the input bar. The
     // Screen exposes the inline label + a single tappable that opens a
     // single-section popup. Single popup holds both model + level rows.
-    inlineModelLabel: String = "M2.7 智能/高",
+    inlineModelLabel: String = "M2.7 智能/深入",
     onModelLabelClick: () -> Unit = {},
     availableModels: List<String> = listOf("M2.7", "M3-pro", "M2.7-fast"),
     availableLevels: List<String> = listOf("深入", "标准", "快速"),

@@ -398,9 +398,9 @@ class AgentConversationScreenE2ETest {
             ZhiBanTheme {
                 AgentConversationScreen(
                     state = AgentConversationUiState(),
-                    inlineModelLabel = "step-3.5-flash 智能/高",
+                    inlineModelLabel = "step-3.5-flash 智能/深入",
                     availableModels = listOf("step-3.5-flash"),
-                    availableLevels = listOf("高", "中", "快速"),
+                    availableLevels = listOf("深入", "标准", "快速"),
                     onLevelSelect = level::set,
                     conversationHistory = listOf(
                         com.zhiban.rebuild.runtime.store.ConversationSummary("s-delete", "需要删除的对话", 10),
@@ -420,8 +420,8 @@ class AgentConversationScreenE2ETest {
         compose.onNodeWithContentDescription("消息输入框").performClick()
         compose.onNodeWithContentDescription("选择模型与思考强度").performClick()
         compose.onNodeWithText("模型").assertIsDisplayed()
-        compose.onNodeWithText("中").performClick()
-        assertEquals("中", level.get())
+        compose.onNodeWithText("标准").performClick()
+        assertEquals("标准", level.get())
 
         compose.onNodeWithContentDescription("对话历史").performClick()
         compose.onNodeWithContentDescription("删除对话").performClick()
@@ -429,6 +429,25 @@ class AgentConversationScreenE2ETest {
         assertEquals(null, deleted.get())
         compose.onNodeWithText("删除").performClick()
         assertEquals("s-delete", deleted.get())
+    }
+
+    @Test fun attachmentPickerReflectsTheActualReasoningLevel() {
+        val level = AtomicReference<String>()
+        compose.setContent {
+            ZhiBanTheme {
+                AgentConversationScreen(
+                    state = AgentConversationUiState(),
+                    inlineModelLabel = "step-3.5-flash 智能/标准",
+                    onLevelSelect = level::set,
+                )
+            }
+        }
+
+        compose.onNodeWithContentDescription("添加附件").performClick()
+        compose.onNodeWithText("深入思考").assertIsDisplayed()
+        compose.onNodeWithText("✓").assertDoesNotExist()
+        compose.onNodeWithText("深入思考").performClick()
+        assertEquals("深入", level.get())
     }
 
     @Test fun attachmentWithoutTextExposesSendAndDispatchesAnAnalysisRequest() {
