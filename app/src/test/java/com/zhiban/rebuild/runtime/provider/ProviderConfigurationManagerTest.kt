@@ -7,6 +7,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -144,6 +145,31 @@ class ProviderConfigurationManagerTest {
         assertEquals(1, probes)
     }
 
+    @Test fun `verified credential rotation removes the previous profile health snapshot`() = runTest {
+        val configuration = ProviderConfigurationManager(FakeCredentialProvisioner(), FakeProviderProfileStore())
+        val cache = KeyedProviderHealthCache()
+        val environment = ProviderEnvironmentManager(
+            configuration,
+            healthyAdapter {},
+            healthCache = cache,
+            clock = { 20 },
+        )
+
+        environment.configureStepFun("first-test-key".encodeToByteArray(), "step-3.5-flash")
+        val first = requireNotNull(environment.activeProfile())
+        val firstDigest = TrustedProviderRegistry().digest(first)
+        assertTrue(requireNotNull(cache.load(firstDigest, 20)).available)
+
+        environment.configureStepFun("second-test-key".encodeToByteArray(), "step-3.5-flash")
+        val second = requireNotNull(environment.activeProfile())
+        val secondDigest = TrustedProviderRegistry().digest(second)
+
+        assertNotEquals(firstDigest, secondDigest)
+        assertNull(cache.load(firstDigest, 20))
+        assertTrue(requireNotNull(cache.load(secondDigest, 20)).available)
+        assertEquals(1, cache.clearCount)
+    }
+
     @Test fun `provision binds secret to trusted profile without retaining caller bytes`() = runTest {
         val vault = FakeCredentialProvisioner()
         val profiles = FakeProviderProfileStore()
@@ -264,6 +290,22 @@ private class FakeProviderHealthCache(initial: ProviderHealth?) : ProviderHealth
 
     override fun clear() {
         loaded = null
+    }
+}
+
+private class KeyedProviderHealthCache : ProviderHealthCache {
+    private val values = mutableMapOf<String, ProviderHealth>()
+    var clearCount = 0
+
+    override fun load(profileDigest: String, nowEpochMs: Long): ProviderHealth? = values[profileDigest]
+
+    override fun save(profileDigest: String, health: ProviderHealth) {
+        values[profileDigest] = health
+    }
+
+    override fun clear() {
+        clearCount += 1
+        values.clear()
     }
 }
 

@@ -14,15 +14,18 @@ class ProviderEnvironmentManager(
     private val healthCache: ProviderHealthCache = NoopProviderHealthCache,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
+    private val registry = TrustedProviderRegistry()
+
     suspend fun configureStepFun(credential: ByteArray, requestedModel: String): ProviderHealth =
         configure(ProviderConfigurationManager.DEFAULT_PROVIDER, credential, requestedModel)
 
     suspend fun configure(providerId: String, credential: ByteArray, requestedModel: String): ProviderHealth {
+        val previous = configuration.activeProfile()
         val profile = configuration.provisionCandidate(providerId, credential, requestedModel)
         return try {
             requireHealthy(profile).also {
                 configuration.publish(profile)
-                healthCache.save(TrustedProviderRegistry().digest(profile), it)
+                replaceCachedHealth(previous, profile, it)
             }
         } catch (failure: Throwable) {
             configuration.discard(profile)
@@ -34,7 +37,7 @@ class ProviderEnvironmentManager(
         val previous = configuration.activeProfile()
         val profile = configuration.selectModel(requestedModel)
         return try {
-            requireHealthy(profile)
+            requireHealthy(profile).also { replaceCachedHealth(previous, profile, it) }
         } catch (failure: Throwable) {
             previous?.let { configuration.restoreTrustedProfile(it) }
             throw failure
@@ -45,7 +48,7 @@ class ProviderEnvironmentManager(
         val profile = configuration.activeProfile()
             ?: return ProviderHealth(false, clock(), null, "CREDENTIAL_MISSING")
         val now = clock()
-        val digest = TrustedProviderRegistry().digest(profile)
+        val digest = registry.digest(profile)
         if (!forceRefresh) {
             healthCache.load(digest, now)?.takeIf(ProviderHealth::available)?.let { return it }
         }
@@ -66,8 +69,14 @@ class ProviderEnvironmentManager(
     private suspend fun requireHealthy(profile: ProviderProfile): ProviderHealth {
         val checkedAt = clock()
         val capability = adapter.probe(profile, "health-$checkedAt")
-        capability.requireFresh(checkedAt, TrustedProviderRegistry().digest(profile))
+        capability.requireFresh(checkedAt, registry.digest(profile))
         return ProviderHealth(true, checkedAt, capability, null)
+    }
+
+    private fun replaceCachedHealth(previous: ProviderProfile?, current: ProviderProfile, health: ProviderHealth) {
+        val currentDigest = registry.digest(current)
+        if (previous != null && registry.digest(previous) != currentDigest) healthCache.clear()
+        healthCache.save(currentDigest, health)
     }
 
     private fun safeFailureCode(failure: Throwable): String = safeConfigurationFailureCode(failure)
