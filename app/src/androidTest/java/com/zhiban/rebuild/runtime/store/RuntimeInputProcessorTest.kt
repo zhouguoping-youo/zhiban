@@ -382,10 +382,10 @@ class RuntimeInputProcessorTest {
         assertEquals(KernelCommandProcessor.Outcome.PROCESSED, restartedProcessor.processNext())
         awaitRunStatus("r-work", "SUCCEEDED")
         val scheduleId = payload["scheduleId"]!!.jsonPrimitive.content
-        assertEquals("项目会", database.scheduleDao().findById(scheduleId)?.title)
+        assertEquals("开会", database.scheduleDao().findById(scheduleId)?.title)
         assertEquals(10, database.scheduleDao().findById(scheduleId)?.reminderMinutesBefore)
         assertEquals(1, database.runtimeToolExecutionDao().listByRunId("r-work").size)
-        assertEquals(listOf("schedule:$scheduleId"), FactIndex(database).search("项目会", now, 10).map { it.factId })
+        assertEquals(listOf("schedule:$scheduleId"), FactIndex(database).search("开会", now, 10).map { it.factId })
         val change = database.changeLogDao().listByRun("r-work").single()
         assertEquals("AVAILABLE", change.undoState)
         val undoRevision = database.runtimeSessionDao().find("s-work")!!.nextSequence - 1
@@ -447,6 +447,93 @@ class RuntimeInputProcessorTest {
                 .atZone(java.time.ZoneId.systemDefault()).hour,
         )
         assertNull(database.scheduleDao().findById(approval["scheduleId"]!!.jsonPrimitive.content))
+    }
+
+    @Test fun explicitCalendarIntentCreatesExactLocalPlanWithoutProviderOrConfiguredProfile() = runBlocking {
+        val fixedNow = java.time.LocalDateTime.of(2026, 8, 14, 8, 0)
+            .atZone(java.time.ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli()
+        val text = "让agent创建一个 明晚10点与委内瑞拉客户会议的日程提醒"
+        val input =
+            """{"schemaVersion":1,"text":"$text","mode":"Work","model":"M2.7","level":"高"}"""
+        val staged = RoomTextInputGateway(database, { true }, { fixedNow }).stage(input)
+        RoomRuntimeGateways(database, "test") { fixedNow }.accept(
+            RuntimeUiCommand.Start(
+                "s-calendar-local-first",
+                staged.inputRef,
+                "c-calendar-local-first",
+                "a-calendar-local-first",
+                0,
+                "chat",
+                "r-calendar-local-first",
+            ),
+        )
+        KernelCommandProcessor(database, "processor", { true }, { fixedNow }).processNext()
+        val lease = requireNotNull(database.runtimeSessionDao().find("s-calendar-local-first"))
+        val providerCalls = AtomicInteger()
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile): CapabilitySnapshot {
+                providerCalls.incrementAndGet()
+                error("provider must not be called for an exact local calendar command")
+            }
+
+            override fun stream(request: ModelRequest) = flow<ModelEvent> {
+                providerCalls.incrementAndGet()
+                error("provider must not be called for an exact local calendar command")
+            }
+
+            override fun cancel(requestId: String): Boolean {
+                providerCalls.incrementAndGet()
+                return false
+            }
+        }
+        val noProfile = object : ProviderProfileStore {
+            override suspend fun load(): ProviderProfile? = null
+            override suspend fun save(profile: ProviderProfile) = Unit
+            override suspend fun clear() = Unit
+        }
+        val engine = com.zhiban.rebuild.runtime.kernel.ProviderExecutionEngine(
+            database,
+            provider,
+            noProfile,
+            "processor",
+            { fixedNow },
+        )
+
+        assertTrue(engine.execute("r-calendar-local-first", "s-calendar-local-first", lease.leaseEpoch))
+        assertEquals("AWAITING_CONFIRMATION", database.runtimeRunDao().find("r-calendar-local-first")?.status)
+        assertEquals(0, providerCalls.get())
+        val approval = approvalPlan("r-calendar-local-first")
+        assertEquals("与委内瑞拉客户会议", approval.getValue("title").jsonPrimitive.content)
+        assertEquals(
+            java.time.LocalDateTime.of(2026, 8, 15, 22, 0)
+                .atZone(java.time.ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli(),
+            approval.getValue("startAtEpochMs").jsonPrimitive.content.toLong(),
+        )
+        assertEquals(60, approval.getValue("durationMinutes").jsonPrimitive.content.toInt())
+        assertEquals(10, approval.getValue("reminderMinutesBefore").jsonPrimitive.content.toInt())
+
+        val revision = requireNotNull(database.runtimeSessionDao().find("s-calendar-local-first")).nextSequence - 1
+        RoomRuntimeGateways(database, "test") { fixedNow }.accept(
+            RuntimeUiCommand.RunAction(
+                RuntimeAction.APPROVE,
+                "s-calendar-local-first",
+                "r-calendar-local-first",
+                "c-calendar-local-first-approve",
+                "a-calendar-local-first-approve",
+                revision,
+                "chat",
+                approval.getValue("proposalId").jsonPrimitive.content,
+                approval.getValue("payloadRef").jsonPrimitive.content,
+            ),
+        )
+        KernelCommandProcessor(database, "processor", { true }, { fixedNow }).processNext()
+        assertTrue(engine.executeApprovedTool("r-calendar-local-first", "s-calendar-local-first", lease.leaseEpoch))
+        assertEquals("SUCCEEDED", database.runtimeRunDao().find("r-calendar-local-first")?.status)
+        assertEquals(0, providerCalls.get())
+        assertEquals(
+            "与委内瑞拉客户会议",
+            database.scheduleDao().findById(approval.getValue("scheduleId").jsonPrimitive.content)?.title,
+        )
     }
 
     @Test fun contactSearchAutoExecutesWithoutApprovalAndFeedsFinalAnswer() = runBlocking {

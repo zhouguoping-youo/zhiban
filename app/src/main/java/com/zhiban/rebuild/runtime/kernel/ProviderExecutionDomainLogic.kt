@@ -130,6 +130,13 @@ private val CHINESE_AFTER_TIME_TITLE =
 private val ENGLISH_REMINDER =
     Regex("""\b(\d{1,4})\s*minutes?\s*before\b""", RegexOption.IGNORE_CASE)
 private val CHINESE_REMINDER = Regex("""提前\s*(\d{1,4})\s*分钟""")
+private val CHINESE_DURATION = Regex("""(?:时长|持续)\s*(\d{1,4}(?:\.5)?)\s*(个?小时|分钟)""")
+private val CHINESE_HALF_HOUR_DURATION = Regex("""(?:时长|持续)\s*(?:一|1)?个?半小时""")
+private val ENGLISH_DURATION = Regex(
+    """\b(?:for|duration\s*)\s*(\d{1,4}(?:\.5)?)\s*(hours?|hrs?|minutes?|mins?)\b""",
+    RegexOption.IGNORE_CASE,
+)
+private val EXPLICIT_DURATION_MARKER = Regex("""(?:时长|持续|\b(?:for|duration)\b)""", RegexOption.IGNORE_CASE)
 
 /**
  * Forced calendar-create suppresses the model's streamed prose so the user sees only the
@@ -210,6 +217,8 @@ internal fun normalizeCalendarToolCall(
 
 internal fun deterministicCalendarToolCall(input: DecodedInput, queryContext: QueryContext, nowEpochMs: Long? = null): ModelEvent.ToolCall? {
     val startAt = resolveCalendarStartEpochMs(input.text, queryContext.timeRange, nowEpochMs = nowEpochMs) ?: return null
+    val durationMinutes = explicitCalendarDurationMinutes(input.text)
+        ?: if (EXPLICIT_DURATION_MARKER.containsMatchIn(input.text)) return null else 60
     val title = ENGLISH_NAMED_TITLE.find(input.text)?.groupValues?.get(1)
         ?: CHINESE_NAMED_TITLE.find(input.text)?.groupValues?.get(1)
         ?: CHINESE_AFTER_TIME_TITLE.find(input.text)?.groupValues?.get(1)
@@ -222,7 +231,7 @@ internal fun deterministicCalendarToolCall(input: DecodedInput, queryContext: Qu
     val arguments = buildJsonObject {
         put("title", normalizedTitle)
         put("startAtEpochMs", startAt)
-        put("durationMinutes", 60)
+        put("durationMinutes", durationMinutes)
         safeReminder?.let { put("reminderMinutesBefore", it) }
     }.toString()
     return ModelEvent.ToolCall(
@@ -231,6 +240,20 @@ internal fun deterministicCalendarToolCall(input: DecodedInput, queryContext: Qu
         name = SchedulePlanValidator.TOOL_NAME,
         argumentsJson = arguments,
     )
+}
+
+internal fun explicitCalendarDurationMinutes(text: String): Int? {
+    if (CHINESE_HALF_HOUR_DURATION.containsMatchIn(text)) return 30
+    val chinese = CHINESE_DURATION.find(text)
+    if (chinese != null) {
+        val value = chinese.groupValues[1].toDoubleOrNull() ?: return null
+        val minutes = if (chinese.groupValues[2].contains("小时")) value * 60 else value
+        return minutes.toInt().takeIf { it in 1..1_440 && minutes == it.toDouble() }
+    }
+    val english = ENGLISH_DURATION.find(text) ?: return null
+    val value = english.groupValues[1].toDoubleOrNull() ?: return null
+    val minutes = if (english.groupValues[2].startsWith("h", ignoreCase = true)) value * 60 else value
+    return minutes.toInt().takeIf { it in 1..1_440 && minutes == it.toDouble() }
 }
 
 internal fun sanitizeScheduleTitleFromText(inputText: String, candidate: String): String {
@@ -242,10 +265,14 @@ internal fun sanitizeScheduleTitleFromText(inputText: String, candidate: String)
 }
 
 internal fun sanitizeCalendarCandidateTitle(value: String): String {
-    val fromAnalyzer = NotificationInsightAnalyzer.sanitizeScheduleTitle(value, null)
+    val withoutCommandWrapper = value.trim().replace(
+        Regex("""(?:的)?日程(?:提醒)?\s*$"""),
+        "",
+    )
+    val fromAnalyzer = NotificationInsightAnalyzer.sanitizeScheduleTitle(withoutCommandWrapper, null)
     if (fromAnalyzer.isNotBlank() && fromAnalyzer != "待确认安排") return fromAnalyzer
 
-    var title = value.trim()
+    var title = withoutCommandWrapper
         .replace(Regex("""^[\"“”‘’'`]+|[\"“”‘’'`]+$"""), "")
         .replace(Regex("""^[（(][^）)]{0,20}[)）]\s*"""), "")
         .replace(Regex("""^\s*(?:我|你|对方|他|她|它|系统|知伴|客服|联系人)\s*[:：,，]?\s*"""), "")

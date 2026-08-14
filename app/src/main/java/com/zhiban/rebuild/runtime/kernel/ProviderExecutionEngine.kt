@@ -208,6 +208,7 @@ internal class ProviderExecutionEngine(
     private val perception = infrastructure.perception
     private val store = RoomRuntimeStore(database, producerVersion = "runtime-v2-provider")
     private val events = RuntimeEventAppender(store, ownerId, clock)
+    private val deterministicObservation = DeterministicObservationCompleter(store, ownerId, clock, ::perceiveForObservation)
     private val contextAssembler = ProviderContextAssembler(clock, personalization)
     private val scheduleExecutor = RoomScheduleToolExecutor(database, onScheduleSaved = onScheduleSaved)
     private val memoryExecutor = RoomMemoryToolExecutor({ database }, clock)
@@ -525,63 +526,6 @@ internal class ProviderExecutionEngine(
         ContextRetrievalResult(emptyList(), 0, listOf("retrieval_pipeline_failed"), 0)
     }
 
-    private sealed class PreparedRun {
-        data class Failure(val code: String, val retryable: Boolean) : PreparedRun()
-
-        data class Ready(
-            val input: DecodedInput,
-            val queryContext: QueryContext,
-            val retrieval: ContextRetrievalResult,
-            val approvedMemories: List<String>,
-            val conversationContext: com.zhiban.rebuild.runtime.store.SessionConversationContext,
-            val feedback: List<String>,
-            val activatedSkills: List<SkillActivation>,
-            val profile: ProviderProfile,
-            val config: com.zhiban.rebuild.runtime.config.AgentDynamicConfig,
-            val currentNetwork: NetworkQuality,
-            val attemptId: String,
-        ) : PreparedRun()
-    }
-
-    private data class RunIdentifiers(val runId: String, val sessionId: String, val fencingEpoch: Long)
-
-    private data class AssembledReActContext(
-        val capability: CapabilitySnapshot,
-        val retrieval: ContextRetrievalResult,
-        val assembledMessages: AssembledModelContext,
-    )
-
-    private data class PreparedReActRequest(val request: ModelRequest, val forcedCanonicalTool: String?, val capability: CapabilitySnapshot)
-
-    private data class ObservationSetup(
-        val input: DecodedInput,
-        val queryContext: QueryContext,
-        val retrieval: ContextRetrievalResult,
-        val approvedMemories: List<String>,
-        val conversationContext: com.zhiban.rebuild.runtime.store.SessionConversationContext,
-        val feedback: List<String>,
-        val activatedSkills: List<SkillActivation>,
-        val profile: ProviderProfile,
-        val config: com.zhiban.rebuild.runtime.config.AgentDynamicConfig,
-        val attemptId: String,
-    )
-
-    private data class ObservationProbeResult(
-        val capability: CapabilitySnapshot,
-        val retrieval: ContextRetrievalResult,
-        val observation: String,
-        val observationTools: Set<String>,
-    )
-
-    private data class PerceptionResult(val context: QueryContext, val durationMs: Long, val degraded: Boolean)
-
-    private data class MemoryContext(
-        val retrieval: ContextRetrievalResult,
-        val approvedMemories: List<String>,
-        val conversation: com.zhiban.rebuild.runtime.store.SessionConversationContext,
-        val feedback: List<String>,
-    )
-
     private suspend fun perceiveForRun(input: DecodedInput): PerceptionResult {
         val startedAt = clock()
         var degraded = false
@@ -656,13 +600,42 @@ internal class ProviderExecutionEngine(
     private suspend fun prepareRun(runActiveAttemptId: String?, runId: String, sessionId: String, fencingEpoch: Long): PreparedRun {
         val rawInput = store.readRunInput(runId, clock()) ?: return PreparedRun.Failure("INPUT_EXPIRED_OR_MISSING", retryable = false)
         val input = decodeInput(rawInput)
+        val perception = perceiveForRun(input)
+        val config = dynamicConfig()
+        val activatedSkills = activatedSkillsFor(input, perception.context, config, skillSpecs(), toolCatalog.names(), toolEnabled)
+        val localCalendarCall = if (
+            input.mode == "Work" &&
+            input.attachments.isEmpty() &&
+            perception.context.intentLabel == com.zhiban.rebuild.runtime.context.IntentLabel.CALENDAR_CREATE &&
+            toolEnabled(SchedulePlanValidator.TOOL_NAME)
+        ) {
+            deterministicCalendarToolCall(input, perception.context, nowEpochMs = clock())
+        } else {
+            null
+        }
+        if (localCalendarCall != null) {
+            val attemptId = startRunAttempt(runActiveAttemptId, runId, fencingEpoch)
+            events.appendPerception(
+                attemptId,
+                runId,
+                sessionId,
+                fencingEpoch,
+                perception.context,
+                perception.durationMs,
+                perception.degraded,
+            )
+            return PreparedRun.LocalCalendar(
+                input,
+                perception.context,
+                activatedSkills,
+                attemptId,
+                localCalendarCall,
+            )
+        }
         val currentNetwork = networkQuality()
         networkPreflightFailure(currentNetwork, input.attachments.isNotEmpty())?.let { (code, retryable) ->
             return PreparedRun.Failure(code, retryable)
         }
-        val perception = perceiveForRun(input)
-        val config = dynamicConfig()
-        val activatedSkills = activatedSkillsFor(input, perception.context, config, skillSpecs(), toolCatalog.names(), toolEnabled)
         val profile = try {
             selectProfile(input, config)
         } catch (failure: ProviderFailure) {
@@ -700,6 +673,7 @@ internal class ProviderExecutionEngine(
         val prepared = prepareRun(run.activeAttemptId, runId, sessionId, fencingEpoch)
         return when (prepared) {
             is PreparedRun.Failure -> events.failBeforeAttempt(runId, sessionId, fencingEpoch, prepared.code, prepared.retryable)
+            is PreparedRun.LocalCalendar -> runLocalCalendar(prepared, runId, sessionId, fencingEpoch)
             is PreparedRun.Ready -> runReActLoop(prepared, runId, sessionId, fencingEpoch)
         }
     }
@@ -828,15 +802,15 @@ internal class ProviderExecutionEngine(
     }
 
     private suspend fun handleReActToolCall(
-        ready: PreparedRun.Ready,
+        context: ToolCallContext,
         event: ModelEvent.ToolCall,
         forcedCanonicalTool: String?,
         ids: RunIdentifiers,
     ): ReActStreamOutcome {
-        val input = ready.input
-        val queryContext = ready.queryContext
-        val activatedSkills = ready.activatedSkills
-        val attemptId = ready.attemptId
+        val input = context.input
+        val queryContext = context.queryContext
+        val activatedSkills = context.activatedSkills
+        val attemptId = context.attemptId
         val runId = ids.runId
         val sessionId = ids.sessionId
         val fencingEpoch = ids.fencingEpoch
@@ -886,7 +860,7 @@ internal class ProviderExecutionEngine(
                     ),
                     result.safeResultJson, ownerId, fencingEpoch, clock(),
                 )
-                provider.cancel(attemptId)
+                if (context.providerRequestActive) provider.cancel(attemptId)
                 return ReActStreamOutcome.ToolCompleted(result)
             }
 
@@ -895,7 +869,7 @@ internal class ProviderExecutionEngine(
                     toolRequest,
                     routeContext,
                 )
-                provider.cancel(attemptId)
+                if (context.providerRequestActive) provider.cancel(attemptId)
                 return ReActStreamOutcome.ToolCompleted(result)
             }
 
@@ -910,7 +884,7 @@ internal class ProviderExecutionEngine(
                 throw ProviderFailure("INVALID_TOOL_CALL", retryable = false)
             }
         }
-        provider.cancel(attemptId)
+        if (context.providerRequestActive) provider.cancel(attemptId)
         return ReActStreamOutcome.PendingApproval
     }
 
@@ -1024,7 +998,12 @@ internal class ProviderExecutionEngine(
 
                 is ModelEvent.Usage -> appendReActUsageEvent(event, capability, attemptId, ids)
 
-                is ModelEvent.ToolCall -> return handleReActToolCall(ready, event, forcedCanonicalTool, ids)
+                is ModelEvent.ToolCall -> return handleReActToolCall(
+                    ToolCallContext(input, queryContext, ready.activatedSkills, attemptId, providerRequestActive = true),
+                    event,
+                    forcedCanonicalTool,
+                    ids,
+                )
 
                 is ModelEvent.Final -> {
                     finalSeen = true
@@ -1122,6 +1101,29 @@ internal class ProviderExecutionEngine(
             return finishFailure(runId, fencingEpoch, ProviderFailure("TIMEOUT", retryable = true))
         } catch (cancelled: CancellationException) {
             provider.cancel(attemptId)
+            return handleReactCancellation(cancelled, ids)
+        } catch (failure: Throwable) {
+            return finishFailure(runId, fencingEpoch, failure)
+        }
+        return completeReactOutcome(outcome, ids)
+    }
+
+    private suspend fun runLocalCalendar(prepared: PreparedRun.LocalCalendar, runId: String, sessionId: String, fencingEpoch: Long): Boolean {
+        val ids = RunIdentifiers(runId, sessionId, fencingEpoch)
+        val outcome = try {
+            handleReActToolCall(
+                ToolCallContext(
+                    prepared.input,
+                    prepared.queryContext,
+                    prepared.activatedSkills,
+                    prepared.attemptId,
+                    providerRequestActive = false,
+                ),
+                prepared.toolCall,
+                SchedulePlanValidator.TOOL_NAME,
+                ids,
+            )
+        } catch (cancelled: CancellationException) {
             return handleReactCancellation(cancelled, ids)
         } catch (failure: Throwable) {
             return finishFailure(runId, fencingEpoch, failure)
@@ -1240,61 +1242,6 @@ internal class ProviderExecutionEngine(
             config,
             attemptId,
         )
-    }
-
-    private suspend fun handleDeterministicObservation(setup: ObservationSetup, ids: RunIdentifiers, toolName: String, safeResultJson: String): Boolean {
-        val attemptId = setup.attemptId
-        val queryContext = setup.queryContext
-        val runId = ids.runId
-        val sessionId = ids.sessionId
-        val fencingEpoch = ids.fencingEpoch
-        // A single, explicit calendar request can be acknowledged from the verified local
-        // result without asking the model to restate identifiers or invent details. A newly
-        // discovered CRM lead must also stop here: it belongs to the candidate pool and must not
-        // be silently chained into a formal opportunity during the same observation turn.
-        // Other composite requests still enter observation so the planner can propose the next
-        // separately-approved tool.
-        if (shouldCompleteObservationDeterministically(toolName, queryContext.intentLabel)) {
-            val summary = deterministicToolSummary(toolName, safeResultJson)
-            appendObservation(
-                attemptId,
-                runId,
-                sessionId,
-                fencingEpoch,
-                "deterministic-result",
-                "AssistantDelta",
-                buildJsonObject {
-                    put("ordinal", 0)
-                    put("part", summary)
-                    put("final", false)
-                    put("providerOffset", 0)
-                }.toString(),
-            )
-            appendObservation(
-                attemptId,
-                runId,
-                sessionId,
-                fencingEpoch,
-                "deterministic-final",
-                "AssistantDelta",
-                buildJsonObject {
-                    put("ordinal", 1)
-                    put("part", "")
-                    put("final", true)
-                    put("finishReason", "verified_local_write")
-                }.toString(),
-            )
-            store.completeObservationWithAssistantTurn(
-                runId,
-                summary,
-                "{\"observation\":\"verified_local_write\"}",
-                ownerId,
-                fencingEpoch,
-                clock(),
-            )
-            return true
-        }
-        return false
     }
 
     private suspend fun buildObservationRequest(
@@ -1615,8 +1562,8 @@ internal class ProviderExecutionEngine(
         safeResultJson: String,
     ): Boolean {
         val ids = RunIdentifiers(runId, sessionId, fencingEpoch)
+        if (deterministicObservation.complete(ids, toolName, safeResultJson)) return true
         val setup = prepareObservationContext(ids)
-        if (handleDeterministicObservation(setup, ids, toolName, safeResultJson)) return true
         val outcome = try {
             consumeObservationStream(setup, ids, toolName, providerCallId, safeResultJson)
         } catch (_: TimeoutCancellationException) {
