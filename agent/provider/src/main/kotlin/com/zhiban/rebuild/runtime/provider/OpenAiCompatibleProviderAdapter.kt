@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.runtime.provider
 
+import java.io.IOException
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import javax.net.ssl.SSLPeerUnverifiedException
@@ -128,23 +129,44 @@ class OpenAiCompatibleProviderAdapter(
     private suspend fun FlowCollector<ModelEvent>.emitStreamingResponse(call: Call, requestId: String) {
         call.execute().use { response ->
             if (!response.isSuccessful) throw mapResponseFailure(response)
-            val decoder = StreamDecoder(requestId)
-            val source = response.body?.source()
-                ?: throw ProviderFailure("PROVIDER_PROTOCOL_ERROR", retryable = true)
-            source.use {
-                emitDecodedStream(source, call, decoder)
-            }
-            decoder.finishAtCleanEof().forEach { emit(it) }
+            emitSuccessfulStream(response.body, call, requestId)
         }
     }
 
+    private suspend fun FlowCollector<ModelEvent>.emitSuccessfulStream(body: okhttp3.ResponseBody?, call: Call, requestId: String) {
+        val source = body?.source() ?: throw ProviderFailure("PROVIDER_PROTOCOL_ERROR", retryable = true)
+        val decoder = StreamDecoder(requestId)
+        var shouldFinalize = false
+        var transportFailure: IOException? = null
+        try {
+            source.use { emitDecodedStream(source, call, decoder) }
+            shouldFinalize = true
+        } catch (failure: ProviderTransportException) {
+            shouldFinalize = true
+            transportFailure = failure.ioFailure
+        } finally {
+            if (shouldFinalize) decoder.finishAtCleanEof().forEach { emit(it) }
+        }
+        transportFailure?.let { throw it }
+    }
+
     private suspend fun FlowCollector<ModelEvent>.emitDecodedStream(source: BufferedSource, call: Call, decoder: StreamDecoder) {
-        while (!source.exhausted()) {
-            val data = decoder.readData(source, call) ?: continue
+        while (!readSourceExhausted(source)) {
+            val data = try {
+                decoder.readData(source, call)
+            } catch (failure: IOException) {
+                throw ProviderTransportException(failure)
+            } ?: continue
             val decoded = decoder.accept(data)
             decoded.events.forEach { emit(it) }
             if (decoded.isDone) break
         }
+    }
+
+    private fun readSourceExhausted(source: BufferedSource): Boolean = try {
+        source.exhausted()
+    } catch (failure: IOException) {
+        throw ProviderTransportException(failure)
     }
 
     override fun cancel(requestId: String): Boolean = active.remove(requestId)?.let {
@@ -326,6 +348,8 @@ class OpenAiCompatibleProviderAdapter(
         var name: String? = null
         val arguments = StringBuilder()
     }
+
+    private class ProviderTransportException(val ioFailure: IOException) : RuntimeException(ioFailure)
 
     private inner class StreamDecoder(private val requestId: String) {
         private val pendingTools = linkedMapOf<Int, PendingToolCall>()
