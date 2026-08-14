@@ -1,11 +1,14 @@
 package com.zhiban.rebuild.runtime.input.asr
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -62,5 +65,28 @@ class StepFunRealtimeProtocolTest {
         assertTrue(isActiveRealtimeConnection(callbackGeneration = 4, currentGeneration = 4, sameSocket = true))
         assertTrue(!isActiveRealtimeConnection(callbackGeneration = 3, currentGeneration = 4, sameSocket = true))
         assertTrue(!isActiveRealtimeConnection(callbackGeneration = 4, currentGeneration = 4, sameSocket = false))
+    }
+
+    @Test
+    fun `resource release reports a fixed degradation instead of swallowing a runtime failure`() {
+        val degradations = mutableListOf<String>()
+
+        val released = releaseRealtimeResource("audio:release", degradations::add) {
+            throw IllegalStateException("native release failed")
+        }
+
+        assertFalse(released)
+        assertEquals(listOf("audio:release"), degradations)
+    }
+
+    @Test
+    fun `resource release always propagates cancellation`() {
+        val cancellation = CancellationException("cancelled")
+
+        val thrown = runCatching {
+            releaseRealtimeResource("audio:release", {}) { throw cancellation }
+        }.exceptionOrNull()
+
+        assertSame(cancellation, thrown)
     }
 }

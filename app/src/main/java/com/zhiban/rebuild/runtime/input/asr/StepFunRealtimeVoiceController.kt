@@ -9,6 +9,7 @@ import android.media.MediaRecorder
 import android.media.audiofx.AcousticEchoCanceler
 import android.media.audiofx.NoiseSuppressor
 import android.util.Base64
+import android.util.Log
 import com.zhiban.rebuild.runtime.provider.CredentialResolver
 import com.zhiban.rebuild.runtime.provider.OutboundChannel
 import com.zhiban.rebuild.runtime.provider.OutboundExportDecision
@@ -54,6 +55,16 @@ sealed interface RealtimeVoiceState {
     data class Responding(val transcript: String, val replyText: String = "") : RealtimeVoiceState
     data class Completed(val exchangeId: String, val transcript: String, val replyText: String) : RealtimeVoiceState
     data class Failed(val safeMessage: String) : RealtimeVoiceState
+}
+
+internal fun releaseRealtimeResource(reasonCode: String, onDegradation: (String) -> Unit, release: () -> Unit): Boolean = try {
+    release()
+    true
+} catch (cancelled: CancellationException) {
+    throw cancelled
+} catch (_: RuntimeException) {
+    onDegradation(reasonCode)
+    false
 }
 
 internal object StepFunRealtimeProtocol {
@@ -238,8 +249,8 @@ class StepFunRealtimeVoiceController @Inject constructor(
         val createdEchoCanceler = effects.echoCanceler
         val createdNoiseSuppressor = effects.noiseSuppressor
         if (_state.value is RealtimeVoiceState.Idle) {
-            runCatching { createdEchoCanceler?.release() }
-            runCatching { createdNoiseSuppressor?.release() }
+            releaseResource(EFFECT_RELEASE_FAILURE) { createdEchoCanceler?.release() }
+            releaseResource(EFFECT_RELEASE_FAILURE) { createdNoiseSuppressor?.release() }
             releaseAudioRecord(audioRecord)
             return
         }
@@ -267,13 +278,13 @@ class StepFunRealtimeVoiceController @Inject constructor(
             }
             audioRecord.startRecording()
         } catch (cancelled: CancellationException) {
-            runCatching { createdEchoCanceler?.release() }
-            runCatching { createdNoiseSuppressor?.release() }
+            releaseResource(EFFECT_RELEASE_FAILURE) { createdEchoCanceler?.release() }
+            releaseResource(EFFECT_RELEASE_FAILURE) { createdNoiseSuppressor?.release() }
             releaseAudioRecord(audioRecord)
             throw cancelled
         } catch (_: Throwable) {
-            runCatching { createdEchoCanceler?.release() }
-            runCatching { createdNoiseSuppressor?.release() }
+            releaseResource(EFFECT_RELEASE_FAILURE) { createdEchoCanceler?.release() }
+            releaseResource(EFFECT_RELEASE_FAILURE) { createdNoiseSuppressor?.release() }
             releaseAudioRecord(audioRecord)
             return null
         }
@@ -361,7 +372,7 @@ class StepFunRealtimeVoiceController @Inject constructor(
             player = created
             created
         } catch (failure: Throwable) {
-            runCatching { created.release() }
+            releaseResource(PLAYER_RELEASE_FAILURE) { created.release() }
             throw failure
         }
     }
@@ -406,10 +417,12 @@ class StepFunRealtimeVoiceController @Inject constructor(
     }
 
     private fun releasePlayer() {
-        runCatching { player?.pause() }
-        runCatching { player?.flush() }
-        runCatching { player?.release() }
+        val activePlayer = player
         player = null
+        activePlayer ?: return
+        releaseResource(PLAYER_RELEASE_FAILURE) { activePlayer.pause() }
+        releaseResource(PLAYER_RELEASE_FAILURE) { activePlayer.flush() }
+        releaseResource(PLAYER_RELEASE_FAILURE) { activePlayer.release() }
     }
 
     private fun releaseCaptureResources() {
@@ -419,14 +432,42 @@ class StepFunRealtimeVoiceController @Inject constructor(
         echoCanceler = null
         val activeNoiseSuppressor = noiseSuppressor
         noiseSuppressor = null
-        runCatching { activeEchoCanceler?.release() }
-        runCatching { activeNoiseSuppressor?.release() }
+        releaseResource(EFFECT_RELEASE_FAILURE) { activeEchoCanceler?.release() }
+        releaseResource(EFFECT_RELEASE_FAILURE) { activeNoiseSuppressor?.release() }
         activeRecorder?.let(::releaseAudioRecord)
     }
 
     private fun releaseAudioRecord(audioRecord: AudioRecord) {
-        runCatching { audioRecord.stop() }
-        runCatching { audioRecord.release() }
+        releaseResource(RECORDER_RELEASE_FAILURE) { audioRecord.stop() }
+        releaseResource(RECORDER_RELEASE_FAILURE) { audioRecord.release() }
+    }
+
+    private fun releaseResource(reasonCode: String, release: () -> Unit) {
+        releaseRealtimeResource(reasonCode, { code -> Log.w(LOG_TAG, code) }, release)
+    }
+
+    private fun playAudioDelta(delta: String) {
+        try {
+            responding.set(true)
+            val pcm = Base64.decode(delta, Base64.DEFAULT)
+            try {
+                ensurePlayer().write(pcm, 0, pcm.size)
+            } finally {
+                pcm.fill(0)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: RuntimeException) {
+            releasePlayer()
+            fail("实时语音播放失败")
+        }
+    }
+
+    private fun stopAndReleasePlayer() {
+        player?.let { activePlayer ->
+            releaseResource(PLAYER_RELEASE_FAILURE) { activePlayer.stop() }
+        }
+        releasePlayer()
     }
 
     private inner class Listener(private val generation: Long) : WebSocketListener() {
@@ -458,7 +499,6 @@ class StepFunRealtimeVoiceController @Inject constructor(
                     if (responding.getAndSet(false)) {
                         webSocket.send(StepFunRealtimeProtocol.CANCEL_RESPONSE)
                     }
-                    runCatching { player?.pause() }
                     releasePlayer()
                     _state.value = RealtimeVoiceState.Recording()
                 }
@@ -486,22 +526,10 @@ class StepFunRealtimeVoiceController @Inject constructor(
                     _state.value = RealtimeVoiceState.Responding(transcript.toString(), reply.toString())
                 }
 
-                "response.audio.delta" -> runCatching {
-                    responding.set(true)
-                    val pcm = Base64.decode(delta, Base64.DEFAULT)
-                    try {
-                        ensurePlayer().write(pcm, 0, pcm.size)
-                    } finally {
-                        pcm.fill(0)
-                    }
-                }.onFailure {
-                    releasePlayer()
-                    fail("实时语音播放失败")
-                }
+                "response.audio.delta" -> playAudioDelta(delta)
 
                 "response.done" -> {
-                    runCatching { player?.stop() }
-                    releasePlayer()
+                    stopAndReleasePlayer()
                     responding.set(false)
                     val completed = RealtimeVoiceState.Completed(
                         exchangeId,
@@ -538,6 +566,10 @@ class StepFunRealtimeVoiceController @Inject constructor(
     }
 
     private companion object {
+        const val LOG_TAG = "ZhiBanRealtimeVoice"
+        const val EFFECT_RELEASE_FAILURE = "realtime_audio:effect_release_failure"
+        const val PLAYER_RELEASE_FAILURE = "realtime_audio:player_release_failure"
+        const val RECORDER_RELEASE_FAILURE = "realtime_audio:recorder_release_failure"
         const val SAMPLE_RATE = 24_000
 
         // 20 ms PCM16 mono frames at 24 kHz, matching StepFun's realtime VAD
