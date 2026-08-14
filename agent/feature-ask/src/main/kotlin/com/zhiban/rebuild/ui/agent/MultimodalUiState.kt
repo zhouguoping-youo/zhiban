@@ -55,6 +55,7 @@ data class TranscriptionUiState(
     val partialText: String = "",
     val finalText: String = "",
     val originalAudioRetained: Boolean = false,
+    val safeCode: String? = null,
     val safeMessage: String? = null,
     val retryable: Boolean = true,
     /** Smoothed microphone amplitude in the inclusive 0f..1f range. */

@@ -637,7 +637,7 @@ private fun LiveVoiceWaveform(level: Float, modifier: Modifier = Modifier) {
     }
 }
 
-@Composable fun TranscriptionStatus(state: TranscriptionUiState, onRetry: () -> Unit = {}, onDelete: () -> Unit = {}) {
+@Composable fun TranscriptionStatus(state: TranscriptionUiState, onRetry: () -> Unit = {}, onDelete: () -> Unit = {}, onNavigateToSettings: () -> Unit = {}) {
     when (state.phase) {
         TranscriptionPhase.IDLE -> Unit
 
@@ -672,7 +672,11 @@ private fun LiveVoiceWaveform(level: Float, modifier: Modifier = Modifier) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(state.safeMessage ?: "没有完成转写，录音已保留", Modifier.weight(1f), color = FailureText)
-            if (state.retryable) TextButton(onClick = onRetry) { Text("重试") }
+            if (state.safeCode in MODEL_SETTINGS_ASR_FAILURES) {
+                TextButton(onClick = onNavigateToSettings) { Text("去设置") }
+            } else if (state.retryable) {
+                TextButton(onClick = onRetry) { Text("重试") }
+            }
             // Realtime voice retains no recording, so offer a neutral dismiss; mic batch keeps the
             // file and can offer to delete it.
             TextButton(onClick = onDelete) { Text(if (state.originalAudioRetained) "删除录音" else "关闭") }
@@ -685,6 +689,11 @@ private fun LiveVoiceWaveform(level: Float, modifier: Modifier = Modifier) {
         )
     }
 }
+
+private val MODEL_SETTINGS_ASR_FAILURES = setOf(
+    "ASR_PROVIDER_NOT_CONFIGURED",
+    "ASR_AUTHENTICATION_FAILED",
+)
 
 @Composable fun ScrollToBottomFAB(visible: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
     if (visible) {

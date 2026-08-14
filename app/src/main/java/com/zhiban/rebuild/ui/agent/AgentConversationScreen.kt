@@ -231,7 +231,12 @@ fun AgentConversationScreen(
             )
         } else {
             if (multimodalState.transcription.phase in setOf(TranscriptionPhase.FAILED, TranscriptionPhase.CANCELLED)) {
-                TranscriptionStatus(multimodalState.transcription, onRetry = onVoiceRetry, onDelete = onVoiceCancel)
+                TranscriptionStatus(
+                    state = multimodalState.transcription,
+                    onRetry = onVoiceRetry,
+                    onDelete = onVoiceCancel,
+                    onNavigateToSettings = onNavigateToSettings,
+                )
             }
             MessageInput(
                 value = inputText, enabled = state.isInputEnabled, onValueChange = onInputChange, onSend = onSend,

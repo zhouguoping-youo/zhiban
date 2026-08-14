@@ -658,7 +658,7 @@ private fun ConversationAvatar(label: String, background: Color, foreground: Col
     val credentialHint = if (isCredentialMissing &&
         stage == AgentConversationStage.FAILED_FINAL
     ) {
-        "请前往 我的 → 智能体设置 → 连接 AI 服务 完成连接"
+        "前往 我的 → 智能体设置 → 大模型连接 完成配置"
     } else {
         null
     }

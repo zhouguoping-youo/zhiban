@@ -646,6 +646,32 @@ class AgentConversationScreenE2ETest {
         assertTrue(voiceDelete.get())
     }
 
+    @Test fun unconfiguredCloudAsrLinksDirectlyToModelSettings() {
+        val settings = AtomicInteger()
+        val retry = AtomicInteger()
+        compose.setContent {
+            ZhiBanTheme {
+                AgentConversationScreen(
+                    state = AgentConversationUiState(),
+                    multimodalState = MultimodalUiState(
+                        transcription = TranscriptionUiState(
+                            phase = TranscriptionPhase.FAILED,
+                            safeCode = "ASR_PROVIDER_NOT_CONFIGURED",
+                            safeMessage = "前往 我的 → 智能体设置 → 大模型连接 完成配置",
+                        ),
+                    ),
+                    onNavigateToSettings = { settings.incrementAndGet() },
+                    onVoiceRetry = { retry.incrementAndGet() },
+                )
+            }
+        }
+
+        compose.onNodeWithText("去设置").assertIsDisplayed().performClick()
+        compose.onNodeWithText("重试").assertDoesNotExist()
+        assertEquals(1, settings.get())
+        assertEquals(0, retry.get())
+    }
+
     @Test fun structuredLongReplyRendersHeadingsListsCodeAndAutomaticallyShowsLatestContent() {
         val longTail = (1..60).joinToString("\n") { "- 第 $it 条可核对结果" }
         compose.setContent {
