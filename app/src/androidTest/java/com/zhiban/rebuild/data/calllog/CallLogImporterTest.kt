@@ -14,9 +14,12 @@ import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityStage
 import com.zhiban.rebuild.data.crm.CrmRecordStatus
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -154,6 +157,42 @@ class CallLogImporterTest {
         suggestCrmFollowUpsForSyncedCalls(database, crm, listOf(call), nowEpochMs = 5_000)
 
         assertEquals(1, database.crmDao().observePendingSuggestions(0.0).first().size)
+    }
+
+    @Test
+    fun failedCrmSuggestionRollsBackTheImportedCall() = runTest {
+        database.contactDao().insert(contact("contact-1"))
+        database.contactKnowledgeDao().upsertMethods(listOf(method("contact-1", "13800138000")))
+        database.crmDao().insertOpportunity(opportunity("opportunity-1", "contact-1"))
+        val call = row(10, "13800138000", CallLog.Calls.PRESENTATION_ALLOWED)
+        database.openHelper.writableDatabase.execSQL(
+            """
+            CREATE TRIGGER fail_call_follow_up
+            BEFORE INSERT ON crm_agent_suggestions
+            WHEN NEW.suggestionType = 'CALL_FOLLOW_UP'
+            BEGIN
+                SELECT RAISE(ABORT, 'forced suggestion failure');
+            END
+            """.trimIndent(),
+        )
+
+        val failure = try {
+            importCallsAndSuggestionsAtomically(
+                database = database,
+                crmRepository = CrmAgentDataRepository(database),
+                rows = listOf(call),
+                nowEpochMs = 4_000,
+            )
+            null
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: RuntimeException) {
+            error
+        }
+
+        assertNotNull(failure)
+        assertNull(database.callLogDao().findBySourceRow(CallLogImporter.SOURCE_ANDROID, call.providerRowId))
+        assertEquals(0, database.crmDao().observePendingSuggestions(0.0).first().size)
     }
 
     private fun contact(id: String) = ContactEntity(

@@ -41,8 +41,7 @@ class CallLogSyncCoordinator @Inject internal constructor(
         } catch (_: Throwable) {
             return CallLogSyncResult(0, 0, 0, 0, "call_log:failure")
         }
-        val result = CallLogImporter(database).import(rows, nowEpochMs)
-        suggestCrmFollowUpsForSyncedCalls(database, crmRepository, rows, nowEpochMs)
+        val result = importCallsAndSuggestionsAtomically(database, crmRepository, rows, nowEpochMs)
         rows.maxOfOrNull(SystemCallLogRow::lastModifiedEpochMs)?.let { preferences.advanceCursor(it) }
         return result.copy(rowsRead = rows.size)
     }
@@ -56,6 +55,17 @@ class CallLogSyncCoordinator @Inject internal constructor(
         private const val INITIAL_LOOKBACK_MS = 90L * 24 * 60 * 60_000L
         private const val MAX_ROWS = 500
     }
+}
+
+internal suspend fun importCallsAndSuggestionsAtomically(
+    database: AgentDatabase,
+    crmRepository: com.zhiban.rebuild.data.agent.CrmAgentDataRepository,
+    rows: List<SystemCallLogRow>,
+    nowEpochMs: Long,
+): CallLogSyncResult = database.withTransaction {
+    val result = CallLogImporter(database).import(rows, nowEpochMs)
+    suggestCrmFollowUpsForSyncedCalls(database, crmRepository, rows, nowEpochMs)
+    result
 }
 
 internal suspend fun suggestCrmFollowUpsForSyncedCalls(
