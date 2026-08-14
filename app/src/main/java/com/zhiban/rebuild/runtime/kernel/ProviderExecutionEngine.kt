@@ -1606,6 +1606,7 @@ internal class ProviderExecutionEngine(
         val ids = RunIdentifiers(runId, sessionId, fencingEpoch)
         if (deterministicObservation.complete(ids, toolName, safeResultJson)) return true
         val setup = prepareObservationContext(ids)
+        val completedToolsBeforeObservation = store.completedToolNames(runId)
         val outcome = try {
             consumeObservationStream(setup, ids, toolName, providerCallId, safeResultJson)
         } catch (_: TimeoutCancellationException) {
@@ -1627,7 +1628,7 @@ internal class ProviderExecutionEngine(
                 // exclusion + "不得重复调用" instruction: without this the observation step recurses
                 // forever and the run never leaves OBSERVING. We already hold the tool's result, so
                 // answer from it (deterministic summary) instead of asking the model again.
-                if (outcome.result.canonicalName in store.completedToolNames(runId)) {
+                if (outcome.result.canonicalName in completedToolsBeforeObservation) {
                     if (!RequiredReadContinuation(capabilityRouter, store, ownerId, clock)
                             .completeSummary(setup.input.text, runId, sessionId, fencingEpoch)
                     ) {

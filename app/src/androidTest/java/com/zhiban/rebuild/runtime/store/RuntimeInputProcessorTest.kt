@@ -821,6 +821,61 @@ class RuntimeInputProcessorTest {
         assertTrue(database.runtimeEventDao().listByRunId("r-contact").any { it.eventType == "RunCompleted" })
     }
 
+    @Test fun observationCanExecuteADifferentReadToolWithoutLeavingRunStuck() = runBlocking {
+        database.contactDao().insert(
+            ContactEntity(
+                "contact-observation", "张三", "张三", null, null, null,
+                "知伴科技", null, "[]", "[]", null, null, "USER", null, now, now,
+            ),
+        )
+        val staged = RoomTextInputGateway(database, { true }, { now }).stage(
+            """{"schemaVersion":1,"text":"查张三的资料，再告诉我联系人总数","mode":"Work","model":"M2.7","level":"高"}""",
+        )
+        RoomRuntimeGateways(database, "test") { now++ }.accept(
+            RuntimeUiCommand.Start(
+                "s-observation-read",
+                staged.inputRef,
+                "c-observation-read",
+                "a-observation-read",
+                0,
+                "chat",
+                "r-observation-read",
+            ),
+        )
+        var requestNumber = 0
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile) = capability(profile)
+            override fun stream(request: ModelRequest) = when (requestNumber++) {
+                0 -> flowOf(
+                    ModelEvent.ToolCall(0, "call-contact-search", "contact.search", """{"query":"张三"}"""),
+                    ModelEvent.Final("tool_calls"),
+                )
+
+                1 -> flowOf(
+                    ModelEvent.ToolCall(0, "call-contact-count", "contact.maintenance.list", """{"limit":1}"""),
+                    ModelEvent.Final("tool_calls"),
+                )
+
+                else -> flowOf(ModelEvent.Delta(0, "已完成两项查询。"), ModelEvent.Final("stop"))
+            }
+            override fun cancel(requestId: String) = true
+        }
+        KernelCommandProcessor(
+            database,
+            "processor",
+            { true },
+            { now++ },
+            provider = provider,
+            profiles = fixedProfileStore(),
+        ).processNext()
+
+        awaitRunStatus("r-observation-read", "SUCCEEDED")
+        assertEquals(
+            setOf("contact.search", "contact.maintenance.list"),
+            database.runtimeToolExecutionDao().listByRunId("r-observation-read").map { it.toolName }.toSet(),
+        )
+    }
+
     @Test fun calendarUpdateAndDeleteRequireApprovalPersistAuditAndUndo() = runBlocking {
         database.scheduleDao().insert(
             com.zhiban.rebuild.data.agent.ScheduleEntity(
