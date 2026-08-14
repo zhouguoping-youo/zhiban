@@ -177,18 +177,22 @@ internal fun CallNoteDialog(
         val file = File(context.cacheDir, "call-notes/call_${System.currentTimeMillis()}.ogg").apply {
             parentFile?.mkdirs()
         }
-        val next = runCatching {
-            MediaRecorder().apply {
-                setAudioSource(MediaRecorder.AudioSource.MIC)
-                setOutputFormat(MediaRecorder.OutputFormat.OGG)
-                setAudioEncoder(MediaRecorder.AudioEncoder.OPUS)
-                setAudioChannels(1)
-                setAudioSamplingRate(16_000)
-                setOutputFile(file.absolutePath)
-                prepare()
-                start()
-            }
-        }.getOrElse {
+        val next = acquireStartedResource(
+            create = ::MediaRecorder,
+            start = { mediaRecorder ->
+                mediaRecorder.apply {
+                    setAudioSource(MediaRecorder.AudioSource.MIC)
+                    setOutputFormat(MediaRecorder.OutputFormat.OGG)
+                    setAudioEncoder(MediaRecorder.AudioEncoder.OPUS)
+                    setAudioChannels(1)
+                    setAudioSamplingRate(16_000)
+                    setOutputFile(file.absolutePath)
+                    prepare()
+                    start()
+                }
+            },
+            release = MediaRecorder::release,
+        ).getOrElse {
             file.delete()
             error = "无法开始录音，请手动输入"
             return
