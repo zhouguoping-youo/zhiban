@@ -290,6 +290,7 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | 16.10 | 工具执行幂等 | ⚪ | — | 同一幂等键重复执行返回原结果，仅保留一条日程与一条审计；同键不同 digest 明确冲突 | 审计提交 | `RoomScheduleToolExecutorTest.confirmedWriteIsAtomicAndDuplicateReturnsOriginalResult` + `idempotencyKeyWithDifferentCanonicalDigestIsConflictWithoutSecondWrite` |
 | 16.11 | attempt 创建前立即取消可终结 | ✅ | 功能不可用 | Start 已进入 ASSEMBLING_CONTEXT、attempt 尚未创建时，Cancel 会转入 CANCEL_REQUESTED；旧终结逻辑强制 activeAttemptId 非空而永久卡住。取消事件现允许无 attempt 落库并原子转为 CANCELLED | 本提交 `fix(16.11)` | `RuntimeInputProcessorTest.immediateCancelBeforeAttemptExistsStillReachesCancelled`（真机红→绿） |
 | 16.12 | 空闲命令 runner 不热自旋 | ✅ | 性能/耗电 | 无待处理命令且无租约到期时间时，旧循环向自己的 conflated channel 发送再立即接收，2 秒读取时钟 467 次并反复扫库。现首次主动排空，之后只等待真实工作信号或租约超时 | 本提交 `fix(16.12)` | `RuntimeInputProcessorTest.idleRunnerWaitsForAWorkSignalInsteadOfHotSpinning`（SM-W7023：467 次红→≤8 次绿） |
+| 16.13 | 过期审批不会卡在 EXECUTING | ✅ | 功能不可用 | 确认卡超过 24 小时后暂存计划已过期；旧执行入口取不到计划便静默返回，run 永久停在 EXECUTING。现写入固定安全失败码并原子终结为 FAILED_FINAL | 本提交 `fix(16.13)` | `RuntimeInputProcessorTest.approvingAnExpiredPlanFailsTerminallyInsteadOfStayingExecuting`（SM-W7023：EXECUTING 红→FAILED_FINAL 绿） |
 
 ## 维度 17 · 检索与上下文
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |

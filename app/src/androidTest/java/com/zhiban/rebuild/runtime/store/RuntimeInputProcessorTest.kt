@@ -536,6 +536,72 @@ class RuntimeInputProcessorTest {
         )
     }
 
+    @Test fun approvingAnExpiredPlanFailsTerminallyInsteadOfStayingExecuting() = runBlocking {
+        var currentNow = java.time.LocalDateTime.of(2026, 8, 14, 8, 0)
+            .atZone(java.time.ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli()
+        val text = "让agent创建一个 明晚10点与委内瑞拉客户会议的日程提醒"
+        val staged = RoomTextInputGateway(database, { true }, { currentNow }).stage(
+            """{"schemaVersion":1,"text":"$text","mode":"Work","model":"M2.7","level":"高"}""",
+        )
+        val gateway = RoomRuntimeGateways(database, "test") { currentNow }
+        gateway.accept(
+            RuntimeUiCommand.Start(
+                "s-expired-approval",
+                staged.inputRef,
+                "c-expired-approval-start",
+                "a-expired-approval-start",
+                0,
+                "chat",
+                "r-expired-approval",
+            ),
+        )
+        val processor = KernelCommandProcessor(database, "processor", { true }, { currentNow })
+        processor.processNext()
+        val initialLease = requireNotNull(database.runtimeSessionDao().find("s-expired-approval"))
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile) = capability(profile)
+            override fun stream(request: ModelRequest) = flowOf<ModelEvent>()
+            override fun cancel(requestId: String) = false
+        }
+        val engine = com.zhiban.rebuild.runtime.kernel.ProviderExecutionEngine(
+            database,
+            provider,
+            fixedProfileStore(),
+            "processor",
+            { currentNow },
+        )
+        assertTrue(engine.execute("r-expired-approval", "s-expired-approval", initialLease.leaseEpoch))
+        assertEquals("AWAITING_CONFIRMATION", database.runtimeRunDao().find("r-expired-approval")?.status)
+        val approval = approvalPlan("r-expired-approval")
+
+        currentNow += 24L * 60 * 60 * 1_000 + 1
+        val revision = requireNotNull(database.runtimeSessionDao().find("s-expired-approval")).nextSequence - 1
+        gateway.accept(
+            RuntimeUiCommand.RunAction(
+                RuntimeAction.APPROVE,
+                "s-expired-approval",
+                "r-expired-approval",
+                "c-expired-approval-approve",
+                "a-expired-approval-approve",
+                revision,
+                "chat",
+                approval.getValue("proposalId").jsonPrimitive.content,
+                approval.getValue("payloadRef").jsonPrimitive.content,
+            ),
+        )
+        processor.processNext()
+        val approvalLease = requireNotNull(database.runtimeSessionDao().find("s-expired-approval"))
+        assertEquals("EXECUTING", database.runtimeRunDao().find("r-expired-approval")?.status)
+
+        assertFalse(engine.executeApprovedTool("r-expired-approval", "s-expired-approval", approvalLease.leaseEpoch))
+        assertEquals("FAILED_FINAL", database.runtimeRunDao().find("r-expired-approval")?.status)
+        assertTrue(
+            database.runtimeEventDao().listByRunId("r-expired-approval").any {
+                it.eventType == "RunFailedFinal" && it.payloadJson.contains("APPROVAL_EXPIRED_OR_MISSING")
+            },
+        )
+    }
+
     @Test fun exactCalendarConflictQuestionReadsLocalAndDeviceCalendarsWithoutProvider() = runBlocking {
         val fixedNow = java.time.LocalDateTime.of(2026, 8, 14, 8, 0)
             .atZone(java.time.ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli()

@@ -1161,7 +1161,19 @@ internal class ProviderExecutionEngine(
         return completeReactOutcome(outcome, ids)
     }
     suspend fun executeApprovedTool(runId: String, sessionId: String, fencingEpoch: Long): Boolean {
-        val planJson = store.pendingToolPlan(runId, clock()) ?: return false
+        val planReadAt = clock()
+        val planJson = store.pendingToolPlan(runId, planReadAt) ?: run {
+            if (store.runById(runId)?.status == RuntimeRunStatus.EXECUTING.name) {
+                store.finishExecutingRunFailure(
+                    runId,
+                    "APPROVAL_EXPIRED_OR_MISSING",
+                    ownerId,
+                    fencingEpoch,
+                    planReadAt,
+                )
+            }
+            return false
+        }
         return runSuspendCatching {
             val toolName = Json.parseToJsonElement(planJson).jsonObject["toolName"]?.jsonPrimitive?.content
                 ?: throw ProviderFailure("INVALID_TOOL_CALL", false)
