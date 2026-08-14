@@ -5,10 +5,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import com.zhiban.rebuild.data.agent.ScheduleProjection
+import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.ui.theme.ZhiBanTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -53,10 +55,12 @@ class ScheduleProgressActionsTest {
             ZhiBanTheme {
                 ScheduleCompletionDialog(
                     schedule = schedule,
-                    onDismiss = {},
-                    onComplete = { selectedAction = "complete" },
-                    onPostpone = { selectedAction = "postpone" },
-                    onCancelSchedule = { selectedAction = "cancel" },
+                    actions = ScheduleCompletionActions(
+                        onDismiss = {},
+                        onComplete = { selectedAction = "complete" },
+                        onPostpone = { selectedAction = "postpone" },
+                        onCancelSchedule = { selectedAction = "cancel" },
+                    ),
                 )
             }
         }
@@ -65,5 +69,28 @@ class ScheduleProgressActionsTest {
         compose.onNodeWithText("标记完成").assertIsDisplayed()
         compose.onNodeWithText("取消日程").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals("cancel", selectedAction) }
+    }
+
+    @Test
+    fun voiceResultUsesInAppProviderStateInsteadOfLaunchingSystemRecognizer() {
+        compose.setContent {
+            ZhiBanTheme {
+                ScheduleCompletionDialog(
+                    schedule = schedule,
+                    actions = ScheduleCompletionActions(
+                        onDismiss = {},
+                        onComplete = {},
+                        onPostpone = {},
+                        onCancelSchedule = {},
+                    ),
+                    voice = ScheduleOutcomeVoiceConfig(
+                        availability = CloudAsrAvailability.PROVIDER_NOT_CONFIGURED,
+                    ),
+                )
+            }
+        }
+
+        compose.onNodeWithContentDescription("语音填写结果").performClick()
+        compose.onNodeWithText("请先在“我的”中连接模型服务").assertIsDisplayed()
     }
 }

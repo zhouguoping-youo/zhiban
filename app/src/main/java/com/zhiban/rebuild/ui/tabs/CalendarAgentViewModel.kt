@@ -9,8 +9,12 @@ import com.zhiban.rebuild.data.calendar.SystemCalendarEvent
 import com.zhiban.rebuild.data.calendar.SystemCalendarReader
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.ScheduleInsight
+import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
+import com.zhiban.rebuild.runtime.input.asr.CloudAsrGateway
+import com.zhiban.rebuild.runtime.input.asr.CloudAsrResult
 import com.zhiban.rebuild.runtime.runSuspendCatching
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.io.File
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
@@ -32,6 +36,7 @@ class CalendarAgentViewModel @Inject constructor(
     private val repository: AgentDataRepository,
     private val systemCalendarReader: SystemCalendarReader,
     private val reminderScheduler: ScheduleReminderScheduler,
+    private val cloudAsrGateway: CloudAsrGateway,
 ) : ViewModel() {
     sealed interface SaveResult {
         data class Saved(val notificationPermissionNeeded: Boolean) : SaveResult
@@ -45,11 +50,16 @@ class CalendarAgentViewModel @Inject constructor(
         val error: String? = null,
         val resultMessage: String? = null,
     )
+    data class AuxiliaryUiState(val importState: ImportState = ImportState(), val cloudAsrAvailability: CloudAsrAvailability? = null)
 
     private val selectedDay = MutableStateFlow(LocalDate.now())
     private val currentDay = MutableStateFlow(LocalDate.now())
     private val mutableImportState = MutableStateFlow(ImportState())
+    private val mutableCloudAsrAvailability = MutableStateFlow<CloudAsrAvailability?>(null)
     val importState = mutableImportState.asStateFlow()
+    val cloudAsrAvailability = mutableCloudAsrAvailability.asStateFlow()
+    val auxiliaryUiState = kotlinx.coroutines.flow.combine(importState, cloudAsrAvailability, ::AuxiliaryUiState)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AuxiliaryUiState())
     val schedules: StateFlow<List<ScheduleProjection>> = selectedDay
         .flatMapLatest { day ->
             val zone = ZoneId.systemDefault()
@@ -77,6 +87,7 @@ class CalendarAgentViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     init {
+        refreshCloudAsrAvailability()
         viewModelScope.launch {
             while (true) {
                 delay(CURRENT_DAY_REFRESH_MS)
@@ -136,6 +147,23 @@ class CalendarAgentViewModel @Inject constructor(
 
     fun reopen(scheduleId: String, onDone: (Boolean) -> Unit) {
         viewModelScope.launch { onDone(repository.reopenSchedule(scheduleId)) }
+    }
+
+    fun refreshCloudAsrAvailability() {
+        viewModelScope.launch { mutableCloudAsrAvailability.value = cloudAsrGateway.availability() }
+    }
+
+    fun transcribeScheduleOutcome(audio: File, onResult: (String?, String?) -> Unit) {
+        viewModelScope.launch {
+            when (val result = cloudAsrGateway.transcribe(audio)) {
+                is CloudAsrResult.Success -> {
+                    audio.delete()
+                    onResult(result.text, null)
+                }
+
+                is CloudAsrResult.Failure -> onResult(null, scheduleOutcomeAsrFailureMessage(result.safeCode))
+            }
+        }
     }
 
     fun loadSystemCalendar() {
@@ -220,4 +248,13 @@ class CalendarAgentViewModel @Inject constructor(
         const val PENDING_FEEDBACK_LOOKBACK_DAYS = 90L
         const val CURRENT_DAY_REFRESH_MS = 60_000L
     }
+}
+
+internal fun scheduleOutcomeAsrFailureMessage(safeCode: String): String = when (safeCode) {
+    "ASR_CLOUD_CONSENT_REQUIRED" -> "请先在“我的－隐私与权限”中允许语音识别"
+    "ASR_PROVIDER_NOT_CONFIGURED", "ASR_CREDENTIAL_UNAVAILABLE" -> "请先在“我的”中连接模型服务"
+    "ASR_RATE_LIMITED" -> "语音服务繁忙，请稍后重试"
+    "ASR_NETWORK_FAILURE", "ASR_PROVIDER_UNAVAILABLE" -> "网络不稳定，请重试或键盘输入"
+    "AUDIO_EMPTY" -> "没有录到有效内容，请重试"
+    else -> "语音识别失败，请重试或键盘输入"
 }

@@ -143,7 +143,9 @@ fun CalendarTab(
     val schedules by viewModel.schedules.collectAsState()
     val pendingFeedback by viewModel.pendingFeedback.collectAsState()
     val messageScheduleCandidates by viewModel.messageScheduleCandidates.collectAsState()
-    val importState by viewModel.importState.collectAsState()
+    val auxiliaryUiState by viewModel.auxiliaryUiState.collectAsState()
+    val importState = auxiliaryUiState.importState
+    val cloudAsrAvailability = auxiliaryUiState.cloudAsrAvailability
     val context = LocalContext.current
     var showImportDialog by remember { mutableStateOf(false) }
     var showPermissionExplanation by remember { mutableStateOf(false) }
@@ -166,6 +168,9 @@ fun CalendarTab(
             selectedDate = focusedDate
             viewModel.selectDay(focusedDate)
         }
+    }
+    LaunchedEffect(completing?.id) {
+        if (completing != null) viewModel.refreshCloudAsrAvailability()
     }
     val calendarPermissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -324,24 +329,30 @@ fun CalendarTab(
     completing?.let { schedule ->
         ScheduleCompletionDialog(
             schedule = schedule,
-            onDismiss = { completing = null },
-            onComplete = { feedback ->
-                viewModel.complete(schedule.id, feedback) { completed ->
+            actions = ScheduleCompletionActions(
+                onDismiss = { completing = null },
+                onComplete = { feedback ->
+                    viewModel.complete(schedule.id, feedback) { completed ->
+                        completing = null
+                        showFeedback(if (completed) "已标记完成" else "日程已不存在")
+                    }
+                },
+                onPostpone = {
+                    viewModel.reopen(schedule.id) {
+                        completing = null
+                        editing = schedule.copy(status = ScheduleStatus.PENDING, outcomeNote = null, completedAtEpochMs = null)
+                        showEditor = true
+                    }
+                },
+                onCancelSchedule = {
                     completing = null
-                    showFeedback(if (completed) "已标记完成" else "日程已不存在")
-                }
-            },
-            onPostpone = {
-                viewModel.reopen(schedule.id) {
-                    completing = null
-                    editing = schedule.copy(status = ScheduleStatus.PENDING, outcomeNote = null, completedAtEpochMs = null)
-                    showEditor = true
-                }
-            },
-            onCancelSchedule = {
-                completing = null
-                deleting = schedule
-            },
+                    deleting = schedule
+                },
+            ),
+            voice = ScheduleOutcomeVoiceConfig(
+                availability = cloudAsrAvailability,
+                onTranscribe = viewModel::transcribeScheduleOutcome,
+            ),
         )
     }
 
