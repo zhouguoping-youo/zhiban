@@ -4,6 +4,7 @@ import com.zhiban.rebuild.runtime.context.ContextRetrievalResult
 import com.zhiban.rebuild.runtime.context.IntentLabel
 import com.zhiban.rebuild.runtime.context.QueryContext
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ProviderContextAssemblerPresentationTest {
@@ -33,5 +34,25 @@ class ProviderContextAssemblerPresentationTest {
         assertTrue(policy.contains("仅同事和上下级依赖用户当前公司全称"))
         assertTrue(policy.contains("不能在非工作关系下机械追问当前公司"))
         assertTrue(policy.contains("客户与合作方依据真实项目、合同、订单或业务沟通"))
+    }
+
+    @Test
+    fun currentUserInputIsNeverOmittedWhenSessionContextFillsBudget() {
+        val currentInput = "请根据刚才的信息安排明晚八点的日程".repeat(30)
+        val result = ProviderContextAssembler(clock = { 0L }, personalization = { null }).assembleMessages(
+            input = DecodedInput(text = currentInput, mode = "Work"),
+            queryContext = QueryContext(IntentLabel.CALENDAR_CREATE, 1.0, emptyList(), null, emptyList()),
+            retrieval = ContextRetrievalResult(emptyList(), 0, emptyList(), 0),
+            memories = listOf("历史上下文".repeat(300)),
+            sessionSummary = "会话摘要".repeat(300),
+            recentConversation = emptyList(),
+            feedback = emptyList(),
+            activatedSkills = emptyList(),
+            maxContextTokens = 2_000,
+        )
+
+        val userMessages = result.messages.filter { it.role == "user" }
+        assertEquals(1, userMessages.size)
+        assertEquals(currentInput, userMessages.single().content)
     }
 }

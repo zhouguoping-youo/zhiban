@@ -45,6 +45,32 @@ class ContextModuleTest {
         assertTrue(runCatching { PromptAssembler().assemble(stable, PromptBudget(9, 0)) }.isFailure)
     }
 
+    @Test fun requiredInputIsNeverOmittedWhenOptionalContextFillsBudget() {
+        val blocks = listOf(
+            block("policy", ContextLayer.STABLE, TrustLevel.SYSTEM, 2, "policy"),
+            block("retrieval", ContextLayer.CONTEXT, TrustLevel.TRUSTED_APP, 6, "retrieval"),
+            block("input", ContextLayer.VOLATILE, TrustLevel.TRUSTED_APP, 3, "current question", isRequired = true),
+        )
+
+        val result = PromptAssembler().assemble(blocks, PromptBudget(10, 0))
+
+        assertEquals(listOf("policy", "input"), result.included.map { it.id })
+        assertEquals(listOf("retrieval"), result.omittedIds)
+        assertEquals(5, result.usedTokens)
+    }
+
+    @Test fun requiredInputOverflowFailsExplicitlyInsteadOfSilentlyDroppingInput() {
+        val blocks = listOf(
+            block("policy", ContextLayer.STABLE, TrustLevel.SYSTEM, 6, "policy"),
+            block("input", ContextLayer.VOLATILE, TrustLevel.TRUSTED_APP, 5, "current question", isRequired = true),
+        )
+
+        val failure = runCatching { PromptAssembler().assemble(blocks, PromptBudget(10, 0)) }
+
+        assertTrue(failure.isFailure)
+        assertEquals("required context exceeds prompt budget", failure.exceptionOrNull()?.message)
+    }
+
     @Test fun toolCallAndResultAtomicPairIsNeverSplitByBudget() {
         val pair = listOf(
             block(
@@ -140,6 +166,7 @@ class ContextModuleTest {
         atomic: String? = null,
         kind: ContextKind = ContextKind.TEXT,
         seq: Long = 1,
+        isRequired: Boolean = false,
     ) = ContextBlock(
         id, layer, content, trust, Sensitivity.PUBLIC, tokens,
         ContextProvenance(
@@ -155,6 +182,6 @@ class ContextModuleTest {
             "v1",
             digest = "digest-$id",
         ),
-        atomic, kind,
+        atomic, kind, isRequired,
     )
 }

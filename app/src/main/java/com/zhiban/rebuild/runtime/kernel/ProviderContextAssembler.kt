@@ -144,6 +144,7 @@ internal class ProviderContextAssembler(private val clock: () -> Long, private v
                     Sensitivity.PERSONAL,
                     cost(input.text),
                     provenance("user_input", "current-input", input.text),
+                    isRequired = true,
                 ),
             )
         }

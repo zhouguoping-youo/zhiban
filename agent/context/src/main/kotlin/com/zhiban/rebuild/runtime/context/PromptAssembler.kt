@@ -14,21 +14,25 @@ class PromptAssembler {
             }, { it.index }),
         ).map { it.value }
         val groups = ordered.groupBy { it.atomicGroupId ?: "block:${it.id}" }
-        val stableCost = ordered.filter { it.layer == ContextLayer.STABLE }.sumOf { it.tokenCost }
-        require(stableCost <= budget.availableInputTokens) { "stable context exceeds prompt budget" }
-        val included = mutableListOf<ContextBlock>()
-        val omitted = mutableListOf<String>()
-        var used = 0
-        groups.values.forEach { group ->
-            validateAtomicGroup(group)
+        groups.values.forEach(::validateAtomicGroup)
+        val requiredGroups = groups.filterValues { group ->
+            group.any { it.layer == ContextLayer.STABLE || it.isRequired }
+        }
+        val requiredCost = requiredGroups.values.flatten().sumOf { it.tokenCost }
+        require(requiredCost <= budget.availableInputTokens) { "required context exceeds prompt budget" }
+
+        val includedGroupIds = requiredGroups.keys.toMutableSet()
+        var used = requiredCost
+        groups.forEach { (groupId, group) ->
+            if (groupId in includedGroupIds) return@forEach
             val cost = group.sumOf { it.tokenCost }
             if (used + cost <= budget.availableInputTokens) {
-                included += group
+                includedGroupIds += groupId
                 used += cost
-            } else {
-                omitted += group.map { it.id }
             }
         }
+        val included = ordered.filter { (it.atomicGroupId ?: "block:${it.id}") in includedGroupIds }
+        val omitted = ordered.filterNot { (it.atomicGroupId ?: "block:${it.id}") in includedGroupIds }.map { it.id }
         return PromptAssembly(included, omitted, used, included.map { message(it) })
     }
 

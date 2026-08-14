@@ -24,6 +24,7 @@ data class ContextBlock(
     val provenance: ContextProvenance,
     val atomicGroupId: String? = null,
     val kind: ContextKind = ContextKind.TEXT,
+    val isRequired: Boolean = false,
 ) {
     init {
         require(id.isNotBlank() && content.toByteArray().size <= 64 * 1024)
