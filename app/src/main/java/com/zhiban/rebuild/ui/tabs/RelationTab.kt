@@ -22,8 +22,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -124,7 +122,6 @@ import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.personalization.UserProfile
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
-import com.zhiban.rebuild.ui.components.ZhiBanChip
 import com.zhiban.rebuild.ui.components.ZhiBanHeaderIconAction
 import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
 import com.zhiban.rebuild.ui.components.ZhiBanPrimaryTabHeader
@@ -172,7 +169,6 @@ internal val RelationDanger: Color @Composable get() = MaterialTheme.colorScheme
 internal val RelationFilters = listOf("全部") + RelationshipGroup.entries.map(RelationshipGroup::displayName)
 internal val ContactCategoryTags = RelationshipGroup.entries.map(RelationshipGroup::displayName)
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun RelationTab(
     modifier: Modifier = Modifier,
@@ -491,20 +487,11 @@ fun RelationTab(
                 Spacer(Modifier.height(14.dp))
             }
             item {
-                FlowRow(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(7.dp),
-                    verticalArrangement = Arrangement.spacedBy(7.dp),
-                ) {
-                    RelationFilters.forEach { label ->
-                        ZhiBanChip(
-                            text = label,
-                            selected = tag == label,
-                            color = RelationAccent,
-                            onClick = { tag = label },
-                        )
-                    }
-                }
+                RelationshipCategoryFilter(
+                    selected = tag,
+                    options = RelationFilters,
+                    onSelected = { tag = it },
+                )
                 Spacer(Modifier.height(18.dp))
             }
             if (maintenanceCount > 0) {
