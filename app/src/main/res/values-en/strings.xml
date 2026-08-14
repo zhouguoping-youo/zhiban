@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ZhiBan</string>
+    <string name="permission_contacts_rationale">Used to import, organize, and write back the contacts you select. Changes are shown before they are written.</string>
+    <string name="permission_calllog_rationale">Used to read call time, direction, and number so calls can be linked to contacts and follow-ups. Call audio is never recorded.</string>
+    <string name="permission_phone_state_rationale">Used to detect when a call ends so you can add a call note.</string>
+    <string name="permission_calendar_rationale">Used to import system calendars and check time conflicts. Changes are shown before they are written.</string>
+    <string name="notification_listener_service_label">ZhiBan incoming message awareness</string>
+    <string name="notification_listener_description">When enabled, ZhiBan recognizes new notifications from allowlisted messaging apps and organizes them on-device for review. Model processing follows your privacy and outbound-data settings. It does not read message history or send messages.</string>
+    <string name="outgoing_accessibility_service_label">ZhiBan outgoing message awareness</string>
+    <string name="outgoing_message_accessibility_description">When explicitly enabled, ZhiBan recognizes messages you just sent. If an app hides text, ZhiBan captures the current screen only during a send flow initiated by ZhiBan and performs OCR on-device; screenshots are not stored. It does not click, send messages, or read history.</string>
+    <string name="privacy_policy_summary">Personal data is stored on-device by default. Processing by a connected model follows your privacy and outbound-data settings.</string>
+    <string name="user_agreement_summary">Before using ZhiBan, review the required system permissions, data purposes, and reversible actions.</string>
+</resources>

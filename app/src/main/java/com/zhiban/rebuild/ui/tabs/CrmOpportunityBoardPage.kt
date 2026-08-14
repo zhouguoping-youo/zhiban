@@ -24,9 +24,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.zhiban.rebuild.R
 import com.zhiban.rebuild.data.crm.CrmOpportunityStage
 import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
+import com.zhiban.rebuild.ui.components.localizedQuantity
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
 import com.zhiban.rebuild.ui.theme.ZhiBanSize
 import com.zhiban.rebuild.ui.theme.ZhiBanSpacing
@@ -42,7 +44,11 @@ fun CrmOpportunityBoardPage(onBack: () -> Unit, onOpenOpportunity: (String) -> U
 
     ZhiBanPage {
         Column(Modifier.fillMaxSize()) {
-            ZhiBanTopBar(title = "机会看板", subtitle = "${state.opportunities.size} 条机会", onBack = onBack)
+            ZhiBanTopBar(
+                title = "机会看板",
+                subtitle = localizedQuantity(R.plurals.opportunity_count, state.opportunities.size),
+                onBack = onBack,
+            )
             if (columns.isEmpty()) {
                 CrmDetailPageState(title = "还没有机会", message = "先创建一条机会，再按阶段推进。")
             } else {
@@ -91,7 +97,8 @@ internal fun CrmBoardColumnView(column: CrmBoardColumn, onOpenOpportunity: (Stri
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
-                "${column.count} 条 · ${formatCrmMoney(column.totalValueMinor, "CNY")}",
+                "${localizedQuantity(R.plurals.board_opportunity_count, column.count)} · " +
+                    formatCrmMoney(column.totalValueMinor, "CNY"),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

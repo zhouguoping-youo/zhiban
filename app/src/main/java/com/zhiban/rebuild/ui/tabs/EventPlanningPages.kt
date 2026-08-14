@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.zhiban.rebuild.R
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.event.EventPlanStatus
 import com.zhiban.rebuild.data.event.EventResponseStatus
@@ -47,6 +48,7 @@ import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
 import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.components.ZhiBanSectionTitle
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
+import com.zhiban.rebuild.ui.components.localizedQuantity
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
 import com.zhiban.rebuild.ui.theme.ZhiBanIconSize
 import com.zhiban.rebuild.ui.theme.ZhiBanSize
@@ -283,7 +285,7 @@ internal fun EventPlanningWorkbench(
                     item {
                         ZhiBanSectionTitle(
                             "全部",
-                            action = "查看 ${state.plans.size} 项",
+                            action = localizedQuantity(R.plurals.view_item_count, state.plans.size),
                             onActionClick = onOpenAll,
                             modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
                         )

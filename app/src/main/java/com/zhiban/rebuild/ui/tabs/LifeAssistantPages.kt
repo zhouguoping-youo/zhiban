@@ -36,10 +36,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.zhiban.rebuild.R
 import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
 import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.components.ZhiBanSectionTitle
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
+import com.zhiban.rebuild.ui.components.localizedQuantity
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
 import com.zhiban.rebuild.ui.theme.ZhiBanIconSize
 import com.zhiban.rebuild.ui.theme.ZhiBanSpacing
@@ -228,7 +230,7 @@ internal fun LifeAssistantWorkbench(
                         item {
                             ZhiBanSectionTitle(
                                 title = "全部",
-                                action = "查看 ${state.items.size} 项",
+                                action = localizedQuantity(R.plurals.view_item_count, state.items.size),
                                 onActionClick = onOpenAll,
                                 modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
                             )

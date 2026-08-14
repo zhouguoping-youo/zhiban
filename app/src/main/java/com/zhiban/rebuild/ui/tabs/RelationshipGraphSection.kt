@@ -101,6 +101,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.zhiban.rebuild.R
 import com.zhiban.rebuild.data.agent.RelationshipEventParticipantInput
 import com.zhiban.rebuild.data.calllog.CallRecordEntity
 import com.zhiban.rebuild.data.contact.ContactAliasEntity
@@ -126,6 +127,7 @@ import com.zhiban.rebuild.ui.components.ZhiBanSearchField
 import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
 import com.zhiban.rebuild.ui.components.ZhiBanTabHorizontalPadding
 import com.zhiban.rebuild.ui.components.ZhiBanTabTopPadding
+import com.zhiban.rebuild.ui.components.localizedQuantity
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
 import com.zhiban.rebuild.ui.settings.AutoWriteViewModel
 import com.zhiban.rebuild.ui.theme.DangerRed
@@ -267,9 +269,10 @@ internal fun RelationshipGraphState(
                 )
                 Text(
                     if (root.isOwner) {
-                        "${contacts.size} 位联系人 · ${allValidEdges.size} 条关联"
+                        "${localizedQuantity(R.plurals.contact_count, contacts.size)} · " +
+                            localizedQuantity(R.plurals.relationship_count, allValidEdges.size)
                     } else {
-                        "${visibleEdges.size} 条直接关系"
+                        localizedQuantity(R.plurals.direct_relationship_count, visibleEdges.size)
                     },
                     color = RelationMuted,
                     style = MaterialTheme.typography.bodySmall,

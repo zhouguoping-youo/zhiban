@@ -66,8 +66,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.zhiban.rebuild.R
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.ScheduleInsight
+import com.zhiban.rebuild.ui.components.localizedQuantity
 import com.zhiban.rebuild.ui.theme.*
 import kotlin.math.abs
 import kotlin.math.sin
@@ -292,7 +294,11 @@ private fun PerceptionConfirmationBar(candidate: NotificationCandidateEntity, re
                 )
                 Text(
                     listOfNotNull(candidate.senderName, schedule?.title ?: candidate.body)
-                        .joinToString(" · ") + if (remainingCount > 0) " · 另有 $remainingCount 项" else "",
+                        .joinToString(" · ") + if (remainingCount > 0) {
+                        " · ${localizedQuantity(R.plurals.remaining_item_count, remainingCount)}"
+                    } else {
+                        ""
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,

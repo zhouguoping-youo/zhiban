@@ -22,10 +22,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.zhiban.rebuild.R
 import com.zhiban.rebuild.data.crm.CrmOpportunityStage
 import com.zhiban.rebuild.ui.components.ZhiBanChip
 import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
+import com.zhiban.rebuild.ui.components.localizedQuantity
 import com.zhiban.rebuild.ui.theme.ZhiBanSpacing
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -65,7 +67,7 @@ fun CrmOpportunityListPage(
             item {
                 ZhiBanTopBar(
                     title = "机会",
-                    subtitle = "${visible.size} 条",
+                    subtitle = localizedQuantity(R.plurals.opportunity_count, visible.size),
                     onBack = onBack,
                     trailing = {
                         Row(verticalAlignment = Alignment.CenterVertically) {

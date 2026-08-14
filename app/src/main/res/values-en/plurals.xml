@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="contact_count">
+        <item quantity="one">%1$d contact</item>
+        <item quantity="other">%1$d contacts</item>
+    </plurals>
+    <plurals name="selected_contact_count">
+        <item quantity="one">%1$d selected</item>
+        <item quantity="other">%1$d selected</item>
+    </plurals>
+    <plurals name="import_contact_count">
+        <item quantity="one">Import %1$d contact</item>
+        <item quantity="other">Import %1$d contacts</item>
+    </plurals>
+    <plurals name="schedule_count">
+        <item quantity="one">%1$d schedule</item>
+        <item quantity="other">%1$d schedules</item>
+    </plurals>
+    <plurals name="selected_schedule_count">
+        <item quantity="one">%1$d selected</item>
+        <item quantity="other">%1$d selected</item>
+    </plurals>
+    <plurals name="import_schedule_count">
+        <item quantity="one">Import %1$d schedule</item>
+        <item quantity="other">Import %1$d schedules</item>
+    </plurals>
+    <plurals name="item_count">
+        <item quantity="one">%1$d item</item>
+        <item quantity="other">%1$d items</item>
+    </plurals>
+    <plurals name="view_item_count">
+        <item quantity="one">View %1$d item</item>
+        <item quantity="other">View %1$d items</item>
+    </plurals>
+    <plurals name="suggestion_count">
+        <item quantity="one">%1$d suggestion</item>
+        <item quantity="other">%1$d suggestions</item>
+    </plurals>
+    <plurals name="opportunity_count">
+        <item quantity="one">%1$d opportunity</item>
+        <item quantity="other">%1$d opportunities</item>
+    </plurals>
+    <plurals name="board_opportunity_count">
+        <item quantity="one">%1$d opportunity</item>
+        <item quantity="other">%1$d opportunities</item>
+    </plurals>
+    <plurals name="formal_lead_count">
+        <item quantity="one">%1$d formal lead</item>
+        <item quantity="other">%1$d formal leads</item>
+    </plurals>
+    <plurals name="candidate_lead_count">
+        <item quantity="one">%1$d candidate</item>
+        <item quantity="other">%1$d candidates</item>
+    </plurals>
+    <plurals name="relationship_count">
+        <item quantity="one">%1$d relationship</item>
+        <item quantity="other">%1$d relationships</item>
+    </plurals>
+    <plurals name="direct_relationship_count">
+        <item quantity="one">%1$d direct relationship</item>
+        <item quantity="other">%1$d direct relationships</item>
+    </plurals>
+    <plurals name="account_or_group_count">
+        <item quantity="one">%1$d account or group name</item>
+        <item quantity="other">%1$d accounts or group names</item>
+    </plurals>
+    <plurals name="message_count_continue">
+        <item quantity="one">Continue from %1$d message</item>
+        <item quantity="other">Continue from %1$d messages</item>
+    </plurals>
+    <plurals name="remaining_item_count">
+        <item quantity="one">%1$d more item</item>
+        <item quantity="other">%1$d more items</item>
+    </plurals>
+    <plurals name="needs_confirmation_count">
+        <item quantity="one">%1$d item needs confirmation</item>
+        <item quantity="other">%1$d items need confirmation</item>
+    </plurals>
+</resources>

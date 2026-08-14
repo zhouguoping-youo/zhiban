@@ -25,12 +25,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.zhiban.rebuild.R
 import com.zhiban.rebuild.data.agent.CrmLeadConversionInput
 import com.zhiban.rebuild.data.crm.CrmLeadEntity
 import com.zhiban.rebuild.data.crm.CrmLeadStatus
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
+import com.zhiban.rebuild.ui.components.localizedQuantity
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
 import com.zhiban.rebuild.ui.theme.ZhiBanSize
 import com.zhiban.rebuild.ui.theme.ZhiBanSpacing
@@ -54,7 +56,8 @@ fun CrmLeadListPage(onBack: () -> Unit, onOpenOpportunity: (String) -> Unit, vie
             item {
                 ZhiBanTopBar(
                     title = "线索池",
-                    subtitle = "${formalLeads.size} 条正式线索 · ${state.candidateLeads.size} 条候选",
+                    subtitle = "${localizedQuantity(R.plurals.formal_lead_count, formalLeads.size)} · " +
+                        localizedQuantity(R.plurals.candidate_lead_count, state.candidateLeads.size),
                     onBack = onBack,
                 )
             }

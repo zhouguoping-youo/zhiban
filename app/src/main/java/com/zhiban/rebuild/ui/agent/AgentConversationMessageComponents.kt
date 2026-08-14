@@ -63,8 +63,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.zhiban.rebuild.R
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanHeaderIconAction
+import com.zhiban.rebuild.ui.components.localizedQuantity
 import com.zhiban.rebuild.ui.icons.ReplyGlyph
 import com.zhiban.rebuild.ui.icons.ZhiBanReplyIcon
 import com.zhiban.rebuild.ui.theme.*
@@ -182,7 +184,11 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
         ).padding(ZhiBanSpacing.Md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("从 $messageCount 条消息继续", Modifier.weight(1f), color = ZhiBanTextSecondary)
+        Text(
+            localizedQuantity(R.plurals.message_count_continue, messageCount),
+            Modifier.weight(1f),
+            color = ZhiBanTextSecondary,
+        )
         Text("查看", color = ZhiBanTerracotta, fontWeight = FontWeight.SemiBold)
     }
 }

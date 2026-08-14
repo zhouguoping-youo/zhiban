@@ -48,6 +48,7 @@ import java.text.NumberFormat
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.Locale
 
 internal val crmVisibleStages = listOf(
@@ -78,11 +79,11 @@ internal fun crmStakeholderRoleLabel(role: String): String = when (role) {
     else -> "相关人"
 }
 
-internal fun formatCrmMoney(valueMinor: Long?, currencyCode: String): String {
+internal fun formatCrmMoney(valueMinor: Long?, currencyCode: String, locale: Locale = Locale.getDefault()): String {
     if (valueMinor == null) return "金额待确认"
     val amount = valueMinor.toBigDecimal().movePointLeft(2)
     val prefix = if (currencyCode == "CNY") "¥" else "$currencyCode "
-    return prefix + NumberFormat.getNumberInstance(Locale.CHINA).apply { maximumFractionDigits = 2 }.format(amount)
+    return prefix + NumberFormat.getNumberInstance(locale).apply { maximumFractionDigits = 2 }.format(amount)
 }
 
 /** Parses a user-entered major-unit amount into exact minor units without floating-point rounding or overflow. */
@@ -96,19 +97,18 @@ internal fun parseCrmMoneyMinor(text: String): Long? {
     }.getOrNull()
 }
 
-private val crmDateTimeFormatter = DateTimeFormatter.ofPattern("M月d日 E HH:mm", Locale.CHINA)
-private val crmDateFormatter = DateTimeFormatter.ofPattern("M月d日", Locale.CHINA)
-
 /** Warning tone for overdue follow-ups; readable on both light and dark surfaces. */
 internal val CrmOverdueColor = FailureText
 internal val CrmOverdueSoft = FailureText.copy(alpha = 0.10f)
 
-internal fun formatCrmDateTime(epochMs: Long?): String = epochMs?.let {
-    Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).format(crmDateTimeFormatter)
+internal fun formatCrmDateTime(epochMs: Long?, locale: Locale = Locale.getDefault(), zoneId: ZoneId = ZoneId.systemDefault()): String = epochMs?.let {
+    val formatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT).withLocale(locale)
+    Instant.ofEpochMilli(it).atZone(zoneId).format(formatter)
 } ?: "时间待确认"
 
-internal fun formatCrmDate(epochMs: Long?): String = epochMs?.let {
-    Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).format(crmDateFormatter)
+internal fun formatCrmDate(epochMs: Long?, locale: Locale = Locale.getDefault(), zoneId: ZoneId = ZoneId.systemDefault()): String = epochMs?.let {
+    val formatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
+    Instant.ofEpochMilli(it).atZone(zoneId).format(formatter)
 } ?: "待确认"
 
 /** One board column: a stage plus its opportunities and aggregate count/value. */

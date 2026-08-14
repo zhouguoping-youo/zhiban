@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.zhiban.rebuild.R
 import com.zhiban.rebuild.data.contact.ContactEnrichmentCandidateEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.ContactMaintenanceIssue
@@ -44,6 +45,7 @@ import com.zhiban.rebuild.ui.components.ZhiBanDialogHeader
 import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
 import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
+import com.zhiban.rebuild.ui.components.localizedQuantity
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
 import com.zhiban.rebuild.ui.theme.ZhiBanSpacing
 
@@ -98,7 +100,7 @@ fun ContactMaintenancePage(onBack: () -> Unit, onAsk: (String) -> Unit, viewMode
                             MaintenanceActionRow(
                                 icon = Icons.Outlined.AutoAwesome,
                                 title = "资料待核实",
-                                detail = "${overview.enrichmentReviewCount} 条建议",
+                                detail = localizedQuantity(R.plurals.suggestion_count, overview.enrichmentReviewCount),
                                 onClick = { reviewingEnrichment = true },
                             )
                         }
@@ -106,7 +108,7 @@ fun ContactMaintenancePage(onBack: () -> Unit, onAsk: (String) -> Unit, viewMode
                             MaintenanceActionRow(
                                 icon = Icons.Outlined.AlternateEmail,
                                 title = "社交身份待关联",
-                                detail = "${unresolvedIdentities.size} 个账号或群昵称",
+                                detail = localizedQuantity(R.plurals.account_or_group_count, unresolvedIdentities.size),
                                 onClick = { onAsk(unresolvedIdentityPrompt(unresolvedIdentities.first())) },
                             )
                         }
@@ -165,7 +167,11 @@ internal fun ContactEnrichmentReviewSheet(
         Column(Modifier.fillMaxWidth().padding(horizontal = ZhiBanSpacing.Xl)) {
             ZhiBanDialogHeader(
                 title = "资料待核实",
-                subtitle = if (candidates.isEmpty()) "全部处理完成" else "${candidates.size} 条建议",
+                subtitle = if (candidates.isEmpty()) {
+                    "全部处理完成"
+                } else {
+                    localizedQuantity(R.plurals.suggestion_count, candidates.size)
+                },
                 onDismiss = actions.onDismiss,
             )
             error?.let {

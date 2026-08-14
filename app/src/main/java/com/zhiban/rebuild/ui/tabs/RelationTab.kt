@@ -102,6 +102,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.zhiban.rebuild.R
 import com.zhiban.rebuild.data.agent.AndroidContactSyncPreview
 import com.zhiban.rebuild.data.agent.RelationshipEventParticipantInput
 import com.zhiban.rebuild.data.calllog.CallRecordEntity
@@ -130,6 +131,7 @@ import com.zhiban.rebuild.ui.components.ZhiBanSegmentedControl
 import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
 import com.zhiban.rebuild.ui.components.ZhiBanTabHorizontalPadding
 import com.zhiban.rebuild.ui.components.ZhiBanTabTopPadding
+import com.zhiban.rebuild.ui.components.localizedQuantity
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
 import com.zhiban.rebuild.ui.settings.AutoWriteViewModel
 import com.zhiban.rebuild.ui.theme.DangerRed
@@ -360,7 +362,7 @@ fun RelationTab(
             item {
                 ZhiBanPrimaryTabHeader(
                     title = "关系",
-                    subtitle = "${contacts.size} 位联系人",
+                    subtitle = localizedQuantity(R.plurals.contact_count, contacts.size),
                 ) {
                     ZhiBanHeaderIconAction(
                         icon = Icons.Outlined.NotificationsNone,

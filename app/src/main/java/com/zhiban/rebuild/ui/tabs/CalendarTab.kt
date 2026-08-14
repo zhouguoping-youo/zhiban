@@ -75,6 +75,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.zhiban.rebuild.R
 import com.zhiban.rebuild.data.agent.ScheduleProjection
 import com.zhiban.rebuild.data.agent.ScheduleStatus
 import com.zhiban.rebuild.data.calendar.SystemCalendarEvent
@@ -88,6 +89,7 @@ import com.zhiban.rebuild.ui.components.ZhiBanPrimaryTabHeader
 import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
 import com.zhiban.rebuild.ui.components.ZhiBanTabHorizontalPadding
 import com.zhiban.rebuild.ui.components.ZhiBanTabTopPadding
+import com.zhiban.rebuild.ui.components.localizedQuantity
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
 import com.zhiban.rebuild.ui.theme.DangerRed
 import com.zhiban.rebuild.ui.theme.DateFormats
@@ -109,6 +111,7 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.time.format.TextStyle
 import java.time.temporal.TemporalAdjusters
 import java.util.Locale
@@ -519,7 +522,11 @@ private fun MessageScheduleSuggestions(
                 Text("知伴发现了明确的日期和时间", color = CalendarMuted, style = MaterialTheme.typography.bodySmall)
             }
             if (candidates.size > 1) {
-                Text("${candidates.size} 条", color = CalendarMuted, style = MaterialTheme.typography.labelMedium)
+                Text(
+                    localizedQuantity(R.plurals.item_count, candidates.size),
+                    color = CalendarMuted,
+                    style = MaterialTheme.typography.labelMedium,
+                )
             }
         }
         candidates.take(3).forEachIndexed { index, candidate ->
@@ -687,7 +694,7 @@ private fun SystemCalendarImportDialog(state: CalendarAgentViewModel.ImportState
                         }
                         Spacer(Modifier.weight(1f))
                         Text(
-                            "已选 ${selectedEvents.size} 条",
+                            localizedQuantity(R.plurals.selected_schedule_count, selectedEvents.size),
                             color = CalendarMuted,
                             style = MaterialTheme.typography.bodySmall,
                         )
@@ -715,7 +722,7 @@ private fun SystemCalendarImportDialog(state: CalendarAgentViewModel.ImportState
                                     maxLines = 1,
                                 )
                                 Text(
-                                    "${source.events.size} 条日程",
+                                    localizedQuantity(R.plurals.schedule_count, source.events.size),
                                     color = CalendarMuted,
                                     style = MaterialTheme.typography.bodySmall,
                                     maxLines = 1,
@@ -736,7 +743,7 @@ private fun SystemCalendarImportDialog(state: CalendarAgentViewModel.ImportState
                     if (state.isImporting) {
                         CircularProgressIndicator(Modifier.size(18.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
                     } else {
-                        Text("导入 ${selectedEvents.size} 条日程")
+                        Text(localizedQuantity(R.plurals.import_schedule_count, selectedEvents.size))
                     }
                 }
             }
@@ -777,7 +784,7 @@ private fun WeekStrip(selected: LocalDate, onSelect: (LocalDate) -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    date.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.CHINA),
+                    weekdayNarrow(date),
                     style = MaterialTheme.typography.labelSmall,
                     color = if (active) CalendarInk else CalendarMuted,
                 )
@@ -960,9 +967,11 @@ internal fun EmptyDay(onAdd: () -> Unit) {
     }
 }
 
-private fun dayHeading(date: LocalDate): String = when (date) {
-    LocalDate.now() -> "今天"
-    LocalDate.now().plusDays(1) -> "明天"
-    LocalDate.now().minusDays(1) -> "昨天"
-    else -> date.format(DateTimeFormatter.ofPattern("M月d日 EEEE", Locale.CHINA))
+internal fun weekdayNarrow(date: LocalDate, locale: Locale = Locale.getDefault()): String = date.dayOfWeek.getDisplayName(TextStyle.NARROW, locale)
+
+internal fun dayHeading(date: LocalDate, today: LocalDate = LocalDate.now(), locale: Locale = Locale.getDefault()): String = when (date) {
+    today -> "今天"
+    today.plusDays(1) -> "明天"
+    today.minusDays(1) -> "昨天"
+    else -> date.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).withLocale(locale))
 }

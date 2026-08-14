@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="contact_count">
+        <item quantity="other">%1$d 位联系人</item>
+    </plurals>
+    <plurals name="selected_contact_count">
+        <item quantity="other">已选 %1$d 位</item>
+    </plurals>
+    <plurals name="import_contact_count">
+        <item quantity="other">导入 %1$d 位联系人</item>
+    </plurals>
+    <plurals name="schedule_count">
+        <item quantity="other">%1$d 条日程</item>
+    </plurals>
+    <plurals name="selected_schedule_count">
+        <item quantity="other">已选 %1$d 条</item>
+    </plurals>
+    <plurals name="import_schedule_count">
+        <item quantity="other">导入 %1$d 条日程</item>
+    </plurals>
+    <plurals name="item_count">
+        <item quantity="other">%1$d 项</item>
+    </plurals>
+    <plurals name="view_item_count">
+        <item quantity="other">查看 %1$d 项</item>
+    </plurals>
+    <plurals name="suggestion_count">
+        <item quantity="other">%1$d 条建议</item>
+    </plurals>
+    <plurals name="opportunity_count">
+        <item quantity="other">%1$d 条机会</item>
+    </plurals>
+    <plurals name="board_opportunity_count">
+        <item quantity="other">%1$d 条</item>
+    </plurals>
+    <plurals name="formal_lead_count">
+        <item quantity="other">%1$d 条正式线索</item>
+    </plurals>
+    <plurals name="candidate_lead_count">
+        <item quantity="other">%1$d 条候选</item>
+    </plurals>
+    <plurals name="relationship_count">
+        <item quantity="other">%1$d 条关联</item>
+    </plurals>
+    <plurals name="direct_relationship_count">
+        <item quantity="other">%1$d 条直接关系</item>
+    </plurals>
+    <plurals name="account_or_group_count">
+        <item quantity="other">%1$d 个账号或群昵称</item>
+    </plurals>
+    <plurals name="message_count_continue">
+        <item quantity="other">从 %1$d 条消息继续</item>
+    </plurals>
+    <plurals name="remaining_item_count">
+        <item quantity="other">另有 %1$d 项</item>
+    </plurals>
+    <plurals name="needs_confirmation_count">
+        <item quantity="other">还有 %1$d 项需要你确认</item>
+    </plurals>
+</resources>

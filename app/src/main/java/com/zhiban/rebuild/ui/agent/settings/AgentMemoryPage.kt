@@ -34,6 +34,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import com.zhiban.rebuild.R
 import com.zhiban.rebuild.runtime.config.AgentControlStore
 import com.zhiban.rebuild.runtime.config.ExecutionPreference
 import com.zhiban.rebuild.runtime.config.FeedbackPolicy
@@ -62,6 +63,7 @@ import com.zhiban.rebuild.ui.components.ZhiBanSectionTitle
 import com.zhiban.rebuild.ui.components.ZhiBanSingleChoiceRow
 import com.zhiban.rebuild.ui.components.ZhiBanToggleRow
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
+import com.zhiban.rebuild.ui.components.localizedQuantity
 import com.zhiban.rebuild.ui.theme.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -212,7 +214,7 @@ fun AgentMemoryPage(onBack: () -> Unit, viewModel: AgentMemoryViewModel = hiltVi
                             )
                             if (s.items.isNotEmpty()) {
                                 Text(
-                                    "${s.items.size} 条",
+                                    localizedQuantity(R.plurals.item_count, s.items.size),
                                     color = ZhiBanTextSecondary,
                                     style = MaterialTheme.typography.bodySmall,
                                 )

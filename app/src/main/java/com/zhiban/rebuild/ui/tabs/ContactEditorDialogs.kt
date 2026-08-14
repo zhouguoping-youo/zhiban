@@ -103,6 +103,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.zhiban.rebuild.R
 import com.zhiban.rebuild.data.agent.RelationshipEventParticipantInput
 import com.zhiban.rebuild.data.calllog.CallRecordEntity
 import com.zhiban.rebuild.data.contact.ContactAliasEntity
@@ -130,6 +131,7 @@ import com.zhiban.rebuild.ui.components.ZhiBanSearchField
 import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
 import com.zhiban.rebuild.ui.components.ZhiBanTabHorizontalPadding
 import com.zhiban.rebuild.ui.components.ZhiBanTabTopPadding
+import com.zhiban.rebuild.ui.components.localizedQuantity
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
 import com.zhiban.rebuild.ui.settings.AutoWriteViewModel
 import com.zhiban.rebuild.ui.theme.DangerRed
@@ -188,7 +190,7 @@ internal fun ContactImportDialog(state: ContactImportUiState, onDismiss: () -> U
                     )
                     if (state.rowsRead > 0) {
                         Text(
-                            "手机返回 ${state.contacts.size} 位联系人",
+                            "手机返回 ${localizedQuantity(R.plurals.contact_count, state.contacts.size)}",
                             color = RelationMuted,
                             style = MaterialTheme.typography.bodySmall,
                         )
@@ -254,7 +256,7 @@ internal fun ContactImportDialog(state: ContactImportUiState, onDismiss: () -> U
                             )
                             Text("全选", modifier = Modifier.weight(1f), color = RelationInk)
                             Text(
-                                "已选 ${selected.size} 位",
+                                localizedQuantity(R.plurals.selected_contact_count, selected.size),
                                 color = RelationMuted,
                                 style = MaterialTheme.typography.bodySmall,
                             )
@@ -312,7 +314,7 @@ internal fun ContactImportDialog(state: ContactImportUiState, onDismiss: () -> U
                                     modifier = Modifier.size(20.dp),
                                 )
                             } else {
-                                Text("导入 ${selected.size} 位联系人")
+                                Text(localizedQuantity(R.plurals.import_contact_count, selected.size))
                             }
                         }
                     }

@@ -99,6 +99,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.zhiban.rebuild.R
 import com.zhiban.rebuild.data.agent.RelationshipEventParticipantInput
 import com.zhiban.rebuild.data.calllog.CallRecordEntity
 import com.zhiban.rebuild.data.contact.ContactAliasEntity
@@ -124,6 +125,7 @@ import com.zhiban.rebuild.ui.components.ZhiBanSearchField
 import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
 import com.zhiban.rebuild.ui.components.ZhiBanTabHorizontalPadding
 import com.zhiban.rebuild.ui.components.ZhiBanTabTopPadding
+import com.zhiban.rebuild.ui.components.localizedQuantity
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
 import com.zhiban.rebuild.ui.settings.AutoWriteViewModel
 import com.zhiban.rebuild.ui.theme.DangerRed
@@ -431,7 +433,7 @@ internal fun NotificationCandidateDialog(
                             linking != null -> "只有当前匹配不正确时才需要重新选择"
                             showCollectionSettings -> "选择知伴可以整理的消息来源"
                             candidates.isEmpty() -> "仅显示知伴无法确定的内容"
-                            else -> "还有 ${candidates.size} 项需要你确认"
+                            else -> localizedQuantity(R.plurals.needs_confirmation_count, candidates.size)
                         },
                         color = RelationMuted,
                         style = MaterialTheme.typography.bodySmall,
