@@ -975,9 +975,20 @@ internal class RoomRuntimeStore(private val database: AgentDatabase, private val
         requireActiveLease(run.sessionId, ownerId, fencingEpoch, nowEpochMs)
         if (run.status == RuntimeRunStatus.CANCELLED.name) return@withTransaction
         check(run.status == RuntimeRunStatus.CANCEL_REQUESTED.name)
-        val attemptId = requireNotNull(run.activeAttemptId)
+        val attemptId = run.activeAttemptId
+        val cancellationIdentity = attemptId ?: runId
         val event = appendEventInTransaction(
-            RuntimeEventDraft("event-provider-$attemptId-cancelled", "RunCancelled", run.sessionId, runId, attemptId, attemptId, runId, "{}", nowEpochMs),
+            RuntimeEventDraft(
+                "event-provider-$cancellationIdentity-cancelled",
+                "RunCancelled",
+                run.sessionId,
+                runId,
+                attemptId,
+                attemptId,
+                runId,
+                "{}",
+                nowEpochMs,
+            ),
             fencingEpoch,
         )
         check(
@@ -990,7 +1001,7 @@ internal class RoomRuntimeStore(private val database: AgentDatabase, private val
             ) ==
                 1,
         )
-        database.runtimeAttemptDao().finish(attemptId, "CANCELLED", nowEpochMs)
+        attemptId?.let { database.runtimeAttemptDao().finish(it, "CANCELLED", nowEpochMs) }
         database.runtimeRunInputDao().deleteByRunId(runId)
     }
 

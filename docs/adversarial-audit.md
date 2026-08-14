@@ -288,6 +288,7 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | 16.8 | 恢复扫描器完整重放 | ⚪ | — | 只扫描租约已过期且未终止的会话；数据库重开后可携快照重新 claim 并继续状态转换 | 审计提交 | `RoomRuntimeStoreTest.recoveryScannerOnlyReturnsExpiredNonTerminalSessions` + `fileReopenRecoveryHandleCarriesSnapshotAndCanContinueWithClaimedLease` |
 | 16.9 | 工具确认门拦截 | ⚪ | — | 未确认或确认载荷不匹配时，日程、审计和工具结果均保持零写入 | 审计提交 | `RoomScheduleToolExecutorTest.unconfirmedOrMismatchedApprovalWritesNothing` |
 | 16.10 | 工具执行幂等 | ⚪ | — | 同一幂等键重复执行返回原结果，仅保留一条日程与一条审计；同键不同 digest 明确冲突 | 审计提交 | `RoomScheduleToolExecutorTest.confirmedWriteIsAtomicAndDuplicateReturnsOriginalResult` + `idempotencyKeyWithDifferentCanonicalDigestIsConflictWithoutSecondWrite` |
+| 16.11 | attempt 创建前立即取消可终结 | ✅ | 功能不可用 | Start 已进入 ASSEMBLING_CONTEXT、attempt 尚未创建时，Cancel 会转入 CANCEL_REQUESTED；旧终结逻辑强制 activeAttemptId 非空而永久卡住。取消事件现允许无 attempt 落库并原子转为 CANCELLED | 本提交 `fix(16.11)` | `RuntimeInputProcessorTest.immediateCancelBeforeAttemptExistsStillReachesCancelled`（真机红→绿） |
 
 ## 维度 17 · 检索与上下文
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |

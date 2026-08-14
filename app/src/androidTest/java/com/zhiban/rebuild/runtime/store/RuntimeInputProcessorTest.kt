@@ -2508,6 +2508,59 @@ class RuntimeInputProcessorTest {
         assertTrue(database.runtimeEventDao().listByRunId("r-cancel-race").any { it.eventType == "RunCancelled" })
     }
 
+    @Test fun immediateCancelBeforeAttemptExistsStillReachesCancelled() = runBlocking {
+        val staged = RoomTextInputGateway(database, { true }, { now }).stage("cancel before attempt")
+        val gateway = RoomRuntimeGateways(database, "test") { now++ }
+        gateway.accept(
+            RuntimeUiCommand.Start(
+                "s-cancel-before-attempt",
+                staged.inputRef,
+                "c-start-before-attempt",
+                "a-start-before-attempt",
+                0,
+                "chat",
+                "r-cancel-before-attempt",
+            ),
+        )
+        val commandOnlyProcessor = KernelCommandProcessor(database, "processor", { true }, { now++ })
+        commandOnlyProcessor.processNext()
+        val lease = database.runtimeSessionDao().find("s-cancel-before-attempt")!!
+        val revision = lease.nextSequence - 1
+        gateway.accept(
+            RuntimeUiCommand.RunAction(
+                RuntimeAction.CANCEL,
+                "s-cancel-before-attempt",
+                "r-cancel-before-attempt",
+                "c-cancel-before-attempt",
+                "a-cancel-before-attempt",
+                revision,
+                "chat",
+            ),
+        )
+        commandOnlyProcessor.processNext()
+        assertEquals("CANCEL_REQUESTED", database.runtimeRunDao().find("r-cancel-before-attempt")?.status)
+        assertNull(database.runtimeRunDao().find("r-cancel-before-attempt")?.activeAttemptId)
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile) = capability(profile)
+            override fun stream(request: ModelRequest) = flowOf<ModelEvent>()
+            override fun cancel(requestId: String) = false
+        }
+        val engine = com.zhiban.rebuild.runtime.kernel.ProviderExecutionEngine(
+            database,
+            provider,
+            fixedProfileStore(),
+            "processor",
+            { now++ },
+        )
+
+        assertTrue(engine.cancel("r-cancel-before-attempt", "s-cancel-before-attempt", lease.leaseEpoch))
+        assertEquals("CANCELLED", database.runtimeRunDao().find("r-cancel-before-attempt")?.status)
+        assertTrue(
+            database.runtimeEventDao().listByRunId("r-cancel-before-attempt")
+                .any { it.eventType == "RunCancelled" },
+        )
+    }
+
     @Test fun crashAfterPartialSupersedesAttemptInsteadOfAssumingIdenticalReplay() = runBlocking {
         val staged = RoomTextInputGateway(database, { true }, { now }).stage("recover")
         RoomRuntimeGateways(database, "test") { now++ }
