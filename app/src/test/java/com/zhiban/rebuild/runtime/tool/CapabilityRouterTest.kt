@@ -159,6 +159,42 @@ class CapabilityRouterTest {
         assertEquals("{\"status\":\"ok\"}", result.safeResultJson)
     }
 
+    @Test
+    fun oversizedToolResultsAreRejectedAtEveryExecutionExit() = runTest {
+        val hugeResult = "\"" + "文".repeat(400_000) + "\""
+        val readSpec = spec.copy(name = "contact.search", risk = RuntimeToolRisk.READ_ONLY)
+        val autoSpec = spec.copy(name = "contact.tag.add", risk = RuntimeToolRisk.REVERSIBLE_AUTO_WRITE)
+        val router = CapabilityRouter(
+            listOf(
+                FakeBinding(spec, safeResultJson = hugeResult),
+                FakeBinding(readSpec, safeResultJson = hugeResult),
+                FakeAutoBinding(autoSpec, ReversibleWriteReadiness(true, true, true), hugeResult),
+            ),
+            proposalCount = { _, _ -> 0 },
+            policy = CapabilityPolicy(
+                autoUndoTools = setOf(autoSpec.name),
+                autoPresentationTools = setOf(autoSpec.name),
+            ),
+        )
+
+        val failures = listOf(
+            runCatching {
+                router.executeReadOnly(RuntimeToolCallRequest("read", readSpec.name, "{}"), routeContext())
+            }.exceptionOrNull(),
+            runCatching {
+                router.executeReversibleAutoWrite(RuntimeToolCallRequest("auto", autoSpec.name, "{}"), routeContext())
+            }.exceptionOrNull(),
+            runCatching {
+                router.executeApproved(spec.name, "{}", ConfirmedToolExecutionContext("run", "owner", 4, 100))
+            }.exceptionOrNull(),
+        )
+
+        failures.forEach { failure ->
+            assertTrue(failure is ToolPolicyRejectedException)
+            assertEquals("TOOL_RESULT_TOO_LARGE", failure?.message)
+        }
+    }
+
     @Test fun bindingExecutionHasHardTimeout() = runTest {
         val binding = FakeBinding(spec, delayMs = 50)
         val router = CapabilityRouter(listOf(binding), proposalCount = { _, _ -> 0 }, timeoutMs = 1)
@@ -262,7 +298,12 @@ class CapabilityRouterTest {
 
     private fun routeContext() = RuntimeToolRouteContext("run", "session", "attempt", "owner", 4, 8, 100)
 
-    private class FakeBinding(override val spec: RuntimeToolSpec, override val aliases: Set<String> = emptySet(), private val delayMs: Long = 0) :
+    private class FakeBinding(
+        override val spec: RuntimeToolSpec,
+        override val aliases: Set<String> = emptySet(),
+        private val delayMs: Long = 0,
+        private val safeResultJson: String = "{\"status\":\"ok\"}",
+    ) :
         RuntimeToolBinding {
         var approvalCalled = false
         var readCalled = false
@@ -276,15 +317,19 @@ class CapabilityRouterTest {
         }
 
         override suspend fun executeApproved(planJson: String, context: ConfirmedToolExecutionContext) =
-            RoutedToolResult(spec.name, "call-safe", "{\"status\":\"ok\"}")
+            RoutedToolResult(spec.name, "call-safe", safeResultJson)
 
         override suspend fun executeReadOnly(request: RuntimeToolCallRequest, context: RuntimeToolRouteContext): RoutedToolResult {
             readCalled = true
-            return RoutedToolResult(spec.name, request.providerCallId, "{\"status\":\"ok\"}")
+            return RoutedToolResult(spec.name, request.providerCallId, safeResultJson)
         }
     }
 
-    private class FakeAutoBinding(override val spec: RuntimeToolSpec, private val readiness: ReversibleWriteReadiness) : ReversibleAutoWriteBinding {
+    private class FakeAutoBinding(
+        override val spec: RuntimeToolSpec,
+        private val readiness: ReversibleWriteReadiness,
+        private val safeResultJson: String = "{\"status\":\"ok\"}",
+    ) : ReversibleAutoWriteBinding {
         var approvalCalled = false
         var autoWriteCalled = false
 
@@ -297,7 +342,7 @@ class CapabilityRouterTest {
 
         override suspend fun executeReversibleAutoWrite(request: RuntimeToolCallRequest, context: RuntimeToolRouteContext): RoutedToolResult {
             autoWriteCalled = true
-            return RoutedToolResult(spec.name, request.providerCallId, "{\"status\":\"ok\"}")
+            return RoutedToolResult(spec.name, request.providerCallId, safeResultJson)
         }
     }
 }

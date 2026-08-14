@@ -115,11 +115,17 @@ class MainActivity : ComponentActivity() {
 
     private fun acceptSharedText(intent: Intent) {
         val source = resolveShareSource(intent)
+        val sharedText = safeSharedTextPayload(intent)
+        val subject = safeSharedSubject(intent)
         val candidate = sharedTextCandidate(
             sourcePackage = source.packageName,
             sourceLabel = source.label,
-            subject = safeSharedSubject(intent),
-            body = safeSharedText(intent),
+            subject = if (sharedText.truncated) {
+                listOfNotNull(subject, SHARED_TEXT_TRUNCATED_NOTICE).joinToString(" · ")
+            } else {
+                subject
+            },
+            body = sharedText.text,
         ) ?: return
         lifecycleScope.launch {
             repository.stageNotificationCandidate(candidate)
@@ -196,6 +202,16 @@ class MainActivity : ComponentActivity() {
 private const val UNKNOWN_SIZE = -1L
 private const val MAX_SHARED_IMAGE_BYTES = 20L * 1024 * 1024
 private const val MAX_SHARED_IMAGE_DIMENSION = 2_048
+private const val MAX_SHARED_SUBJECT_BYTES = 1_024
+private const val MAX_SHARED_TEXT_BYTES = 16 * 1_024
+private const val SHARED_TEXT_TRUNCATED_NOTICE = "内容过长，已截取"
+private const val UTF8_ASCII_BYTES = 1
+private const val UTF8_TWO_BYTE_SEQUENCE = 2
+private const val UTF8_THREE_BYTE_SEQUENCE = 3
+private const val UTF8_FOUR_BYTE_SEQUENCE = 4
+private const val UTF8_ONE_BYTE_MAX_CODE_POINT = 0x7F
+private const val UTF8_TWO_BYTE_MAX_CODE_POINT = 0x7FF
+private const val UTF8_THREE_BYTE_MAX_CODE_POINT = 0xFFFF
 
 internal fun calculateSharedImageSampleSize(width: Int, height: Int): Int {
     require(width > 0 && height > 0) { "SHARED_IMAGE_DIMENSIONS_INVALID" }
@@ -207,12 +223,52 @@ internal fun calculateSharedImageSampleSize(width: Int, height: Int): Int {
 internal fun isSharedImageDeclaredSizeAllowed(byteCount: Long): Boolean = byteCount == UNKNOWN_SIZE || byteCount in 0..MAX_SHARED_IMAGE_BYTES
 
 internal fun safeSharedSubject(intent: Intent): String? = runCatching {
-    intent.getStringExtra(Intent.EXTRA_SUBJECT)
+    boundedExternalText(intent.getStringExtra(Intent.EXTRA_SUBJECT), MAX_SHARED_SUBJECT_BYTES).text
 }.getOrNull()
 
-internal fun safeSharedText(intent: Intent): String? = runCatching {
-    intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
-}.getOrNull()
+internal fun safeSharedText(intent: Intent): String? = safeSharedTextPayload(intent).text
+
+internal fun safeSharedTextPayload(intent: Intent): BoundedExternalText = runCatching {
+    boundedExternalText(intent.getCharSequenceExtra(Intent.EXTRA_TEXT), MAX_SHARED_TEXT_BYTES)
+}.getOrDefault(BoundedExternalText(null, truncated = false))
+
+internal data class BoundedExternalText(val text: String?, val truncated: Boolean)
+
+/** Preserves valid Unicode while removing transport control characters and enforcing a UTF-8 byte cap. */
+internal fun boundedExternalText(value: CharSequence?, maxUtf8Bytes: Int): BoundedExternalText {
+    if (value == null) return BoundedExternalText(null, truncated = false)
+    require(maxUtf8Bytes > 0)
+    val output = StringBuilder(minOf(value.length, maxUtf8Bytes))
+    var utf8Bytes = 0
+    var index = 0
+    while (index < value.length) {
+        val sourceCodePoint = Character.codePointAt(value, index)
+        val codePoint = when {
+            sourceCodePoint in Character.MIN_SURROGATE.code..Character.MAX_SURROGATE.code -> 0xFFFD
+            sourceCodePoint in ALLOWED_SHARED_TEXT_CONTROLS -> sourceCodePoint
+            Character.isISOControl(sourceCodePoint) -> ' '.code
+            else -> sourceCodePoint
+        }
+        val encodedBytes = codePoint.utf8Length()
+        if (utf8Bytes + encodedBytes > maxUtf8Bytes) break
+        output.appendCodePoint(codePoint)
+        utf8Bytes += encodedBytes
+        index += Character.charCount(sourceCodePoint)
+    }
+    return BoundedExternalText(
+        text = output.toString().takeIf(String::isNotBlank),
+        truncated = index < value.length,
+    )
+}
+
+private fun Int.utf8Length(): Int = when {
+    this <= UTF8_ONE_BYTE_MAX_CODE_POINT -> UTF8_ASCII_BYTES
+    this <= UTF8_TWO_BYTE_MAX_CODE_POINT -> UTF8_TWO_BYTE_SEQUENCE
+    this <= UTF8_THREE_BYTE_MAX_CODE_POINT -> UTF8_THREE_BYTE_SEQUENCE
+    else -> UTF8_FOUR_BYTE_SEQUENCE
+}
+
+private val ALLOWED_SHARED_TEXT_CONTROLS = setOf('\t'.code, '\n'.code, '\r'.code)
 
 internal fun safeSharedImageUri(intent: Intent): Uri? = runCatching {
     IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)

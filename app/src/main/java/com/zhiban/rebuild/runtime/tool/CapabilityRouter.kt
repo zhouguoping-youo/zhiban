@@ -190,6 +190,7 @@ internal class CapabilityRouter(
             throw ToolPolicyRejectedException("tool call budget exceeded")
         }
         return withTimeout(timeoutMs) { binding.executeReadOnly(request.copy(name = spec.name), context) }
+            .validateSafeResultSize()
     }
 
     suspend fun executeReversibleAutoWrite(request: RuntimeToolCallRequest, context: RuntimeToolRouteContext): RoutedToolResult {
@@ -210,6 +211,7 @@ internal class CapabilityRouter(
         val reversible = binding as? ReversibleAutoWriteBinding
             ?: throw ToolPolicyRejectedException("auto write binding is not reversible")
         return withTimeout(timeoutMs) { reversible.executeReversibleAutoWrite(canonicalRequest, context) }
+            .validateSafeResultSize()
     }
 
     suspend fun executeApproved(canonicalName: String, planJson: String, context: ConfirmedToolExecutionContext): RoutedToolResult {
@@ -221,6 +223,7 @@ internal class CapabilityRouter(
             "tool is not authorized for confirmed execution"
         }
         return withTimeout(timeoutMs) { binding.executeApproved(planJson, context) }
+            .validateSafeResultSize()
     }
 
     private fun binding(name: String): RuntimeToolBinding = registry().byName[name] ?: throw ToolPolicyRejectedException("tool is not registered")
@@ -249,8 +252,16 @@ internal class CapabilityRouter(
         }
     }
 
+    private fun RoutedToolResult.validateSafeResultSize(): RoutedToolResult {
+        if (safeResultJson.toByteArray(Charsets.UTF_8).size > MAX_SAFE_RESULT_BYTES) {
+            throw ToolPolicyRejectedException("TOOL_RESULT_TOO_LARGE")
+        }
+        return this
+    }
+
     private companion object {
         const val MAX_TOOL_CALLS_PER_RUN = 12
         const val MAX_PROVIDER_TOOL_NAME_LENGTH = 64
+        const val MAX_SAFE_RESULT_BYTES = 1024 * 1024
     }
 }

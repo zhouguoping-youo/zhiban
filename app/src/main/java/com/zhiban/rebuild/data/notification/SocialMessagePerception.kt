@@ -579,7 +579,7 @@ object SocialNotificationParser {
             !latestSender.isNullOrBlank() && !latestSender.equals(title, ignoreCase = true) -> latestSender
             platform.code == "SMS" || isUsefulSender(title) -> title
             else -> null
-        }?.take(80)
+        }?.replaceIsoControls()?.take(80)
         if (sender == null && title == null) return null
         if (!isGroup && isServiceSender(sender ?: title.orEmpty())) return null
 
@@ -653,6 +653,7 @@ object SocialNotificationParser {
     }
 
     private fun cleanTitle(value: String?): String? = value
+        ?.replaceIsoControls()
         ?.replace(Regex("""^\[\d+条?]\s*"""), "")
         ?.replace(Regex("""\s*\(\d+\)\s*$"""), "")
         ?.replace(Regex("""\s*（\d+条?新消息）\s*$"""), "")
@@ -661,9 +662,14 @@ object SocialNotificationParser {
         ?.takeIf(String::isNotBlank)
 
     private fun cleanText(value: String?): String? = value
+        ?.replaceIsoControls()
         ?.replace(Regex("\\s+"), " ")
         ?.trim()
         ?.takeIf(String::isNotBlank)
+
+    private fun String.replaceIsoControls(): String = map { character ->
+        if (character.isISOControl()) ' ' else character
+    }.joinToString("")
 
     private fun isUsefulSender(value: String?): Boolean {
         val clean = value?.trim().orEmpty()

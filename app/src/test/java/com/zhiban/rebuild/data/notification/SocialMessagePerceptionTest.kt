@@ -39,6 +39,25 @@ class SocialMessagePerceptionTest {
     }
 
     @Test
+    fun notificationTextIsBoundedAndControlCharactersAreRemovedWithoutLanguageWhitelist() {
+        val candidate = SocialNotificationParser.parse(
+            snapshot(
+                packageName = "com.tencent.mm",
+                title = "مرحبا\u0000🙂",
+                text = "བཀྲ་ཤིས་\u0000" + "文".repeat(1_500),
+            ),
+        )!!
+
+        assertFalse(candidate.senderName!!.contains('\u0000'))
+        assertTrue(candidate.senderName!!.contains("مرحبا"))
+        assertTrue(candidate.senderName!!.contains("🙂"))
+        assertFalse(candidate.body!!.contains('\u0000'))
+        assertTrue(candidate.body!!.startsWith("བཀྲ་ཤིས་"))
+        assertEquals(1_000, candidate.body!!.length)
+        assertEquals(64, candidate.sourceKey.length)
+    }
+
+    @Test
     fun wechatGroupSeparatesConversationAndActualSender() {
         val candidate = SocialNotificationParser.parse(
             snapshot(

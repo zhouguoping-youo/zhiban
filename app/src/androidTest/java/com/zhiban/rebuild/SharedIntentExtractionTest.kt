@@ -5,7 +5,9 @@ import android.net.Uri
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.calendar.ScheduleReminderWorker
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -51,5 +53,22 @@ class SharedIntentExtractionTest {
         assertEquals("客户🙂", safeSharedSubject(valid))
         assertEquals("第一行🙂\nhttps://example.com/?q=知伴", safeSharedText(valid))
         assertEquals(image, safeSharedImageUri(valid))
+    }
+
+    @Test
+    fun oversizedSharedTextIsUtf8BoundedWithoutRejectingLanguagesOrEmoji() {
+        val prefix = "مرحبا བཀྲ་ཤིས་ 🙂\u0000"
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            putExtra(Intent.EXTRA_TEXT, prefix + "文".repeat(8_000))
+        }
+
+        val payload = safeSharedTextPayload(intent)
+
+        assertTrue(payload.truncated)
+        assertTrue(payload.text!!.toByteArray(Charsets.UTF_8).size <= 16 * 1_024)
+        assertTrue(payload.text!!.contains("مرحبا"))
+        assertTrue(payload.text!!.contains("བཀྲ་ཤིས་"))
+        assertTrue(payload.text!!.contains("🙂"))
+        assertFalse(payload.text!!.contains('\u0000'))
     }
 }
