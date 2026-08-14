@@ -38,14 +38,12 @@ import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHost
@@ -95,7 +93,6 @@ import com.zhiban.rebuild.ui.theme.DangerRed
 import com.zhiban.rebuild.ui.theme.DateFormats
 import com.zhiban.rebuild.ui.theme.ZhiBanCard
 import com.zhiban.rebuild.ui.theme.ZhiBanDivider
-import com.zhiban.rebuild.ui.theme.ZhiBanIconContainer
 import com.zhiban.rebuild.ui.theme.ZhiBanIconSize
 import com.zhiban.rebuild.ui.theme.ZhiBanRadius
 import com.zhiban.rebuild.ui.theme.ZhiBanSize
@@ -308,7 +305,6 @@ fun CalendarTab(
                             editing = schedules[index]
                             showEditor = true
                         },
-                        onDelete = { deleting = schedules[index] },
                         onProgress = { completing = schedules[index] },
                     )
                     if (index != schedules.lastIndex) {
@@ -341,6 +337,10 @@ fun CalendarTab(
                     editing = schedule.copy(status = ScheduleStatus.PENDING, outcomeNote = null, completedAtEpochMs = null)
                     showEditor = true
                 }
+            },
+            onCancelSchedule = {
+                completing = null
+                deleting = schedule
             },
         )
     }
@@ -387,17 +387,17 @@ fun CalendarTab(
     deleting?.let { schedule ->
         ZhiBanAlertDialog(
             onDismissRequest = { deleting = null },
-            title = { Text("删除日程？") },
+            title = { Text("取消这项日程？") },
             text = { Text("“${schedule.title}”将从日历中移除。") },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.delete(schedule.id) {
                         deleting = null
-                        showFeedback("日程已删除")
+                        showFeedback("日程已取消")
                     }
-                }) { Text("删除", color = CalendarDanger) }
+                }) { Text("取消日程", color = CalendarDanger) }
             },
-            dismissButton = { TextButton(onClick = { deleting = null }) { Text("取消", color = CalendarInk) } },
+            dismissButton = { TextButton(onClick = { deleting = null }) { Text("保留", color = CalendarInk) } },
             containerColor = CalendarSurface,
         )
     }
@@ -478,7 +478,7 @@ private fun PendingScheduleFeedbackCard(schedules: List<ScheduleProjection>, onO
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                 )
-                Text("完成或延期", color = CalendarAccent, style = MaterialTheme.typography.labelMedium)
+                Text("更新进展", color = CalendarAccent, style = MaterialTheme.typography.labelMedium)
             }
         }
         if (schedules.size > 3) {
@@ -851,7 +851,7 @@ internal fun MonthGrid(selected: LocalDate, onSelect: (LocalDate) -> Unit) {
 }
 
 @Composable
-private fun ScheduleRow(schedule: ScheduleProjection, onClick: () -> Unit, onDelete: () -> Unit, onProgress: () -> Unit) {
+internal fun ScheduleRow(schedule: ScheduleProjection, onClick: () -> Unit, onProgress: () -> Unit) {
     val start = Instant.ofEpochMilli(schedule.startAtEpochMs).atZone(ZoneId.systemDefault()).toLocalTime()
     val end = start.plusMinutes(schedule.durationMinutes.toLong())
     Row(
@@ -865,14 +865,7 @@ private fun ScheduleRow(schedule: ScheduleProjection, onClick: () -> Unit, onDel
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
             )
-            val lifecycle = scheduleLifecycleLabel(schedule, System.currentTimeMillis())
-            TextButton(
-                onClick = onProgress,
-                modifier = Modifier.semantics { contentDescription = "${schedule.title}，$lifecycle" },
-                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
-            ) {
-                Text(lifecycle, color = if (schedule.status == ScheduleStatus.COMPLETED) CalendarMuted else CalendarAccent)
-            }
+            Spacer(Modifier.height(4.dp))
             Text(
                 end.format(DateFormats.Time),
                 color = CalendarMuted,
@@ -913,22 +906,29 @@ private fun ScheduleRow(schedule: ScheduleProjection, onClick: () -> Unit, onDel
                 color = CalendarMuted,
                 style = MaterialTheme.typography.labelSmall,
             )
-        }
-        IconButton(onClick = onDelete, modifier = Modifier.size(ZhiBanIconContainer.TouchTarget)) {
-            Icon(
-                Icons.Rounded.DeleteOutline,
-                "删除${schedule.title}",
-                tint = CalendarMuted,
-                modifier = Modifier.size(ZhiBanIconSize.Action),
-            )
+            val lifecycle = scheduleLifecycleLabel(schedule, System.currentTimeMillis())
+            TextButton(
+                onClick = onProgress,
+                modifier = Modifier
+                    .defaultMinSize(minHeight = ZhiBanSize.Control)
+                    .semantics { contentDescription = "${schedule.title}，$lifecycle" },
+                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
+            ) {
+                Text(
+                    lifecycle,
+                    color = if (schedule.status == ScheduleStatus.COMPLETED) CalendarMuted else CalendarAccent,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
         }
     }
 }
 
 internal fun scheduleLifecycleLabel(schedule: ScheduleProjection, nowEpochMs: Long): String = when {
-    schedule.status == ScheduleStatus.COMPLETED -> "已完成"
-    schedule.startAtEpochMs + schedule.durationMinutes * 60_000L < nowEpochMs -> "待反馈"
-    else -> "完成或延期"
+    schedule.status == ScheduleStatus.COMPLETED -> "查看结果"
+    schedule.startAtEpochMs + schedule.durationMinutes * 60_000L < nowEpochMs -> "补充结果"
+    else -> "更新进展"
 }
 
 @Composable

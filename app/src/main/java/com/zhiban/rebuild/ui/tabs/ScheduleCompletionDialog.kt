@@ -31,7 +31,13 @@ import com.zhiban.rebuild.ui.theme.ZhiBanRadius
 import com.zhiban.rebuild.ui.theme.ZhiBanSize
 
 @Composable
-internal fun ScheduleCompletionDialog(schedule: ScheduleProjection, onDismiss: () -> Unit, onComplete: (String?) -> Unit, onPostpone: () -> Unit) {
+internal fun ScheduleCompletionDialog(
+    schedule: ScheduleProjection,
+    onDismiss: () -> Unit,
+    onComplete: (String?) -> Unit,
+    onPostpone: () -> Unit,
+    onCancelSchedule: () -> Unit,
+) {
     var feedback by remember(schedule.id) { mutableStateOf(schedule.outcomeNote.orEmpty()) }
     val speech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let { feedback = it }
@@ -62,7 +68,15 @@ internal fun ScheduleCompletionDialog(schedule: ScheduleProjection, onDismiss: (
             Modifier.fillMaxWidth().padding(top = 18.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            TextButton(onClick = onPostpone, modifier = Modifier.weight(1f).height(ZhiBanSize.Control)) {
+            Button(
+                onClick = onPostpone,
+                modifier = Modifier.weight(1f).height(ZhiBanSize.Control),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = CalendarSoft,
+                    contentColor = CalendarInk,
+                ),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(ZhiBanRadius.Card),
+            ) {
                 Text("延期")
             }
             Button(
@@ -71,6 +85,12 @@ internal fun ScheduleCompletionDialog(schedule: ScheduleProjection, onDismiss: (
                 colors = ButtonDefaults.buttonColors(containerColor = CalendarAccent),
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(ZhiBanRadius.Card),
             ) { Text("标记完成") }
+        }
+        TextButton(
+            onClick = onCancelSchedule,
+            modifier = Modifier.fillMaxWidth().height(ZhiBanSize.Control),
+        ) {
+            Text("取消日程", color = CalendarDanger)
         }
     }
 }

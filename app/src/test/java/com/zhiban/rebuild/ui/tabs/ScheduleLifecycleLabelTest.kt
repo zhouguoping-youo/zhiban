@@ -8,15 +8,15 @@ import org.junit.Test
 class ScheduleLifecycleLabelTest {
     private val schedule = ScheduleProjection("s1", "跟进客户", 10_000L, 30, null)
 
-    @Test fun pendingFutureScheduleOffersCompletionOrPostpone() {
-        assertEquals("完成或延期", scheduleLifecycleLabel(schedule, 1_000L))
+    @Test fun pendingFutureScheduleOffersProgressUpdateWithoutCrowdingTimeColumn() {
+        assertEquals("更新进展", scheduleLifecycleLabel(schedule, 1_000L))
     }
 
     @Test fun elapsedPendingScheduleAsksForFeedbackInsteadOfAssumingCompletion() {
-        assertEquals("待反馈", scheduleLifecycleLabel(schedule, 2_000_000L))
+        assertEquals("补充结果", scheduleLifecycleLabel(schedule, 2_000_000L))
     }
 
     @Test fun completedScheduleShowsCompletedState() {
-        assertEquals("已完成", scheduleLifecycleLabel(schedule.copy(status = ScheduleStatus.COMPLETED), 2_000_000L))
+        assertEquals("查看结果", scheduleLifecycleLabel(schedule.copy(status = ScheduleStatus.COMPLETED), 2_000_000L))
     }
 }
