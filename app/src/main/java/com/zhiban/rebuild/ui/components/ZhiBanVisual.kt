@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -98,27 +99,50 @@ fun ZhiBanPrimaryTabHeader(title: String, subtitle: String, modifier: Modifier =
             .defaultMinSize(minHeight = ZhiBanSize.TopBar),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(
+        ZhiBanHeaderTitleBlock(
+            title = title,
+            subtitle = subtitle,
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(
-                title,
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onBackground,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        )
+        trailing()
+    }
+}
+
+/**
+ * One title block for primary, secondary and conversation headers.
+ *
+ * A subtitle line is always reserved, even on pages that do not show one.
+ * This keeps the visible title on the same top baseline while allowing every
+ * header to grow naturally with the user's font scale.
+ */
+@Composable
+fun ZhiBanHeaderTitleBlock(title: String, subtitle: String?, modifier: Modifier = Modifier, horizontalAlignment: Alignment.Horizontal = Alignment.Start) {
+    val subtitleStyle = MaterialTheme.typography.bodySmall
+    val subtitleLineHeight = with(LocalDensity.current) { subtitleStyle.lineHeight.toDp() }
+    Column(
+        modifier = modifier,
+        horizontalAlignment = horizontalAlignment,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(
+            title,
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onBackground,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (subtitle.isNullOrBlank()) {
+            Spacer(Modifier.height(subtitleLineHeight))
+        } else {
             Text(
                 subtitle,
-                style = MaterialTheme.typography.bodySmall,
+                style = subtitleStyle,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        trailing()
     }
 }
 
@@ -228,7 +252,7 @@ fun ZhiBanTopBar(title: String, onBack: (() -> Unit)?, modifier: Modifier = Modi
         modifier = modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = if (subtitle == null) ZhiBanSize.TopBar else ZhiBanSize.ListRowWithSubtitle)
-            .padding(horizontal = ZhiBanSpacing.Md, vertical = ZhiBanSpacing.Sm),
+            .padding(horizontal = ZhiBanSpacing.PageHorizontal, vertical = ZhiBanSpacing.Sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (onBack != null) {
@@ -242,25 +266,11 @@ fun ZhiBanTopBar(title: String, onBack: (() -> Unit)?, modifier: Modifier = Modi
             }
             Spacer(Modifier.width(ZhiBanSpacing.Xs))
         }
-        Column(Modifier.weight(1f)) {
-            Text(
-                title,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onBackground,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            subtitle?.takeIf { it.isNotBlank() }?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
+        ZhiBanHeaderTitleBlock(
+            title = title,
+            subtitle = subtitle,
+            modifier = Modifier.weight(1f),
+        )
         trailing?.invoke()
     }
 }

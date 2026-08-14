@@ -1,6 +1,7 @@
 package com.zhiban.rebuild.ui.components
 
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LocalRippleConfiguration
@@ -10,10 +11,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.zhiban.rebuild.ui.theme.ZhiBanTerracotta
 import com.zhiban.rebuild.ui.theme.ZhiBanTheme
+import com.zhiban.rebuild.ui.agent.AgentTopBar
 import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -72,6 +75,25 @@ class ZhiBanPageChromeTest {
 
         val top = compose.onNodeWithTag("secondary-header").getUnclippedBoundsInRoot().top
         assertDpClose("secondary header has no decorative row above it", safeTop, top)
+    }
+
+    @Test
+    fun primarySecondaryAndConversationTitlesShareOneTopBaseline() {
+        compose.setContent {
+            ZhiBanTheme {
+                Box {
+                    ZhiBanPrimaryTabHeader(title = "一级标题", subtitle = "一级说明")
+                    ZhiBanTopBar(title = "二级标题", onBack = {})
+                    AgentTopBar()
+                }
+            }
+        }
+
+        val primaryTop = compose.onNodeWithText("一级标题").getUnclippedBoundsInRoot().top
+        val secondaryTop = compose.onNodeWithText("二级标题").getUnclippedBoundsInRoot().top
+        val conversationTop = compose.onNodeWithText("问问").getUnclippedBoundsInRoot().top
+        assertDpClose("primary and secondary title baselines match", primaryTop, secondaryTop)
+        assertDpClose("primary and conversation title baselines match", primaryTop, conversationTop)
     }
 
     @OptIn(ExperimentalMaterial3Api::class)

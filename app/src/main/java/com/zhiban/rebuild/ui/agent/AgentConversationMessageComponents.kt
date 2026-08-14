@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.sp
 import com.zhiban.rebuild.R
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanHeaderIconAction
+import com.zhiban.rebuild.ui.components.ZhiBanHeaderTitleBlock
 import com.zhiban.rebuild.ui.components.localizedQuantity
 import com.zhiban.rebuild.ui.icons.ReplyGlyph
 import com.zhiban.rebuild.ui.icons.ZhiBanReplyIcon
@@ -132,7 +133,7 @@ internal fun PermissionSettingsDialog(permissionName: String, onDismiss: () -> U
 
 @Composable
 fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () -> Unit = {}) = Box(
-    Modifier.fillMaxWidth().defaultMinSize(minHeight = ZhiBanSize.TopBar).padding(horizontal = ZhiBanSpacing.Md),
+    Modifier.fillMaxWidth().defaultMinSize(minHeight = ZhiBanSize.TopBar).padding(horizontal = ZhiBanSpacing.PageHorizontal),
     contentAlignment = Alignment.Center,
 ) {
     Row(
@@ -143,10 +144,10 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
         ZhiBanHeaderIconAction(Icons.AutoMirrored.Outlined.ArrowBack, "返回", onBack)
         ZhiBanHeaderIconAction(Icons.Outlined.Menu, "更多", onMenu)
     }
-    Text(
-        "问问",
-        color = MaterialTheme.colorScheme.onBackground,
-        style = MaterialTheme.typography.headlineSmall,
+    ZhiBanHeaderTitleBlock(
+        title = "问问",
+        subtitle = null,
+        horizontalAlignment = Alignment.CenterHorizontally,
     )
     ZhiBanHeaderIconAction(
         icon = Icons.Outlined.History,
