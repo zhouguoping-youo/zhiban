@@ -295,6 +295,7 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | 16.13 | 过期审批不会卡在 EXECUTING | ✅ | 功能不可用 | 确认卡超过 24 小时后暂存计划已过期；旧执行入口取不到计划便静默返回，run 永久停在 EXECUTING。现写入固定安全失败码并原子终结为 FAILED_FINAL | 本提交 `fix(16.13)` | `RuntimeInputProcessorTest.approvingAnExpiredPlanFailsTerminallyInsteadOfStayingExecuting`（SM-W7023：EXECUTING 红→FAILED_FINAL 绿） |
 | 16.14 | 观察期可继续调用不同的读取工具 | ✅ | 功能不可用 | 旧递归保护在工具写入后才读取 completedTools，新工具因此也被误判成重复；当前 attempt 已结束后又用它终结，run 永久停在 OBSERVING。现与观察流启动前快照比较，新工具进入下一观察 attempt，只有真实重复调用走兜底 | 本提交 `fix(16.14)` | `RuntimeInputProcessorTest.observationCanExecuteADifferentReadToolWithoutLeavingRunStuck`（SM-W7023：OBSERVING 红→SUCCEEDED 绿） |
 | 16.15 | 确认后工具超时可安全重试 | ✅ | 功能不可用 | `runSuspendCatching` 会按取消语义直接重抛 `TimeoutCancellationException`，旧代码因此绕过 TIMEOUT 映射并被外层收容成 `RUNTIME_INTERRUPTED/FAILED_FINAL`。现显式区分超时与协作取消：超时落 `TIMEOUT/FAILED_RETRYABLE`、保留原输入、清理旧审批暂存，领域事务不产生半写 | 本提交 `fix(16.15)` | `RuntimeInputProcessorTest.approvedToolTimeoutIsRetryableInsteadOfRuntimeInterrupted`（SM-W7023：异常外逃红→FAILED_RETRYABLE 绿） |
+| 16.16 | 模型工具参数错误可受控自纠 | ✅ | 功能不可用 | 工具名有效但参数缺失/非法时，旧引擎直接把 run 终结为 `FAILED_FINAL`，模型看不到错误也无法修正。现原子记录脱敏 `ToolFailed`，只把固定错误码回灌并仅开放原工具重试一次；修正成功继续观察链，连续第二次错误明确终结，不会循环或假报成功 | 本提交 `fix(16.16)` | `RuntimeInputProcessorTest.invalidToolArgumentsAreReturnedToModelForOneCorrection`（SM-W7023：FAILED_FINAL 红→三段 ReAct 成功绿）+ `repeatedInvalidToolArgumentsStopAfterOneCorrection`（两次后有界终结） |
 
 ## 维度 17 · 检索与上下文
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
@@ -314,9 +315,9 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
 |---|---|---|---|---|---|---|
 | 18.1 | 参数缺失拒绝不崩溃 | ⚪ | — | ToolArgumentParser 与各 binding 做必填字段/引用校验，缺失返回固定安全错误，不进入 DomainWriter | 审计提交 | `ToolArgumentParserTest` + `CrmMutationToolBindingTest` |
-| 18.2 | 参数非法拒绝不崩溃 | ⚪ | — | 畸形 JSON、未知字段、幻觉 contact/opportunity id 均在审批前 fail-closed；运行时落安全失败而非异常正文 | 审计提交 | `ToolArgumentParserTest.rejectsUnknownKeysAndMalformedJsonWithSameSafeFailure` + `RuntimeInputProcessorTest.invalidToolCallFailsClosedWithoutSuccess` |
+| 18.2 | 参数非法拒绝不崩溃 | ✅ | 功能不可用 | 畸形 JSON、未知字段、幻觉 contact/opportunity id 均在审批前 fail-closed；有效工具的参数错误会以固定码回灌并仅允许同工具自纠一次，原始参数和异常正文不进入日志；未知工具仍直接拒绝 | 本提交 `fix(16.16)` | `ToolArgumentParserTest.rejectsUnknownKeysAndMalformedJsonWithSameSafeFailure` + `RuntimeInputProcessorTest.invalidToolCallFailsClosedWithoutSuccess` + `invalidToolArgumentsAreReturnedToModelForOneCorrection` |
 | 18.3 | 执行超时显示错误 | ⚪ | — | Provider/感知/重排均有有界 timeout；主执行超时落 `FAILED_RETRYABLE` 与安全失败码，UI reducer 显示可重试状态 | 审计提交 | `RuntimeInputProcessorTest.stalledProviderTimesOutWhileLeaseHeartbeatKeepsSafeFailureWritable` + `AgentProjectionUiMapperTest` |
-| 18.4 | 执行失败显示错误不卡住 | ⚪ | — | 认证失败、非法工具与网络失败均终结 attempt/run 并投影固定文案，不保留 EXECUTING 死状态 | 审计提交 | `RuntimeInputProcessorTest.providerAuthenticationFailureIsFinalAndPersistsOnlySafeCode` + `invalidToolCallFailsClosedWithoutSuccess` |
+| 18.4 | 执行失败显示错误不卡住 | ✅ | 功能不可用 | 认证失败、未知工具与网络失败均终结 attempt/run；可纠正的工具参数错误先进入一次有界自纠，连续失败再落固定 `INVALID_TOOL_ARGUMENTS/FAILED_FINAL`，不保留 OBSERVING/EXECUTING 死状态 | 本提交 `fix(16.16)` | `RuntimeInputProcessorTest.providerAuthenticationFailureIsFinalAndPersistsOnlySafeCode` + `invalidToolCallFailsClosedWithoutSuccess` + `repeatedInvalidToolArgumentsStopAfterOneCorrection` |
 | 18.5 | 确认后执行失败显示错误 | ⚪ | — | approval 与执行分离持久化，确认后的 DomainWriter 失败不写成功事件/领域数据，run 投影安全失败 | 审计提交 | `RoomScheduleToolExecutorTest.unconfirmedOrMismatchedApprovalWritesNothing` + 原子失败测试 |
 | 18.6 | 确认后执行成功显示权威结果 | ⚪ | — | 成功正文由已提交 ToolExecution 的 safeResult/领域记录生成，不允许模型仅凭意图宣称成功 | 审计提交 | `RuntimeInputProcessorTest.workToolCallRequiresApprovalThenCreatesScheduleExactlyOnce` |
 | 18.7 | 拒绝后能否再提议 | ⚪ | — | REJECT 终结当前 run 并清 pendingApproval；后续 START 使用新 run/idempotency key，可再次形成独立提议 | 审计提交 | `AgentRuntimeProjectionControllerTest`（reject 命令）+ `RuntimeGatewayTest.sixCommandsPersistWithCasAndDuplicateDoesNotAppendAgain` |

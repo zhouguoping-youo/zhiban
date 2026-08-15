@@ -156,6 +156,140 @@ internal class RuntimeEventAppender(private val store: RoomRuntimeStore, private
         store.appendProviderEventOnce(draft, ownerId, fencingEpoch, clock())
     }
 
+    internal suspend fun appendProviderDelta(event: ModelEvent.Delta, attemptId: String, ids: RunIdentifiers) {
+        append(
+            RuntimeEventDraft(
+                "event-provider-$attemptId-delta-${event.ordinal}",
+                "AssistantDelta",
+                ids.sessionId,
+                ids.runId,
+                attemptId,
+                attemptId,
+                ids.runId,
+                buildJsonObject {
+                    put("ordinal", event.ordinal)
+                    put("part", event.text)
+                    put("final", false)
+                    put("providerOffset", event.ordinal)
+                }.toString(),
+                clock(),
+            ),
+            ids.fencingEpoch,
+        )
+    }
+
+    internal suspend fun appendProviderUsage(event: ModelEvent.Usage, capability: CapabilitySnapshot, attemptId: String, ids: RunIdentifiers) {
+        append(
+            RuntimeEventDraft(
+                "event-provider-$attemptId-usage",
+                "ProviderUsageRecorded",
+                ids.sessionId,
+                ids.runId,
+                attemptId,
+                attemptId,
+                ids.runId,
+                buildJsonObject {
+                    put("usedTokens", event.inputTokens + event.outputTokens)
+                    put("maxTokens", capability.maxContextTokens)
+                }.toString(),
+                clock(),
+            ),
+            ids.fencingEpoch,
+        )
+    }
+
+    internal suspend fun appendProviderFinal(event: ModelEvent.Final, lastOrdinal: Long, attemptId: String, ids: RunIdentifiers) {
+        append(
+            RuntimeEventDraft(
+                "event-provider-$attemptId-final-delta",
+                "AssistantDelta",
+                ids.sessionId,
+                ids.runId,
+                attemptId,
+                attemptId,
+                ids.runId,
+                buildJsonObject {
+                    put("ordinal", lastOrdinal + 1)
+                    put("part", "")
+                    put("final", true)
+                    put("finishReason", event.finishReason)
+                }.toString(),
+                clock(),
+            ),
+            ids.fencingEpoch,
+        )
+    }
+
+    internal suspend fun appendObservation(attemptId: String, ids: RunIdentifiers, suffix: String, type: String, payload: String) {
+        store.appendObservationEventOnce(
+            RuntimeEventDraft(
+                "event-observation-$attemptId-$suffix",
+                type,
+                ids.sessionId,
+                ids.runId,
+                attemptId,
+                attemptId,
+                ids.runId,
+                payload,
+                clock(),
+            ),
+            ownerId,
+            ids.fencingEpoch,
+            clock(),
+        )
+    }
+
+    internal suspend fun appendObservationDelta(event: ModelEvent.Delta, attemptId: String, ids: RunIdentifiers) = appendObservation(
+        attemptId,
+        ids,
+        "delta-${event.ordinal}",
+        "AssistantDelta",
+        buildJsonObject {
+            put("ordinal", event.ordinal)
+            put("part", event.text)
+            put("final", false)
+            put("providerOffset", event.ordinal)
+        }.toString(),
+    )
+
+    internal suspend fun appendObservationUsage(event: ModelEvent.Usage, capability: CapabilitySnapshot, attemptId: String, ids: RunIdentifiers) =
+        appendObservation(
+            attemptId,
+            ids,
+            "usage",
+            "ProviderUsageRecorded",
+            buildJsonObject {
+                put("usedTokens", event.inputTokens + event.outputTokens)
+                put("maxTokens", capability.maxContextTokens)
+            }.toString(),
+        )
+
+    internal suspend fun appendObservationFallback(lastOrdinal: Long, fallback: String, attemptId: String, ids: RunIdentifiers) = appendObservation(
+        attemptId,
+        ids,
+        "deterministic-result",
+        "AssistantDelta",
+        buildJsonObject {
+            put("ordinal", lastOrdinal)
+            put("part", fallback)
+            put("final", false)
+            put("providerOffset", lastOrdinal)
+        }.toString(),
+    )
+
+    internal suspend fun appendObservationFinal(event: ModelEvent.Final, lastOrdinal: Long, attemptId: String, ids: RunIdentifiers) = appendObservation(
+        attemptId,
+        ids,
+        "final-delta",
+        "AssistantDelta",
+        buildJsonObject {
+            put("ordinal", lastOrdinal + 1)
+            put("part", "")
+            put("final", true)
+            put("finishReason", event.finishReason)
+        }.toString(),
+    )
+
     internal suspend fun appendPerception(
         plannedAttemptId: String,
         runId: String,

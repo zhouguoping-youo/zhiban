@@ -322,6 +322,105 @@ class RuntimeInputProcessorTest {
         assertFalse(events.any { it.eventType == "RunCompleted" || it.eventType == "ProviderToolCallReceived" })
     }
 
+    @Test fun invalidToolArgumentsAreReturnedToModelForOneCorrection() = runBlocking {
+        database.contactDao().insert(
+            ContactEntity(
+                "contact-correction", "张三", "张三", "13800138000", null, null,
+                "知伴科技", "项目经理", "[]", "[]", null, null, "USER", null, now, now,
+            ),
+        )
+        val input = """{"schemaVersion":1,"text":"查一下张三的联系方式","mode":"Work","model":"M2.7","level":"高"}"""
+        val staged = RoomTextInputGateway(database, { true }, { now }).stage(input)
+        RoomRuntimeGateways(database, "test") { now++ }.accept(
+            RuntimeUiCommand.Start(
+                "s-tool-correction", staged.inputRef, "c-tool-correction", "a-tool-correction",
+                0, "chat", "r-tool-correction",
+            ),
+        )
+        val requests = mutableListOf<ModelRequest>()
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile) = capability(profile)
+            override fun stream(request: ModelRequest): kotlinx.coroutines.flow.Flow<ModelEvent> {
+                requests += request
+                return when (requests.size) {
+                    1 -> flowOf(
+                        ModelEvent.ToolCall(0, "call-invalid", "contact.search", "{}"),
+                        ModelEvent.Final("tool_calls"),
+                    )
+                    2 -> {
+                        assertTrue(request.messages.any { it.content.contains("INVALID_TOOL_ARGUMENTS") })
+                        assertTrue(requireNotNull(request.toolsJson).contains("contact_search"))
+                        flowOf(
+                            ModelEvent.ToolCall(
+                                0, "call-corrected", "contact.search", """{"query":"张三"}""",
+                            ),
+                            ModelEvent.Final("tool_calls"),
+                        )
+                    }
+                    else -> {
+                        assertTrue(request.messages.any { it.content.contains("contact-correction") })
+                        flowOf(ModelEvent.Delta(0, "找到了张三。"), ModelEvent.Final("stop"))
+                    }
+                }
+            }
+            override fun cancel(requestId: String) = true
+        }
+        val processor = KernelCommandProcessor(
+            database, "processor", { true }, { now++ }, provider = provider, profiles = fixedProfileStore(),
+        )
+
+        processor.processNext()
+        awaitRunStatus("r-tool-correction", "SUCCEEDED")
+
+        assertEquals(3, requests.size)
+        val executions = database.runtimeToolExecutionDao().listByRunId("r-tool-correction")
+        assertEquals(listOf("FAILED", "SUCCEEDED"), executions.map { it.status })
+        assertEquals(setOf("contact.search"), executions.map { it.toolName }.toSet())
+        assertEquals(
+            1,
+            database.runtimeEventDao().listByRunId("r-tool-correction").count { it.eventType == "ToolFailed" },
+        )
+    }
+
+    @Test fun repeatedInvalidToolArgumentsStopAfterOneCorrection() = runBlocking {
+        val input = """{"schemaVersion":1,"text":"查联系人","mode":"Work","model":"M2.7","level":"高"}"""
+        val staged = RoomTextInputGateway(database, { true }, { now }).stage(input)
+        RoomRuntimeGateways(database, "test") { now++ }.accept(
+            RuntimeUiCommand.Start(
+                "s-tool-correction-limit", staged.inputRef, "c-tool-correction-limit",
+                "a-tool-correction-limit", 0, "chat", "r-tool-correction-limit",
+            ),
+        )
+        var requestCount = 0
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile) = capability(profile)
+            override fun stream(request: ModelRequest): kotlinx.coroutines.flow.Flow<ModelEvent> {
+                requestCount += 1
+                return flowOf(
+                    ModelEvent.ToolCall(0, "call-invalid-$requestCount", "contact.search", "{}"),
+                    ModelEvent.Final("tool_calls"),
+                )
+            }
+            override fun cancel(requestId: String) = true
+        }
+        val processor = KernelCommandProcessor(
+            database, "processor", { true }, { now++ }, provider = provider, profiles = fixedProfileStore(),
+        )
+
+        processor.processNext()
+        awaitRunStatus("r-tool-correction-limit", "FAILED_FINAL")
+
+        assertEquals(2, requestCount)
+        assertEquals(
+            listOf("FAILED", "FAILED"),
+            database.runtimeToolExecutionDao().listByRunId("r-tool-correction-limit").map { it.status },
+        )
+        val events = database.runtimeEventDao().listByRunId("r-tool-correction-limit")
+        assertEquals(2, events.count { it.eventType == "ToolFailed" })
+        assertEquals(1, events.count { it.eventType == "RunFailedFinal" })
+        assertFalse(events.any { it.eventType == "RunCompleted" })
+    }
+
     @Test fun workToolApprovalSurvivesProcessorRestartThenCreatesScheduleExactlyOnce() = runBlocking {
         val input = """{"schemaVersion":1,"text":"明天下午 3 点开会，提前 10 分钟提醒我","mode":"Work","model":"M2.7","level":"高"}"""
         val staged = RoomTextInputGateway(database, { true }, { now }).stage(input)

@@ -198,4 +198,93 @@ internal class RoomToolExecutionStore(
         )
         execution
     }
+
+    /** Records a rejected model-generated call without persisting its raw arguments. */
+    suspend fun recordInvalidToolArguments(
+        runId: String,
+        providerCallId: String,
+        toolName: String,
+        argumentsDigest: String,
+        safeResultJson: String,
+        terminal: Boolean,
+        ownerId: String,
+        fencingEpoch: Long,
+        nowEpochMs: Long,
+    ): RuntimeToolExecutionEntity = database.withTransaction {
+        val run = requireNotNull(database.runtimeRunDao().find(runId))
+        requireActiveLease(run.sessionId, ownerId, fencingEpoch, nowEpochMs)
+        val idempotencyKey = sha256("$runId|$providerCallId|$toolName|$argumentsDigest|invalid")
+        database.runtimeToolExecutionDao().findByKey(idempotencyKey)?.let { return@withTransaction it }
+        check(run.status in setOf(RuntimeRunStatus.INFERENCING.name, RuntimeRunStatus.OBSERVING.name))
+        val attemptId = requireNotNull(run.activeAttemptId)
+        val execution = RuntimeToolExecutionEntity(
+            executionId = "exec-${sha256(idempotencyKey).take(32)}",
+            runId = runId,
+            logicalStepId = "step-$providerCallId",
+            toolName = toolName,
+            toolSpecVersion = 1,
+            canonicalInputDigest = argumentsDigest,
+            idempotencyKey = idempotencyKey,
+            providerCallId = providerCallId,
+            attemptId = attemptId,
+            status = "FAILED",
+            resultRef = "result-${sha256(safeResultJson).take(24)}",
+            safeResultJson = safeResultJson,
+            fencingEpoch = fencingEpoch,
+            createdAtEpochMs = nowEpochMs,
+            updatedAtEpochMs = nowEpochMs,
+        )
+        database.runtimeToolExecutionDao().insert(execution)
+        check(database.runtimeAttemptDao().finish(attemptId, "FAILED", nowEpochMs) == 1)
+        val toolFailed = appendEventInTransaction(
+            RuntimeEventDraft(
+                "event-tool-arguments-${sha256("$runId:$providerCallId").take(24)}",
+                "ToolFailed",
+                run.sessionId,
+                runId,
+                attemptId,
+                providerCallId,
+                runId,
+                buildJsonObject {
+                    put("toolName", toolName)
+                    put("errorCode", "INVALID_TOOL_ARGUMENTS")
+                }.toString(),
+                nowEpochMs,
+            ),
+            fencingEpoch,
+        )
+        val terminalEvent = if (terminal) {
+            appendEventInTransaction(
+                RuntimeEventDraft(
+                    "event-tool-arguments-$attemptId-terminal",
+                    "RunFailedFinal",
+                    run.sessionId,
+                    runId,
+                    attemptId,
+                    providerCallId,
+                    runId,
+                    "{\"errorCode\":\"INVALID_TOOL_ARGUMENTS\"}",
+                    nowEpochMs,
+                ),
+                fencingEpoch,
+            )
+        } else {
+            toolFailed
+        }
+        val targetStatus = if (terminal) {
+            RuntimeRunStatus.FAILED_FINAL.name
+        } else {
+            RuntimeRunStatus.OBSERVING.name
+        }
+        check(
+            database.runtimeRunDao().transition(
+                runId,
+                run.status,
+                targetStatus,
+                terminalEvent.sequence,
+                nowEpochMs,
+            ) == 1,
+        )
+        execution
+    }
 }

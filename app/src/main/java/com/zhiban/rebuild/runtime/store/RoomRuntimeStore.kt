@@ -1473,6 +1473,28 @@ internal class RoomRuntimeStore(private val database: AgentDatabase, private val
     ): RuntimeToolExecutionEntity =
         tools.completeReadOnlyTool(runId, providerCallId, toolName, toolSpecVersion, argumentsDigest, safeResultJson, ownerId, fencingEpoch, nowEpochMs)
 
+    suspend fun recordInvalidToolArguments(
+        runId: String,
+        providerCallId: String,
+        toolName: String,
+        argumentsDigest: String,
+        safeResultJson: String,
+        terminal: Boolean,
+        ownerId: String,
+        fencingEpoch: Long,
+        nowEpochMs: Long,
+    ): RuntimeToolExecutionEntity = tools.recordInvalidToolArguments(
+        runId,
+        providerCallId,
+        toolName,
+        argumentsDigest,
+        safeResultJson,
+        terminal,
+        ownerId,
+        fencingEpoch,
+        nowEpochMs,
+    )
+
     suspend fun recoverableSessionIds(nowEpochMs: Long): List<String> = database.runtimeSessionDao().findRecoverableSessionIds(nowEpochMs)
 
     suspend fun eventsAfter(sessionId: String, sequence: Long): List<RuntimeEventEntity> = database.runtimeEventDao().listAfter(sessionId, sequence)
