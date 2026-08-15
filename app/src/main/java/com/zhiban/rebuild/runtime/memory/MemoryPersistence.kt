@@ -417,7 +417,7 @@ internal interface MemoryPersistenceDao {
         WHERE c.namespaceId=:namespaceId AND r.status='ACTIVE' AND r.txToEpochMs IS NULL
           AND (r.expiresAtEpochMs IS NULL OR r.expiresAtEpochMs>:trustedNow)
           AND NOT EXISTS (SELECT 1 FROM memory_tombstones t WHERE t.namespaceId=c.namespaceId AND t.logicalMemoryId=c.logicalMemoryId)
-        ORDER BY r.logicalMemoryId
+        ORDER BY r.confidence DESC, r.observedAtEpochMs DESC, r.logicalMemoryId
     """,
     )
     suspend fun recall(namespaceId: String, trustedNow: Long): List<MemoryRecordEntity>

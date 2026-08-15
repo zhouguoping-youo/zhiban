@@ -234,7 +234,7 @@ internal class RoomContextRetrievalPipeline(
 
     private suspend fun recentMemoryCandidates(): List<RetrievalCandidate> {
         val now = clock()
-        return database.memoryPersistenceDao().recall("runtime-global", now).takeLast(10).map { memory ->
+        return database.memoryPersistenceDao().recall("runtime-global", now).take(10).map { memory ->
             RetrievalCandidate(
                 "memory:${memory.memoryId}",
                 "memory",

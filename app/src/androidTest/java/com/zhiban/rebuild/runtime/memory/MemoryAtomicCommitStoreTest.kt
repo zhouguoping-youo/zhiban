@@ -117,6 +117,20 @@ class MemoryAtomicCommitStoreTest {
         assertEquals(listOf(memoryText), search.items.map { it.canonicalText })
     }
 
+    @Test fun recallReturnsNewestHighConfidenceMemoriesFirst() = runBlocking {
+        store.ensureNamespace(namespace())
+        val olderId = stage("older", "较早记忆")
+        store.commit(commitRequest(olderId, "较早记忆").copy(logicalMemoryId = "a-older"))
+        now += 10_000
+        val newerId = stage("newer", "最新记忆")
+        store.commit(commitRequest(newerId, "最新记忆").copy(logicalMemoryId = "z-newer"))
+
+        assertEquals(
+            listOf("最新记忆", "较早记忆"),
+            store.recall("namespace-1").records.map { it.canonicalText },
+        )
+    }
+
     @Test fun commitFailureRollsBackRecordReceiptEventOutboxAndCandidateConsumption() = runBlocking {
         store.ensureNamespace(namespace())
         val candidateId = stage()
