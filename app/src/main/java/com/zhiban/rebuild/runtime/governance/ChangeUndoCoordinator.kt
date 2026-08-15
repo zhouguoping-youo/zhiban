@@ -223,12 +223,16 @@ internal class ChangeUndoCoordinator(private val database: AgentDatabase) {
             id = text("id") ?: return false, title = text("title") ?: return false,
             startAtEpochMs = text("startAtEpochMs")?.toLongOrNull() ?: return false,
             durationMinutes = text("durationMinutes")?.toIntOrNull() ?: return false,
+            reminderMinutesBefore = text("reminderMinutesBefore")?.toIntOrNull(),
             note = json["note"]?.jsonPrimitive?.content,
             createdByRunId = json["createdByRunId"]?.jsonPrimitive?.content,
             createdByRuntimeRunId = json["createdByRuntimeRunId"]?.jsonPrimitive?.content,
             createdByRuntimeAttemptId = json["createdByRuntimeAttemptId"]?.jsonPrimitive?.content,
             createdAtEpochMs = text("createdAtEpochMs")?.toLongOrNull() ?: return false,
             updatedAtEpochMs = nowEpochMs,
+            status = text("status") ?: com.zhiban.rebuild.data.agent.ScheduleStatus.PENDING,
+            outcomeNote = text("outcomeNote"),
+            completedAtEpochMs = text("completedAtEpochMs")?.toLongOrNull(),
         )
         val changed = if (insert) {
             runSuspendCatching {

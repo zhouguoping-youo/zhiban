@@ -13,12 +13,16 @@ internal class RoomScheduleProjectionWriter(private val database: AgentDatabase)
         put("title", value.title)
         put("startAtEpochMs", value.startAtEpochMs)
         put("durationMinutes", value.durationMinutes)
+        value.reminderMinutesBefore?.let { put("reminderMinutesBefore", it) }
         value.note?.let { put("note", it) }
         value.createdByRunId?.let { put("createdByRunId", it) }
         value.createdByRuntimeRunId?.let { put("createdByRuntimeRunId", it) }
         value.createdByRuntimeAttemptId?.let { put("createdByRuntimeAttemptId", it) }
         put("createdAtEpochMs", value.createdAtEpochMs)
         put("updatedAtEpochMs", value.updatedAtEpochMs)
+        put("status", value.status)
+        value.outcomeNote?.let { put("outcomeNote", it) }
+        value.completedAtEpochMs?.let { put("completedAtEpochMs", it) }
     }.toString()
 
     suspend fun putScheduleFact(value: ScheduleEntity, runId: String, nowEpochMs: Long) {

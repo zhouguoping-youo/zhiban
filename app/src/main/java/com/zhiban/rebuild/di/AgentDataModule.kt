@@ -270,6 +270,17 @@ object AgentDataModule {
                     schedule.reminderMinutesBefore,
                 )
             },
+            onScheduleUndo = { scheduleId, schedule ->
+                if (schedule == null) {
+                    reminderScheduler.cancel(scheduleId)
+                } else {
+                    reminderScheduler.replace(
+                        schedule.id,
+                        schedule.startAtEpochMs,
+                        schedule.reminderMinutesBefore,
+                    )
+                }
+            },
         ),
         infrastructure = com.zhiban.rebuild.runtime.kernel.ProviderEngineInfrastructure(
             mcpEnvironment = mcpEnvironment,

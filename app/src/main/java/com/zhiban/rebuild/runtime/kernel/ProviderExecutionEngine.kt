@@ -166,6 +166,7 @@ internal data class ProviderEngineConfig(
     },
     val skillSpecs: () -> List<SkillSpec> = { com.zhiban.agent.skills.BuiltInSkills.all },
     val onScheduleSaved: (com.zhiban.rebuild.data.agent.ScheduleEntity) -> Unit = {},
+    val onScheduleUndo: (String, com.zhiban.rebuild.data.agent.ScheduleEntity?) -> Unit = { _, _ -> },
 )
 
 /** 可选的外部依赖网关；缺省为 null，引擎按既定降级路径走。 */

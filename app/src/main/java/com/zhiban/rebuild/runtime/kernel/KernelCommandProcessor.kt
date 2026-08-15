@@ -6,12 +6,13 @@ import com.zhiban.rebuild.runtime.provider.ProviderProfileStore
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
 import com.zhiban.rebuild.runtime.store.RuntimeCommandInboxEntity
 import com.zhiban.rebuild.runtime.store.containClaimedCommandFailure
+import com.zhiban.rebuild.runtime.store.notifyReminderAfterScheduleUndo
 import kotlinx.coroutines.CancellationException
 
 private const val SESSION_LEASE_MS = 30_000L
 
 internal class KernelCommandProcessor(
-    database: AgentDatabase,
+    private val database: AgentDatabase,
     private val ownerId: String,
     private val enabled: () -> Boolean,
     private val clock: () -> Long = System::currentTimeMillis,
@@ -22,6 +23,7 @@ internal class KernelCommandProcessor(
 ) {
     enum class Outcome { IDLE, PROCESSED, FAILED }
     private val store = RoomRuntimeStore(database, producerVersion = "runtime-v2")
+    private val onScheduleUndo = config.onScheduleUndo
     private val providerEngine = if (provider != null && profiles != null) {
         ProviderExecutionEngine(
             database = database,
@@ -55,6 +57,7 @@ internal class KernelCommandProcessor(
             return Outcome.FAILED
         }
         if (!processed) return Outcome.FAILED
+        database.notifyReminderAfterScheduleUndo(command.commandId, onScheduleUndo)
         return if (dispatchRuntimeWork(command, lease.leaseEpoch)) Outcome.PROCESSED else Outcome.FAILED
     }
 

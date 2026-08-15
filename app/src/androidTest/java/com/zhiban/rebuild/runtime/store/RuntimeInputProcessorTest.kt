@@ -23,6 +23,7 @@ import com.zhiban.rebuild.runtime.context.LocalEntityExtractor
 import com.zhiban.rebuild.runtime.context.PerceptionGateway
 import com.zhiban.rebuild.runtime.context.QueryContext
 import com.zhiban.rebuild.runtime.kernel.KernelCommandProcessor
+import com.zhiban.rebuild.runtime.kernel.ProviderEngineConfig
 import com.zhiban.rebuild.runtime.kernel.RuntimeCommandRunner
 import com.zhiban.rebuild.runtime.mcp.McpConnectionFactory
 import com.zhiban.rebuild.runtime.mcp.McpRemoteEnvironment
@@ -1184,9 +1185,11 @@ class RuntimeInputProcessorTest {
     }
 
     @Test fun calendarUpdateAndDeleteRequireApprovalPersistAuditAndUndo() = runBlocking {
+        val reminderChanges = mutableListOf<Pair<String, com.zhiban.rebuild.data.agent.ScheduleEntity?>>()
         database.scheduleDao().insert(
             com.zhiban.rebuild.data.agent.ScheduleEntity(
                 "schedule-mutate", "原始会议", 5_000_000, 30, "原备注", null, null, null, now, now,
+                reminderMinutesBefore = 15,
             ),
         )
 
@@ -1212,10 +1215,17 @@ class RuntimeInputProcessorTest {
                 }
                 override fun cancel(requestId: String) = true
             }
-            val processor =
-                KernelCommandProcessor(database, "processor", {
-                    true
-                }, { now++ }, provider = provider, profiles = fixedProfileStore())
+            val processor = KernelCommandProcessor(
+                database,
+                "processor",
+                { true },
+                { now++ },
+                provider = provider,
+                profiles = fixedProfileStore(),
+                config = ProviderEngineConfig(
+                    onScheduleUndo = { id, schedule -> reminderChanges += id to schedule },
+                ),
+            )
             processor.processNext()
             awaitRunStatus(runId, "AWAITING_CONFIRMATION")
             val approval = database.runtimeEventDao().latestByType(runId, "ApprovalRequested")!!
@@ -1257,9 +1267,14 @@ class RuntimeInputProcessorTest {
             """{"scheduleId":"schedule-mutate","title":"修改后会议","startAtEpochMs":7000000,"durationMinutes":45,"note":"新备注"}""",
         )
         assertEquals("原始会议", database.scheduleDao().findById("schedule-mutate")?.title)
+        assertEquals(15, database.scheduleDao().findById("schedule-mutate")?.reminderMinutesBefore)
+        assertEquals(15, reminderChanges.last().second?.reminderMinutesBefore)
 
         runMutation("delete", "calendar.schedule.delete", """{"scheduleId":"schedule-mutate"}""")
         assertEquals("原始会议", database.scheduleDao().findById("schedule-mutate")?.title)
+        assertEquals(15, database.scheduleDao().findById("schedule-mutate")?.reminderMinutesBefore)
+        assertEquals("schedule-mutate", reminderChanges.last().first)
+        assertEquals(15, reminderChanges.last().second?.reminderMinutesBefore)
         assertTrue(FactIndex(database).search("原始会议", now, 10).any { it.factId == "schedule:schedule-mutate" })
     }
 
