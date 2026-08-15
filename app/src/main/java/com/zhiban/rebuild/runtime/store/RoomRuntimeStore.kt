@@ -1432,7 +1432,7 @@ internal class RoomRuntimeStore(private val database: AgentDatabase, private val
 
     suspend fun commandResult(commandId: String): String? = database.runtimeCommandInboxDao().find(commandId)?.resultJson
 
-    private val tools = RoomToolExecutionStore(
+    internal val tools = RoomToolExecutionStore(
         database = database,
         requireActiveLease = ::requireActiveLease,
         appendEventInTransaction = ::appendEventInTransaction,

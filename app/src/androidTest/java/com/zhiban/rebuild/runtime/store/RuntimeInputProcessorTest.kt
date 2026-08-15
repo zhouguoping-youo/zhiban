@@ -2355,6 +2355,120 @@ class RuntimeInputProcessorTest {
         environment.remove("lease")
     }
 
+    @Test fun recoveredRemoteToolDoesNotRepeatAnUnresolvedExternalSideEffect() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.getSharedPreferences("runtime_mcp_servers", Context.MODE_PRIVATE).edit().clear().commit()
+        var currentNow = 20_000L
+        val factory = RuntimeMcpFactory()
+        val environment = McpRemoteEnvironment(
+            context,
+            NoopCredentialProvisioner(),
+            factory,
+            OutboundExportGate({ OutboundPolicySettings(allowRemoteMcp = true) }),
+        ) { currentNow }
+        environment.configure("recovery", "Recovery MCP", "https://mcp.example.test/rpc", null)
+        val staged = RoomTextInputGateway(database, { true }, { currentNow }).stage(
+            """{"schemaVersion":1,"text":"查询团队任务","mode":"Work","model":"M2.7","level":"高"}""",
+        )
+        val gateway = RoomRuntimeGateways(database, "test", clock = { currentNow })
+        gateway.accept(
+            RuntimeUiCommand.Start(
+                "s-mcp-recovery",
+                staged.inputRef,
+                "c-mcp-recovery",
+                "a-mcp-recovery",
+                0,
+                "chat",
+                "r-mcp-recovery",
+            ),
+        )
+        val commandProcessor = KernelCommandProcessor(database, "owner-a", { true }, { currentNow })
+        commandProcessor.processNext()
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile) = capability(profile)
+            override fun stream(request: ModelRequest) = flowOf(
+                ModelEvent.ToolCall(
+                    0,
+                    "call-mcp-recovery",
+                    "mcp_recovery_tasks_search",
+                    """{"query":"quarterly"}""",
+                ),
+                ModelEvent.Final("tool_calls"),
+            )
+            override fun cancel(requestId: String) = true
+        }
+        val infrastructure = com.zhiban.rebuild.runtime.kernel.ProviderEngineInfrastructure(mcpEnvironment = environment)
+        val preparingEngine = com.zhiban.rebuild.runtime.kernel.ProviderExecutionEngine(
+            database,
+            provider,
+            fixedProfileStore(),
+            "owner-a",
+            { currentNow },
+            infrastructure = infrastructure,
+        )
+        val initialLease = requireNotNull(database.runtimeSessionDao().find("s-mcp-recovery"))
+        assertTrue(preparingEngine.execute("r-mcp-recovery", "s-mcp-recovery", initialLease.leaseEpoch))
+        val approval = approvalPlan("r-mcp-recovery")
+        val approvalRevision = requireNotNull(database.runtimeSessionDao().find("s-mcp-recovery")).nextSequence - 1
+        gateway.accept(
+            RuntimeUiCommand.RunAction(
+                RuntimeAction.APPROVE,
+                "s-mcp-recovery",
+                "r-mcp-recovery",
+                "approve-mcp-recovery",
+                "approve-mcp-recovery-action",
+                approvalRevision,
+                "chat",
+                approval.getValue("proposalId").jsonPrimitive.content,
+                approval.getValue("payloadRef").jsonPrimitive.content,
+            ),
+        )
+        commandProcessor.processNext()
+        val executionLease = requireNotNull(database.runtimeSessionDao().find("s-mcp-recovery"))
+        val store = RoomRuntimeStore(database, "test")
+        store.reserveApprovedExternalTool(
+            ApprovedExternalToolReservationRequest(
+                "r-mcp-recovery",
+                approval.getValue("providerCallId").jsonPrimitive.content,
+                approval.getValue("logicalStepId").jsonPrimitive.content,
+                approval.getValue("toolName").jsonPrimitive.content,
+                1,
+                approval.getValue("canonicalInputDigest").jsonPrimitive.content,
+                approval.getValue("idempotencyKey").jsonPrimitive.content,
+                "owner-a",
+                executionLease.leaseEpoch,
+                currentNow,
+            ),
+        )
+
+        currentNow = requireNotNull(executionLease.leaseExpiresAtEpochMs) + 1
+        val recoveredLease = store.claimSession("s-mcp-recovery", "owner-b", currentNow, 30_000)
+        val recoveryEngine = com.zhiban.rebuild.runtime.kernel.ProviderExecutionEngine(
+            database,
+            provider,
+            fixedProfileStore(),
+            "owner-b",
+            { currentNow },
+            infrastructure = infrastructure,
+        )
+
+        assertFalse(recoveryEngine.executeApprovedTool("r-mcp-recovery", "s-mcp-recovery", recoveredLease.leaseEpoch))
+        assertEquals(0, factory.callCount)
+        assertEquals("FAILED_FINAL", database.runtimeRunDao().find("r-mcp-recovery")?.status)
+        assertTrue(
+            database.runtimeEventDao().listByRunId("r-mcp-recovery").any {
+                it.eventType == "RunFailedFinal" && it.payloadJson.contains("EXTERNAL_SIDE_EFFECT_OUTCOME_UNKNOWN")
+            },
+        )
+        assertEquals(
+            "IN_PROGRESS",
+            database.runtimeToolExecutionDao().findByKey(
+                approval.getValue("idempotencyKey").jsonPrimitive.content,
+            )?.status,
+        )
+        environment.remove("recovery")
+    }
+
     @Test fun explicitFeedbackIsPersistedAndAvailableToFuturePlanning() = runBlocking {
         val staged = RoomTextInputGateway(database, { true }, { now }).stage("hello")
         val gateway = RoomRuntimeGateways(database, "test") { now++ }

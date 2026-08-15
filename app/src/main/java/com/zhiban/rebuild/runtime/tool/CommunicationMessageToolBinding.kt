@@ -3,8 +3,11 @@ package com.zhiban.rebuild.runtime.tool
 import com.zhiban.rebuild.data.communication.CommunicationHandoffLauncher
 import com.zhiban.rebuild.runtime.provider.ProviderFailure
 import com.zhiban.rebuild.runtime.runSuspendCatching
+import com.zhiban.rebuild.runtime.store.ApprovedExternalToolReservationRequest
 import com.zhiban.rebuild.runtime.store.ApprovedToolExecutionRequest
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
+import com.zhiban.rebuild.runtime.store.abandonApprovedExternalToolReservation
+import com.zhiban.rebuild.runtime.store.reserveApprovedExternalTool
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -70,10 +73,32 @@ internal class CommunicationMessageToolBinding(
         val idempotencyKey = value("idempotencyKey")
         store.toolResult(idempotencyKey)?.let { existing ->
             require(existing.canonicalInputDigest == expectedDigest) { "COMMUNICATION_IDEMPOTENCY_CONFLICT" }
+            if (existing.status != "SUCCEEDED") {
+                throw ProviderFailure("EXTERNAL_SIDE_EFFECT_OUTCOME_UNKNOWN", false)
+            }
             return RoutedToolResult(TOOL_NAME, value("providerCallId"), requireNotNull(existing.safeResultJson))
         }
+        val providerCallId = value("providerCallId")
+        val reservation = store.reserveApprovedExternalTool(
+            ApprovedExternalToolReservationRequest(
+                context.runId,
+                providerCallId,
+                value("logicalStepId"),
+                TOOL_NAME,
+                spec.version,
+                expectedDigest,
+                idempotencyKey,
+                context.ownerId,
+                context.fencingEpoch,
+                context.nowEpochMs,
+            ),
+        )
+        if (!reservation.acquired) throw ProviderFailure("EXTERNAL_SIDE_EFFECT_OUTCOME_UNKNOWN", false)
         val handoff = runSuspendCatching { handoffLauncher.open(platform, recipient, message) }
-            .getOrElse { throw ProviderFailure("TARGET_APP_UNAVAILABLE", false) }
+            .getOrElse {
+                store.abandonApprovedExternalToolReservation(reservation.execution.executionId, context.fencingEpoch)
+                throw ProviderFailure("TARGET_APP_UNAVAILABLE", false)
+            }
         val safeResult = buildJsonObject {
             put("platform", handoff.platform)
             put("recipient", recipient)
@@ -87,7 +112,7 @@ internal class CommunicationMessageToolBinding(
             store.completeApprovedRemoteTool(
                 ApprovedToolExecutionRequest(
                     context.runId,
-                    value("providerCallId"),
+                    providerCallId,
                     value("logicalStepId"),
                     TOOL_NAME,
                     spec.version,
@@ -100,7 +125,7 @@ internal class CommunicationMessageToolBinding(
                 ),
             )
         }
-        return RoutedToolResult(TOOL_NAME, value("providerCallId"), safeResult)
+        return RoutedToolResult(TOOL_NAME, providerCallId, safeResult)
     }
 
     private fun parseArguments(value: String) = runCatching { Json.parseToJsonElement(value).jsonObject }

@@ -219,6 +219,16 @@ internal interface RuntimeToolExecutionDao {
 
     @Query("SELECT COUNT(*) FROM runtime_tool_executions WHERE runId = :runId")
     suspend fun countByRun(runId: String): Int
+
+    @Query(
+        "UPDATE runtime_tool_executions SET status = 'SUCCEEDED', resultRef = :resultRef, safeResultJson = :safeResultJson, fencingEpoch = :fencingEpoch, updatedAtEpochMs = :nowEpochMs WHERE executionId = :executionId AND status = 'IN_PROGRESS'",
+    )
+    suspend fun completeReserved(executionId: String, resultRef: String, safeResultJson: String, fencingEpoch: Long, nowEpochMs: Long): Int
+
+    @Query(
+        "DELETE FROM runtime_tool_executions WHERE executionId = :executionId AND status = 'IN_PROGRESS' AND fencingEpoch = :fencingEpoch",
+    )
+    suspend fun deleteReservation(executionId: String, fencingEpoch: Long): Int
 }
 
 @Dao

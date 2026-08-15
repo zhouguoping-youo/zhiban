@@ -4,8 +4,10 @@ import com.zhiban.rebuild.runtime.mcp.McpRemoteEnvironment
 import com.zhiban.rebuild.runtime.mcp.McpRemoteTool
 import com.zhiban.rebuild.runtime.provider.ProviderFailure
 import com.zhiban.rebuild.runtime.runSuspendCatching
+import com.zhiban.rebuild.runtime.store.ApprovedExternalToolReservationRequest
 import com.zhiban.rebuild.runtime.store.ApprovedToolExecutionRequest
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
+import com.zhiban.rebuild.runtime.store.reserveApprovedExternalTool
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -86,12 +88,31 @@ internal class RemoteMcpToolBinding(private val remote: McpRemoteTool, private v
         val idempotencyKey = plan.getValue("idempotencyKey").jsonPrimitive.content
         store.toolResult(idempotencyKey)?.let { existing ->
             require(existing.canonicalInputDigest == expected) { "MCP_IDEMPOTENCY_CONFLICT" }
+            if (existing.status != "SUCCEEDED") {
+                throw ProviderFailure("EXTERNAL_SIDE_EFFECT_OUTCOME_UNKNOWN", false)
+            }
             return RoutedToolResult(
                 spec.name,
                 plan.getValue("providerCallId").jsonPrimitive.content,
                 requireNotNull(existing.safeResultJson),
             )
         }
+        val providerCallId = plan.getValue("providerCallId").jsonPrimitive.content
+        val reservation = store.reserveApprovedExternalTool(
+            ApprovedExternalToolReservationRequest(
+                context.runId,
+                providerCallId,
+                plan.getValue("logicalStepId").jsonPrimitive.content,
+                spec.name,
+                spec.version,
+                expected,
+                idempotencyKey,
+                context.ownerId,
+                context.fencingEpoch,
+                context.nowEpochMs,
+            ),
+        )
+        if (!reservation.acquired) throw ProviderFailure("EXTERNAL_SIDE_EFFECT_OUTCOME_UNKNOWN", false)
         val result = environment.call(remote.serverId, remote.remoteName, arguments)
         val validatedContent = validateRemoteMcpContent(result.content)
         val safeResult = buildJsonObject {
@@ -104,7 +125,6 @@ internal class RemoteMcpToolBinding(private val remote: McpRemoteTool, private v
             put("isError", result.isError)
         }.toString()
         if (safeResult.toByteArray().size > MAX_RESULT_BYTES) throw ProviderFailure("MCP_RESULT_TOO_LARGE", false)
-        val providerCallId = plan.getValue("providerCallId").jsonPrimitive.content
         store.completeApprovedRemoteTool(
             ApprovedToolExecutionRequest(
                 context.runId,
