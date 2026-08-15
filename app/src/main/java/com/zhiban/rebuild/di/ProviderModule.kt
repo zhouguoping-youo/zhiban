@@ -2,7 +2,8 @@ package com.zhiban.rebuild.di
 
 import android.content.Context
 import com.zhiban.rebuild.runtime.context.EmbeddingGateway
-import com.zhiban.rebuild.runtime.context.FtsOnlyEmbeddingGateway
+import com.zhiban.rebuild.runtime.embedding.VolcEmbeddingEnvironment
+import com.zhiban.rebuild.runtime.embedding.VolcEmbeddingTransport
 import com.zhiban.rebuild.runtime.governance.AppPrivateOutboundAuditStore
 import com.zhiban.rebuild.runtime.governance.OutboundDataPreferences
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrGateway
@@ -106,7 +107,20 @@ object ProviderModule {
     ): McpRemoteEnvironment = McpRemoteEnvironment(context, vault, connections, outboundGate)
 
     @Provides @Singleton
-    internal fun provideEmbeddingGateway(): EmbeddingGateway = FtsOnlyEmbeddingGateway
+    internal fun provideVolcEmbeddingEnvironment(
+        @ApplicationContext context: Context,
+        vault: KeystoreCredentialVault,
+        client: OkHttpClient,
+        outboundGate: OutboundExportGate,
+    ): VolcEmbeddingEnvironment = VolcEmbeddingEnvironment(
+        context,
+        vault,
+        VolcEmbeddingTransport(client),
+        outboundGate,
+    )
+
+    @Provides @Singleton
+    internal fun provideEmbeddingGateway(environment: VolcEmbeddingEnvironment): EmbeddingGateway = environment
 
     @Provides @Singleton
     internal fun provideCloudAsrGateway(

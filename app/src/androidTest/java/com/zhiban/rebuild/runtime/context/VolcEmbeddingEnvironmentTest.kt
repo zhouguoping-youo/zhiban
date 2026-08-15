@@ -3,6 +3,7 @@ package com.zhiban.rebuild.runtime.context
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.zhiban.rebuild.di.ProviderModule
 import com.zhiban.rebuild.runtime.embedding.EmbeddingTransport
 import com.zhiban.rebuild.runtime.embedding.VolcEmbeddingEnvironment
 import com.zhiban.rebuild.runtime.provider.KeystoreCredentialVault
@@ -13,6 +14,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -49,6 +51,15 @@ class VolcEmbeddingEnvironmentTest {
         val prefsFile = context.applicationInfo.dataDir + "/shared_prefs/agent_embedding_profile.xml"
         val disk = runCatching { java.io.File(prefsFile).readText() }.getOrDefault("")
         assertFalse(disk.contains("volc-secret-good"))
+    }
+
+    @Test fun productionGatewayUsesTheConfigurableEnvironment() = runBlocking {
+        val gateway = ProviderModule.provideEmbeddingGateway(environment)
+
+        assertSame(environment, gateway)
+        assertNull(gateway.activeSpace())
+        environment.configure("volc-production-binding".toByteArray(), "ep-embedding-binding")
+        assertEquals("ep-embedding-binding", gateway.activeSpace()?.modelId)
     }
 
     @Test fun failedFirstConfigurationDoesNotPublishAndFailedRotationKeepsOldKey() = runBlocking {
