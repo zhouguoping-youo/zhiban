@@ -403,7 +403,12 @@ private val FUTURE_DAY =
 private val CLOCK_PRESENT = Regex("""\d{1,2}\s*(?::|：)\s*\d{1,2}|\d{1,2}\s*点|\b\d{1,2}\s*(?:a\.?m\.?|p\.?m\.?)\b""", RegexOption.IGNORE_CASE)
 
 // Question / query phrasing that means the user is asking about the calendar, not creating in it.
-private val QUERY_INTENT = Regex("""什么|哪些|有没有|有木有|查一下|查看|列出|几点|什么时候|是不是|有空|空闲|[吗呢？?]""")
+private val QUERY_INTENT = Regex("""什么|哪些|有啥|有何|有没有|有木有|查一下|查看|列出|几点|什么时候|是不是|有空|空闲|[吗么嘛呢？?]""")
+private val CALENDAR_READ_QUESTION = Regex(
+    "(?:有啥|有何|有什么|有哪些|有没有)\\s*(?:安排|日程|会议|事)|" +
+        "(?:安排|日程|会议).{0,8}(?:是什么|有哪些|有啥|有何|哪些事)|" +
+        "(?:有安排|有日程|有会议|有事)\\s*(?:吗|么|嘛|吧|呢|[?？])",
+)
 
 /**
  * True when [text] pairs a future day anchor with a concrete clock time and is not phrased as a
@@ -415,6 +420,8 @@ private fun hasFutureScheduleSignal(text: String): Boolean =
     FUTURE_DAY.containsMatchIn(text) && CLOCK_PRESENT.containsMatchIn(text) && !QUERY_INTENT.containsMatchIn(text)
 
 private fun isCalendarReadQuestion(text: String): Boolean {
+    if (listOf("帮我安排", "帮忙安排", "创建日程", "新建日程", "加到日历", "提醒我").any(text::contains)) return false
+    if (CALENDAR_READ_QUESTION.containsMatchIn(text)) return true
     if (!QUERY_INTENT.containsMatchIn(text)) return false
     val asksAboutExistingSchedule = listOf(
         "有安排", "有日程", "有会议", "有什么安排", "有什么日程", "哪些安排", "哪些日程",

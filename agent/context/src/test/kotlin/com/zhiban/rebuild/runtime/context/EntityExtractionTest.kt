@@ -141,6 +141,23 @@ class EntityExtractionTest {
         assertEquals(IntentLabel.GENERAL_CHAT, extractor.extract("明晚8点健身", "Chat", now).intentLabel)
     }
 
+    @Test fun colloquialCalendarQuestionsNeverBecomeCreateIntents() {
+        listOf(
+            "明天有啥安排",
+            "明天有安排么",
+            "明天有安排嘛",
+            "明天有安排吧？",
+            "我明天的安排是什么",
+            "明天安排了哪些事",
+        ).forEach { input ->
+            assertEquals(input, IntentLabel.CALENDAR_QUERY, extractor.extract(input, "Work", now).intentLabel)
+        }
+        assertEquals(
+            IntentLabel.CALENDAR_CREATE,
+            extractor.extract("帮我安排明天下午3点开会吧", "Work", now).intentLabel,
+        )
+    }
+
     // now = 2026-07-21 (Tuesday). Current-week Monday = 2026-07-20.
     @Test fun resolvesNextWeekWeekdayInsteadOfTrustingProviderRelativeDateMath() {
         val result = extractor.extract("下周三下午3点和张总开会", "Work", now)
