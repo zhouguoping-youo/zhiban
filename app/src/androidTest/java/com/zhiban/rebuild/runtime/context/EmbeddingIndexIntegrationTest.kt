@@ -66,7 +66,7 @@ class EmbeddingIndexIntegrationTest {
         assertFalse(result.degradationPath.any { it.startsWith("vector_skipped") })
 
         facts.upsert(fact("fact:okr", "季度目标已经改为客户成功"))
-        assertEquals("vector_skipped:rebuild_pending", index.search("OKR").degradation)
+        assertEquals("vector_partial:rebuild_pending", index.search("OKR").degradation)
         assertEquals(1, index.backfillBatch())
         assertEquals("fact:okr", index.search("OKR").candidates.first().id)
     }
@@ -84,6 +84,19 @@ class EmbeddingIndexIntegrationTest {
         assertEquals(null, index.search("OKR").degradation)
         assertEquals(1, database.embeddingVectorDao().active("provider-a", "embed-v1", 8, now, 10).size)
         assertEquals(1, database.embeddingVectorDao().active("provider-b", "embed-v2", 8, now, 10).size)
+    }
+
+    @Test fun incompleteBackfillStillSearchesTheIndexedSubset() = runTest {
+        val gateway = FakeEmbeddingGateway()
+        FactIndex(database).upsert(fact("fact:okr", "季度目标"))
+        FactIndex(database).upsert(fact("fact:travel", "年度旅行"))
+        val index = EmbeddingIndex(database, gateway) { now }
+
+        assertEquals(1, index.backfillBatch(limit = 1))
+        val result = index.search("目标")
+
+        assertEquals("vector_partial:rebuild_pending", result.degradation)
+        assertEquals(1, result.candidates.size)
     }
 
     @Test fun confirmedOwnerEmploymentIsAlwaysAvailableToAgentContext() = runBlocking {

@@ -68,7 +68,16 @@ internal class EmbeddingIndex(
             space.modelId,
             space.dimensions,
         )
-        if (missing > 0) return VectorSearchResult(emptyList(), "vector_skipped:rebuild_pending")
+        val rows = database.embeddingVectorDao().active(
+            space.providerId,
+            space.modelId,
+            space.dimensions,
+            clock(),
+            MAX_SCAN,
+        )
+        if (rows.isEmpty() && missing > 0) {
+            return VectorSearchResult(emptyList(), "vector_skipped:rebuild_pending")
+        }
         val queryVector = gateway.embed(
             listOf(
                 EmbeddingInput(
@@ -83,13 +92,6 @@ internal class EmbeddingIndex(
         ).singleOrNull()
             ?: return VectorSearchResult(emptyList(), "vector_skipped:invalid_response")
         validate(queryVector, space)
-        val rows = database.embeddingVectorDao().active(
-            space.providerId,
-            space.modelId,
-            space.dimensions,
-            clock(),
-            MAX_SCAN,
-        )
         val ranked = rows.mapNotNull { row ->
             val vector = runSuspendCatching { decode(row.vectorBlob, row.dimensions) }.getOrNull() ?: return@mapNotNull null
             row.factId to cosine(queryVector, vector)
@@ -108,6 +110,7 @@ internal class EmbeddingIndex(
                     )
                 }
             },
+            degradation = if (missing > 0) "vector_partial:rebuild_pending" else null,
         )
     }
 
