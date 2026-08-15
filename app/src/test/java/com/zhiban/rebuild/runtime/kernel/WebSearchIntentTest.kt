@@ -16,4 +16,22 @@ class WebSearchIntentTest {
         assertFalse(shouldForceWebSearch("查一下我今天的日程"))
         assertFalse(shouldForceWebSearch("搜索我的长期记忆"))
     }
+
+    @Test fun stablePreferencesUseAutomaticMemoryButOneTimeTasksDoNot() {
+        assertTrue(shouldForceMemoryUpsert("记住我喜欢先看结论"))
+        assertTrue(shouldForceMemoryUpsert("Remember that I prefer concise answers"))
+        assertFalse(shouldForceMemoryUpsert("提醒我明天交报告"))
+        assertFalse(shouldForceMemoryUpsert("Remember tomorrow's meeting"))
+    }
+
+    @Test fun calendarThenWebThenMemoryDefineForcedToolPrecedence() {
+        val available = setOf("calendar.schedule.create", "web.search", "memory.upsert")
+        fun select(input: String, calendar: Boolean = false) = selectForcedCanonicalTool(
+            ForcedToolSelection(true, calendar, input, available, null) { true },
+        )
+
+        assertTrue(select("安排明晚会议", calendar = true) == "calendar.schedule.create")
+        assertTrue(select("Search the web for current weather") == "web.search")
+        assertTrue(select("Remember that I prefer concise answers") == "memory.upsert")
+    }
 }

@@ -805,20 +805,16 @@ internal class ProviderExecutionEngine(
         val attemptId = ready.attemptId
         val profile = ready.profile
         val allowedTools = toolAllowlist(activatedSkills)
-        val forcedCanonicalTool = when {
-            input.mode == "Work" &&
-                queryContext.intentLabel == com.zhiban.rebuild.runtime.context.IntentLabel.CALENDAR_CREATE &&
-                (allowedTools == null || "calendar.schedule.create" in allowedTools) &&
-                toolEnabled("calendar.schedule.create") -> "calendar.schedule.create"
-
-            input.mode == "Work" &&
-                shouldForceWebSearch(input.text) &&
-                WebSearchToolBinding.TOOL_NAME in capabilityRouter.canonicalNames() &&
-                (allowedTools == null || WebSearchToolBinding.TOOL_NAME in allowedTools) &&
-                toolEnabled(WebSearchToolBinding.TOOL_NAME) -> WebSearchToolBinding.TOOL_NAME
-
-            else -> null
-        }
+        val forcedCanonicalTool = selectForcedCanonicalTool(
+            ForcedToolSelection(
+                workMode = input.mode == "Work",
+                calendarCreateIntent = queryContext.intentLabel == com.zhiban.rebuild.runtime.context.IntentLabel.CALENDAR_CREATE,
+                input = input.text,
+                availableTools = capabilityRouter.canonicalNames(),
+                allowedTools = allowedTools,
+                enabled = toolEnabled,
+            ),
+        )
         val forcedToolName = forcedCanonicalTool?.let(capabilityRouter::providerName)
         val request = ModelRequest(
             requestId = attemptId,

@@ -92,7 +92,7 @@ class RuntimeToolCatalog(val specs: Map<String, RuntimeToolSpec>) {
                     MemoryRememberPlanValidator.TOOL_NAME,
                     1,
                     RuntimeToolRisk.WRITE_CONFIRMATION_REQUIRED,
-                    """{"type":"function","function":{"name":"memory.remember","description":"提出一条需要用户确认后才能保存的长期记忆候选。仅在用户明确要求记住或稳定偏好对未来有帮助时调用。","parameters":{"type":"object","additionalProperties":false,"required":["content"],"properties":{"content":{"type":"string"},"memoryType":{"type":"string","enum":["PREFERENCE","FACT","PROJECT_RULE"]},"subjectKey":{"type":"string"},"predicateKey":{"type":"string"}}}}}""",
+                    """{"type":"function","function":{"name":"memory.remember","description":"提出一条必须由用户确认的长期记忆候选。仅用于敏感、含糊、项目规则或不满足 memory.upsert 自动写条件的内容；用户明确表达的低敏稳定偏好或关于自己的稳定事实必须优先使用 memory.upsert。","parameters":{"type":"object","additionalProperties":false,"required":["content"],"properties":{"content":{"type":"string"},"memoryType":{"type":"string","enum":["PREFERENCE","FACT","PROJECT_RULE"]},"subjectKey":{"type":"string"},"predicateKey":{"type":"string"}}}}}""",
                     4,
                 ),
                 RuntimeToolSpec(

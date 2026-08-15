@@ -154,8 +154,9 @@ object BuiltInSkills {
             1,
             "偏好记忆",
             setOf("MEMORY_QUERY", "MEMORY_WRITE"),
-            setOf("memory.search"),
-            "区分当前会话信息和长期稳定偏好；长期保存必须说明内容并等待用户确认。",
+            setOf("memory.search", "memory.upsert", "memory.remember"),
+            "区分当前会话信息和长期稳定偏好。用户明确表达的低敏稳定偏好或关于自己的稳定事实优先使用 memory.upsert，" +
+                "高置信时自动保存且可见可撤销；敏感、含糊、项目规则或不满足自动写条件的内容才使用 memory.remember 等待确认。",
         ),
     )
 }

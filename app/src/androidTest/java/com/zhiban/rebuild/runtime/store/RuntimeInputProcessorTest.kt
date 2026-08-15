@@ -2832,6 +2832,53 @@ class RuntimeInputProcessorTest {
         assertEquals(1, database.planDao().nodesForDefinition("runtime-plan-r-web").size)
     }
 
+    @Test fun explicitStablePreferenceUsesVisibleReversibleAutoMemory() = runBlocking {
+        val input = RoomTextInputGateway(database, { true }, { now }).stage(
+            """{"schemaVersion":1,"text":"Remember that I prefer concise answers","mode":"Work","model":"M2.7","level":"高"}""",
+        )
+        RoomRuntimeGateways(database, "test") { now++ }.accept(
+            RuntimeUiCommand.Start("s-memory-auto", input.inputRef, "c-memory-auto", "a-memory-auto", 0, "chat", "r-memory-auto"),
+        )
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile) = capability(profile)
+            override fun stream(request: ModelRequest): kotlinx.coroutines.flow.Flow<ModelEvent> {
+                if (request.messages.any { it.content.contains("\"tool\":\"memory.upsert\"") }) {
+                    return flowOf(ModelEvent.Delta(0, "I'll keep answers concise."), ModelEvent.Final("stop"))
+                }
+                assertEquals("memory_upsert", request.forcedToolName)
+                return flowOf(
+                    ModelEvent.ToolCall(
+                        0,
+                        "call-memory-auto",
+                        "memory_upsert",
+                        """{"content":"Prefer concise answers","memoryType":"PREFERENCE","subjectKey":"user","predicateKey":"response.style","sensitivity":"PERSONAL","evidenceSummary":"User explicitly stated a stable preference","confidence":0.99,"sourceRef":"conversation:r-memory-auto"}""",
+                    ),
+                    ModelEvent.Final("tool_calls"),
+                )
+            }
+            override fun cancel(requestId: String) = true
+        }
+        val processor = KernelCommandProcessor(
+            database,
+            "processor",
+            { true },
+            { now++ },
+            provider = provider,
+            profiles = fixedProfileStore(),
+        )
+
+        processor.processNext()
+        awaitRunStatus("r-memory-auto", "SUCCEEDED")
+
+        val executions = database.runtimeToolExecutionDao().listByRunId("r-memory-auto")
+        assertEquals(listOf("memory.upsert"), executions.map { it.toolName })
+        val memories = database.memoryPersistenceDao().recall("runtime-global", 100)
+        assertTrue(memories.any { it.canonicalText == "Prefer concise answers" })
+        val change = database.changeLogDao().listByRun("r-memory-auto").single()
+        assertNotNull(database.changeLogDao().findAutoWriteReceipt(change.changeId))
+        assertEquals(1, database.planDao().nodesForDefinition("runtime-plan-r-memory-auto").size)
+    }
+
     @Test fun hangingProbeIsCancelledByCancelCommand() = runBlocking {
         val probeCancelled = AtomicBoolean(false)
         val staged = RoomTextInputGateway(database, { true }, { now }).stage("probe cancel")

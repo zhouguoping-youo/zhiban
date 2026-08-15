@@ -456,6 +456,36 @@ internal fun shouldForceWebSearch(input: String): Boolean {
     return EXPLICIT_WEB_SEARCH_PATTERNS.any(normalized::contains)
 }
 
+internal fun shouldForceMemoryUpsert(input: String): Boolean {
+    val normalized = input.trim().lowercase()
+    if (ONE_TIME_MEMORY_PATTERNS.any(normalized::contains)) return false
+    return STABLE_MEMORY_PATTERNS.any(normalized::contains)
+}
+
+internal data class ForcedToolSelection(
+    val workMode: Boolean,
+    val calendarCreateIntent: Boolean,
+    val input: String,
+    val availableTools: Set<String>,
+    val allowedTools: Set<String>?,
+    val enabled: (String) -> Boolean,
+)
+
+internal fun selectForcedCanonicalTool(selection: ForcedToolSelection): String? {
+    if (!selection.workMode) return null
+    val candidate = when {
+        selection.calendarCreateIntent -> CALENDAR_CREATE_TOOL
+        shouldForceWebSearch(selection.input) -> WEB_SEARCH_TOOL
+        shouldForceMemoryUpsert(selection.input) -> MEMORY_UPSERT_TOOL
+        else -> return null
+    }
+    return candidate.takeIf {
+        it in selection.availableTools &&
+            (selection.allowedTools == null || it in selection.allowedTools) &&
+            selection.enabled(it)
+    }
+}
+
 private val CONTACT_COUNT_PATTERNS = listOf("联系人数量", "联系人总数", "多少联系人", "多少位联系人", "统计联系人", "count my contact", "how many contact")
 private val CALENDAR_QUERY_PATTERNS = listOf("今天日程", "今日日程", "今天安排", "今日安排", "today's schedule", "today%27s schedule", "today schedule")
 private val CALENDAR_QUERY_TOOLS = setOf("calendar.search", "calendar.schedule.search")
@@ -478,6 +508,28 @@ private val EXPLICIT_WEB_SEARCH_PATTERNS = listOf(
     "current weather",
     "today's weather",
 )
+private val STABLE_MEMORY_PATTERNS = listOf(
+    "记住我喜欢",
+    "记住我偏好",
+    "记住我习惯",
+    "我的偏好是",
+    "以后回答",
+    "今后回答",
+    "remember that i prefer",
+    "remember i prefer",
+    "my stable preference",
+    "i always prefer",
+)
+private val ONE_TIME_MEMORY_PATTERNS = listOf(
+    "记住明天",
+    "记住今天",
+    "提醒我",
+    "remember tomorrow",
+    "remind me",
+)
+private const val CALENDAR_CREATE_TOOL = "calendar.schedule.create"
+private const val WEB_SEARCH_TOOL = "web.search"
+private const val MEMORY_UPSERT_TOOL = "memory.upsert"
 
 internal data class AssembledModelContext(val messages: List<ModelMessage>, val sources: List<String>)
 
