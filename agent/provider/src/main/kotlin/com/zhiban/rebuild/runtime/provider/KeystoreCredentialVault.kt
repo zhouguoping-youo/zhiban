@@ -39,11 +39,9 @@ class KeystoreCredentialVault(context: Context) :
         val packed = Base64.decode(encoded, Base64.NO_WRAP)
         check(packed.size > 12) { "CREDENTIAL_CORRUPT" }
         val key = runSuspendCatching { key(alias(credentialRef, keyVersion)) }.getOrElse {
-            // The Android Keystore entry can be lost while the encrypted blob survives in prefs (observed
-            // on some devices after an over-install). The credential is then unrecoverable, so drop the
-            // orphaned blob and surface a clean re-configure signal instead of a persistent corrupt state.
-            prefs.edit().remove(storageKey(credentialRef, keyVersion)).commit()
-            error("CREDENTIAL_NOT_FOUND")
+            handleCredentialKeyReadFailure(it) {
+                prefs.edit().remove(storageKey(credentialRef, keyVersion)).commit()
+            }
         }
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(
@@ -94,10 +92,20 @@ class KeystoreCredentialVault(context: Context) :
 
     private fun key(alias: String): SecretKey = KeyStore.getInstance("AndroidKeyStore").run {
         load(null)
-        getKey(alias, null) as? SecretKey ?: error("CREDENTIAL_KEY_NOT_FOUND")
+        getKey(alias, null) as? SecretKey ?: throw CredentialKeyNotFoundException()
     }
 
     private fun alias(ref: String, version: Int) = "zhiban.provider.${digest(ref)}.v$version"
     private fun storageKey(ref: String, version: Int) = "${digest(ref)}:$version"
     private fun digest(value: String) = MessageDigest.getInstance("SHA-256").digest(value.toByteArray()).joinToString("") { "%02x".format(it) }
+}
+
+internal class CredentialKeyNotFoundException : IllegalStateException("CREDENTIAL_KEY_NOT_FOUND")
+
+internal fun handleCredentialKeyReadFailure(failure: Throwable, removeOrphan: () -> Unit): Nothing {
+    if (failure is CredentialKeyNotFoundException) {
+        removeOrphan()
+        error("CREDENTIAL_NOT_FOUND")
+    }
+    throw IllegalStateException("CREDENTIAL_TEMPORARILY_UNAVAILABLE", failure)
 }

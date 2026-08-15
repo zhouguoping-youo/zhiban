@@ -134,6 +134,7 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | 7.14 | 给知伴指令注入 prompt | ⚪ | — | 未复现：用户资料转义并限制长度后写入 user.md，ProviderContextAssembler 作为 PERSONAL/AUTO_RETRIEVED 上下文注入，最终仍经过出站策略 | — | `UserProfileTest.markdownSanitizesCustomInstructionsLineBreaks` + ProviderContextAssembler 代码审查 |
 | 7.15 | API Key 修改后立即生效 | ⚪ | — | 未复现：新凭据先 provision、健康探测成功后原子切换 profile；失败轮换保留旧 profile，不把未验证 key 发布给运行时 | — | `ProviderConfigurationBridgeTest.fiveProviderSwitchPublishesOnlyVerifiedKeyAndFailedRotationKeepsPrevious` |
 | 7.15a | 网络恢复后“检查连接”仍显示旧失败 | ✅ | 体验 | 健康检查曾把失败快照与成功快照同样缓存一小时，且用户主动检查也不强制刷新。现仅复用/保存成功快照，主动检查始终探测当前网络 | 本提交 `fix(P1)` | `ProviderConfigurationManagerTest.failed health cache never masks a recovered provider`、`explicit health refresh bypasses a positive snapshot` |
+| 7.15b | Keystore 瞬态失败不会删除 API Key 密文 | ✅ | 数据丢失 | 旧读取路径把密钥条目不存在与 Keystore 服务暂时不可用统一处理为删除密文，瞬态故障会造成不可逆凭据丢失。现只有确定的 `CredentialKeyNotFoundException` 清理孤儿密文，其他失败保留密文并提示可重试 | 本提交 `fix(7.15b)` | `KeystoreCredentialVaultPolicyTest`（缺失清理/瞬态保留）+ `KeystoreCredentialVaultTest.canaryIsCiphertextBoundToRefAndVersionAndCanBeDeleted`（SM-W7023） |
 | 7.16 | API Key 删除后显示未配置 | ⚪ | — | 未复现：clear 同时删除活动 profile 与凭据，设置页刷新通过 `isConfigured()` 得到 false；运行时也不再可解析旧 credentialRef | — | `ProviderConfigurationManagerTest.clear removes profile and bound credential` |
 
 ## 维度 8 · 导航与路由
