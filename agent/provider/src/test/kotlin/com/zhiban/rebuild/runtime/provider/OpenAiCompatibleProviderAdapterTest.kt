@@ -86,6 +86,21 @@ class OpenAiCompatibleProviderAdapterTest {
         assertTrue(events.none { it is ModelEvent.ToolCall || it is ModelEvent.Final })
     }
 
+    @Test fun explicitNullFieldsDoNotFinalizeOrEmitLiteralNullDuringFragmentedToolCall() = runTest {
+        val body = listOf(
+            """data: {"choices":[{"delta":{"content":null,"tool_calls":[{"index":0,"id":"call-null","function":{"name":"calendar.create","arguments":"{\"title\":"}}]},"finish_reason":null}]}""",
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"demo\"}"}}]},"finish_reason":"tool_calls"}]}""",
+            "data: [DONE]",
+        ).joinToString("\n\n", postfix = "\n")
+
+        val events = adapter(body.toResponseBody(SSE_TYPE)).stream(request("explicit-null")).toList()
+
+        assertTrue(events.none { it is ModelEvent.Delta && it.text == "null" })
+        assertEquals("call-null", events.filterIsInstance<ModelEvent.ToolCall>().single().providerCallId)
+        assertEquals(1, events.count { it is ModelEvent.Final })
+        assertEquals("tool_calls", events.filterIsInstance<ModelEvent.Final>().single().finishReason)
+    }
+
     private fun adapter(body: ResponseBody): OpenAiCompatibleProviderAdapter = OpenAiCompatibleProviderAdapter(
         FixedCallFactory(body),
         resolver,

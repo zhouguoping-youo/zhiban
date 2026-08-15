@@ -15,6 +15,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import okhttp3.Call
@@ -255,8 +256,8 @@ class OpenAiCompatibleProviderAdapter(
         val bodyRequestId = runCatching {
             val root = json.parseToJsonElement(body) as JsonObject
             val error = root["error"] as? JsonObject
-            (error?.get("request_id") as? JsonPrimitive)?.content
-                ?: (root["request_id"] as? JsonPrimitive)?.content
+            (error?.get("request_id") as? JsonPrimitive)?.contentOrNull
+                ?: (root["request_id"] as? JsonPrimitive)?.contentOrNull
         }.getOrNull()
         val safeId = redactor.safeRequestId(
             response.header("trace_id") ?: response.header("x-request-id") ?: bodyRequestId,
@@ -269,7 +270,7 @@ class OpenAiCompatibleProviderAdapter(
         val root = json.parseToJsonElement(body) as JsonObject
         val error = root["error"] as? JsonObject ?: return@runCatching null
         val providerCode = listOf("code", "type").mapNotNull { key ->
-            (error[key] as? JsonPrimitive)?.content
+            (error[key] as? JsonPrimitive)?.contentOrNull
         }.joinToString(" ").lowercase()
         if (providerCode.isBlank()) return@runCatching null
         val code = when {
@@ -321,12 +322,12 @@ class OpenAiCompatibleProviderAdapter(
         )
     }.getOrNull()
 
-    private fun JsonObject.int(key: String): Int = (this[key] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+    private fun JsonObject.int(key: String): Int = (this[key] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 0
 
     private fun parseAvailableModels(body: String): Set<String> = runCatching {
         val root = json.parseToJsonElement(body) as JsonObject
         (root["data"] as? JsonArray).orEmpty().mapNotNull { item ->
-            ((item as? JsonObject)?.get("id") as? JsonPrimitive)?.content
+            ((item as? JsonObject)?.get("id") as? JsonPrimitive)?.contentOrNull
         }.toSet()
     }.getOrDefault(emptySet())
 
@@ -394,7 +395,7 @@ class OpenAiCompatibleProviderAdapter(
             contentEvent(delta)?.let(events::add)
             accumulateTools(delta)
             usageEvent(chunk)?.let(events::add)
-            (choice?.get("finish_reason") as? JsonPrimitive)?.content?.let { reason ->
+            (choice?.get("finish_reason") as? JsonPrimitive)?.contentOrNull?.let { reason ->
                 if (!finalEmitted) events += finalize(reason)
             }
             return DecodedStreamChunk(events, isDone = false)
@@ -415,7 +416,7 @@ class OpenAiCompatibleProviderAdapter(
             throw ProviderFailure("PROVIDER_PROTOCOL_ERROR", retryable = true)
         }
 
-        private fun contentEvent(delta: JsonObject?): ModelEvent.Delta? = (delta?.get("content") as? JsonPrimitive)?.content
+        private fun contentEvent(delta: JsonObject?): ModelEvent.Delta? = (delta?.get("content") as? JsonPrimitive)?.contentOrNull
             ?.takeIf(String::isNotEmpty)
             ?.let(reasoningFilter::accept)
             ?.takeIf(String::isNotEmpty)
@@ -427,23 +428,23 @@ class OpenAiCompatibleProviderAdapter(
         }
 
         private fun accumulateTool(item: JsonObject) {
-            val index = (item["index"] as? JsonPrimitive)?.content?.toIntOrNull() ?: return
+            val index = (item["index"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: return
             if (index !in 0 until MAX_TOOL_CALLS) {
                 throw ProviderFailure("INVALID_TOOL_CALL_INDEX", retryable = false)
             }
             val function = item["function"] as? JsonObject ?: return
             val pending = pendingTools.getOrPut(index) { PendingToolCall(index) }
-            (item["id"] as? JsonPrimitive)?.content?.takeIf(String::isNotEmpty)?.let { id ->
+            (item["id"] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotEmpty)?.let { id ->
                 validateToolId(id, index, pending)
                 pending.providerCallId = id
             }
-            (function["name"] as? JsonPrimitive)?.content?.takeIf(String::isNotEmpty)?.let { name ->
+            (function["name"] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotEmpty)?.let { name ->
                 if (pending.name != null && pending.name != name) {
                     throw ProviderFailure("TOOL_CALL_NAME_CONFLICT", retryable = false)
                 }
                 pending.name = name
             }
-            (function["arguments"] as? JsonPrimitive)?.content?.let { fragment ->
+            (function["arguments"] as? JsonPrimitive)?.contentOrNull?.let { fragment ->
                 if (pending.arguments.length + fragment.length > MAX_TOOL_ARGUMENT_CHARS) {
                     throw ProviderFailure("TOOL_ARGUMENTS_TOO_LARGE", retryable = false)
                 }
