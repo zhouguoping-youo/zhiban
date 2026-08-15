@@ -294,6 +294,7 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | 16.12 | 空闲命令 runner 不热自旋 | ✅ | 性能/耗电 | 无待处理命令且无租约到期时间时，旧循环向自己的 conflated channel 发送再立即接收，2 秒读取时钟 467 次并反复扫库。现首次主动排空，之后只等待真实工作信号或租约超时 | 本提交 `fix(16.12)` | `RuntimeInputProcessorTest.idleRunnerWaitsForAWorkSignalInsteadOfHotSpinning`（SM-W7023：467 次红→≤8 次绿） |
 | 16.13 | 过期审批不会卡在 EXECUTING | ✅ | 功能不可用 | 确认卡超过 24 小时后暂存计划已过期；旧执行入口取不到计划便静默返回，run 永久停在 EXECUTING。现写入固定安全失败码并原子终结为 FAILED_FINAL | 本提交 `fix(16.13)` | `RuntimeInputProcessorTest.approvingAnExpiredPlanFailsTerminallyInsteadOfStayingExecuting`（SM-W7023：EXECUTING 红→FAILED_FINAL 绿） |
 | 16.14 | 观察期可继续调用不同的读取工具 | ✅ | 功能不可用 | 旧递归保护在工具写入后才读取 completedTools，新工具因此也被误判成重复；当前 attempt 已结束后又用它终结，run 永久停在 OBSERVING。现与观察流启动前快照比较，新工具进入下一观察 attempt，只有真实重复调用走兜底 | 本提交 `fix(16.14)` | `RuntimeInputProcessorTest.observationCanExecuteADifferentReadToolWithoutLeavingRunStuck`（SM-W7023：OBSERVING 红→SUCCEEDED 绿） |
+| 16.15 | 确认后工具超时可安全重试 | ✅ | 功能不可用 | `runSuspendCatching` 会按取消语义直接重抛 `TimeoutCancellationException`，旧代码因此绕过 TIMEOUT 映射并被外层收容成 `RUNTIME_INTERRUPTED/FAILED_FINAL`。现显式区分超时与协作取消：超时落 `TIMEOUT/FAILED_RETRYABLE`、保留原输入、清理旧审批暂存，领域事务不产生半写 | 本提交 `fix(16.15)` | `RuntimeInputProcessorTest.approvedToolTimeoutIsRetryableInsteadOfRuntimeInterrupted`（SM-W7023：异常外逃红→FAILED_RETRYABLE 绿） |
 
 ## 维度 17 · 检索与上下文
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |

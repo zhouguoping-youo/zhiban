@@ -1270,38 +1270,47 @@ internal class RoomRuntimeStore(private val database: AgentDatabase, private val
         database.runtimeApprovalStagingDao().deleteByRunId(runId)
     }
 
-    suspend fun finishExecutingRunFailure(runId: String, safeFailureCode: String, ownerId: String, fencingEpoch: Long, nowEpochMs: Long) =
-        database.withTransaction {
-            val run = requireNotNull(database.runtimeRunDao().find(runId))
-            requireActiveLease(run.sessionId, ownerId, fencingEpoch, nowEpochMs)
-            check(run.status == RuntimeRunStatus.EXECUTING.name)
-            val attemptId = requireNotNull(run.activeAttemptId)
-            val payload = buildJsonObject { put("errorCode", safeFailureCode) }.toString()
-            val event = appendEventInTransaction(
-                RuntimeEventDraft(
-                    "event-execution-$attemptId-terminal", "RunFailedFinal", run.sessionId, runId,
-                    attemptId, attemptId, runId, payload, nowEpochMs,
-                ),
-                fencingEpoch,
-            )
-            check(
-                database.runtimeRunDao().transition(
-                    runId,
-                    RuntimeRunStatus.EXECUTING.name,
-                    RuntimeRunStatus.FAILED_FINAL.name,
-                    event.sequence,
-                    nowEpochMs,
-                ) ==
-                    1,
-            )
-            database.runtimeAttemptDao().listByRunId(runId).firstOrNull {
-                it.attemptId == attemptId && it.status == "ACTIVE"
-            }
-                ?.let { check(database.runtimeAttemptDao().finish(attemptId, "FAILED", nowEpochMs) == 1) }
-            database.planDao().transitionRunStatus(runId, PLAN_STATUS_ACTIVE, PLAN_STATUS_TERMINAL, nowEpochMs)
-            database.runtimeRunInputDao().deleteByRunId(runId)
-            database.runtimeApprovalStagingDao().deleteByRunId(runId)
+    suspend fun finishExecutingRunFailure(
+        runId: String,
+        safeFailureCode: String,
+        ownerId: String,
+        fencingEpoch: Long,
+        nowEpochMs: Long,
+        retryable: Boolean = false,
+    ) = database.withTransaction {
+        val run = requireNotNull(database.runtimeRunDao().find(runId))
+        requireActiveLease(run.sessionId, ownerId, fencingEpoch, nowEpochMs)
+        check(run.status == RuntimeRunStatus.EXECUTING.name)
+        val attemptId = requireNotNull(run.activeAttemptId)
+        val payload = buildJsonObject { put("errorCode", safeFailureCode) }.toString()
+        val event = appendEventInTransaction(
+            RuntimeEventDraft(
+                "event-execution-$attemptId-terminal",
+                if (retryable) "RunFailedRetryable" else "RunFailedFinal",
+                run.sessionId,
+                runId,
+                attemptId, attemptId, runId, payload, nowEpochMs,
+            ),
+            fencingEpoch,
+        )
+        check(
+            database.runtimeRunDao().transition(
+                runId,
+                RuntimeRunStatus.EXECUTING.name,
+                if (retryable) RuntimeRunStatus.FAILED_RETRYABLE.name else RuntimeRunStatus.FAILED_FINAL.name,
+                event.sequence,
+                nowEpochMs,
+            ) ==
+                1,
+        )
+        database.runtimeAttemptDao().listByRunId(runId).firstOrNull {
+            it.attemptId == attemptId && it.status == "ACTIVE"
         }
+            ?.let { check(database.runtimeAttemptDao().finish(attemptId, "FAILED", nowEpochMs) == 1) }
+        database.planDao().transitionRunStatus(runId, PLAN_STATUS_ACTIVE, PLAN_STATUS_TERMINAL, nowEpochMs)
+        if (!retryable) database.runtimeRunInputDao().deleteByRunId(runId)
+        database.runtimeApprovalStagingDao().deleteByRunId(runId)
+    }
 
     suspend fun transitionRun(
         runId: String,

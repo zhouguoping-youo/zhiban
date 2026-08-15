@@ -133,6 +133,7 @@ private const val DEFAULT_TOTAL_TIMEOUT_MS = 120_000L
 private const val DEFAULT_IDLE_TIMEOUT_MS = 30_000L
 private const val DEFAULT_HEARTBEAT_INTERVAL_MS = 10_000L
 private const val DEFAULT_RERANK_TIMEOUT_MS = 2_500L
+private const val DEFAULT_TOOL_EXECUTION_TIMEOUT_MS = 30_000L
 
 /**
  * 运行期可变的引擎配置（超时 + 策略 lambda）。从原本散列在构造函数里的十几个参数收敛而来，
@@ -144,6 +145,7 @@ internal data class ProviderEngineConfig(
     val heartbeatIntervalMs: Long = DEFAULT_HEARTBEAT_INTERVAL_MS,
     val leaseDurationMs: Long = LEASE_DURATION_MS,
     val rerankTimeoutMs: Long = DEFAULT_RERANK_TIMEOUT_MS,
+    val toolExecutionTimeoutMs: Long = DEFAULT_TOOL_EXECUTION_TIMEOUT_MS,
     val personalization: () -> String? = { null },
     val ownerProfile: () -> ContactOwnerProfileSnapshot = { ContactOwnerProfileSnapshot() },
     val memoryPolicy: () -> com.zhiban.rebuild.runtime.config.MemoryPolicy = {
@@ -396,6 +398,7 @@ internal class ProviderExecutionEngine(
                 }.orEmpty()
             }
         },
+        timeoutMs = config.toolExecutionTimeoutMs,
     )
     private val calendarConflictGuard = CalendarConflictGuard(capabilityRouter)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -1177,7 +1180,7 @@ internal class ProviderExecutionEngine(
             }
             return false
         }
-        return runSuspendCatching {
+        return try {
             val toolName = Json.parseToJsonElement(planJson).jsonObject["toolName"]?.jsonPrimitive?.content
                 ?: throw ProviderFailure("INVALID_TOOL_CALL", false)
             val context = ConfirmedToolExecutionContext(runId, ownerId, fencingEpoch, clock())
@@ -1190,8 +1193,19 @@ internal class ProviderExecutionEngine(
                 result.providerCallId,
                 result.safeResultJson,
             )
-        }.getOrElse { failure ->
-            if (failure is CancellationException) throw failure
+        } catch (_: TimeoutCancellationException) {
+            store.finishExecutingRunFailure(
+                runId,
+                "TIMEOUT",
+                ownerId,
+                fencingEpoch,
+                clock(),
+                retryable = true,
+            )
+            false
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Throwable) {
             val run = store.runById(runId)
             if (run?.status == RuntimeRunStatus.OBSERVING.name) {
                 store.finishObservationRun(

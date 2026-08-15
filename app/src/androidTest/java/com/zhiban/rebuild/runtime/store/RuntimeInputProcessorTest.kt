@@ -602,6 +602,61 @@ class RuntimeInputProcessorTest {
         )
     }
 
+    @Test fun approvedToolTimeoutIsRetryableInsteadOfRuntimeInterrupted() = runBlocking {
+        val fixedNow = java.time.LocalDateTime.of(2026, 8, 14, 8, 0)
+            .atZone(java.time.ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli()
+        val staged = RoomTextInputGateway(database, { true }, { fixedNow }).stage(
+            """{"schemaVersion":1,"text":"明晚10点开项目会","mode":"Work","model":"M2.7","level":"高"}""",
+        )
+        val gateway = RoomRuntimeGateways(database, "test") { fixedNow }
+        gateway.accept(
+            RuntimeUiCommand.Start(
+                "s-approved-timeout", staged.inputRef, "c-approved-timeout", "a-approved-timeout",
+                0, "chat", "r-approved-timeout",
+            ),
+        )
+        KernelCommandProcessor(database, "processor", { true }, { fixedNow }).processNext()
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile) = capability(profile)
+            override fun stream(request: ModelRequest) = flowOf<ModelEvent>()
+            override fun cancel(requestId: String) = false
+        }
+        val preparingEngine = com.zhiban.rebuild.runtime.kernel.ProviderExecutionEngine(
+            database, provider, fixedProfileStore(), "processor", { fixedNow },
+        )
+        val initialLease = requireNotNull(database.runtimeSessionDao().find("s-approved-timeout"))
+        assertTrue(preparingEngine.execute("r-approved-timeout", "s-approved-timeout", initialLease.leaseEpoch))
+        val approval = approvalPlan("r-approved-timeout")
+        val revision = requireNotNull(database.runtimeSessionDao().find("s-approved-timeout")).nextSequence - 1
+        gateway.accept(
+            RuntimeUiCommand.RunAction(
+                RuntimeAction.APPROVE, "s-approved-timeout", "r-approved-timeout", "c-approved-timeout-approve",
+                "a-approved-timeout-approve", revision, "chat",
+                approval.getValue("proposalId").jsonPrimitive.content,
+                approval.getValue("payloadRef").jsonPrimitive.content,
+            ),
+        )
+        KernelCommandProcessor(database, "processor", { true }, { fixedNow }).processNext()
+        val executionLease = requireNotNull(database.runtimeSessionDao().find("s-approved-timeout"))
+        val timeoutEngine = com.zhiban.rebuild.runtime.kernel.ProviderExecutionEngine(
+            database,
+            provider,
+            fixedProfileStore(),
+            "processor",
+            { fixedNow },
+            com.zhiban.rebuild.runtime.kernel.ProviderEngineConfig(toolExecutionTimeoutMs = 0),
+        )
+
+        assertFalse(timeoutEngine.executeApprovedTool("r-approved-timeout", "s-approved-timeout", executionLease.leaseEpoch))
+        assertEquals("FAILED_RETRYABLE", database.runtimeRunDao().find("r-approved-timeout")?.status)
+        assertNull(database.scheduleDao().findById(approval.getValue("scheduleId").jsonPrimitive.content))
+        assertTrue(
+            database.runtimeEventDao().listByRunId("r-approved-timeout").any {
+                it.eventType == "RunFailedRetryable" && it.payloadJson.contains("TIMEOUT")
+            },
+        )
+    }
+
     @Test fun exactCalendarConflictQuestionReadsLocalAndDeviceCalendarsWithoutProvider() = runBlocking {
         val fixedNow = java.time.LocalDateTime.of(2026, 8, 14, 8, 0)
             .atZone(java.time.ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli()
