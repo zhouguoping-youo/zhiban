@@ -173,6 +173,7 @@ class OpenAiCompatibleProviderAdapterTest {
     private class ThrowAfterFrameBody(frame: String) : ResponseBody() {
         private val throwingSource = mockk<BufferedSource> {
             every { exhausted() } returns false andThenThrows IOException("simulated_disconnect")
+            every { indexOf(any<Byte>(), any(), any()) } returns 0L
             every { readUtf8LineStrict(any()) } returns frame.trimEnd('\n')
             every { close() } just Runs
         }

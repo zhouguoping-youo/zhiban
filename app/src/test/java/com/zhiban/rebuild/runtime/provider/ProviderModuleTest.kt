@@ -389,6 +389,29 @@ class ProviderModuleTest {
         assertEquals(1, events.count { it is ModelEvent.Final })
     }
 
+    @Test fun cleanEofWithoutTrailingNewlineStillDecodesTheLastSseFrame() = runBlocking {
+        val adapter = OpenAiCompatibleProviderAdapter(
+            QueueCallFactory(response(200, "data: {\"choices\":[{\"delta\":{\"content\":\"done\"}}]}")),
+            resolver,
+            registry,
+            clock = { 10 },
+        )
+
+        val events = adapter.stream(
+            ModelRequest(
+                "plain-eof-no-newline",
+                OutboundChannel.LLM_INFERENCE,
+                profile,
+                listOf(userMessage("x")),
+                capability(100),
+                10,
+            ),
+        ).toList()
+
+        assertEquals(listOf(ModelEvent.Delta(0, "done"), ModelEvent.Final("stop")), events)
+        assertEquals(1, events.count { it is ModelEvent.Final })
+    }
+
     @Test fun doneWithoutFinishReasonEmitsExactlyOneFinal() = runBlocking {
         val stream = listOf(
             "data: {\"choices\":[{\"delta\":{\"content\":\"done\"}}]}",

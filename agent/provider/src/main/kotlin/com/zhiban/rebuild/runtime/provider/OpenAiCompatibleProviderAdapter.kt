@@ -362,9 +362,18 @@ class OpenAiCompatibleProviderAdapter(
         private var ordinal = 0L
 
         fun readData(source: BufferedSource, call: Call): String? {
-            val line = try {
-                source.readUtf8LineStrict(MAX_SSE_FRAME_BYTES)
-            } catch (_: java.io.EOFException) {
+            val newlineOffset = source.indexOf('\n'.code.toByte(), 0L, MAX_SSE_FRAME_BYTES + 1L)
+            val line = when {
+                newlineOffset >= 0L -> source.readUtf8LineStrict(MAX_SSE_FRAME_BYTES)
+
+                source.buffer.size <= MAX_SSE_FRAME_BYTES -> source.readUtf8()
+
+                else -> {
+                    call.cancel()
+                    throw ProviderFailure("PROVIDER_FRAME_TOO_LARGE", retryable = false)
+                }
+            }
+            if (line.toByteArray(Charsets.UTF_8).size > MAX_SSE_FRAME_BYTES) {
                 call.cancel()
                 throw ProviderFailure("PROVIDER_FRAME_TOO_LARGE", retryable = false)
             }
