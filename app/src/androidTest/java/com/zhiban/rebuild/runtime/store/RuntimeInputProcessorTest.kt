@@ -1113,6 +1113,76 @@ class RuntimeInputProcessorTest {
         )
     }
 
+    @Test fun stalledObservationRenewsLeaseUntilItsProviderStreamCompletes() = runBlocking {
+        val realClock = System::currentTimeMillis
+        database.contactDao().insert(
+            ContactEntity(
+                "contact-observation-lease", "张三", "张三", null, null, null,
+                "知伴科技", null, "[]", "[]", null, null, "USER", null, realClock(), realClock(),
+            ),
+        )
+        val staged = RoomTextInputGateway(database, { true }, realClock).stage(
+            """{"schemaVersion":1,"text":"查张三的资料，再告诉我联系人总数","mode":"Work","model":"M2.7","level":"高"}""",
+        )
+        RoomRuntimeGateways(database, "test", clock = realClock).accept(
+            RuntimeUiCommand.Start(
+                "s-observation-lease",
+                staged.inputRef,
+                "c-observation-lease",
+                "a-observation-lease",
+                0,
+                "chat",
+                "r-observation-lease",
+            ),
+        )
+        val observationStarted = CompletableDeferred<Unit>()
+        val releaseObservation = CompletableDeferred<Unit>()
+        var requestNumber = 0
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile) = capability(profile)
+            override fun stream(request: ModelRequest) = when (requestNumber++) {
+                0 -> flowOf(
+                    ModelEvent.ToolCall(0, "call-contact-lease", "contact.search", """{"query":"张三"}"""),
+                    ModelEvent.Final("tool_calls"),
+                )
+
+                1 -> flow {
+                    observationStarted.complete(Unit)
+                    releaseObservation.await()
+                    emit(ModelEvent.ToolCall(0, "call-contact-count-lease", "contact.maintenance.list", """{"limit":1}"""))
+                    emit(ModelEvent.Final("tool_calls"))
+                }
+
+                else -> flowOf(ModelEvent.Delta(0, "已完成两项查询。"), ModelEvent.Final("stop"))
+            }
+            override fun cancel(requestId: String) = true
+        }
+        KernelCommandProcessor(
+            database,
+            "owner-a",
+            { true },
+            realClock,
+            provider,
+            fixedProfileStore(),
+            com.zhiban.rebuild.runtime.kernel.ProviderEngineConfig(
+                heartbeatIntervalMs = 25,
+                leaseDurationMs = 100,
+                rerankTimeoutMs = 0,
+            ),
+        ).processNext()
+
+        withTimeout(1_000) { observationStarted.await() }
+        delay(250)
+        assertTrue(
+            RoomRuntimeStore(database, "recovery-test")
+                .claimRecoverable("owner-b", realClock(), 1_000, "ui")
+                .isEmpty(),
+        )
+        releaseObservation.complete(Unit)
+        awaitRunStatus("r-observation-lease", "SUCCEEDED")
+        assertEquals(3, requestNumber)
+    }
+
     @Test fun calendarUpdateAndDeleteRequireApprovalPersistAuditAndUndo() = runBlocking {
         database.scheduleDao().insert(
             com.zhiban.rebuild.data.agent.ScheduleEntity(

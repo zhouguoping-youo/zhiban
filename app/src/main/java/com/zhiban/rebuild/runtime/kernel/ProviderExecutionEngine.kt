@@ -1613,7 +1613,9 @@ internal class ProviderExecutionEngine(
         val setup = prepareObservationContext(ids)
         val completedToolsBeforeObservation = store.completedToolNames(runId)
         val outcome = try {
-            consumeObservationStream(setup, ids, toolName, providerCallId, safeResultJson)
+            withSessionLeaseHeartbeat(sessionId, fencingEpoch) {
+                consumeObservationStream(setup, ids, toolName, providerCallId, safeResultJson)
+            }
         } catch (_: TimeoutCancellationException) {
             provider.cancel(setup.attemptId)
             val run = store.runById(runId)
