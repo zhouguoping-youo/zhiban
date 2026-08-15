@@ -79,6 +79,21 @@ class OpenAiCompatibleProviderAdapterTest {
         assertEquals(1, events.count { it is ModelEvent.Final })
     }
 
+    @Test fun ioFailureTruncatingAToolCallSurfacesARetryableTransportFailure() = runTest {
+        // The tool_call frame is cut off mid-arguments ("{\"title\":" is not valid JSON), then the
+        // stream drops. Finalizing that truncated call throws INVALID_TOOL_ARGUMENTS; the fix
+        // converts it back into the retryable transport cause.
+        val truncatedToolFrame =
+            "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call-trunc\",\"function\":{\"name\":\"calendar.create\",\"arguments\":\"{\\\"title\\\":\"}}]}}]}\n"
+        val failure = runSuspendCatching {
+            adapter(ThrowAfterFrameBody(truncatedToolFrame))
+                .stream(request("truncated-tool-disconnect"))
+                .collect()
+        }.exceptionOrNull()
+
+        assertTrue("unexpected failure: ${failure?.javaClass?.name}", failure is IOException)
+    }
+
     @Test fun ioFailureAfterPartialTextDoesNotPretendTheResponseCompleted() = runTest {
         val events = mutableListOf<ModelEvent>()
         val failure = runSuspendCatching {

@@ -141,8 +141,15 @@ class OpenAiCompatibleProviderAdapter(
         try {
             source.use { emitDecodedStream(source, call, decoder) }
         } catch (failure: ProviderTransportException) {
-            val recoveredEvents = decoder.finishAfterTransportFailure()
-                ?: throw failure.ioFailure
+            // A drop that truncates a tool call makes finishAfterTransportFailure() throw a
+            // non-retryable INVALID_TOOL_* failure. That is a transport problem, not a genuinely
+            // malformed call, so surface the retryable I/O cause and let the resilient layer retry
+            // instead of recording a permanent failure the circuit breaker will not even count.
+            val recoveredEvents = try {
+                decoder.finishAfterTransportFailure()
+            } catch (finalizeFailure: ProviderFailure) {
+                throw failure.ioFailure
+            } ?: throw failure.ioFailure
             recoveredEvents.forEach { emit(it) }
             return
         }
