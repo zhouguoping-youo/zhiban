@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -51,7 +52,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -111,16 +111,16 @@ fun ZhiBanPrimaryTabHeader(title: String, subtitle: String, modifier: Modifier =
 /**
  * One title block for primary, secondary and conversation headers.
  *
- * A subtitle line is always reserved, even on pages that do not show one.
- * This keeps the visible title on the same top baseline while allowing every
- * header to grow naturally with the user's font scale.
+ * The block wraps its own content height: a header without a subtitle is exactly
+ * as tall as its title, so the title's optical centre lands on the same row as the
+ * leading back/action icons. Reserving an empty subtitle line pushed a bare title
+ * above that icon row, which is the misalignment this avoids.
  */
 @Composable
 fun ZhiBanHeaderTitleBlock(title: String, subtitle: String?, modifier: Modifier = Modifier, horizontalAlignment: Alignment.Horizontal = Alignment.Start) {
     val subtitleStyle = MaterialTheme.typography.bodySmall
-    val subtitleLineHeight = with(LocalDensity.current) { subtitleStyle.lineHeight.toDp() }
     Column(
-        modifier = modifier,
+        modifier = modifier.wrapContentHeight(),
         horizontalAlignment = horizontalAlignment,
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -132,9 +132,7 @@ fun ZhiBanHeaderTitleBlock(title: String, subtitle: String?, modifier: Modifier 
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        if (subtitle.isNullOrBlank()) {
-            Spacer(Modifier.height(subtitleLineHeight))
-        } else {
+        if (!subtitle.isNullOrBlank()) {
             Text(
                 subtitle,
                 style = subtitleStyle,
@@ -252,7 +250,7 @@ fun ZhiBanTopBar(title: String, onBack: (() -> Unit)?, modifier: Modifier = Modi
         modifier = modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = if (subtitle == null) ZhiBanSize.TopBar else ZhiBanSize.ListRowWithSubtitle)
-            .padding(horizontal = ZhiBanSpacing.PageHorizontal, vertical = ZhiBanSpacing.Sm),
+            .padding(horizontal = ZhiBanSpacing.PageHorizontal),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (onBack != null) {

@@ -18,7 +18,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ArrowUpward
@@ -67,7 +66,7 @@ import androidx.compose.ui.unit.sp
 import com.zhiban.rebuild.R
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanHeaderIconAction
-import com.zhiban.rebuild.ui.components.ZhiBanHeaderTitleBlock
+import com.zhiban.rebuild.ui.components.ZhiBanTopBar
 import com.zhiban.rebuild.ui.components.localizedQuantity
 import com.zhiban.rebuild.ui.icons.ReplyGlyph
 import com.zhiban.rebuild.ui.icons.ZhiBanReplyIcon
@@ -133,30 +132,14 @@ internal fun PermissionSettingsDialog(permissionName: String, onDismiss: () -> U
 }
 
 @Composable
-fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () -> Unit = {}) = Box(
-    Modifier.fillMaxWidth().defaultMinSize(minHeight = ZhiBanSize.TopBar).padding(horizontal = ZhiBanSpacing.PageHorizontal),
-    contentAlignment = Alignment.Center,
-) {
-    Row(
-        modifier = Modifier.align(Alignment.CenterStart),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        ZhiBanHeaderIconAction(Icons.AutoMirrored.Outlined.ArrowBack, "返回", onBack)
+fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () -> Unit = {}) = ZhiBanTopBar(
+    title = "问问",
+    onBack = onBack,
+    trailing = {
         ZhiBanHeaderIconAction(Icons.Outlined.Menu, "更多", onMenu)
-    }
-    ZhiBanHeaderTitleBlock(
-        title = "问问",
-        subtitle = null,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    )
-    ZhiBanHeaderIconAction(
-        icon = Icons.Outlined.History,
-        contentDescription = "对话历史",
-        onClick = onHistory,
-        modifier = Modifier.align(Alignment.CenterEnd),
-    )
-}
+        ZhiBanHeaderIconAction(Icons.Outlined.History, "对话历史", onHistory)
+    },
+)
 
 @Composable fun MemoryHint(text: String, onDismiss: () -> Unit) {
     Row(

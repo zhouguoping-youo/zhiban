@@ -8,8 +8,10 @@ import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.Dp
@@ -78,22 +80,54 @@ class ZhiBanPageChromeTest {
     }
 
     @Test
-    fun primarySecondaryAndConversationTitlesShareOneTopBaseline() {
+    fun secondaryAndConversationTitlesShareOneTopBaseline() {
         compose.setContent {
             ZhiBanTheme {
                 Box {
-                    ZhiBanPrimaryTabHeader(title = "一级标题", subtitle = "一级说明")
                     ZhiBanTopBar(title = "二级标题", onBack = {})
                     AgentTopBar()
                 }
             }
         }
 
-        val primaryTop = compose.onNodeWithText("一级标题").getUnclippedBoundsInRoot().top
         val secondaryTop = compose.onNodeWithText("二级标题").getUnclippedBoundsInRoot().top
         val conversationTop = compose.onNodeWithText("问问").getUnclippedBoundsInRoot().top
-        assertDpClose("primary and secondary title baselines match", primaryTop, secondaryTop)
-        assertDpClose("primary and conversation title baselines match", primaryTop, conversationTop)
+        assertDpClose("secondary and conversation titles share one top baseline", secondaryTop, conversationTop)
+    }
+
+    @Test
+    fun secondaryTopBarAlignsBackArrowWithTitleRow() {
+        compose.setContent {
+            ZhiBanTheme {
+                ZhiBanTopBar(title = "个人资料", onBack = {})
+            }
+        }
+
+        val backCenter = compose.onNodeWithContentDescription("返回").verticalCenterDp()
+        val titleCenter = compose.onNodeWithText("个人资料").verticalCenterDp()
+        assertRowAligned("secondary header back arrow and title share one row", backCenter, titleCenter)
+    }
+
+    @Test
+    fun conversationTopBarAlignsBackArrowWithTitleRow() {
+        compose.setContent {
+            ZhiBanTheme {
+                AgentTopBar()
+            }
+        }
+
+        val backCenter = compose.onNodeWithContentDescription("返回").verticalCenterDp()
+        val titleCenter = compose.onNodeWithText("问问").verticalCenterDp()
+        assertRowAligned("conversation header back arrow and title share one row", backCenter, titleCenter)
+    }
+
+    private fun SemanticsNodeInteraction.verticalCenterDp(): Float {
+        val bounds = getUnclippedBoundsInRoot()
+        return (bounds.top.value + bounds.bottom.value) / 2f
+    }
+
+    private fun assertRowAligned(message: String, expected: Float, actual: Float) {
+        assertTrue("$message: expectedCenterY=$expected actualCenterY=$actual", abs(expected - actual) < 1.0f)
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
