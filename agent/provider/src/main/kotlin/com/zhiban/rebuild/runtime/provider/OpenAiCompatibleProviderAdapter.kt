@@ -398,6 +398,7 @@ class OpenAiCompatibleProviderAdapter(
                 return DecodedStreamChunk(events, isDone = true)
             }
             val chunk = parseChunk(data)
+            streamFailure(chunk)?.let { throw it }
             val choice = (chunk["choices"] as? JsonArray)?.firstOrNull() as? JsonObject
             val delta = choice?.get("delta") as? JsonObject
             val events = mutableListOf<ModelEvent>()
@@ -423,6 +424,16 @@ class OpenAiCompatibleProviderAdapter(
             throw failure
         } catch (_: Throwable) {
             throw ProviderFailure("PROVIDER_PROTOCOL_ERROR", retryable = true)
+        }
+
+        private fun streamFailure(chunk: JsonObject): ProviderFailure? {
+            val error = chunk["error"] as? JsonObject ?: return null
+            val safeRequestId = redactor.safeRequestId(
+                (error["request_id"] as? JsonPrimitive)?.contentOrNull
+                    ?: (chunk["request_id"] as? JsonPrimitive)?.contentOrNull,
+            )
+            return standardBusinessFailure(chunk.toString(), safeRequestId, retryAfter = null)
+                ?: ProviderFailure("PROVIDER_REJECTED", retryable = false, safeRequestId = safeRequestId)
         }
 
         private fun contentEvent(delta: JsonObject?): ModelEvent.Delta? = (delta?.get("content") as? JsonPrimitive)?.contentOrNull

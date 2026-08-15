@@ -446,6 +446,36 @@ class ProviderModuleTest {
         assertTrue(failure.retryable)
     }
 
+    @Test fun providerErrorInsideSuccessfulSseResponseIsNeverTreatedAsAnEmptySuccess() = runBlocking {
+        val stream = listOf(
+            "data: {\"error\":{\"code\":\"InvalidApiKey\",\"message\":\"secret detail\",\"request_id\":\"req_safe\"}}",
+            "data: [DONE]",
+        ).joinToString("\n\n", postfix = "\n")
+        val adapter = OpenAiCompatibleProviderAdapter(
+            QueueCallFactory(response(200, stream)),
+            resolver,
+            registry,
+            clock = { 10 },
+        )
+
+        val failure = runCatching {
+            adapter.stream(
+                ModelRequest(
+                    "sse-error",
+                    OutboundChannel.LLM_INFERENCE,
+                    profile,
+                    listOf(userMessage("x")),
+                    capability(100),
+                    10,
+                ),
+            ).toList()
+        }.exceptionOrNull() as ProviderFailure
+
+        assertEquals("AUTHENTICATION_FAILED", failure.code)
+        assertEquals("req_safe", failure.safeRequestId)
+        assertFalse(failure.message.orEmpty().contains("secret detail"))
+    }
+
     @Test fun stepFunStopFinishReasonDoesNotDiscardAValidToolCall() = runBlocking {
         val stream = listOf(
             "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call-step\",\"function\":{\"name\":\"calendar.create\",\"arguments\":\"{\\\"title\\\":\\\"demo\\\"}\"}}]}}]}",
