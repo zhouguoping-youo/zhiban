@@ -228,6 +228,40 @@ class OutboundDataPolicyTest {
         assertTrue(OutboundPiiDetector.containsDirectIdentifier(opaqueLike))
     }
 
+    @Test fun automaticContextRedactsCommonCredentialFamiliesAndVariableLengthOpaqueSecrets() = runTest {
+        val credentials = listOf(
+            "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signaturePart",
+            "xoxb-123456789012-abcdefghijklmnopqrstuv",
+            "glpat-abcdefghijklmnopqrstuv",
+            "gho_0123456789abcdefghijklmnopqrstuv",
+            "ASIAABCDEFGHIJKLMNOP",
+            "npm_0123456789abcdefghijklmnopqrstuv",
+            "Abcdefghijklmnopqrstuvwxyz0123456789+/=",
+            "LongOpaqueCredential0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".repeat(2),
+            "-----BEGIN PRIVATE KEY-----\nTestOnlyPrivateMaterial123456\n-----END PRIVATE KEY-----",
+        )
+        val delegate = CapturingAdapter()
+        PolicyEnforcingProviderAdapter(delegate, DefaultOutboundDataPolicy()).stream(
+            request(
+                message(
+                    credentials.joinToString("\n"),
+                    OutboundSensitivity.PERSONAL,
+                    OutboundPurpose.AUTO_RETRIEVED,
+                ),
+            ),
+        ).toList()
+
+        val sent = delegate.requests.single().messages.single().content
+        credentials.forEach { credential -> assertFalse(sent.contains(credential)) }
+        credentials.forEach { credential -> assertTrue(OutboundPiiDetector.containsDirectIdentifier(credential)) }
+    }
+
+    @Test fun credentialDetectorDoesNotTreatOrdinaryIdentifiersAsSecrets() {
+        assertFalse(OutboundPiiDetector.containsDirectIdentifier("订单号 abcdefghijklmnopqrstuvwxyz012345"))
+        assertFalse(OutboundPiiDetector.containsDirectIdentifier("提交 0123456789abcdef0123456789abcdef01234567"))
+        assertFalse(OutboundPiiDetector.containsDirectIdentifier("项目 ZHIBAN-RUNTIME-PLANNING-2026"))
+    }
+
     @Test fun identifierDetectorAvoidsOrdinaryShortAndOverlongNumbers() {
         assertTrue(OutboundPiiDetector.containsDirectIdentifier("座机 0755-12345678"))
         assertTrue(OutboundPiiDetector.containsDirectIdentifier("银行客服 95588"))

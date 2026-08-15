@@ -196,19 +196,28 @@ class DefaultOutboundDataPolicy(private val settings: () -> OutboundPolicySettin
 
 private object OutboundCredentialGuard {
     private val knownPrefix = Regex(
-        "(?<![A-Za-z0-9_-])(?:sk-[A-Za-z0-9_-]{12,}|ghp_[A-Za-z0-9]{20,}|" +
-            "github_pat_[A-Za-z0-9_]{20,}|AKIA[A-Z0-9]{16}|AIza[A-Za-z0-9_-]{35})(?![A-Za-z0-9_-])",
+        "(?<![A-Za-z0-9_-])(?:sk-[A-Za-z0-9_-]{12,}|gh[opusr]_[A-Za-z0-9]{20,}|" +
+            "github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{12,}|xox[abpors]-[A-Za-z0-9-]{12,}|" +
+            "(?:AKIA|ASIA)[A-Z0-9]{16}|AIza[A-Za-z0-9_-]{35}|npm_[A-Za-z0-9]{20,})(?![A-Za-z0-9_-])",
     )
-    private val opaqueValue = Regex("(?<![A-Za-z0-9])[A-Za-z0-9]{48,96}(?![A-Za-z0-9])")
+    private val jwt = Regex("(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{4,}\\.[A-Za-z0-9_-]{4,}\\.[A-Za-z0-9_-]{4,}(?![A-Za-z0-9_-])")
+    private val privateKeyBlock = Regex(
+        "-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\\s\\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----",
+    )
+    private val opaqueValue = Regex("(?<![A-Za-z0-9._~+/=-])[A-Za-z0-9._~+/=-]{32,512}(?![A-Za-z0-9._~+/=-])")
 
     fun redact(value: String): String {
-        val knownSafe = knownPrefix.replace(value, "[REDACTED]")
+        val privateKeySafe = privateKeyBlock.replace(value, "[REDACTED]")
+        val jwtSafe = jwt.replace(privateKeySafe, "[REDACTED]")
+        val knownSafe = knownPrefix.replace(jwtSafe, "[REDACTED]")
         return opaqueValue.replace(knownSafe) { match ->
             if (match.value.looksLikeOpaqueCredential()) "[REDACTED]" else match.value
         }
     }
 
-    fun contains(value: String): Boolean = knownPrefix.containsMatchIn(value) ||
+    fun contains(value: String): Boolean = privateKeyBlock.containsMatchIn(value) ||
+        jwt.containsMatchIn(value) ||
+        knownPrefix.containsMatchIn(value) ||
         opaqueValue.findAll(value).any { it.value.looksLikeOpaqueCredential() }
 
     private fun String.looksLikeOpaqueCredential(): Boolean = any(Char::isLowerCase) &&
