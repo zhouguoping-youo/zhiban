@@ -68,4 +68,36 @@ class EventPlanningRepositoryTest {
         "contact-1", "李雷", "李雷", null, null, null, null, null,
         "[]", "[]", null, null, "USER", null, 1, 1,
     )
+
+    @Test fun deletePlanRemovesPlanParticipantsAndGeneratedSchedule() = runBlocking {
+        database.contactDao().insert(contact())
+        val planId = repository.createPlan("老同事聚餐", 1_000_000L, 120, "静安寺", null, nowEpochMs = 1L)
+        repository.addParticipant(planId, "contact-1", nowEpochMs = 2L)
+        val schedule = repository.confirmToCalendar(planId, nowEpochMs = 3L)
+        assertEquals(1, database.scheduleDao().count())
+
+        val deleted = repository.deletePlan(planId)
+
+        assertTrue(deleted)
+        assertEquals(null, repository.observePlan(planId).first())
+        assertTrue(repository.observeParticipants(planId).first().isEmpty())
+        // A confirmed plan's generated calendar event is removed with it, leaving no orphan.
+        assertEquals(0, database.scheduleDao().count())
+        assertEquals(null, database.scheduleDao().findById(schedule.id))
+        // Deleting again is a no-op, not an error.
+        assertFalse(repository.deletePlan(planId))
+    }
+
+    @Test fun deletePlanWithoutCalendarConfirmationRemovesPlanAndParticipants() = runBlocking {
+        database.contactDao().insert(contact())
+        val planId = repository.createPlan("周末郊游", 1_000_000L, 120, null, null, nowEpochMs = 1L)
+        repository.addParticipant(planId, "contact-1", nowEpochMs = 2L)
+
+        val deleted = repository.deletePlan(planId)
+
+        assertTrue(deleted)
+        assertEquals(null, repository.observePlan(planId).first())
+        assertTrue(repository.observeParticipants(planId).first().isEmpty())
+        assertEquals(0, database.scheduleDao().count())
+    }
 }

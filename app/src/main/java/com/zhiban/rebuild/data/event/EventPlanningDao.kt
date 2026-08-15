@@ -41,4 +41,10 @@ interface EventPlanningDao {
 
     @Query("DELETE FROM event_plan_participants WHERE planId = :planId AND contactId = :contactId")
     suspend fun removeParticipant(planId: String, contactId: String): Int
+
+    @Query("DELETE FROM event_plan_participants WHERE planId = :planId")
+    suspend fun removeAllParticipants(planId: String): Int
+
+    @Query("DELETE FROM event_plans WHERE planId = :planId")
+    suspend fun deletePlan(planId: String): Int
 }

@@ -107,6 +107,22 @@ class EventPlanningViewModel @Inject constructor(
         actionMessage.value = null
     }
 
+    fun deletePlan(item: EventPlanUi, onDeleted: () -> Unit) {
+        viewModelScope.launch {
+            val scheduleId = item.plan.scheduleId
+            runSuspendCatching { planning.deletePlan(item.plan.planId) }
+                .onSuccess { deleted ->
+                    if (deleted) {
+                        scheduleId?.let(reminderScheduler::cancel)
+                        onDeleted()
+                    } else {
+                        actionMessage.value = "安排不存在"
+                    }
+                }
+                .onFailure { actionMessage.value = it.message ?: "删除没有完成" }
+        }
+    }
+
     private fun launchAction(success: String, block: suspend () -> Unit) {
         viewModelScope.launch {
             runSuspendCatching(block)

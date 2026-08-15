@@ -44,6 +44,7 @@ import com.zhiban.rebuild.R
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.event.EventPlanStatus
 import com.zhiban.rebuild.data.event.EventResponseStatus
+import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
 import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.components.ZhiBanSectionTitle
@@ -128,6 +129,7 @@ fun EventPlanningDetailPage(planId: String, onBack: () -> Unit, onAskAgent: (Str
     val item = state.plans.firstOrNull { it.plan.planId == planId }
     var contactPickerOpen by remember { mutableStateOf(false) }
     var responseContact by remember { mutableStateOf<ContactEntity?>(null) }
+    var deleteConfirmOpen by remember { mutableStateOf(false) }
     ZhiBanPage {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -185,6 +187,12 @@ fun EventPlanningDetailPage(planId: String, onBack: () -> Unit, onAskAgent: (Str
                         ) {
                             Text(if (item.plan.status == EventPlanStatus.CONFIRMED) "已加入日历" else "确定并加入日历")
                         }
+                        TextButton(
+                            onClick = { deleteConfirmOpen = true },
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                        ) {
+                            Text("删除这项安排", color = MaterialTheme.colorScheme.error)
+                        }
                     }
                 }
             }
@@ -217,6 +225,28 @@ fun EventPlanningDetailPage(planId: String, onBack: () -> Unit, onAskAgent: (Str
                 viewModel.updateResponse(planId, contact.contactId, status)
                 responseContact = null
             },
+        )
+    }
+    if (deleteConfirmOpen && item != null) {
+        ZhiBanAlertDialog(
+            onDismissRequest = { deleteConfirmOpen = false },
+            title = { Text("删除这项安排？") },
+            text = {
+                Text(
+                    if (item.plan.status == EventPlanStatus.CONFIRMED) {
+                        "“${item.plan.title}”将被删除，已加入日历的对应日程也会一并移除。"
+                    } else {
+                        "“${item.plan.title}”及其参与人将被删除。"
+                    },
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    deleteConfirmOpen = false
+                    viewModel.deletePlan(item) { onBack() }
+                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { deleteConfirmOpen = false }) { Text("保留") } },
         )
     }
 }

@@ -70,6 +70,18 @@ class EventPlanningRepository @Inject internal constructor(private val database:
 
     suspend fun removeParticipant(planId: String, contactId: String): Boolean = plans.removeParticipant(planId, contactId) == 1
 
+    /**
+     * Deletes a plan and all its participants. If the plan was already confirmed into the calendar,
+     * the schedule it generated is removed too, so cancelling a mistaken arrangement leaves no
+     * orphaned calendar event. All three writes share one transaction.
+     */
+    suspend fun deletePlan(planId: String): Boolean = database.withTransaction {
+        val plan = plans.findPlan(planId) ?: return@withTransaction false
+        plan.scheduleId?.let { database.scheduleDao().deleteById(it) }
+        plans.removeAllParticipants(planId)
+        plans.deletePlan(planId) == 1
+    }
+
     suspend fun updateResponse(planId: String, contactId: String, responseStatus: String, nowEpochMs: Long = System.currentTimeMillis()) {
         require(responseStatus in EventResponseStatus.ALL) { "回复状态无效" }
         require(plans.findPlan(planId) != null) { "安排不存在" }
