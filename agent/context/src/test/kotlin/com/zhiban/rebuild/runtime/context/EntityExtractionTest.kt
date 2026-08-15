@@ -149,6 +149,19 @@ class EntityExtractionTest {
         assertEquals(expected, resolveCalendarStartEpochMs("下周三下午3点和张总开会", result.timeRange, zone))
     }
 
+    @Test fun resolvesWeekAfterNextWithoutCollapsingItToNextWeek() {
+        val result = extractor.extract("下下周三下午3点和张总开会", "Work", now)
+        val expected = LocalDateTime.of(2026, 8, 5, 15, 0).atZone(zone).toInstant().toEpochMilli()
+        assertEquals("下下周三", result.timeRange?.expression)
+        assertEquals(expected, resolveCalendarStartEpochMs("下下周三下午3点和张总开会", result.timeRange, zone))
+
+        val synonym = extractor.extract("下下星期二上午9点复盘", "Work", now)
+        assertEquals(
+            LocalDateTime.of(2026, 8, 4, 9, 0).atZone(zone).toInstant().toEpochMilli(),
+            resolveCalendarStartEpochMs("下下星期二上午9点复盘", synonym.timeRange, zone),
+        )
+    }
+
     @Test fun resolvesThisWeekAndBareWeekdayToUpcomingLocalDay() {
         val thisWeek = extractor.extract("本周三上午10点开会", "Work", now)
         assertEquals(

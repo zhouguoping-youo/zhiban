@@ -216,6 +216,9 @@ class LocalEntityExtractor(private val zoneId: ZoneId = ZoneId.systemDefault()) 
         val target = chineseWeekday(match.groupValues[1]) ?: return null
         val currentMonday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
         val resolvedDay = when {
+            text.contains("下下周") || text.contains("下下星期") ->
+                currentMonday.plusWeeks(2).plusDays((target.value - 1).toLong())
+
             text.contains("下周") || text.contains("下星期") ->
                 currentMonday.plusWeeks(1).plusDays((target.value - 1).toLong())
 
@@ -389,11 +392,11 @@ private val CHINESE_HOUR_CLOCK =
     Regex("""(凌晨|早上|上午|中午|下午|晚上|早|晚|夜)?\s*(\d{1,2})\s*点(?:\s*(\d{1,2}|半)\s*分?)?""")
 private val NIGHT_MARKERS = setOf("晚上", "晚", "夜")
 
-private val WEEKDAY = Regex("""(?:本周|这周|下周|下星期|星期|周)\s*([一二三四五六日天])""")
+private val WEEKDAY = Regex("""(?:下下星期|下下周|本周|这周|下星期|下周|星期|周)\s*([一二三四五六日天])""")
 
 // A future date anchor: relative day words or weekday expressions.
 private val FUTURE_DAY =
-    Regex("""今天|今早|今晚|今夜|明早|明天|明晚|后天|大后天|下周|下星期|本周|这周|周[一二三四五六日天]|星期[一二三四五六日天]|tonight|tomorrow""")
+    Regex("""今天|今早|今晚|今夜|明早|明天|明晚|后天|大后天|下下周|下下星期|下周|下星期|本周|这周|周[一二三四五六日天]|星期[一二三四五六日天]|tonight|tomorrow""")
 
 // A concrete clock time: "8点", "下午3点半", "20:30", "8 PM".
 private val CLOCK_PRESENT = Regex("""\d{1,2}\s*(?::|：)\s*\d{1,2}|\d{1,2}\s*点|\b\d{1,2}\s*(?:a\.?m\.?|p\.?m\.?)\b""", RegexOption.IGNORE_CASE)
