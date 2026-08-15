@@ -314,8 +314,13 @@ fun resolveCalendarStartEpochMs(text: String, timeRange: QueryTimeRange?, zoneId
     val range = timeRange
     val clock = parseWallClock(text) ?: return null
     val date = Instant.ofEpochMilli(range.startEpochMs).atZone(zoneId).toLocalDate()
-    val resolved = date.atTime(clock).atZone(zoneId).toInstant().toEpochMilli()
-    return resolved.takeIf { it >= range.startEpochMs && it < range.endExclusiveEpochMs }
+    val rollsToFollowingDay = isNightTwelve(text)
+    val resolved = date.plusDays(if (rollsToFollowingDay) 1 else 0)
+        .atTime(clock).atZone(zoneId).toInstant().toEpochMilli()
+    return resolved.takeIf {
+        it >= range.startEpochMs &&
+            (it < range.endExclusiveEpochMs || (rollsToFollowingDay && it == range.endExclusiveEpochMs))
+    }
 }
 
 /** Parses the explicit wall-clock (English or Chinese) in [text], or null when absent/invalid. */
@@ -353,7 +358,9 @@ private fun applyChineseDayPeriod(marker: String, rawHour: Int): Int = when {
     // 中午 pins to the 12:00 block: 中午12点→12:00, 中午1点→13:00 (not 24:00 / mis-added).
     marker == "中午" -> if (rawHour == 12) 12 else rawHour + 12
 
-    marker in setOf("下午", "晚上", "晚", "夜") && rawHour in 1..11 -> rawHour + 12
+    marker in NIGHT_MARKERS && rawHour == 12 -> 0
+
+    (marker == "下午" || marker in NIGHT_MARKERS) && rawHour in 1..11 -> rawHour + 12
 
     marker == "凌晨" && rawHour == 12 -> 0
 
@@ -363,7 +370,13 @@ private fun applyChineseDayPeriod(marker: String, rawHour: Int): Int = when {
 /** Resolves the wall-clock in [text] onto [date] in [zoneId], or null when no clock is present. */
 private fun resolveClockOnDate(text: String, date: java.time.LocalDate, zoneId: ZoneId): Long? {
     val clock = parseWallClock(text) ?: return null
-    return date.atTime(clock).atZone(zoneId).toInstant().toEpochMilli()
+    return date.plusDays(if (isNightTwelve(text)) 1 else 0)
+        .atTime(clock).atZone(zoneId).toInstant().toEpochMilli()
+}
+
+private fun isNightTwelve(text: String): Boolean {
+    val match = CHINESE_COLON_CLOCK.find(text) ?: CHINESE_HOUR_CLOCK.find(text) ?: return false
+    return match.groupValues[1] in NIGHT_MARKERS && match.groupValues[2].toIntOrNull() == 12
 }
 
 private val ENGLISH_CLOCK = Regex(
@@ -374,6 +387,7 @@ private val CHINESE_COLON_CLOCK =
     Regex("""(凌晨|早上|上午|中午|下午|晚上|早|晚|夜)?\s*(\d{1,2})\s*(?::|：)\s*(\d{1,2})""")
 private val CHINESE_HOUR_CLOCK =
     Regex("""(凌晨|早上|上午|中午|下午|晚上|早|晚|夜)?\s*(\d{1,2})\s*点(?:\s*(\d{1,2}|半)\s*分?)?""")
+private val NIGHT_MARKERS = setOf("晚上", "晚", "夜")
 
 private val WEEKDAY = Regex("""(?:本周|这周|下周|下星期|星期|周)\s*([一二三四五六日天])""")
 

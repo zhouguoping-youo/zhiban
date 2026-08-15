@@ -190,6 +190,24 @@ class EntityExtractionTest {
         )
     }
 
+    @Test fun resolvesNightTwelveToTheFollowingMidnight() {
+        val tonight = extractor.extract("今晚12点关灯", "Work", now)
+        assertEquals(
+            LocalDateTime.of(2026, 7, 22, 0, 0).atZone(zone).toInstant().toEpochMilli(),
+            resolveCalendarStartEpochMs("今晚12点关灯", tonight.timeRange, zone),
+        )
+        val tomorrowNight = extractor.extract("明晚12点开跨国会议", "Work", now)
+        assertEquals(
+            LocalDateTime.of(2026, 7, 23, 0, 0).atZone(zone).toInstant().toEpochMilli(),
+            resolveCalendarStartEpochMs("明晚12点开跨国会议", tomorrowNight.timeRange, zone),
+        )
+        val tomorrowMidnight = extractor.extract("明天凌晨12点出发", "Work", now)
+        assertEquals(
+            LocalDateTime.of(2026, 7, 22, 0, 0).atZone(zone).toInstant().toEpochMilli(),
+            resolveCalendarStartEpochMs("明天凌晨12点出发", tomorrowMidnight.timeRange, zone),
+        )
+    }
+
     // Bug: a bare "下午3点" (no 今天/明天) yields a null timeRange, so the local resolver returns
     // null and the wrong provider epoch is trusted. It should anchor to today (or tomorrow if past).
     @Test fun resolvesBareAfternoonClockToUpcomingDayWhenNoDayWordPresent() {
