@@ -44,7 +44,7 @@ internal class RoomScheduleProjectionWriter(private val database: AgentDatabase)
                 contactId = null,
                 skillId = null,
                 confidence = 1.0,
-                sensitivity = "NORMAL",
+                sensitivity = "PERSONAL",
                 status = "ACTIVE",
                 ttlDays = 0,
                 expiresAtEpochMs = null,

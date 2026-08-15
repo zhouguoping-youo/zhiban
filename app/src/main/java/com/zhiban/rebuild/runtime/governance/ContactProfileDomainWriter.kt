@@ -124,7 +124,7 @@ internal class ContactProfileDomainWriter(private val database: AgentDatabase) {
                     contactId = call.contactId,
                     skillId = "contact_relationship",
                     confidence = call.confidence,
-                    sensitivity = if (type == "IMPORTANT_DATE") "SENSITIVE" else "NORMAL",
+                    sensitivity = if (type == "IMPORTANT_DATE") "SENSITIVE" else "PERSONAL",
                     status = "ACTIVE",
                     ttlDays = 0,
                     expiresAtEpochMs = null,

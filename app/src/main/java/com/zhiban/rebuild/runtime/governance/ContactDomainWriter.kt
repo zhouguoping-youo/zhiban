@@ -98,7 +98,7 @@ internal class ContactDomainWriter(private val database: AgentDatabase) {
                     ) {
                         "SENSITIVE"
                     } else {
-                        "NORMAL"
+                        "PERSONAL"
                     },
                     status = "ACTIVE", ttlDays = 0, expiresAtEpochMs = null,
                     createdAtEpochMs = context.nowEpochMs, updatedAtEpochMs = context.nowEpochMs,

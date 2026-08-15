@@ -190,7 +190,7 @@ internal class RoomScheduleToolExecutor(
                     put("durationMinutes", call.durationMinutes)
                 }.toString(),
                 sourceType = "AGENT_DOMAIN_WRITE", sourceRef = context.runId, contactId = null, skillId = null,
-                confidence = 1.0, sensitivity = "NORMAL", status = "ACTIVE", ttlDays = 0, expiresAtEpochMs = null,
+                confidence = 1.0, sensitivity = "PERSONAL", status = "ACTIVE", ttlDays = 0, expiresAtEpochMs = null,
                 createdAtEpochMs = context.nowEpochMs, updatedAtEpochMs = context.nowEpochMs,
             ),
         )

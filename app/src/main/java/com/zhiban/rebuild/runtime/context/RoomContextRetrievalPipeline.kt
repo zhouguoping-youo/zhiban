@@ -319,8 +319,15 @@ internal class RoomContextRetrievalPipeline(
 
     private fun estimateTokens(value: String) = ceil(value.toByteArray().size / 4.0).toInt().coerceAtLeast(1)
 
-    private fun String.toSensitivity(): Sensitivity = runCatching { Sensitivity.valueOf(uppercase()) }
-        .getOrDefault(Sensitivity.SENSITIVE)
+    // "NORMAL" is a legacy free-text label for ordinary personal facts, not a Sensitivity
+    // enum value; mapping it to SENSITIVE wrongly omitted benign schedule/contact facts.
+    private fun String.toSensitivity(): Sensitivity = when (uppercase()) {
+        "PUBLIC" -> Sensitivity.PUBLIC
+        "PERSONAL" -> Sensitivity.PERSONAL
+        "NORMAL" -> Sensitivity.PERSONAL
+        "SENSITIVE" -> Sensitivity.SENSITIVE
+        else -> Sensitivity.SENSITIVE
+    }
     private data class PathResult(val items: List<RetrievalCandidate>, val degradations: List<String> = emptyList())
 
     private companion object {

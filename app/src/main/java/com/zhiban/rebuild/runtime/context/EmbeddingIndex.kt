@@ -1,4 +1,5 @@
 package com.zhiban.rebuild.runtime.context
+import android.util.Log
 import androidx.room.withTransaction
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.runtime.runSuspendCatching
@@ -26,22 +27,29 @@ internal class EmbeddingIndex(
             limit,
         )
         if (facts.isEmpty()) return 0
-        val vectors = gateway.embed(
-            facts.map { fact ->
-                EmbeddingInput(
-                    text = fact.textContent,
-                    sensitivity = fact.sensitivity.toSensitivity(),
-                    purpose = EmbeddingPurpose.LOCAL_INDEX_CONTENT,
-                    sourceKind = "fact",
-                    sourceId = fact.factId,
-                )
-            },
-            space,
-        )
-        require(vectors.size == facts.size) { "EMBEDDING_RESULT_COUNT_MISMATCH" }
+        // Isolate each row so a fact the export gate blocks (a direct identifier in free
+        // text, e.g. a phone number inside a schedule note) skips only itself instead of
+        // aborting the whole batch — that all-or-nothing failure was the backfill deadlock.
+        val indexed = facts.mapNotNull { fact ->
+            val input = EmbeddingInput(
+                text = fact.textContent,
+                sensitivity = fact.sensitivity.toSensitivity(),
+                purpose = EmbeddingPurpose.LOCAL_INDEX_CONTENT,
+                sourceKind = "fact",
+                sourceId = fact.factId,
+            )
+            runSuspendCatching { gateway.embed(listOf(input), space).single().also { validate(it, space) } }
+                .onFailure { failure ->
+                    // Log only the exception class, never the message: a blocked row may carry a
+                    // direct identifier (e.g. a phone in free text) that must not reach logcat.
+                    Log.w(LOG_TAG, "embedding backfill row skipped (${failure.javaClass.simpleName})")
+                }
+                .getOrNull()
+                ?.let { vector -> fact to vector }
+        }
+        if (indexed.isEmpty()) return 0
         database.withTransaction {
-            facts.zip(vectors).forEach { (fact, vector) ->
-                validate(vector, space)
+            indexed.forEach { (fact, vector) ->
                 database.embeddingVectorDao().upsert(
                     EmbeddingVectorEntity(
                         embeddingId = "emb-${digest("${fact.factId}|${space.providerId}|${space.modelId}").take(32)}",
@@ -56,7 +64,7 @@ internal class EmbeddingIndex(
                 )
             }
         }
-        return facts.size
+        return indexed.size
     }
 
     suspend fun search(query: String, limit: Int = 20): VectorSearchResult {
@@ -145,9 +153,19 @@ internal class EmbeddingIndex(
     private fun digest(value: String) = MessageDigest.getInstance("SHA-256").digest(value.toByteArray())
         .joinToString("") { "%02x".format(it) }
 
-    private fun String.toSensitivity(): Sensitivity = runCatching { Sensitivity.valueOf(this) }.getOrDefault(Sensitivity.SENSITIVE)
+    // Legacy facts carry the free-text label "NORMAL" (ordinary personal data), which is not
+    // a Sensitivity enum value. Fail-closing it to SENSITIVE tripped the export gate and stalled
+    // the whole backfill; NORMAL maps to PERSONAL (passes the gate, still redacted on export).
+    private fun String.toSensitivity(): Sensitivity = when (uppercase()) {
+        "PUBLIC" -> Sensitivity.PUBLIC
+        "PERSONAL" -> Sensitivity.PERSONAL
+        "NORMAL" -> Sensitivity.PERSONAL
+        "SENSITIVE" -> Sensitivity.SENSITIVE
+        else -> Sensitivity.SENSITIVE
+    }
 
     companion object {
         private const val MAX_SCAN = 2_000
+        private const val LOG_TAG = "EmbeddingIndex"
     }
 }

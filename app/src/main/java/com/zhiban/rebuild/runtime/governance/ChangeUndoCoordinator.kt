@@ -268,7 +268,7 @@ internal class ChangeUndoCoordinator(private val database: AgentDatabase) {
             FactEntity(
                 "schedule:${restored.id}", "CALENDAR_EVENT",
                 "${restored.title}，开始时间=${restored.startAtEpochMs}，时长=${restored.durationMinutes}分钟",
-                null, "UNDO", change.runtimeRunId, null, null, 1.0, "NORMAL", "ACTIVE", 0, null,
+                null, "UNDO", change.runtimeRunId, null, null, 1.0, "PERSONAL", "ACTIVE", 0, null,
                 restored.createdAtEpochMs, nowEpochMs,
             ),
         )

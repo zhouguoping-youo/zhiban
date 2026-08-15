@@ -192,6 +192,34 @@ class EmbeddingIndexIntegrationTest {
         assertEquals(null, index.search("销售").degradation)
     }
 
+    @Test fun legacyNormalFactsAreEmbeddedAsPersonalAndIndexed() = runTest {
+        val gateway = FakeEmbeddingGateway()
+        FactIndex(database).upsert(fact("fact:legacy", "季度复盘与目标客户梳理", sensitivity = "NORMAL"))
+        val index = EmbeddingIndex(database, gateway) { now }
+
+        assertEquals(1, index.backfillBatch())
+
+        assertEquals(Sensitivity.PERSONAL, gateway.lastInputs.single().sensitivity)
+        val result = index.search("复盘")
+        assertEquals(null, result.degradation)
+        assertEquals("fact:legacy", result.candidates.first().id)
+    }
+
+    @Test fun oneBlockedFactDoesNotAbortTheRestOfTheBatch() = runTest {
+        val gateway = FakeEmbeddingGateway()
+        gateway.blockedSourceId = "fact:blocked"
+        val facts = FactIndex(database)
+        facts.upsert(fact("fact:good", "年度复盘"))
+        facts.upsert(fact("fact:blocked", "备注里写了电话13812345678"))
+        val index = EmbeddingIndex(database, gateway) { now }
+
+        assertEquals(1, index.backfillBatch())
+
+        val result = index.search("复盘")
+        assertEquals("vector_partial:rebuild_pending", result.degradation)
+        assertEquals(listOf("fact:good"), result.candidates.map { it.id })
+    }
+
     private fun fact(id: String, text: String, sensitivity: String = "PERSONAL") = FactEntity(
         id, "NOTE", text, null, "test", id, null, null, 1.0, sensitivity, "ACTIVE", -1, null, now, now++,
     )
@@ -199,10 +227,12 @@ class EmbeddingIndexIntegrationTest {
     private class FakeEmbeddingGateway : EmbeddingGateway {
         var space = EmbeddingSpace("provider-a", "embed-v1", 8)
         var lastInputs: List<EmbeddingInput> = emptyList()
+        var blockedSourceId: String? = null
         override suspend fun activeSpace() = space
         override suspend fun embed(inputs: List<EmbeddingInput>, space: EmbeddingSpace): List<FloatArray> {
             lastInputs = inputs
             return inputs.map { input ->
+                if (input.sourceId == blockedSourceId) error("EMBEDDING_SENSITIVE_INPUT_BLOCKED")
                 val text = input.text
                 when {
                     text.contains("旅行") || text.contains("酒店") -> FloatArray(8).also { it[1] = 1f }
