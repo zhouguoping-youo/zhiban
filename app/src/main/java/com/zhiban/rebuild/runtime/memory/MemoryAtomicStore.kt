@@ -5,6 +5,8 @@ import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.context.FactIndex
 import java.security.MessageDigest
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 data class MemoryCommitRequest(
     val namespaceId: String,
@@ -24,6 +26,27 @@ data class MemoryCommitRequest(
 data class MemoryCommitResult(val created: Boolean, val memoryId: String, val recordVersion: Long)
 data class MemoryRecallSnapshot(val generation: Long, val records: List<MemoryRecordEntity>)
 data class MemoryDeletionResult(val generation: Long, val created: Boolean)
+data class MemoryUpsertRequest(
+    val namespaceId: String,
+    val logicalMemoryId: String,
+    val memoryType: String,
+    val subjectKey: String,
+    val predicateKey: String,
+    val canonicalText: String,
+    val sensitivity: String,
+    val confidence: Double,
+    val sourceRef: String,
+)
+
+data class MemoryUpsertResult(
+    val changed: Boolean,
+    val created: Boolean,
+    val memoryId: String,
+    val recordVersion: Long,
+    val beforeDigest: String?,
+    val afterDigest: String,
+    val inversePayloadJson: String,
+)
 
 /** Atomic Room boundary for durable memory commits and deletion read barriers. */
 internal class MemoryAtomicStore(private val database: AgentDatabase, private val clock: () -> Long = System::currentTimeMillis) {
@@ -191,6 +214,138 @@ internal class MemoryAtomicStore(private val database: AgentDatabase, private va
         val namespace = requireNotNull(dao.namespace(namespaceId))
         val now = clock()
         MemoryRecallSnapshot(namespace.invalidationGeneration, dao.recall(namespaceId, now))
+    }
+
+    suspend fun upsertReversible(request: MemoryUpsertRequest): MemoryUpsertResult = database.withTransaction {
+        validateUpsert(request)
+        requireNotNull(dao.namespace(request.namespaceId)) { "NAMESPACE_NOT_FOUND" }
+        val canonical = canonicalize(request.canonicalText)
+        val current = dao.current(request.namespaceId, request.logicalMemoryId)
+        val previous = current?.let { dao.record(request.namespaceId, it.memoryId, it.recordVersion) }
+        if (previous?.canonicalText == canonical) {
+            return@withTransaction unchangedUpsert(previous)
+        }
+        val now = clock()
+        val memoryId = current?.memoryId
+            ?: "memory-auto-${digest("${request.namespaceId}|${request.logicalMemoryId}").take(24)}"
+        val version = (current?.recordVersion ?: 0) + 1
+        val record = autoRecord(request, canonical, memoryId, version, now)
+        dao.insertRecord(record)
+        if (current == null) {
+            dao.insertCurrent(MemoryCurrentVersionEntity(request.namespaceId, request.logicalMemoryId, version, memoryId, 0))
+        } else {
+            check(dao.supersedeRecord(request.namespaceId, memoryId, current.recordVersion, now) == 1)
+            check(dao.moveCurrentVersion(request.namespaceId, request.logicalMemoryId, memoryId, current.recordVersion, version) == 1)
+            dao.deleteFts(request.namespaceId, memoryId, current.recordVersion)
+        }
+        indexAutoRecord(request, record, now)
+        MemoryUpsertResult(
+            changed = true,
+            created = current == null,
+            memoryId = memoryId,
+            recordVersion = version,
+            beforeDigest = previous?.canonicalDigest,
+            afterDigest = record.canonicalDigest,
+            inversePayloadJson = buildJsonObject {
+                put("namespaceId", request.namespaceId)
+                put("logicalMemoryId", request.logicalMemoryId)
+                put("memoryId", memoryId)
+                put("expectedVersion", version)
+                previous?.let { put("previousVersion", it.recordVersion) }
+            }.toString(),
+        )
+    }
+
+    suspend fun undoReversible(
+        namespaceId: String,
+        logicalMemoryId: String,
+        memoryId: String,
+        expectedVersion: Long,
+        expectedDigest: String,
+        previousVersion: Long?,
+    ): Boolean = database.withTransaction {
+        val current = dao.current(namespaceId, logicalMemoryId) ?: return@withTransaction false
+        if (current.memoryId != memoryId || current.recordVersion != expectedVersion) return@withTransaction false
+        val currentRecord = dao.record(namespaceId, memoryId, expectedVersion) ?: return@withTransaction false
+        if (currentRecord.canonicalDigest != expectedDigest) return@withTransaction false
+        dao.deleteFts(namespaceId, memoryId, expectedVersion)
+        if (previousVersion == null) {
+            if (dao.deleteCurrent(namespaceId, logicalMemoryId, memoryId, expectedVersion) != 1) return@withTransaction false
+            FactIndex(database).delete("memory:$memoryId")
+            return@withTransaction dao.deleteRecord(namespaceId, memoryId, expectedVersion) == 1
+        }
+        val previous = dao.record(namespaceId, memoryId, previousVersion) ?: return@withTransaction false
+        check(dao.moveCurrentVersion(namespaceId, logicalMemoryId, memoryId, expectedVersion, previousVersion) == 1)
+        check(dao.reactivateRecord(namespaceId, memoryId, previousVersion) == 1)
+        dao.insertFts(MemoryFtsEntity(namespaceId, memoryId, previousVersion, previous.canonicalText))
+        putMemoryFact(previous, "AGENT_AUTO_MEMORY_UNDO")
+        dao.deleteRecord(namespaceId, memoryId, expectedVersion) == 1
+    }
+
+    private fun validateUpsert(request: MemoryUpsertRequest) {
+        require(request.logicalMemoryId.length in 1..128)
+        require(request.memoryType in setOf("PREFERENCE", "FACT"))
+        require(request.subjectKey.length in 1..128 && request.predicateKey.length in 1..128)
+        require(request.canonicalText.trim().length in 1..500)
+        require(request.sensitivity in setOf("PUBLIC", "PERSONAL"))
+        require(request.confidence in 0.0..1.0 && request.sourceRef.length in 1..500)
+    }
+
+    private fun unchangedUpsert(record: MemoryRecordEntity) = MemoryUpsertResult(
+        changed = false,
+        created = false,
+        memoryId = record.memoryId,
+        recordVersion = record.recordVersion,
+        beforeDigest = record.canonicalDigest,
+        afterDigest = record.canonicalDigest,
+        inversePayloadJson = "{}",
+    )
+
+    private fun autoRecord(request: MemoryUpsertRequest, canonical: String, memoryId: String, version: Long, now: Long) = MemoryRecordEntity(
+        request.namespaceId, memoryId, version, request.logicalMemoryId, request.memoryType,
+        request.subjectKey, request.predicateKey, canonical, canonical, digest(canonical),
+        request.sensitivity, request.confidence, 1.0, "ACTIVE", null, null, now, now,
+        null, now, null, 1, digest(request.sourceRef),
+    )
+
+    private suspend fun indexAutoRecord(request: MemoryUpsertRequest, record: MemoryRecordEntity, now: Long) {
+        dao.insertEvidence(
+            listOf(
+                MemoryEvidenceEntity(
+                    request.namespaceId, record.memoryId, record.recordVersion,
+                    "evidence-auto-${digest(request.sourceRef).take(24)}", "SOURCE", request.sourceRef,
+                    digest(request.sourceRef), now, record.canonicalDigest, "USER", request.sensitivity,
+                ),
+            ),
+        )
+        val jobs = listOf("FTS", "EMBEDDING").map { type ->
+            MemoryIndexOutboxEntity(
+                "index-${request.namespaceId}-${record.memoryId}-${record.recordVersion}-$type",
+                request.namespaceId,
+                record.memoryId,
+                record.recordVersion,
+                type,
+                record.canonicalDigest,
+                "PENDING",
+                now,
+            )
+        }
+        check(dao.insertIndexJobs(jobs).all { it != -1L })
+        dao.insertFts(MemoryFtsEntity(request.namespaceId, record.memoryId, record.recordVersion, record.canonicalText))
+        putMemoryFact(record, "AGENT_AUTO_MEMORY")
+    }
+
+    private suspend fun putMemoryFact(record: MemoryRecordEntity, sourceType: String) {
+        FactIndex(database).upsert(
+            FactEntity(
+                factId = "memory:${record.memoryId}", factType = "AGENT_MEMORY",
+                textContent = record.canonicalText, structuredDataJson = null,
+                sourceType = sourceType, sourceRef = record.namespaceId, contactId = null,
+                skillId = null, confidence = record.confidence, sensitivity = record.sensitivity,
+                status = "ACTIVE", ttlDays = 0, expiresAtEpochMs = null,
+                createdAtEpochMs = record.createdAtEpochMs, updatedAtEpochMs = clock(),
+            ),
+        )
     }
 
     /** Keeps old memory auditable while removing it from normal recall after 180 days. */

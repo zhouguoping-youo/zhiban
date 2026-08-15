@@ -341,6 +341,21 @@ internal interface MemoryPersistenceDao {
     suspend fun deleteCurrent(namespaceId: String, logicalMemoryId: String, memoryId: String, recordVersion: Long): Int
 
     @Query(
+        "UPDATE memory_current_versions SET memoryId=:memoryId,recordVersion=:newVersion,revision=revision+1 WHERE namespaceId=:namespaceId AND logicalMemoryId=:logicalMemoryId AND memoryId=:memoryId AND recordVersion=:expectedVersion",
+    )
+    suspend fun moveCurrentVersion(namespaceId: String, logicalMemoryId: String, memoryId: String, expectedVersion: Long, newVersion: Long): Int
+
+    @Query(
+        "UPDATE memory_records SET status='SUPERSEDED',txToEpochMs=:nowEpochMs WHERE namespaceId=:namespaceId AND memoryId=:memoryId AND recordVersion=:recordVersion AND status='ACTIVE' AND txToEpochMs IS NULL",
+    )
+    suspend fun supersedeRecord(namespaceId: String, memoryId: String, recordVersion: Long, nowEpochMs: Long): Int
+
+    @Query(
+        "UPDATE memory_records SET status='ACTIVE',txToEpochMs=NULL WHERE namespaceId=:namespaceId AND memoryId=:memoryId AND recordVersion=:recordVersion AND status='SUPERSEDED'",
+    )
+    suspend fun reactivateRecord(namespaceId: String, memoryId: String, recordVersion: Long): Int
+
+    @Query(
         "DELETE FROM memory_fts WHERE namespaceId=:namespaceId AND memoryId=:memoryId AND recordVersion=:recordVersion",
     )
     suspend fun deleteFts(namespaceId: String, memoryId: String, recordVersion: Long)

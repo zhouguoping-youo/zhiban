@@ -131,6 +131,63 @@ class MemoryAtomicCommitStoreTest {
         )
     }
 
+    @Test fun reversibleUpsertCreatesUpdatesAndRestoresThePreviousVersion() = runBlocking {
+        store.ensureNamespace(namespace())
+
+        val created = store.upsertReversible(upsertRequest("喜欢清淡口味"))
+        val updated = store.upsertReversible(upsertRequest("现在喜欢微辣"))
+
+        assertTrue(created.created)
+        assertFalse(updated.created)
+        assertEquals(2L, updated.recordVersion)
+        assertEquals(listOf("现在喜欢微辣"), store.recall("namespace-1").records.map { it.canonicalText })
+        assertTrue(
+            store.undoReversible(
+                "namespace-1",
+                "auto-user-food",
+                updated.memoryId,
+                updated.recordVersion,
+                updated.afterDigest,
+                previousVersion = 1,
+            ),
+        )
+        assertEquals(listOf("喜欢清淡口味"), store.recall("namespace-1").records.map { it.canonicalText })
+        assertEquals(1, scalar("SELECT COUNT(*) FROM memory_records WHERE logicalMemoryId='auto-user-food'"))
+    }
+
+    @Test fun reversibleUpsertIsIdempotentAndNeverOverwritesANewerEditDuringUndo() = runBlocking {
+        store.ensureNamespace(namespace())
+        val first = store.upsertReversible(upsertRequest("偏好简洁回答"))
+        val duplicate = store.upsertReversible(upsertRequest("偏好简洁回答"))
+        val newer = store.upsertReversible(upsertRequest("偏好先给结论再解释"))
+
+        assertFalse(duplicate.changed)
+        assertFalse(
+            store.undoReversible(
+                "namespace-1",
+                "auto-user-food",
+                first.memoryId,
+                first.recordVersion,
+                first.afterDigest,
+                previousVersion = null,
+            ),
+        )
+        assertEquals(listOf("偏好先给结论再解释"), store.recall("namespace-1").records.map { it.canonicalText })
+        assertEquals(2L, newer.recordVersion)
+    }
+
+    @Test fun reversibleUpsertFailureRollsBackEveryProjection() = runBlocking {
+        store.ensureNamespace(namespace())
+        database.openHelper.writableDatabase.execSQL(
+            "CREATE TRIGGER abort_auto_memory BEFORE INSERT ON memory_index_outbox BEGIN SELECT RAISE(ABORT, 'simulated crash'); END",
+        )
+
+        assertTrue(runCatching { store.upsertReversible(upsertRequest("必须完整回滚")) }.isFailure)
+        assertEquals(0, scalar("SELECT COUNT(*) FROM memory_records WHERE logicalMemoryId='auto-user-food'"))
+        assertEquals(0, scalar("SELECT COUNT(*) FROM memory_current_versions WHERE logicalMemoryId='auto-user-food'"))
+        assertEquals(0, scalar("SELECT COUNT(*) FROM memory_fts"))
+    }
+
     @Test fun commitFailureRollsBackRecordReceiptEventOutboxAndCandidateConsumption() = runBlocking {
         store.ensureNamespace(namespace())
         val candidateId = stage()
@@ -311,6 +368,18 @@ class MemoryAtomicCommitStoreTest {
 
     private fun namespace() = MemoryNamespaceEntity(
         "namespace-1", "owner-1", "profile-1", "PERSON", "user-1", "ACTIVE", 0, 0, now++,
+    )
+
+    private fun upsertRequest(content: String) = MemoryUpsertRequest(
+        namespaceId = "namespace-1",
+        logicalMemoryId = "auto-user-food",
+        memoryType = "PREFERENCE",
+        subjectKey = "user",
+        predicateKey = "food_preference",
+        canonicalText = content,
+        sensitivity = "PERSONAL",
+        confidence = 0.99,
+        sourceRef = "runtime:test-turn",
     )
 
     private suspend fun commitRequest(candidateId: String, canonicalText: String = "value") = MemoryCommitRequest(
