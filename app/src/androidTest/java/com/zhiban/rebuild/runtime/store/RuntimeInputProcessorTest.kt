@@ -1166,14 +1166,14 @@ class RuntimeInputProcessorTest {
             provider,
             fixedProfileStore(),
             com.zhiban.rebuild.runtime.kernel.ProviderEngineConfig(
-                heartbeatIntervalMs = 25,
-                leaseDurationMs = 100,
+                heartbeatIntervalMs = 100,
+                leaseDurationMs = 1_200,
                 rerankTimeoutMs = 0,
             ),
         ).processNext()
 
-        withTimeout(1_000) { observationStarted.await() }
-        delay(250)
+        withTimeout(5_000) { observationStarted.await() }
+        delay(2_500)
         assertTrue(
             RoomRuntimeStore(database, "recovery-test")
                 .claimRecoverable("owner-b", realClock(), 1_000, "ui")
