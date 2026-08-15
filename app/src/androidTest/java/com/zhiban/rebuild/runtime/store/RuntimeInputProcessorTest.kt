@@ -121,7 +121,7 @@ class RuntimeInputProcessorTest {
 
     @Test fun memoryApprovalSnapshotCarriesPreviewButEventJournalStaysRedacted() = runBlocking {
         val input = RoomTextInputGateway(database, { true }, { now }).stage(
-            """{"schemaVersion":1,"text":"记住我喜欢简洁回答","mode":"Work","model":"M2.7","level":"高"}""",
+            """{"schemaVersion":1,"text":"请保存一条需要确认的长期规则","mode":"Work","model":"M2.7","level":"高"}""",
         )
         val gateways = RoomRuntimeGateways(database, "test") { now++ }
         gateways.accept(RuntimeUiCommand.Start("s-prev", input.inputRef, "c-prev", "a-prev", 0, "chat", "r-prev"))
@@ -514,7 +514,7 @@ class RuntimeInputProcessorTest {
 
     @Test fun approvalWaitsForPreviousRunJobToExitBeforeLaunchingExecution() = runBlocking {
         val staged = RoomTextInputGateway(database, { true }, { now }).stage(
-            """{"schemaVersion":1,"text":"记住我喜欢简洁回答","mode":"Work","model":"M2.7","level":"高"}""",
+            """{"schemaVersion":1,"text":"请保存一条需要确认的长期规则","mode":"Work","model":"M2.7","level":"高"}""",
         )
         val gateway = RoomRuntimeGateways(database, "test") { now++ }
         gateway.accept(
@@ -2031,7 +2031,7 @@ class RuntimeInputProcessorTest {
     }
 
     @Test fun memoryToolRequiresApprovalThenBecomesRetrievableContext() = runBlocking {
-        val input = """{"schemaVersion":1,"text":"记住我喜欢简洁回答","mode":"Work","model":"M2.7","level":"高"}"""
+        val input = """{"schemaVersion":1,"text":"请保存一条需要确认的长期规则","mode":"Work","model":"M2.7","level":"高"}"""
         val staged = RoomTextInputGateway(database, { true }, { now }).stage(input)
         val gateway = RoomRuntimeGateways(database, "test") { now++ }
         gateway.accept(
@@ -2210,7 +2210,7 @@ class RuntimeInputProcessorTest {
 
     @Test fun memoryCommitRollsBackWhenRuntimeFinalizationFails() = runBlocking {
         val staged = RoomTextInputGateway(database, { true }, { now }).stage(
-            """{"schemaVersion":1,"text":"记住我喜欢简洁回答","mode":"Work","model":"M2.7","level":"高"}""",
+            """{"schemaVersion":1,"text":"请保存一条需要确认的长期规则","mode":"Work","model":"M2.7","level":"高"}""",
         )
         val gateway = RoomRuntimeGateways(database, "test") { now++ }
         gateway.accept(
@@ -2689,7 +2689,7 @@ class RuntimeInputProcessorTest {
     }
 
     @Test fun observationCanReplanIntoSecondApprovedToolAndPersistsDag() = runBlocking {
-        val input = """{"schemaVersion":1,"text":"安排复盘会并记住我喜欢短会","mode":"Work","model":"M2.7","level":"高"}"""
+        val input = """{"schemaVersion":1,"text":"处理复盘会事项并保存一条需要确认的偏好","mode":"Work","model":"M2.7","level":"高"}"""
         val staged = RoomTextInputGateway(database, { true }, { now }).stage(input)
         val gateway = RoomRuntimeGateways(database, "test") { now++ }
         gateway.accept(RuntimeUiCommand.Start("s-dag", staged.inputRef, "c-dag", "a-dag", 0, "chat", "r-dag"))
@@ -2892,7 +2892,7 @@ class RuntimeInputProcessorTest {
             override suspend fun probe(profile: ProviderProfile) = capability(profile)
             override fun stream(request: ModelRequest): kotlinx.coroutines.flow.Flow<ModelEvent> {
                 return if (requestNumber++ == 0) {
-                    assertEquals("contact_maintenance_list", request.forcedToolName)
+                    assertNull(request.forcedToolName)
                     flowOf(
                         ModelEvent.ToolCall(0, "call-required-contacts", "contact_maintenance_list", """{"limit":1}"""),
                         ModelEvent.Final("tool_calls"),

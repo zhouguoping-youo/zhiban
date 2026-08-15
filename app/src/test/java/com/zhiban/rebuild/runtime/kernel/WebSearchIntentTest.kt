@@ -22,6 +22,7 @@ class WebSearchIntentTest {
         assertTrue(shouldForceMemoryUpsert("Remember that I prefer concise answers"))
         assertFalse(shouldForceMemoryUpsert("提醒我明天交报告"))
         assertFalse(shouldForceMemoryUpsert("Remember tomorrow's meeting"))
+        assertFalse(shouldForceMemoryUpsert("安排复盘会并记住我喜欢短会"))
     }
 
     @Test fun calendarThenWebThenMemoryDefineForcedToolPrecedence() {
@@ -41,18 +42,4 @@ class WebSearchIntentTest {
         assertTrue(select("Remember that I prefer concise answers") == "memory.upsert")
     }
 
-    @Test fun explicitReadIsForcedEvenWhenTheActivatedSkillAllowlistMissesIt() {
-        val selected = selectForcedCanonicalTool(
-            ForcedToolSelection(
-                workMode = true,
-                calendarCreateIntent = false,
-                input = "Check the schedule for today and count my contacts",
-                availableTools = setOf("contact.maintenance.list", "calendar.schedule.search"),
-                allowedTools = setOf("contact.search"),
-                enabled = { true },
-            ),
-        )
-
-        assertTrue(selected == "contact.maintenance.list")
-    }
 }

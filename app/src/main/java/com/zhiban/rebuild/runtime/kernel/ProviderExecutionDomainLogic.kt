@@ -459,6 +459,7 @@ internal fun shouldForceWebSearch(input: String): Boolean {
 internal fun shouldForceMemoryUpsert(input: String): Boolean {
     val normalized = input.trim().lowercase()
     if (ONE_TIME_MEMORY_PATTERNS.any(normalized::contains)) return false
+    if (NON_MEMORY_TASK_PATTERNS.any(normalized::contains)) return false
     return STABLE_MEMORY_PATTERNS.any(normalized::contains)
 }
 
@@ -473,17 +474,15 @@ internal data class ForcedToolSelection(
 
 internal fun selectForcedCanonicalTool(selection: ForcedToolSelection): String? {
     if (!selection.workMode) return null
-    val requiredRead = nextRequiredReadTool(selection.input, emptySet())
     val candidate = when {
         selection.calendarCreateIntent -> CALENDAR_CREATE_TOOL
         shouldForceWebSearch(selection.input) -> WEB_SEARCH_TOOL
         shouldForceMemoryUpsert(selection.input) -> MEMORY_UPSERT_TOOL
-        requiredRead != null -> requiredRead
         else -> return null
     }
     return candidate.takeIf {
         it in selection.availableTools &&
-            (candidate == requiredRead || selection.allowedTools == null || it in selection.allowedTools) &&
+            (selection.allowedTools == null || it in selection.allowedTools) &&
             selection.enabled(it)
     }
 }
@@ -543,6 +542,23 @@ private val ONE_TIME_MEMORY_PATTERNS = listOf(
     "提醒我",
     "remember tomorrow",
     "remind me",
+)
+private val NON_MEMORY_TASK_PATTERNS = listOf(
+    "安排",
+    "日程",
+    "会议",
+    "联系人",
+    "客户",
+    "查询",
+    "查看",
+    "搜索",
+    "发送",
+    "schedule",
+    "meeting",
+    "contact",
+    "customer",
+    "search",
+    "send",
 )
 private const val CALENDAR_CREATE_TOOL = "calendar.schedule.create"
 private const val WEB_SEARCH_TOOL = "web.search"
