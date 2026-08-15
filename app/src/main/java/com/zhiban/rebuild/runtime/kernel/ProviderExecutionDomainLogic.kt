@@ -473,21 +473,38 @@ internal data class ForcedToolSelection(
 
 internal fun selectForcedCanonicalTool(selection: ForcedToolSelection): String? {
     if (!selection.workMode) return null
+    val requiredRead = nextRequiredReadTool(selection.input, emptySet())
     val candidate = when {
         selection.calendarCreateIntent -> CALENDAR_CREATE_TOOL
         shouldForceWebSearch(selection.input) -> WEB_SEARCH_TOOL
         shouldForceMemoryUpsert(selection.input) -> MEMORY_UPSERT_TOOL
+        requiredRead != null -> requiredRead
         else -> return null
     }
     return candidate.takeIf {
         it in selection.availableTools &&
-            (selection.allowedTools == null || it in selection.allowedTools) &&
+            (candidate == requiredRead || selection.allowedTools == null || it in selection.allowedTools) &&
             selection.enabled(it)
     }
 }
 
 private val CONTACT_COUNT_PATTERNS = listOf("联系人数量", "联系人总数", "多少联系人", "多少位联系人", "统计联系人", "count my contact", "how many contact")
-private val CALENDAR_QUERY_PATTERNS = listOf("今天日程", "今日日程", "今天安排", "今日安排", "today's schedule", "today%27s schedule", "today schedule")
+private val CALENDAR_QUERY_PATTERNS = listOf(
+    "今天日程",
+    "今日日程",
+    "今天的日程",
+    "今天安排",
+    "今日安排",
+    "今天的安排",
+    "今天有什么日程",
+    "今天有什么安排",
+    "today's schedule",
+    "today%27s schedule",
+    "today schedule",
+    "schedule for today",
+    "calendar for today",
+    "appointments today",
+)
 private val CALENDAR_QUERY_TOOLS = setOf("calendar.search", "calendar.schedule.search")
 private val EXPLICIT_WEB_SEARCH_PATTERNS = listOf(
     "联网搜索",

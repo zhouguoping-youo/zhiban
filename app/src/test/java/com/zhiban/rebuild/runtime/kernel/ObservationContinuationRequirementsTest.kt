@@ -29,6 +29,17 @@ class ObservationContinuationRequirementsTest {
     }
 
     @Test
+    fun `natural schedule for today wording still requires the calendar read`() {
+        val input = "Check the schedule for today and count my contacts, then summarize both."
+
+        assertEquals("contact.maintenance.list", nextRequiredReadTool(input, emptySet()))
+        assertEquals(
+            "calendar.schedule.search",
+            nextRequiredReadTool(input, setOf("contact.maintenance.list")),
+        )
+    }
+
+    @Test
     fun `no continuation remains after both requested domains completed`() {
         val instruction = remainingObservationRequirements(
             "联系人总数和今天安排",

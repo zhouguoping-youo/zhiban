@@ -25,7 +25,13 @@ class WebSearchIntentTest {
     }
 
     @Test fun calendarThenWebThenMemoryDefineForcedToolPrecedence() {
-        val available = setOf("calendar.schedule.create", "web.search", "memory.upsert")
+        val available = setOf(
+            "calendar.schedule.create",
+            "web.search",
+            "memory.upsert",
+            "contact.maintenance.list",
+            "calendar.schedule.search",
+        )
         fun select(input: String, calendar: Boolean = false) = selectForcedCanonicalTool(
             ForcedToolSelection(true, calendar, input, available, null) { true },
         )
@@ -33,5 +39,20 @@ class WebSearchIntentTest {
         assertTrue(select("安排明晚会议", calendar = true) == "calendar.schedule.create")
         assertTrue(select("Search the web for current weather") == "web.search")
         assertTrue(select("Remember that I prefer concise answers") == "memory.upsert")
+    }
+
+    @Test fun explicitReadIsForcedEvenWhenTheActivatedSkillAllowlistMissesIt() {
+        val selected = selectForcedCanonicalTool(
+            ForcedToolSelection(
+                workMode = true,
+                calendarCreateIntent = false,
+                input = "Check the schedule for today and count my contacts",
+                availableTools = setOf("contact.maintenance.list", "calendar.schedule.search"),
+                allowedTools = setOf("contact.search"),
+                enabled = { true },
+            ),
+        )
+
+        assertTrue(selected == "contact.maintenance.list")
     }
 }

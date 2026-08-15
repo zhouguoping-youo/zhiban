@@ -2879,6 +2879,53 @@ class RuntimeInputProcessorTest {
         assertEquals(1, database.planDao().nodesForDefinition("runtime-plan-r-memory-auto").size)
     }
 
+    @Test fun explicitMultiDomainReadCannotFinishUntilCalendarAndContactsAreVerified() = runBlocking {
+        now = 1_800_000_000_000L
+        val input = RoomTextInputGateway(database, { true }, { now }).stage(
+            """{"schemaVersion":1,"text":"Check the schedule for today and count my contacts, then summarize both.","mode":"Work","model":"M2.7","level":"高"}""",
+        )
+        RoomRuntimeGateways(database, "test") { now++ }.accept(
+            RuntimeUiCommand.Start("s-required-reads", input.inputRef, "c-required-reads", "a-required-reads", 0, "chat", "r-required-reads"),
+        )
+        var requestNumber = 0
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile) = capability(profile)
+            override fun stream(request: ModelRequest): kotlinx.coroutines.flow.Flow<ModelEvent> {
+                return if (requestNumber++ == 0) {
+                    assertEquals("contact_maintenance_list", request.forcedToolName)
+                    flowOf(
+                        ModelEvent.ToolCall(0, "call-required-contacts", "contact_maintenance_list", """{"limit":1}"""),
+                        ModelEvent.Final("tool_calls"),
+                    )
+                } else {
+                    flowOf(ModelEvent.Delta(0, "I cannot inspect another domain."), ModelEvent.Final("stop"))
+                }
+            }
+            override fun cancel(requestId: String) = true
+        }
+        KernelCommandProcessor(
+            database,
+            "processor",
+            { true },
+            { now++ },
+            provider = provider,
+            profiles = fixedProfileStore(),
+        ).processNext()
+
+        awaitRunStatus("r-required-reads", "SUCCEEDED")
+        assertEquals(
+            listOf("contact.maintenance.list", "calendar.schedule.search"),
+            database.runtimeToolExecutionDao().listByRunId("r-required-reads").map { it.toolName },
+        )
+        val assistantText = database.runtimeEventDao().listByRunId("r-required-reads")
+            .filter { it.eventType == "AssistantDelta" }
+            .joinToString("") {
+                Json.parseToJsonElement(it.payloadJson).jsonObject.getValue("part").jsonPrimitive.content
+            }
+        assertTrue(assistantText.contains("联系人总数：0 人"))
+        assertTrue(assistantText.contains("没有日程安排"))
+    }
+
     @Test fun hangingProbeIsCancelledByCancelCommand() = runBlocking {
         val probeCancelled = AtomicBoolean(false)
         val staged = RoomTextInputGateway(database, { true }, { now }).stage("probe cancel")
