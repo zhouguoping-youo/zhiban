@@ -391,6 +391,13 @@ internal val AGENT_DATABASE_CALLBACK = object : RoomDatabase.Callback() {
     }
 
     override fun onOpen(db: SupportSQLiteDatabase) {
+        // Foreign-key enforcement is per-connection and off by default. onOpen runs after
+        // onCreate/onUpgrade, so migrations keep their legacy FK-off behavior while every
+        // runtime write on this (primary/writer) connection enforces the declared cascades.
+        // Without this, deleting a memory/fact left orphan child rows: a stale
+        // memory_current_versions row blocked re-committing the same logicalMemoryId
+        // (CURRENT_MEMORY_EXISTS) and embedding_vectors leaked after their fact was removed.
+        db.execSQL("PRAGMA foreign_keys=ON")
         createPreferenceDetachTrigger(db)
         createSingleCurrentMemoryTrigger(db)
         createSingleCurrentMemoryUpdateTrigger(db)
