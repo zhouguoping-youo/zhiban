@@ -322,6 +322,7 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | 17.9 | 中文自然问法可召回相关记忆 | ✅ | 功能不可用 | 旧检索把整句中文视为一个 unicode61 token，且所有词用 AND 连接；“做数据库的是谁”无法召回“张三在知伴科技负责数据库项目”。现保留 FTS 并改为 OR，同时在相同 namespace、当前版本、未过期、无 tombstone 约束下，以受限中文片段补充本地召回 | 本提交 `fix(17.9)` | `MemoryAtomicCommitStoreTest.naturalChineseQuestionRecallsMemoryByMeaningfulSubstring`（SM-W7023：空结果红→正确记忆绿） |
 | 17.10 | 中文自然问法可召回联系人 | ✅ | 功能不可用 | 联系人检索旧调用把完整中文问句直接交给 unicode61 FTS，“做数据库的那家客户是谁”无法命中公司、标签或备注。现统一抽取受限中文检索片段，对 FTS 与本地 substring 结果按命中数去重排序；联系人合并源、软删除过滤仍由原查询执行 | 本提交 `fix(17.10)` | `EmbeddingIndexIntegrationTest.naturalChineseQuestionRecallsContactByCompanyAndNote`（SM-W7023：空结果红→正确联系人绿） |
 | 17.11 | 无明确查询词时优先注入最新高置信记忆 | ✅ | 数据正确性 | 近期记忆旧查询按 `logicalMemoryId` 排序，调用端再 `takeLast(10)`，随机 ID 顺序可能把刚确认的记忆排除。现 DAO 统一按置信度、观察时间倒序，调用端取前 10 条，稳定保留最新高置信内容 | 本提交 `fix(17.11)` | `MemoryAtomicCommitStoreTest.recallReturnsNewestHighConfidenceMemoriesFirst`（SM-W7023） |
+| 17.12 | 会话历史保留真实对话角色 | ✅ | 功能不可用 | 最近轮次原先被拼成 `user:`/`assistant:` 文本后全部作为 system 上下文发送，模型无法获得真实交替结构。现最终 `ModelRequest` 按原顺序发送 user/assistant 历史并保证本轮 user 输入最后；历史仍标记 `AUTO_RETRIEVED`，手机号等自动召回内容继续经过出境脱敏 | 本提交 `fix(17.12)` | `ProviderContextAssemblerPresentationTest.recentConversationRetainsAlternatingRolesBeforeCurrentInput` + `recalledConversationStillPassesOutboundRedaction`（红→绿） |
 
 ## 维度 18 · 工具执行与确认
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
