@@ -33,6 +33,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.zhiban.rebuild.runtime.personalization.UserProfile
 import com.zhiban.rebuild.runtime.personalization.UserProfileStore
+import com.zhiban.rebuild.runtime.personalization.isValidMainlandMobileNumber
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanChip
 import com.zhiban.rebuild.ui.components.ZhiBanPage
@@ -86,7 +87,7 @@ internal fun platformLabel(key: String): String = when (key) {
     else -> key
 }
 
-internal fun isValidPhone(phone: String): Boolean = phone.length == 11 && phone.startsWith("1") && phone.all(Char::isDigit)
+internal fun isValidPhone(phone: String): Boolean = phone.isValidMainlandMobileNumber()
 
 @HiltViewModel class UserProfileViewModel @Inject constructor(private val store: UserProfileStore) : ViewModel() {
     private val current = store.profile.value

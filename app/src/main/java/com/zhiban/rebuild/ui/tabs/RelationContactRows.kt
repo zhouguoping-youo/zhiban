@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material3.Button
@@ -33,57 +35,60 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.runtime.personalization.UserProfile
+import com.zhiban.rebuild.runtime.personalization.hasCompleteRequiredIdentity
+import com.zhiban.rebuild.runtime.personalization.isValidMainlandMobileNumber
+import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
 import com.zhiban.rebuild.ui.theme.ZhiBanIconSize
 import com.zhiban.rebuild.ui.theme.ZhiBanRadius
 import com.zhiban.rebuild.ui.theme.ZhiBanSize
 
 @Composable
-internal fun OwnerContactRow(profile: UserProfile, onClick: () -> Unit) {
-    val displayName = profile.displayNameOrMe()
+internal fun OwnerProfilePrompt(profile: UserProfile, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 13.dp),
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(ZhiBanRadius.Card))
+            .background(RelationSoft)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier.size(44.dp).clip(CircleShape).background(RelationAccent),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                displayName.take(1),
-                color = MaterialTheme.colorScheme.onPrimary,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
+        ZhiBanLeadingIcon(Icons.Outlined.PersonOutline)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                displayName,
+                "完善我的资料",
                 color = RelationInk,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                if (profile.name.isBlank() && profile.preferredName.isBlank()) {
-                    "完善称呼、手机号和社交账号"
-                } else {
-                    "我的资料 · 知伴认识的我"
-                },
+                profile.missingRequiredIdentityHint(),
                 color = RelationMuted,
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Text(
-            "本人",
-            color = RelationInk,
-            style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.background(RelationSoft, RoundedCornerShape(ZhiBanRadius.Medium))
-                .padding(horizontal = 8.dp, vertical = 4.dp),
+        Icon(
+            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+            contentDescription = "去完善个人资料",
+            tint = RelationMuted,
+            modifier = Modifier.size(ZhiBanIconSize.Leading),
         )
     }
+}
+
+internal fun shouldShowOwnerProfilePrompt(profile: UserProfile, selectedCategory: String, query: String): Boolean =
+    !profile.hasCompleteRequiredIdentity() && selectedCategory == "全部" && query.isBlank()
+
+private fun UserProfile.missingRequiredIdentityHint(): String {
+    val missing = buildList {
+        if (!phone.isValidMainlandMobileNumber()) add("手机号")
+        if (wechatId.isBlank()) add("微信号")
+    }
+    return "补充${missing.joinToString("和")}，帮助知伴识别你"
 }
 
 @Composable

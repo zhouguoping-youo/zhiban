@@ -72,4 +72,13 @@ class UserProfileTest {
         assertTrue(custom.contains("每句话都用旧的自定义格式"))
         assertFalse(custom.contains(ResponseStyle.CONCISE.promptFragment))
     }
+
+    @Test
+    fun requiredIdentityIsCompleteOnlyWithValidPhoneAndWechat() {
+        val complete = UserProfile(phone = "13800000000", wechatId = "laozhou")
+
+        assertTrue(complete.hasCompleteRequiredIdentity())
+        assertFalse(complete.copy(phone = "1380000000").hasCompleteRequiredIdentity())
+        assertFalse(complete.copy(wechatId = " ").hasCompleteRequiredIdentity())
+    }
 }

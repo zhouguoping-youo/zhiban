@@ -527,13 +527,13 @@ fun RelationTab(
                 }
             }
             if (mode == "list") {
-                if (tag == "全部" && ownerProfile.matchesOwnerQuery(query)) {
+                if (shouldShowOwnerProfilePrompt(ownerProfile, tag, query)) {
                     item {
-                        OwnerContactRow(ownerProfile, onOwnerClick)
-                        if (visible.isNotEmpty()) {
-                            Box(Modifier.fillMaxWidth().padding(start = 58.dp).height(1.dp).background(RelationLine))
-                        }
+                        OwnerProfilePrompt(ownerProfile, onOwnerClick)
+                        Spacer(Modifier.height(12.dp))
                     }
+                }
+                if (tag == "全部" && query.isBlank()) {
                     ownerContactLinks.forEach { link ->
                         val linkedContact = rawContacts.firstOrNull { it.contactId == link.contactId }
                         if (linkedContact != null) {
@@ -568,17 +568,15 @@ fun RelationTab(
                         )
                     }
                 } else if (visible.isEmpty()) {
-                    if (!(tag == "全部" && ownerProfile.matchesOwnerQuery(query))) {
-                        item {
-                            RelationEmpty(
-                                searching = query.isNotBlank() || tag != "全部",
-                                onImport = openContactImport,
-                                onAdd = {
-                                    editing = null
-                                    showEditor = true
-                                },
-                            )
-                        }
+                    item {
+                        RelationEmpty(
+                            searching = query.isNotBlank() || tag != "全部",
+                            onImport = openContactImport,
+                            onAdd = {
+                                editing = null
+                                showEditor = true
+                            },
+                        )
                     }
                 } else {
                     items(visible.size, key = { visible[it].contactId }) { index ->

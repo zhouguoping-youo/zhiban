@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import com.zhiban.rebuild.runtime.personalization.UserProfile
 import com.zhiban.rebuild.ui.theme.ZhiBanTheme
 import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Assert.assertEquals
@@ -46,5 +47,22 @@ class RelationEmptyStateTest {
 
         compose.onNodeWithText("导入联系人").assertIsDisplayed().performClick()
         assertEquals(1, imports.get())
+    }
+
+    @Test
+    fun incompleteOwnerProfileShowsCompactActionablePrompt() {
+        val opens = AtomicInteger()
+        compose.setContent {
+            ZhiBanTheme {
+                OwnerProfilePrompt(
+                    profile = UserProfile(phone = "13800000000"),
+                    onClick = { opens.incrementAndGet() },
+                )
+            }
+        }
+
+        compose.onNodeWithText("完善我的资料").assertIsDisplayed().performClick()
+        compose.onNodeWithText("补充微信号，帮助知伴识别你").assertIsDisplayed()
+        assertEquals(1, opens.get())
     }
 }
