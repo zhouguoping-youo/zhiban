@@ -29,8 +29,6 @@ import kotlinx.serialization.json.contentOrNull
  *   - BUDGET_OVERFLOW   (node count, edge count, or max fan-out exceeds
  *                          the configured budget)
  */
-// roadmap placeholder, not dead code: validation layer retained for future plan DAG activation.
-@Suppress("unused")
 internal class PlanValidator(
     private val toolAllowlist: Set<String>,
     private val toolVersions: Map<String, String>,
@@ -144,11 +142,13 @@ internal class PlanValidator(
         // unreachable / detached and must be rejected.
         val incoming = plan.edges.groupingBy { it.toNodeId }.eachCount()
         val outgoing = plan.edges.groupingBy { it.fromNodeId }.eachCount()
-        for (node in plan.nodes) {
-            val inCount = incoming[node.nodeId] ?: 0
-            val outCount = outgoing[node.nodeId] ?: 0
-            if (inCount == 0 && outCount == 0) {
-                out += (node.nodeId to Error.ORPHAN_NODE)
+        if (plan.nodes.size > 1) {
+            for (node in plan.nodes) {
+                val inCount = incoming[node.nodeId] ?: 0
+                val outCount = outgoing[node.nodeId] ?: 0
+                if (inCount == 0 && outCount == 0) {
+                    out += (node.nodeId to Error.ORPHAN_NODE)
+                }
             }
         }
         if (hasCycle(plan.edges, nodeIds)) {

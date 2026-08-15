@@ -244,6 +244,11 @@ internal interface PlanDao {
     suspend fun runById(runId: String): PlanRunEntity?
 
     @androidx.room.Query(
+        "UPDATE plan_runs SET activeAttemptId = :attemptId WHERE runId = :runId AND runStatus = :expectedStatus",
+    )
+    suspend fun updateActiveAttempt(runId: String, expectedStatus: String, attemptId: String): Int
+
+    @androidx.room.Query(
         "UPDATE plan_runs SET runStatus = :newStatus, completedAtEpochMs = :completedAt WHERE runId = :runId AND runStatus = :expectedStatus",
     )
     suspend fun transitionRunStatus(runId: String, expectedStatus: String, newStatus: String, completedAt: Long?): Int

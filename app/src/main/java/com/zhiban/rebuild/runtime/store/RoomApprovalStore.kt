@@ -2,13 +2,6 @@ package com.zhiban.rebuild.runtime.store
 
 import androidx.room.withTransaction
 import com.zhiban.rebuild.data.agent.AgentDatabase
-import com.zhiban.rebuild.data.agent.PLAN_STATUS_ACTIVE
-import com.zhiban.rebuild.data.agent.PLAN_STATUS_TERMINAL
-import com.zhiban.rebuild.data.agent.PlanDefinitionEntity
-import com.zhiban.rebuild.data.agent.PlanEdgeEntity
-import com.zhiban.rebuild.data.agent.PlanNodeEntity
-import com.zhiban.rebuild.data.agent.PlanRunEntity
-import com.zhiban.rebuild.data.agent.PlanVersionEntity
 import com.zhiban.rebuild.data.agent.ScheduleEntity
 import com.zhiban.rebuild.data.agent.ToolAuditEntity
 import com.zhiban.rebuild.data.contact.StagedContactCandidateEntity
@@ -23,6 +16,8 @@ import com.zhiban.rebuild.runtime.governance.RelationshipCandidateCall
 import com.zhiban.rebuild.runtime.kernel.RuntimeSignal
 import com.zhiban.rebuild.runtime.kernel.RuntimeStateMachine
 import com.zhiban.rebuild.runtime.memory.RoomMemoryGate
+import com.zhiban.rebuild.runtime.plan.RuntimePlanRecorder
+import com.zhiban.rebuild.runtime.plan.RuntimePlanStep
 import com.zhiban.rebuild.runtime.runSuspendCatching
 import com.zhiban.rebuild.runtime.spi.CommandReceipt
 import com.zhiban.rebuild.runtime.spi.CommandReceiptStatus
@@ -57,6 +52,8 @@ internal class RoomApprovalStore(
     private val putScheduleFact: suspend (ScheduleEntity, String, Long) -> Unit,
     private val completeApprovedRemoteTool: suspend (ApprovedToolExecutionRequest) -> RuntimeToolExecutionEntity,
 ) {
+    private val planRecorder = RuntimePlanRecorder(database)
+
     suspend fun requestScheduleApproval(
         call: ScheduleCreateToolCall,
         sessionId: String,
@@ -909,54 +906,19 @@ internal class RoomApprovalStore(
         val payload = Json.parseToJsonElement(payloadJson).jsonObject
         val providerCallId = payload.getValue("providerCallId").jsonPrimitive.content
         val toolName = payload.getValue("toolName").jsonPrimitive.content
-        val definitionId = "runtime-plan-$runId"
-        val versionId = "runtime-plan-schema-v1"
-        val dao = database.planDao()
-        dao.insertVersionIgnore(PlanVersionEntity(versionId, 1, nowEpochMs, "Runtime v2 generated plan"))
-        dao.insertDefinitionIgnore(
-            PlanDefinitionEntity(
-                definitionId,
-                versionId,
-                "runtime",
-                sha256("definition:$runId"),
-                "{\"runtimeRunId\":\"$runId\"}",
-                nowEpochMs,
+        planRecorder.record(
+            RuntimePlanStep(
+                runId = runId,
+                attemptId = attemptId,
+                providerCallId = providerCallId,
+                logicalStepId = payload["logicalStepId"]?.jsonPrimitive?.content ?: "step-$providerCallId",
+                toolName = toolName,
+                toolSpecVersion = payload["toolSpecVersion"]?.jsonPrimitive?.intOrNull ?: 1,
+                requiresApproval = true,
+                inputDigest = payload["canonicalInputDigest"]?.jsonPrimitive?.content ?: sha256(payloadJson),
+                nowEpochMs = nowEpochMs,
             ),
         )
-        val previous = dao.nodesForDefinition(definitionId).lastOrNull()
-        val nodeId = "node-${sha256("$runId:$providerCallId").take(24)}"
-        val nodePayload = buildJsonObject {
-            put("tool", toolName)
-            put("version", "1")
-            put("providerCallId", providerCallId)
-            put("approvalPayloadDigest", sha256(payloadJson))
-        }.toString()
-        dao.insertNodeIgnore(
-            PlanNodeEntity(
-                nodeId,
-                definitionId,
-                payload["logicalStepId"]?.jsonPrimitive?.content ?: providerCallId,
-                "TOOL",
-                nodePayload,
-                true,
-                "runtime",
-                nowEpochMs,
-            ),
-        )
-        if (previous != null && previous.nodeId != nodeId) {
-            val ordinal = dao.nodesForDefinition(definitionId).size - 1
-            dao.insertEdgeIgnore(
-                PlanEdgeEntity(
-                    "edge-${sha256("${previous.nodeId}:$nodeId").take(24)}",
-                    definitionId,
-                    previous.nodeId,
-                    nodeId,
-                    null,
-                    ordinal,
-                ),
-            )
-        }
-        dao.insertRunIgnore(PlanRunEntity(runId, definitionId, PLAN_STATUS_ACTIVE, attemptId, nowEpochMs, null))
     }
 
     private fun estimateTurnTokens(value: String): Int = (value.toByteArray().size / 4 + 1).coerceAtLeast(1)

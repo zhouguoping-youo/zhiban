@@ -2074,12 +2074,22 @@ class RuntimeInputProcessorTest {
                     request.messages.any { it.content.contains("不可信数据") } ->
                         flowOf(ModelEvent.Delta(0, "我会按你的偏好回答。"), ModelEvent.Final("stop"))
 
-                    else -> flowOf(
+                    all.contains("\"tool\":\"calendar.schedule.search\"") -> flowOf(
                         ModelEvent.ToolCall(
                             0,
                             "call-memory",
                             "memory.remember",
                             """{"content":"用户喜欢简洁回答","memoryType":"PREFERENCE","subjectKey":"user","predicateKey":"response_style"}""",
+                        ),
+                        ModelEvent.Final("tool_calls"),
+                    )
+
+                    else -> flowOf(
+                        ModelEvent.ToolCall(
+                            0,
+                            "call-dag-read",
+                            "calendar.schedule.search",
+                            """{"fromEpochMs":0,"toEpochMs":4000000,"limit":10}""",
                         ),
                         ModelEvent.Final("tool_calls"),
                     )
@@ -2747,10 +2757,12 @@ class RuntimeInputProcessorTest {
         awaitRunStatus("r-dag", "SUCCEEDED")
 
         val definitionId = "runtime-plan-r-dag"
-        assertEquals(2, database.planDao().nodesForDefinition(definitionId).size)
-        assertEquals(1, database.planDao().edgesForDefinition(definitionId).size)
+        val planNodes = database.planDao().nodesForDefinition(definitionId)
+        assertEquals(3, planNodes.size)
+        assertEquals(listOf(false, true, true), planNodes.map { it.requiresApproval })
+        assertEquals(2, database.planDao().edgesForDefinition(definitionId).size)
         assertEquals("TERMINAL", database.planDao().runById("r-dag")?.runStatus)
-        assertEquals(2, database.runtimeToolExecutionDao().listByRunId("r-dag").size)
+        assertEquals(3, database.runtimeToolExecutionDao().listByRunId("r-dag").size)
         assertTrue(
             com.zhiban.rebuild.runtime.memory.MemoryAtomicStore(database).recall("runtime-global").records.any {
                 it.canonicalText ==

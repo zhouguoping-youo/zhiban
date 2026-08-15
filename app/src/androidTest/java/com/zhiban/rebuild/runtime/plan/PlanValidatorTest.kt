@@ -42,6 +42,15 @@ class PlanValidatorTest {
     }
 
     @Test
+    fun singleStepPlanIsValid() {
+        val result = validator.validate(
+            plan(nodes = listOf(node("a", tool = "calendar.write", version = "v1")), edges = emptyList()),
+        )
+
+        assertTrue(result.isValid)
+    }
+
+    @Test
     fun selfLoopIsRejected() {
         val plan = plan(
             nodes = listOf(node("a", tool = "calendar.write", version = "v1")),

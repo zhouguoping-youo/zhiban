@@ -22,6 +22,8 @@ import com.zhiban.rebuild.runtime.governance.RelationshipCandidateCall
 import com.zhiban.rebuild.runtime.kernel.RuntimeSignal
 import com.zhiban.rebuild.runtime.kernel.RuntimeStateMachine
 import com.zhiban.rebuild.runtime.memory.RoomMemoryGate
+import com.zhiban.rebuild.runtime.plan.RuntimePlanRecorder
+import com.zhiban.rebuild.runtime.plan.RuntimePlanStep
 import com.zhiban.rebuild.runtime.spi.CommandReceipt
 import com.zhiban.rebuild.runtime.spi.CommandReceiptStatus
 import com.zhiban.rebuild.runtime.spi.RUNTIME_SCHEMA_VERSION
@@ -77,6 +79,8 @@ internal class RoomToolExecutionStore(
     private val requireActiveLease: suspend (String, String, Long, Long) -> Unit,
     private val appendEventInTransaction: suspend (RuntimeEventDraft, Long) -> RuntimeEventEntity,
 ) {
+    private val planRecorder = RuntimePlanRecorder(database)
+
     suspend fun recordToolSuccess(
         executionId: String,
         runId: String,
@@ -227,6 +231,19 @@ internal class RoomToolExecutionStore(
         val attemptId = requireNotNull(run.activeAttemptId)
         val idempotencyKey = sha256("$runId|$providerCallId|$toolName|$argumentsDigest")
         database.runtimeToolExecutionDao().findByKey(idempotencyKey)?.let { return@withTransaction it }
+        planRecorder.record(
+            RuntimePlanStep(
+                runId = runId,
+                attemptId = attemptId,
+                providerCallId = providerCallId,
+                logicalStepId = "step-$providerCallId",
+                toolName = toolName,
+                toolSpecVersion = toolSpecVersion,
+                requiresApproval = false,
+                inputDigest = argumentsDigest,
+                nowEpochMs = nowEpochMs,
+            ),
+        )
         val execution = RuntimeToolExecutionEntity(
             executionId = "exec-${sha256(idempotencyKey).take(32)}", runId = runId,
             logicalStepId = "step-$providerCallId", toolName = toolName, toolSpecVersion = toolSpecVersion,
