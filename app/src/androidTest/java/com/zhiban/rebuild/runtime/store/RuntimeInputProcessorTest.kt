@@ -275,7 +275,7 @@ class RuntimeInputProcessorTest {
         assertTrue(database.runtimeEventDao().listByRunId("r-vision").none { it.payloadJson.contains("cache://") })
     }
 
-    @Test fun nativeWebSearchRequiresExplicitOptIn() = runBlocking {
+    @Test fun nativeWebSearchFollowsOptInPolicy() = runBlocking {
         val requests = mutableListOf<ModelRequest>()
         val provider = object : ProviderAdapter {
             override suspend fun probe(profile: ProviderProfile) =
@@ -287,7 +287,7 @@ class RuntimeInputProcessorTest {
             override fun cancel(requestId: String) = true
         }
 
-        // Default (no explicit opt-in): a web_search-capable model must NOT get native web search.
+        // Policy off: a web_search-capable model must NOT get native web search.
         val stagedOff = RoomTextInputGateway(database, { true }, { now }).stage("今天有什么新闻")
         RoomRuntimeGateways(database, "test") { now++ }.accept(
             RuntimeUiCommand.Start("s-web-off", stagedOff.inputRef, "c-web-off", "a-web-off", 0, "chat", "r-web-off"),
@@ -295,9 +295,9 @@ class RuntimeInputProcessorTest {
         KernelCommandProcessor(database, "processor", { true }, { now++ }, provider = provider, profiles = fixedProfileStore())
             .processNext()
         awaitRunStatus("r-web-off", "SUCCEEDED")
-        assertFalse("default must keep native web search off", requests.last().allowWebSearch)
+        assertFalse("policy off must keep native web search off", requests.last().allowWebSearch)
 
-        // Explicit opt-in enables it for a web_search-capable model.
+        // Policy on (the production default): a web_search-capable model gets native web search.
         val stagedOn = RoomTextInputGateway(database, { true }, { now }).stage("今天有什么新闻")
         RoomRuntimeGateways(database, "test") { now++ }.accept(
             RuntimeUiCommand.Start("s-web-on", stagedOn.inputRef, "c-web-on", "a-web-on", 0, "chat", "r-web-on"),
@@ -308,7 +308,7 @@ class RuntimeInputProcessorTest {
             config = ProviderEngineConfig(webSearchOptIn = { true }),
         ).processNext()
         awaitRunStatus("r-web-on", "SUCCEEDED")
-        assertTrue("explicit opt-in should enable native web search", requests.last().allowWebSearch)
+        assertTrue("policy on should enable native web search", requests.last().allowWebSearch)
     }
 
     @Test fun providerAuthenticationFailureIsFinalAndPersistsOnlySafeCode() = runBlocking {

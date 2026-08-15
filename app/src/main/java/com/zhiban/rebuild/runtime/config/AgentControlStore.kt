@@ -60,9 +60,9 @@ class AgentControlStore @Inject constructor(@ApplicationContext context: Context
         check(store.edit().putString("execution_preference", value.name).commit())
     }
 
-    // Native provider web search sends the query text to the model's search backend, so it is
-    // gated behind an explicit user opt-in (default off) rather than auto-enabled per model.
-    fun webSearchOptIn(): Boolean = store.getBoolean("web_search_opt_in", false)
+    // Native provider web search sends the query text to the model's search backend. Per product
+    // decision it is enabled by default; the user can still turn it off here.
+    fun webSearchOptIn(): Boolean = store.getBoolean("web_search_opt_in", true)
 
     fun saveWebSearchOptIn(enabled: Boolean) {
         check(store.edit().putBoolean("web_search_opt_in", enabled).commit())

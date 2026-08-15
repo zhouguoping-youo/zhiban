@@ -41,4 +41,13 @@ class AgentControlStoreTest {
         controls.saveToolEnabled("memory.search", true)
         assertTrue(controls.isToolEnabled("memory.search"))
     }
+
+    @Test fun webSearchDefaultsOnAndOptOutPersists() {
+        // Product default is on: a fresh install must have native web search enabled.
+        assertTrue("web search must default to on", controls.webSearchOptIn())
+        controls.saveWebSearchOptIn(false)
+        assertTrue(!controls.webSearchOptIn())
+        controls.saveWebSearchOptIn(true)
+        assertTrue(controls.webSearchOptIn())
+    }
 }

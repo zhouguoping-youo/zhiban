@@ -305,7 +305,7 @@ data class MemoryUiState(
                 item {
                     ToggleRow(
                         "联网搜索",
-                        "把提问发给搜索服务联网查询；默认关闭",
+                        "把提问发给搜索服务联网查询；默认开启",
                         state.webSearchOptIn,
                     ) { vm.webSearchOptIn(it) }
                 }
