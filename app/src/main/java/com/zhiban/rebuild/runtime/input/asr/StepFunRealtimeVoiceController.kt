@@ -118,16 +118,28 @@ class StepFunRealtimeVoiceController @Inject constructor(
     val state: StateFlow<RealtimeVoiceState> = _state.asStateFlow()
     private val capturing = AtomicBoolean(false)
     private val responding = AtomicBoolean(false)
-    private var socket: WebSocket? = null
-    private var captureJob: Job? = null
-    private var reconnectJob: Job? = null
-    private var recorder: AudioRecord? = null
-    private var player: AudioTrack? = null
-    private var echoCanceler: AcousticEchoCanceler? = null
-    private var noiseSuppressor: NoiseSuppressor? = null
-    private var transcript = StringBuilder()
-    private var reply = StringBuilder()
-    private var exchangeId = UUID.randomUUID().toString()
+
+    // These are read/written from the main thread (start/cancel), the OkHttp WebSocket listener
+    // thread, and the Dispatchers.IO capture loop, so they need cross-thread visibility.
+    @Volatile private var socket: WebSocket? = null
+
+    @Volatile private var captureJob: Job? = null
+
+    @Volatile private var reconnectJob: Job? = null
+
+    @Volatile private var recorder: AudioRecord? = null
+
+    @Volatile private var player: AudioTrack? = null
+
+    @Volatile private var echoCanceler: AcousticEchoCanceler? = null
+
+    @Volatile private var noiseSuppressor: NoiseSuppressor? = null
+
+    @Volatile private var transcript = StringBuilder()
+
+    @Volatile private var reply = StringBuilder()
+
+    @Volatile private var exchangeId = UUID.randomUUID().toString()
     private val connectionGeneration = AtomicLong(0)
 
     @Volatile private var activeReconnectAttempt = 0
@@ -226,7 +238,7 @@ class StepFunRealtimeVoiceController @Inject constructor(
     }
 
     @SuppressLint("MissingPermission")
-    private fun beginCapture() {
+    private fun beginCapture(generation: Long) {
         val minimum = AudioRecord.getMinBufferSize(
             SAMPLE_RATE,
             AudioFormat.CHANNEL_IN_MONO,
@@ -248,7 +260,7 @@ class StepFunRealtimeVoiceController @Inject constructor(
         if (effects == null) return fail("无法启动麦克风")
         val createdEchoCanceler = effects.echoCanceler
         val createdNoiseSuppressor = effects.noiseSuppressor
-        if (_state.value is RealtimeVoiceState.Idle) {
+        if (generation != connectionGeneration.get() || _state.value is RealtimeVoiceState.Idle) {
             releaseResource(EFFECT_RELEASE_FAILURE) { createdEchoCanceler?.release() }
             releaseResource(EFFECT_RELEASE_FAILURE) { createdNoiseSuppressor?.release() }
             releaseAudioRecord(audioRecord)
@@ -260,6 +272,15 @@ class StepFunRealtimeVoiceController @Inject constructor(
         capturing.set(true)
         _state.value = RealtimeVoiceState.Recording()
         captureJob = launchCaptureLoop(audioRecord)
+        // cancel()/fail() increment the generation and release capture resources only through the
+        // `recorder` field; if one landed while the mic was starting (recorder still null then), it
+        // released nothing and would orphan the microphone. Re-check after committing and tear down.
+        if (generation != connectionGeneration.get()) {
+            capturing.set(false)
+            captureJob?.cancel()
+            captureJob = null
+            releaseCaptureResources()
+        }
     }
 
     private fun startRecordingWithEffects(audioRecord: AudioRecord): AudioEffects? {
@@ -482,7 +503,7 @@ class StepFunRealtimeVoiceController @Inject constructor(
                 handleDisconnect(webSocket, generation, "实时语音连接失败")
                 return
             }
-            beginCapture()
+            beginCapture(generation)
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
