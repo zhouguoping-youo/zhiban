@@ -194,6 +194,28 @@ class DefaultOutboundDataPolicy(private val settings: () -> OutboundPolicySettin
     }
 }
 
+private object OutboundCredentialGuard {
+    private val knownPrefix = Regex(
+        "(?<![A-Za-z0-9_-])(?:sk-[A-Za-z0-9_-]{12,}|ghp_[A-Za-z0-9]{20,}|" +
+            "github_pat_[A-Za-z0-9_]{20,}|AKIA[A-Z0-9]{16}|AIza[A-Za-z0-9_-]{35})(?![A-Za-z0-9_-])",
+    )
+    private val opaqueValue = Regex("(?<![A-Za-z0-9])[A-Za-z0-9]{48,96}(?![A-Za-z0-9])")
+
+    fun redact(value: String): String {
+        val knownSafe = knownPrefix.replace(value, "[REDACTED]")
+        return opaqueValue.replace(knownSafe) { match ->
+            if (match.value.looksLikeOpaqueCredential()) "[REDACTED]" else match.value
+        }
+    }
+
+    fun contains(value: String): Boolean = knownPrefix.containsMatchIn(value) ||
+        opaqueValue.findAll(value).any { it.value.looksLikeOpaqueCredential() }
+
+    private fun String.looksLikeOpaqueCredential(): Boolean = any(Char::isLowerCase) &&
+        any(Char::isUpperCase) &&
+        any(Char::isDigit)
+}
+
 /** Prompt-safe redaction. Unlike diagnostic redaction, this never truncates the remaining text. */
 internal object OutboundPiiRedactor {
     private val bearer = Regex("(?i)bearer\\s+[A-Za-z0-9._~+/=-]{8,}")
@@ -214,6 +236,7 @@ internal object OutboundPiiRedactor {
         safe = credentialLike.replace(safe) { match ->
             match.value.substringBefore(':').substringBefore('=') + "=[REDACTED]"
         }
+        safe = OutboundCredentialGuard.redact(safe)
         safe = mainlandPhone.replace(safe) { match -> "${match.groupValues[1]}****${match.groupValues[2]}" }
         safe = email.replace(safe) { match -> "${match.groupValues[1]}***@${match.groupValues[3]}" }
         safe = mainlandId.replace(safe) { match -> "${match.groupValues[1]}********${match.groupValues[2]}" }
@@ -244,6 +267,7 @@ object OutboundPiiDetector {
 
     fun containsDirectIdentifier(value: String): Boolean = bearer.containsMatchIn(value) ||
         credentialLike.containsMatchIn(value) ||
+        OutboundCredentialGuard.contains(value) ||
         mainlandPhone.containsMatchIn(value) ||
         mainlandLandline.containsMatchIn(value) ||
         serviceNumber.containsMatchIn(value) ||

@@ -203,6 +203,31 @@ class OutboundDataPolicyTest {
         assertEquals(4, Regex("\\[已省略敏感内容]").findAll(sent).count())
     }
 
+    @Test fun automaticContextRedactsRawHighConfidenceCredentials() = runTest {
+        val openAiLike = "s" + "k-" + "testOnlyCredential123456789"
+        val githubLike = "g" + "hp_" + "0123456789abcdefghijklmnopqrstuv"
+        val opaqueLike = "TestOnlyOpaqueCredential0123456789abcdefghijklmnopqrstuvwxyzAB"
+        val delegate = CapturingAdapter()
+        PolicyEnforcingProviderAdapter(delegate, DefaultOutboundDataPolicy()).stream(
+            request(
+                message(
+                    "旧配置 $openAiLike，代码托管 $githubLike，服务凭据 $opaqueLike",
+                    OutboundSensitivity.PERSONAL,
+                    OutboundPurpose.AUTO_RETRIEVED,
+                ),
+            ),
+        ).toList()
+
+        val sent = delegate.requests.single().messages.single().content
+        assertFalse(sent.contains(openAiLike))
+        assertFalse(sent.contains(githubLike))
+        assertFalse(sent.contains(opaqueLike))
+        assertEquals(3, Regex("\\[REDACTED]").findAll(sent).count())
+        assertTrue(OutboundPiiDetector.containsDirectIdentifier(openAiLike))
+        assertTrue(OutboundPiiDetector.containsDirectIdentifier(githubLike))
+        assertTrue(OutboundPiiDetector.containsDirectIdentifier(opaqueLike))
+    }
+
     @Test fun identifierDetectorAvoidsOrdinaryShortAndOverlongNumbers() {
         assertTrue(OutboundPiiDetector.containsDirectIdentifier("座机 0755-12345678"))
         assertTrue(OutboundPiiDetector.containsDirectIdentifier("银行客服 95588"))
