@@ -1146,7 +1146,14 @@ internal class ProviderExecutionEngine(
         }
         return completeReactOutcome(outcome, ids)
     }
-    suspend fun executeApprovedTool(runId: String, sessionId: String, fencingEpoch: Long): Boolean {
+    suspend fun executeApprovedTool(runId: String, sessionId: String, fencingEpoch: Long): Boolean = withSessionLeaseHeartbeat(
+        sessionId,
+        fencingEpoch,
+    ) {
+        executeApprovedToolWithLease(runId, sessionId, fencingEpoch)
+    }
+
+    private suspend fun executeApprovedToolWithLease(runId: String, sessionId: String, fencingEpoch: Long): Boolean {
         val planReadAt = clock()
         val planJson = store.pendingToolPlan(runId, planReadAt) ?: run {
             if (store.runById(runId)?.status == RuntimeRunStatus.EXECUTING.name) {
@@ -1207,6 +1214,28 @@ internal class ProviderExecutionEngine(
             } else {
                 finishFailure(runId, fencingEpoch, failure)
             }
+        }
+    }
+
+    private suspend fun <T> withSessionLeaseHeartbeat(sessionId: String, fencingEpoch: Long, block: suspend () -> T): T = coroutineScope {
+        renewCurrentLease(sessionId, fencingEpoch)
+        val heartbeat = launch {
+            while (isActive) {
+                delay(heartbeatIntervalMs)
+                renewCurrentLease(sessionId, fencingEpoch)
+            }
+        }
+        try {
+            block()
+        } finally {
+            heartbeat.cancelAndJoin()
+        }
+    }
+
+    private suspend fun renewCurrentLease(sessionId: String, fencingEpoch: Long) {
+        val claim = store.tryClaimSession(sessionId, ownerId, clock(), leaseDurationMs)
+        check(claim.claimed && claim.leaseEpoch == fencingEpoch) {
+            "session lease is no longer owned by this execution"
         }
     }
 

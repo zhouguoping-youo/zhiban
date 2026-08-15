@@ -2273,6 +2273,88 @@ class RuntimeInputProcessorTest {
         environment.remove("e2e")
     }
 
+    @Test fun approvedRemoteToolRenewsLeaseUntilExternalCallCompletes() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.getSharedPreferences("runtime_mcp_servers", Context.MODE_PRIVATE).edit().clear().commit()
+        val callStarted = CompletableDeferred<Unit>()
+        val releaseCall = CompletableDeferred<Unit>()
+        val factory = RuntimeMcpFactory {
+            callStarted.complete(Unit)
+            releaseCall.await()
+        }
+        val realClock = System::currentTimeMillis
+        val environment = McpRemoteEnvironment(
+            context,
+            NoopCredentialProvisioner(),
+            factory,
+            OutboundExportGate({ OutboundPolicySettings(allowRemoteMcp = true) }),
+            realClock,
+        )
+        environment.configure("lease", "Lease MCP", "https://mcp.example.test/rpc", null)
+        val staged = RoomTextInputGateway(database, { true }, realClock).stage(
+            """{"schemaVersion":1,"text":"查询团队任务","mode":"Work","model":"M2.7","level":"高"}""",
+        )
+        val gateway = RoomRuntimeGateways(database, "test", clock = realClock)
+        gateway.accept(RuntimeUiCommand.Start("s-mcp-lease", staged.inputRef, "c-mcp-lease", "a-mcp-lease", 0, "chat", "r-mcp-lease"))
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile) = capability(profile)
+            override fun stream(request: ModelRequest) = if (request.messages.any { it.content.contains("isError") }) {
+                flowOf(ModelEvent.Delta(0, "找到了团队任务。"), ModelEvent.Final("stop"))
+            } else {
+                flowOf(
+                    ModelEvent.ToolCall(0, "call-mcp-lease", "mcp_lease_tasks_search", """{"query":"quarterly"}"""),
+                    ModelEvent.Final("tool_calls"),
+                )
+            }
+            override fun cancel(requestId: String) = true
+        }
+        val processor = KernelCommandProcessor(
+            database,
+            "owner-a",
+            { true },
+            realClock,
+            provider,
+            fixedProfileStore(),
+            com.zhiban.rebuild.runtime.kernel.ProviderEngineConfig(
+                heartbeatIntervalMs = 25,
+                leaseDurationMs = 100,
+                rerankTimeoutMs = 0,
+            ),
+            com.zhiban.rebuild.runtime.kernel.ProviderEngineInfrastructure(mcpEnvironment = environment),
+        )
+
+        processor.processNext()
+        awaitRunStatus("r-mcp-lease", "AWAITING_CONFIRMATION")
+        val approval = approvalPlan("r-mcp-lease")
+        val revision = requireNotNull(database.runtimeSessionDao().find("s-mcp-lease")).nextSequence - 1
+        gateway.accept(
+            RuntimeUiCommand.RunAction(
+                RuntimeAction.APPROVE,
+                "s-mcp-lease",
+                "r-mcp-lease",
+                "approve-mcp-lease",
+                "approve-mcp-lease-action",
+                revision,
+                "chat",
+                approval.getValue("proposalId").jsonPrimitive.content,
+                approval.getValue("payloadRef").jsonPrimitive.content,
+            ),
+        )
+        processor.processNext()
+        withTimeout(1_000) { callStarted.await() }
+        delay(250)
+
+        assertTrue(
+            RoomRuntimeStore(database, "recovery-test")
+                .claimRecoverable("owner-b", realClock(), 1_000, "ui")
+                .isEmpty(),
+        )
+        releaseCall.complete(Unit)
+        awaitRunStatus("r-mcp-lease", "SUCCEEDED")
+        assertEquals(1, factory.callCount)
+        environment.remove("lease")
+    }
+
     @Test fun explicitFeedbackIsPersistedAndAvailableToFuturePlanning() = runBlocking {
         val staged = RoomTextInputGateway(database, { true }, { now }).stage("hello")
         val gateway = RoomRuntimeGateways(database, "test") { now++ }
@@ -3507,7 +3589,9 @@ class RuntimeInputProcessorTest {
         override suspend fun contains(credentialRef: String, keyVersion: Int) = false
     }
 
-    private class RuntimeMcpFactory : McpConnectionFactory {
+    private class RuntimeMcpFactory(
+        private val beforeToolCall: suspend () -> Unit = {},
+    ) : McpConnectionFactory {
         var callCount = 0
         var lastArguments: JsonObject? = null
         override fun create(endpoint: String, credentialRef: String?) = McpClient(
@@ -3550,6 +3634,7 @@ class RuntimeInputProcessorTest {
 
                     "tools/call" -> {
                         callCount++
+                        beforeToolCall()
                         lastArguments = request["params"]!!.jsonObject["arguments"]!!.jsonObject
                         rpc(
                             id,
