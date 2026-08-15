@@ -137,18 +137,15 @@ class OpenAiCompatibleProviderAdapter(
     private suspend fun FlowCollector<ModelEvent>.emitSuccessfulStream(body: okhttp3.ResponseBody?, call: Call, requestId: String) {
         val source = body?.source() ?: throw ProviderFailure("PROVIDER_PROTOCOL_ERROR", retryable = true)
         val decoder = StreamDecoder(requestId)
-        var shouldFinalize = false
-        var transportFailure: IOException? = null
         try {
             source.use { emitDecodedStream(source, call, decoder) }
-            shouldFinalize = true
         } catch (failure: ProviderTransportException) {
-            shouldFinalize = true
-            transportFailure = failure.ioFailure
-        } finally {
-            if (shouldFinalize) decoder.finishAtCleanEof().forEach { emit(it) }
+            val recoveredEvents = decoder.finishAfterTransportFailure()
+                ?: throw failure.ioFailure
+            recoveredEvents.forEach { emit(it) }
+            return
         }
-        transportFailure?.let { throw it }
+        decoder.finishAtCleanEof().forEach { emit(it) }
     }
 
     private suspend fun FlowCollector<ModelEvent>.emitDecodedStream(source: BufferedSource, call: Call, decoder: StreamDecoder) {
@@ -415,6 +412,12 @@ class OpenAiCompatibleProviderAdapter(
             emptyList()
         } else {
             finalize(if (pendingTools.isEmpty()) "stop" else "tool_calls")
+        }
+
+        fun finishAfterTransportFailure(): List<ModelEvent>? = when {
+            finalEmitted -> emptyList()
+            pendingTools.isNotEmpty() -> finalize("tool_calls")
+            else -> null
         }
 
         private fun parseChunk(data: String): JsonObject = try {

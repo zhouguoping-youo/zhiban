@@ -1,10 +1,6 @@
 package com.zhiban.rebuild.runtime.provider
 
 import com.zhiban.rebuild.runtime.runSuspendCatching
-import io.mockk.Runs
-import io.mockk.every
-import io.mockk.just
-import io.mockk.mockk
 import java.io.IOException
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.toList
@@ -18,8 +14,11 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.ResponseBody
 import okhttp3.ResponseBody.Companion.toResponseBody
+import okio.Buffer
 import okio.BufferedSource
+import okio.Source
 import okio.Timeout
+import okio.buffer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -59,19 +58,32 @@ class OpenAiCompatibleProviderAdapterTest {
         assertEquals(1, events.count { it is ModelEvent.Final })
     }
 
-    @Test fun ioFailureAfterCompleteToolFrameStillFlushesPendingToolCallInFinally() = runTest {
+    @Test fun ioFailureAfterCompleteToolFrameRecoversPendingToolCallWithoutRacingTheFailure() = runTest {
         val events = mutableListOf<ModelEvent>()
+        val body = ThrowAfterFrameBody(toolCallFrame("call-disconnect"))
         val failure = runSuspendCatching {
-            adapter(ThrowAfterFrameBody(toolCallFrame("call-disconnect")))
+            adapter(body)
                 .stream(request("disconnect"))
                 .collect(events::add)
         }.exceptionOrNull()
 
-        assertTrue("unexpected failure: ${failure?.javaClass?.name}", failure is IOException)
+        assertEquals("complete tool call should recover the interrupted stream", null, failure)
         val toolCalls = events.filterIsInstance<ModelEvent.ToolCall>()
-        assertEquals("events=$events", 1, toolCalls.size)
+        assertEquals("events=$events; reads=${body.readCount}", 1, toolCalls.size)
         assertEquals("call-disconnect", toolCalls.single().providerCallId)
         assertEquals(1, events.count { it is ModelEvent.Final })
+    }
+
+    @Test fun ioFailureAfterPartialTextDoesNotPretendTheResponseCompleted() = runTest {
+        val events = mutableListOf<ModelEvent>()
+        val failure = runSuspendCatching {
+            adapter(ThrowAfterFrameBody("data: {\"choices\":[{\"delta\":{\"content\":\"半截回答\"}}]}\n"))
+                .stream(request("partial-text-disconnect"))
+                .collect(events::add)
+        }.exceptionOrNull()
+
+        assertTrue("unexpected failure: ${failure?.javaClass?.name}", failure is IOException)
+        assertTrue(events.none { it is ModelEvent.Final })
     }
 
     @Test fun protocolFailureDoesNotFinalizeOrExposeAPartialToolCall() = runTest {
@@ -171,12 +183,25 @@ class OpenAiCompatibleProviderAdapterTest {
     }
 
     private class ThrowAfterFrameBody(frame: String) : ResponseBody() {
-        private val throwingSource = mockk<BufferedSource> {
-            every { exhausted() } returns false andThenThrows IOException("simulated_disconnect")
-            every { indexOf(any<Byte>(), any(), any()) } returns 0L
-            every { readUtf8LineStrict(any()) } returns frame.trimEnd('\n')
-            every { close() } just Runs
-        }
+        private val frameBytes = frame.encodeToByteArray()
+        var readCount: Int = 0
+            private set
+        private val throwingSource: BufferedSource = object : Source {
+            private var frameOffset = 0
+
+            override fun read(sink: Buffer, byteCount: Long): Long {
+                readCount += 1
+                if (frameOffset == frameBytes.size) throw IOException("simulated_disconnect")
+                val count = minOf(byteCount.toInt(), frameBytes.size - frameOffset)
+                sink.write(frameBytes, frameOffset, count)
+                frameOffset += count
+                return count.toLong()
+            }
+
+            override fun timeout(): Timeout = Timeout.NONE
+
+            override fun close() = Unit
+        }.buffer()
 
         override fun contentType(): MediaType = SSE_TYPE
 
