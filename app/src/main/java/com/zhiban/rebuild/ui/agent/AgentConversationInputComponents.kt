@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.ui.agent
 
+import android.animation.ValueAnimator
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -597,7 +598,11 @@ private fun LiveVoiceWaveform(level: Float, modifier: Modifier = Modifier) {
         animationSpec = tween(durationMillis = 90),
         label = "microphone-level",
     )
-    val motion by rememberInfiniteTransition(label = "voice-wave-motion").animateFloat(
+    // Respect the system "remove animations" accessibility setting: when animators are disabled,
+    // freeze the decorative phase so the bars sit still instead of oscillating (the level-driven
+    // height stays, since that is functional mic feedback, not decoration).
+    val reduceMotion = remember { !ValueAnimator.areAnimatorsEnabled() }
+    val infiniteMotion by rememberInfiniteTransition(label = "voice-wave-motion").animateFloat(
         initialValue = 0f,
         targetValue = (Math.PI * 2).toFloat(),
         animationSpec = infiniteRepeatable(
@@ -606,6 +611,7 @@ private fun LiveVoiceWaveform(level: Float, modifier: Modifier = Modifier) {
         ),
         label = "voice-wave-phase",
     )
+    val motion = if (reduceMotion) 0f else infiniteMotion
     val waveformColor = ZhiBanTerracotta.copy(alpha = 0.78f)
     Canvas(modifier) {
         val barCount = 27

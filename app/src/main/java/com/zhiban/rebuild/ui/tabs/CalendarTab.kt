@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -717,11 +718,15 @@ private fun SystemCalendarImportDialog(state: CalendarAgentViewModel.ImportState
                     items(sources.size, key = { sources[it].key }) { index ->
                         val source = sources[index]
                         Row(
-                            Modifier.fillMaxWidth().clickable {
-                                selectedSources = selectedSources.toMutableSet().apply {
-                                    if (!add(source.key)) remove(source.key)
-                                }
-                            }.padding(vertical = 6.dp),
+                            Modifier.fillMaxWidth().toggleable(
+                                value = source.key in selectedSources,
+                                role = Role.Checkbox,
+                                onValueChange = {
+                                    selectedSources = selectedSources.toMutableSet().apply {
+                                        if (!add(source.key)) remove(source.key)
+                                    }
+                                },
+                            ).padding(vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Checkbox(checked = source.key in selectedSources, onCheckedChange = null)

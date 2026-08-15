@@ -46,6 +46,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -91,6 +92,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -241,13 +243,17 @@ internal fun ContactImportDialog(state: ContactImportUiState, onDismiss: () -> U
                         }
                     } else {
                         Row(
-                            Modifier.fillMaxWidth().clickable {
-                                selected = if (selected.size == state.contacts.size) {
-                                    emptySet()
-                                } else {
-                                    state.contacts.map(SystemContactCandidate::sourceId).toSet()
-                                }
-                            }.padding(vertical = 4.dp),
+                            Modifier.fillMaxWidth().toggleable(
+                                value = selected.size == state.contacts.size,
+                                role = Role.Checkbox,
+                                onValueChange = {
+                                    selected = if (selected.size == state.contacts.size) {
+                                        emptySet()
+                                    } else {
+                                        state.contacts.map(SystemContactCandidate::sourceId).toSet()
+                                    }
+                                },
+                            ).padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Checkbox(
@@ -267,10 +273,14 @@ internal fun ContactImportDialog(state: ContactImportUiState, onDismiss: () -> U
                                 val contact = state.contacts[index]
                                 val checked = contact.sourceId in selected
                                 Row(
-                                    Modifier.fillMaxWidth().clickable {
-                                        selected =
-                                            if (checked) selected - contact.sourceId else selected + contact.sourceId
-                                    }.padding(vertical = 10.dp),
+                                    Modifier.fillMaxWidth().toggleable(
+                                        value = checked,
+                                        role = Role.Checkbox,
+                                        onValueChange = {
+                                            selected =
+                                                if (checked) selected - contact.sourceId else selected + contact.sourceId
+                                        },
+                                    ).padding(vertical = 10.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Checkbox(checked = checked, onCheckedChange = null)
