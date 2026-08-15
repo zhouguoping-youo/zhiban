@@ -75,18 +75,20 @@ class ProviderContextAssemblerPresentationTest {
         val conversation = result.messages.filter { it.provenance.sourceType == "session_memory" }
         assertEquals(listOf("user", "assistant"), conversation.map { it.role })
         assertEquals(listOf("张三是做什么的？", "张三负责数据库产品。"), conversation.map { it.content })
-        assertEquals(OutboundPurpose.AUTO_RETRIEVED, conversation.first().purpose)
+        // A user-authored history turn is a deliberate send (not redacted); an assistant turn is not.
+        assertEquals(OutboundPurpose.USER_AUTHORED, conversation[0].purpose)
+        assertEquals(OutboundPurpose.AUTO_RETRIEVED, conversation[1].purpose)
         assertEquals("user", result.messages.last().role)
         assertEquals("接着上面说", result.messages.last().content)
         assertEquals(OutboundPurpose.USER_AUTHORED, result.messages.last().purpose)
     }
 
     @Test
-    fun recalledConversationStillPassesOutboundRedaction() {
+    fun userAuthoredHistoryPassesIntactWhileAssistantEchoStaysRedacted() {
         val assembled = assembleWithHistory(
             listOf(
                 turn("turn-private", "user", "我的电话是13800000000", 1),
-                turn("turn-answer", "assistant", "我记住了你的电话。", 2),
+                turn("turn-answer", "assistant", "已存联系人号码13800000000", 2),
             ),
         )
         val governed = DefaultOutboundDataPolicy().enforce(
@@ -100,10 +102,18 @@ class ProviderContextAssemblerPresentationTest {
             ),
         ).request
 
+        // The number the user typed reaches the model intact (deliberate send).
         val recalledUser = governed.messages.first { it.provenance.sourceId == "turn-private" }
         assertEquals("user", recalledUser.role)
-        assertEquals(OutboundPurpose.AUTO_RETRIEVED, recalledUser.purpose)
-        assertEquals("我的电话是138****0000", recalledUser.content)
+        assertEquals(OutboundPurpose.USER_AUTHORED, recalledUser.purpose)
+        assertEquals("我的电话是13800000000", recalledUser.content)
+
+        // A number echoed by the assistant (sourced from stored data) is still identifier-redacted.
+        val recalledAssistant = governed.messages.first { it.provenance.sourceId == "turn-answer" }
+        assertEquals("assistant", recalledAssistant.role)
+        assertEquals(OutboundPurpose.AUTO_RETRIEVED, recalledAssistant.purpose)
+        assertEquals("已存联系人号码138****0000", recalledAssistant.content)
+
         assertEquals("接着上面说", governed.messages.last().content)
     }
 

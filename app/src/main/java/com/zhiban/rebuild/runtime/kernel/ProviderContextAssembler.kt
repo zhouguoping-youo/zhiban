@@ -337,7 +337,10 @@ internal class ProviderContextAssembler(private val clock: () -> Long, private v
                     role = requireNotNull(role),
                     content = block.content,
                     sensitivity = block.sensitivity.toOutboundSensitivity(),
-                    purpose = OutboundPurpose.AUTO_RETRIEVED,
+                    // A turn the user authored earlier is still a deliberate send action, so it is
+                    // not identifier-redacted (e.g. a phone number they typed reaches the model);
+                    // assistant turns stay AUTO_RETRIEVED since they may echo stored contact data.
+                    purpose = if (role == "user") OutboundPurpose.USER_AUTHORED else OutboundPurpose.AUTO_RETRIEVED,
                     provenance = OutboundProvenance(block.provenance.sourceType, block.provenance.sourceId),
                 )
             } else {
