@@ -1081,7 +1081,7 @@ internal class ProviderExecutionEngine(
         return false
     }
 
-    private suspend fun completeReactOutcome(outcome: ReActStreamOutcome, ids: RunIdentifiers): Boolean = when (outcome) {
+    private suspend fun completeReactOutcome(outcome: ReActStreamOutcome, ids: RunIdentifiers, inputText: String, attemptId: String): Boolean = when (outcome) {
         is ReActStreamOutcome.ToolCompleted -> observeToolResult(
             ids.runId,
             ids.sessionId,
@@ -1105,14 +1105,31 @@ internal class ProviderExecutionEngine(
         ReActStreamOutcome.PendingApproval -> true
 
         is ReActStreamOutcome.Streamed -> {
-            store.completeProviderRunWithAssistantTurn(
-                ids.runId,
-                outcome.assistantText,
-                ownerId,
-                ids.fencingEpoch,
-                clock(),
-            )
-            true
+            // M2: a query that explicitly required a read domain must not be answered from a
+            // zero-tool first pass. Force the pending read and route through the observation path
+            // so the answer is grounded in the verified result — the same machinery the
+            // observation read-gate uses — instead of trusting the model's ungrounded stream.
+            val forcedRead = RequiredReadContinuation(capabilityRouter, store, ownerId, clock)
+                .executeOrNull(inputText, ids.runId, ids.sessionId, attemptId, ids.fencingEpoch)
+            if (forcedRead != null) {
+                observeToolResult(
+                    ids.runId,
+                    ids.sessionId,
+                    ids.fencingEpoch,
+                    forcedRead.canonicalName,
+                    forcedRead.providerCallId,
+                    forcedRead.safeResultJson,
+                )
+            } else {
+                store.completeProviderRunWithAssistantTurn(
+                    ids.runId,
+                    outcome.assistantText,
+                    ownerId,
+                    ids.fencingEpoch,
+                    clock(),
+                )
+                true
+            }
         }
     }
 
@@ -1141,7 +1158,7 @@ internal class ProviderExecutionEngine(
         } catch (failure: Throwable) {
             return finishFailure(runId, fencingEpoch, failure)
         }
-        return completeReactOutcome(outcome, ids)
+        return completeReactOutcome(outcome, ids, ready.input.text, ready.attemptId)
     }
 
     private suspend fun runLocalCalendarTool(prepared: PreparedRun.LocalCalendarTool, runId: String, sessionId: String, fencingEpoch: Long): Boolean {
@@ -1164,7 +1181,7 @@ internal class ProviderExecutionEngine(
         } catch (failure: Throwable) {
             return finishFailure(runId, fencingEpoch, failure)
         }
-        return completeReactOutcome(outcome, ids)
+        return completeReactOutcome(outcome, ids, prepared.input.text, prepared.attemptId)
     }
     suspend fun executeApprovedTool(runId: String, sessionId: String, fencingEpoch: Long): Boolean = withSessionLeaseHeartbeat(
         sessionId,

@@ -20,8 +20,12 @@ internal class DeterministicObservationCompleter(
     suspend fun complete(ids: RunIdentifiers, toolName: String, safeResultJson: String): Boolean {
         val rawInput = store.readRunInput(ids.runId, clock())
             ?: throw ProviderFailure("INPUT_EXPIRED_OR_MISSING", false)
-        val queryContext = perceive(decodeInput(rawInput))
+        val input = decodeInput(rawInput)
+        val queryContext = perceive(input)
         if (!shouldCompleteObservationDeterministically(toolName, queryContext.intentLabel)) return false
+        // A deterministic write must not close the run while the same input still has an explicit
+        // read domain outstanding; defer so the observation path forces that read (R3 M3).
+        if (nextRequiredReadTool(input.text, store.completedToolNames(ids.runId)) != null) return false
         val attemptId = startObservationAttempt(ids)
         val summary = deterministicToolSummary(toolName, safeResultJson)
         appendDelta(ids, attemptId, DeterministicObservationDelta("deterministic-result", 0, summary, false, ""))

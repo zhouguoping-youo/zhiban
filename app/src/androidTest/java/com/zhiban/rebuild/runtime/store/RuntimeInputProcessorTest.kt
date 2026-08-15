@@ -2962,6 +2962,77 @@ class RuntimeInputProcessorTest {
         assertTrue(assistantText.contains("没有日程安排"))
     }
 
+    @Test fun zeroToolFirstAnswerToCalendarQueryStillForcesTheRead() = runBlocking {
+        // M2: the model answers a calendar query directly (no tool call) on the first pass. The
+        // read-gate must still force the calendar read so the answer is grounded, not hallucinated.
+        now = 1_800_000_000_000L
+        val input = RoomTextInputGateway(database, { true }, { now }).stage(
+            """{"schemaVersion":1,"text":"今天有什么日程","mode":"chat","model":"M2.7"}""",
+        )
+        RoomRuntimeGateways(database, "test") { now++ }.accept(
+            RuntimeUiCommand.Start("s-zero-read", input.inputRef, "c-zero-read", "a-zero-read", 0, "chat", "r-zero-read"),
+        )
+        var requestNumber = 0
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile) = capability(profile)
+            override fun stream(request: ModelRequest): kotlinx.coroutines.flow.Flow<ModelEvent> =
+                if (requestNumber++ == 0) {
+                    flowOf(ModelEvent.Delta(0, "凭空回答：今天应该没事。"), ModelEvent.Final("stop"))
+                } else {
+                    flowOf(ModelEvent.Delta(0, "没有日程安排"), ModelEvent.Final("stop"))
+                }
+            override fun cancel(requestId: String) = true
+        }
+        KernelCommandProcessor(database, "processor", { true }, { now++ }, provider = provider, profiles = fixedProfileStore())
+            .processNext()
+
+        awaitRunStatus("r-zero-read", "SUCCEEDED")
+        assertEquals(
+            listOf("calendar.schedule.search"),
+            database.runtimeToolExecutionDao().listByRunId("r-zero-read").map { it.toolName },
+        )
+    }
+
+    @Test fun deterministicReadCompletionStillForcesAPendingRequiredRead() = runBlocking {
+        // M3: a deterministic-completing tool (conflicts) finishes, but the same input also asked
+        // for today's schedule. The run must not close on the deterministic answer alone — the
+        // pending calendar read must still be forced.
+        now = 1_800_000_000_000L
+        val input = RoomTextInputGateway(database, { true }, { now }).stage(
+            """{"schemaVersion":1,"text":"今天的日程有没有冲突","mode":"Work","model":"M2.7"}""",
+        )
+        RoomRuntimeGateways(database, "test") { now++ }.accept(
+            RuntimeUiCommand.Start("s-m3-defer", input.inputRef, "c-m3-defer", "a-m3-defer", 0, "chat", "r-m3-defer"),
+        )
+        var requestNumber = 0
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile) = capability(profile)
+            override fun stream(request: ModelRequest): kotlinx.coroutines.flow.Flow<ModelEvent> =
+                if (requestNumber++ == 0) {
+                    flowOf(
+                        ModelEvent.ToolCall(
+                            0,
+                            "call-conflicts",
+                            "calendar.schedule.conflicts",
+                            """{"startAtEpochMs":1800000000000,"durationMinutes":30}""",
+                        ),
+                        ModelEvent.Final("tool_calls"),
+                    )
+                } else {
+                    flowOf(ModelEvent.Delta(0, "没有冲突"), ModelEvent.Final("stop"))
+                }
+            override fun cancel(requestId: String) = true
+        }
+        KernelCommandProcessor(database, "processor", { true }, { now++ }, provider = provider, profiles = fixedProfileStore())
+            .processNext()
+
+        awaitRunStatus("r-m3-defer", "SUCCEEDED")
+        assertEquals(
+            listOf("calendar.schedule.conflicts", "calendar.schedule.search"),
+            database.runtimeToolExecutionDao().listByRunId("r-m3-defer").map { it.toolName },
+        )
+    }
+
     @Test fun hangingProbeIsCancelledByCancelCommand() = runBlocking {
         val probeCancelled = AtomicBoolean(false)
         val staged = RoomTextInputGateway(database, { true }, { now }).stage("probe cancel")

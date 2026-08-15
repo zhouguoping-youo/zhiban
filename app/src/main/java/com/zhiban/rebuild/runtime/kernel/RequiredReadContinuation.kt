@@ -1,5 +1,7 @@
 package com.zhiban.rebuild.runtime.kernel
 
+import android.util.Log
+import com.zhiban.rebuild.runtime.runSuspendCatching
 import com.zhiban.rebuild.runtime.store.AttemptStartRequest
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
 import com.zhiban.rebuild.runtime.store.RuntimeEventDraft
@@ -49,6 +51,16 @@ internal class RequiredReadContinuation(
         return result
     }
 
+    /**
+     * Like [execute], but a forced read that cannot run (e.g. a degenerate clock yielding an
+     * invalid range the binding rejects) degrades to null instead of throwing, so enforcing the
+     * read-gate on a first-pass answer can never fail the whole run.
+     */
+    suspend fun executeOrNull(input: String, runId: String, sessionId: String, attemptId: String, fencingEpoch: Long): RoutedToolResult? = runSuspendCatching {
+        execute(input, store.completedToolNames(runId), runId, sessionId, attemptId, fencingEpoch)
+    }.onFailure { Log.w(LOG_TAG, "forced read skipped (${it.javaClass.simpleName})") }
+        .getOrNull()
+
     suspend fun completionSummary(input: String, runId: String): String? = requiredReadCompletionSummary(
         input,
         store.completedToolResults(runId),
@@ -94,4 +106,8 @@ internal class RequiredReadContinuation(
     }
 
     private fun jsonString(value: String): String = kotlinx.serialization.json.JsonPrimitive(value).toString()
+
+    private companion object {
+        const val LOG_TAG = "RequiredReadGate"
+    }
 }
