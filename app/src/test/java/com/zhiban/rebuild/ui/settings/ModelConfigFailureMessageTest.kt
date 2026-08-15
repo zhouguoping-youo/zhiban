@@ -18,4 +18,15 @@ class ModelConfigFailureMessageTest {
             providerConfigurationFailureMessage("TIMEOUT"),
         )
     }
+
+    @Test fun `embedding connection never exposes provider failure details`() {
+        assertEquals(
+            "请输入有效的模型或接入点 ID。",
+            embeddingConfigurationFailureMessage("EMBEDDING_MODEL_INVALID"),
+        )
+        assertEquals(
+            "语义检索连接失败，请检查 API Key 和接入点 ID。",
+            embeddingConfigurationFailureMessage("EMBEDDING_HTTP_401 secret-provider-body"),
+        )
+    }
 }

@@ -2,6 +2,7 @@ package com.zhiban.rebuild.di
 
 import android.content.Context
 import com.zhiban.rebuild.runtime.context.EmbeddingGateway
+import com.zhiban.rebuild.runtime.embedding.EmbeddingConfiguration
 import com.zhiban.rebuild.runtime.embedding.VolcEmbeddingEnvironment
 import com.zhiban.rebuild.runtime.embedding.VolcEmbeddingTransport
 import com.zhiban.rebuild.runtime.governance.AppPrivateOutboundAuditStore
@@ -121,6 +122,9 @@ object ProviderModule {
 
     @Provides @Singleton
     internal fun provideEmbeddingGateway(environment: VolcEmbeddingEnvironment): EmbeddingGateway = environment
+
+    @Provides @Singleton
+    internal fun provideEmbeddingConfiguration(environment: VolcEmbeddingEnvironment): EmbeddingConfiguration = environment
 
     @Provides @Singleton
     internal fun provideCloudAsrGateway(

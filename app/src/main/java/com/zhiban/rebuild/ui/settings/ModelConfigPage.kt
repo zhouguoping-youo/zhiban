@@ -31,6 +31,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -83,6 +84,15 @@ private val ModelSettingsIconSurface = ZhiBanTerracottaSoft
 fun ModelConfigPage(onBack: () -> Unit = {}, viewModel: ModelConfigViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var confirmClear by remember { mutableStateOf(false) }
+    var showEmbeddingConfig by remember { mutableStateOf(false) }
+    var confirmClearEmbedding by remember { mutableStateOf(false) }
+    var openedEmbeddingVersion by remember { mutableStateOf(0) }
+
+    LaunchedEffect(state.embeddingSavedVersion) {
+        if (showEmbeddingConfig && state.embeddingSavedVersion > openedEmbeddingVersion) {
+            showEmbeddingConfig = false
+        }
+    }
 
     ZhiBanPage {
         Column(modifier = Modifier.fillMaxSize().background(ModelSettingsCanvas)) {
@@ -243,6 +253,21 @@ fun ModelConfigPage(onBack: () -> Unit = {}, viewModel: ModelConfigViewModel = h
                     )
                 }
 
+                item {
+                    EmbeddingConnectionCard(
+                        configured = state.embeddingConfigured,
+                        model = state.embeddingModel,
+                        checking = state.embeddingChecking,
+                        healthMessage = state.embeddingHealthMessage,
+                        onConfigure = {
+                            openedEmbeddingVersion = state.embeddingSavedVersion
+                            showEmbeddingConfig = true
+                        },
+                        onCheck = viewModel::checkEmbeddingConnection,
+                        onClear = { confirmClearEmbedding = true },
+                    )
+                }
+
                 item { Spacer(modifier = Modifier.height(ZhiBanTabBottomSpacer)) }
             }
         }
@@ -271,6 +296,152 @@ fun ModelConfigPage(onBack: () -> Unit = {}, viewModel: ModelConfigViewModel = h
             tonalElevation = 0.dp,
         )
     }
+    if (showEmbeddingConfig) {
+        EmbeddingConfigDialog(
+            state = state,
+            onApiKeyChange = viewModel::onEmbeddingApiKeyChange,
+            onToggleVisibility = viewModel::toggleEmbeddingApiKeyVisibility,
+            onModelChange = viewModel::onEmbeddingModelChange,
+            onDismiss = { if (!state.embeddingSaving) showEmbeddingConfig = false },
+            onConnect = viewModel::configureEmbedding,
+        )
+    }
+    if (confirmClearEmbedding) {
+        ZhiBanAlertDialog(
+            onDismissRequest = { confirmClearEmbedding = false },
+            title = { Text("关闭语义检索？") },
+            text = { Text("联系人和记忆仍可使用本地文字检索。") },
+            dismissButton = {
+                TextButton(onClick = { confirmClearEmbedding = false }) { Text("取消") }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmClearEmbedding = false
+                        viewModel.clearEmbedding()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) {
+                    Text("关闭")
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun EmbeddingConnectionCard(
+    configured: Boolean,
+    model: String,
+    checking: Boolean,
+    healthMessage: String?,
+    onConfigure: () -> Unit,
+    onCheck: () -> Unit,
+    onClear: () -> Unit,
+) {
+    ZhiBanGlassCard(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = ZhiBanRadius.Card,
+        containerColor = MaterialTheme.colorScheme.surface,
+        borderColor = Color.Transparent,
+        elevation = 0.dp,
+    ) {
+        Column(modifier = Modifier.padding(ZhiBanSpacing.Lg)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("语义检索", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        if (configured) model else "理解近义表达",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ModelSettingsSecondary,
+                    )
+                }
+                StatusBadge(configured)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onConfigure, contentPadding = PaddingValues(horizontal = 0.dp)) {
+                    Text(if (configured) "更换" else "配置", color = CloudBlue)
+                }
+                if (configured) {
+                    Spacer(modifier = Modifier.width(ZhiBanSpacing.Md))
+                    TextButton(onClick = onCheck, enabled = !checking, contentPadding = PaddingValues(horizontal = 0.dp)) {
+                        Text(if (checking) "检测中…" else "检测", color = CloudBlue)
+                    }
+                    Spacer(modifier = Modifier.width(ZhiBanSpacing.Md))
+                    TextButton(onClick = onClear, contentPadding = PaddingValues(horizontal = 0.dp)) {
+                        Text("关闭", color = ErrorRed)
+                    }
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                healthMessage?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (it == "连接正常") SuccessGreen else ErrorRed,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmbeddingConfigDialog(
+    state: ModelConfigUiState,
+    onApiKeyChange: (String) -> Unit,
+    onToggleVisibility: () -> Unit,
+    onModelChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onConnect: () -> Unit,
+) {
+    ZhiBanAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("连接语义检索") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md)) {
+                OutlinedTextField(
+                    value = state.embeddingApiKey,
+                    onValueChange = onApiKeyChange,
+                    label = { Text("Ark API Key") },
+                    visualTransformation = if (state.embeddingApiKeyVisible) {
+                        VisualTransformation.None
+                    } else {
+                        PasswordVisualTransformation()
+                    },
+                    trailingIcon = {
+                        Icon(
+                            imageVector = if (state.embeddingApiKeyVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                            contentDescription = if (state.embeddingApiKeyVisible) "隐藏" else "显示",
+                            modifier = Modifier.size(ZhiBanIconSize.Field).clickable(onClick = onToggleVisibility),
+                        )
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = state.embeddingModel,
+                    onValueChange = onModelChange,
+                    label = { Text("模型或接入点 ID") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                state.embeddingErrorMessage?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = ErrorRed)
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !state.embeddingSaving) { Text("取消") }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConnect,
+                enabled = !state.embeddingSaving && state.embeddingApiKey.isNotBlank() && state.embeddingModel.isNotBlank(),
+            ) {
+                Text(if (state.embeddingSaving) "连接中…" else "连接")
+            }
+        },
+    )
 }
 
 @Composable

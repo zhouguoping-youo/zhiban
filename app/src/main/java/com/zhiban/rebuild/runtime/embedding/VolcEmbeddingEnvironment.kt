@@ -70,16 +70,27 @@ internal class VolcEmbeddingTransport(private val client: OkHttpClient) : Embedd
     }
 }
 
+interface EmbeddingConfiguration {
+    suspend fun configure(apiKey: ByteArray, modelId: String): EmbeddingSpace
+
+    suspend fun clear()
+
+    suspend fun healthCheck(): Boolean
+
+    suspend fun activeSpace(): EmbeddingSpace?
+}
+
 /** Production embedding configuration with probe-before-publish and Keystore-only credentials. */
 class VolcEmbeddingEnvironment internal constructor(
     context: Context,
     private val vault: KeystoreCredentialVault,
     private val transport: EmbeddingTransport,
     private val outboundGate: OutboundExportGate,
-) : EmbeddingGateway {
+) : EmbeddingGateway,
+    EmbeddingConfiguration {
     private val prefs = context.getSharedPreferences("agent_embedding_profile", Context.MODE_PRIVATE)
 
-    suspend fun configure(apiKey: ByteArray, modelId: String): EmbeddingSpace = withContext(Dispatchers.IO) {
+    override suspend fun configure(apiKey: ByteArray, modelId: String): EmbeddingSpace = withContext(Dispatchers.IO) {
         val model = modelId.trim()
         require(model.matches(Regex("[A-Za-z0-9._-]{2,128}"))) { "EMBEDDING_MODEL_INVALID" }
         require(apiKey.size in 8..16_384) { "EMBEDDING_CREDENTIAL_INVALID" }
@@ -111,12 +122,12 @@ class VolcEmbeddingEnvironment internal constructor(
     }
 
     @android.annotation.SuppressLint("ApplySharedPref")
-    suspend fun clear() {
+    override suspend fun clear() {
         prefs.edit().clear().commit()
         runSuspendCatching { vault.delete(STABLE_REF, KEY_VERSION) }
     }
 
-    suspend fun healthCheck(): Boolean = runSuspendCatching {
+    override suspend fun healthCheck(): Boolean = runSuspendCatching {
         val space = activeSpace() ?: return false
         embed(
             listOf(

@@ -2,6 +2,8 @@ package com.zhiban.rebuild.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.zhiban.rebuild.runtime.embedding.EmbeddingConfiguration
+import com.zhiban.rebuild.runtime.governance.OutboundDataPreferences
 import com.zhiban.rebuild.runtime.provider.ProviderConfigurationManager
 import com.zhiban.rebuild.runtime.provider.ProviderEnvironmentManager
 import com.zhiban.rebuild.runtime.provider.TrustedProviderRegistry
@@ -37,12 +39,23 @@ data class ModelConfigUiState(
     val modelOptions: List<String> = TrustedProviderRegistry().preset(
         ProviderConfigurationManager.DEFAULT_PROVIDER,
     ).models,
+    val embeddingApiKey: String = "",
+    val embeddingApiKeyVisible: Boolean = false,
+    val embeddingModel: String = "",
+    val embeddingConfigured: Boolean = false,
+    val embeddingSaving: Boolean = false,
+    val embeddingChecking: Boolean = false,
+    val embeddingHealthMessage: String? = null,
+    val embeddingErrorMessage: String? = null,
+    val embeddingSavedVersion: Int = 0,
 )
 
 @HiltViewModel
 class ModelConfigViewModel @Inject constructor(
     private val preferencesManager: PreferencesManager,
     private val providerEnvironment: ProviderEnvironmentManager,
+    private val embeddingConfiguration: EmbeddingConfiguration,
+    private val outboundPreferences: OutboundDataPreferences,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ModelConfigUiState())
@@ -66,6 +79,7 @@ class ModelConfigViewModel @Inject constructor(
                 val preset = TrustedProviderRegistry().preset(providerId)
                 val model = profile?.modelId ?: legacyModel.takeIf { it in preset.models } ?: preset.defaultModel
                 val prompt = preferencesManager.getSystemPrompt()
+                val embeddingSpace = embeddingConfiguration.activeSpace()
                 _uiState.update {
                     it.copy(
                         apiKey = "",
@@ -75,6 +89,8 @@ class ModelConfigViewModel @Inject constructor(
                         modelOptions = preset.models,
                         systemPrompt = prompt,
                         isApiKeyConfigured = profile != null,
+                        embeddingModel = embeddingSpace?.modelId.orEmpty(),
+                        embeddingConfigured = embeddingSpace != null,
                         isLoading = false,
                     )
                 }
@@ -178,6 +194,85 @@ class ModelConfigViewModel @Inject constructor(
             }
         }
     }
+
+    fun onEmbeddingApiKeyChange(value: String) {
+        _uiState.update { it.copy(embeddingApiKey = value, embeddingErrorMessage = null) }
+    }
+
+    fun toggleEmbeddingApiKeyVisibility() {
+        _uiState.update { it.copy(embeddingApiKeyVisible = !it.embeddingApiKeyVisible) }
+    }
+
+    fun onEmbeddingModelChange(value: String) {
+        _uiState.update { it.copy(embeddingModel = value, embeddingErrorMessage = null) }
+    }
+
+    fun configureEmbedding() {
+        val current = _uiState.value
+        if (current.embeddingSaving) return
+        _uiState.update { it.copy(embeddingSaving = true, embeddingErrorMessage = null) }
+        viewModelScope.launch {
+            try {
+                val credential = current.embeddingApiKey.trim().toByteArray(Charsets.UTF_8)
+                require(credential.isNotEmpty()) { "EMBEDDING_CREDENTIAL_REQUIRED" }
+                val space = try {
+                    outboundPreferences.setAllowRemoteEmbedding(true)
+                    embeddingConfiguration.configure(credential, current.embeddingModel)
+                } finally {
+                    credential.fill(0)
+                }
+                _uiState.update {
+                    it.copy(
+                        embeddingApiKey = "",
+                        embeddingModel = space.modelId,
+                        embeddingConfigured = true,
+                        embeddingSaving = false,
+                        embeddingHealthMessage = "连接正常",
+                        embeddingSavedVersion = it.embeddingSavedVersion + 1,
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                _uiState.update {
+                    it.copy(
+                        embeddingSaving = false,
+                        embeddingErrorMessage = embeddingConfigurationFailureMessage(failure.message),
+                    )
+                }
+            }
+        }
+    }
+
+    fun clearEmbedding() {
+        viewModelScope.launch {
+            embeddingConfiguration.clear()
+            outboundPreferences.setAllowRemoteEmbedding(false)
+            _uiState.update {
+                it.copy(
+                    embeddingApiKey = "",
+                    embeddingModel = "",
+                    embeddingConfigured = false,
+                    embeddingHealthMessage = null,
+                    embeddingErrorMessage = null,
+                )
+            }
+        }
+    }
+
+    fun checkEmbeddingConnection() {
+        if (_uiState.value.embeddingChecking) return
+        _uiState.update { it.copy(embeddingChecking = true, embeddingHealthMessage = null) }
+        viewModelScope.launch {
+            val available = embeddingConfiguration.healthCheck()
+            _uiState.update {
+                it.copy(
+                    embeddingChecking = false,
+                    embeddingHealthMessage = if (available) "连接正常" else "连接不可用",
+                )
+            }
+        }
+    }
 }
 
 internal fun providerConfigurationFailureMessage(code: String): String = when (code) {
@@ -189,4 +284,11 @@ internal fun providerConfigurationFailureMessage(code: String): String = when (c
     "TLS_VERIFICATION_FAILED" -> "安全连接验证失败，请检查网络环境或更新知伴。"
     "RATE_LIMITED" -> "请求较多，请稍后重试。"
     else -> "暂时无法连接 AI 服务，请稍后重试。"
+}
+
+internal fun embeddingConfigurationFailureMessage(code: String?): String = when (code) {
+    "EMBEDDING_CREDENTIAL_REQUIRED" -> "请输入 Ark API Key。"
+    "EMBEDDING_MODEL_INVALID" -> "请输入有效的模型或接入点 ID。"
+    "EMBEDDING_REMOTE_EXPORT_CONSENT_REQUIRED" -> "请允许语义检索后重试。"
+    else -> "语义检索连接失败，请检查 API Key 和接入点 ID。"
 }
