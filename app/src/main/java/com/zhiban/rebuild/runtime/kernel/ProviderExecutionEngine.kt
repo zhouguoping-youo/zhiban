@@ -158,6 +158,7 @@ internal data class ProviderEngineConfig(
         com.zhiban.rebuild.runtime.config.FeedbackPolicy()
     },
     val toolEnabled: (String) -> Boolean = { true },
+    val webSearchOptIn: () -> Boolean = { false },
     val networkQuality: () -> com.zhiban.rebuild.runtime.network.NetworkQuality = {
         com.zhiban.rebuild.runtime.network.NetworkQuality.NORMAL
     },
@@ -202,6 +203,7 @@ internal class ProviderExecutionEngine(
     private val memoryPolicy: () -> com.zhiban.rebuild.runtime.config.MemoryPolicy = config.memoryPolicy
     private val feedbackPolicy: () -> com.zhiban.rebuild.runtime.config.FeedbackPolicy = config.feedbackPolicy
     private val toolEnabled: (String) -> Boolean = config.toolEnabled
+    private val webSearchOptIn: () -> Boolean = config.webSearchOptIn
     private val networkQuality: () -> com.zhiban.rebuild.runtime.network.NetworkQuality = config.networkQuality
     private val dynamicConfig: () -> com.zhiban.rebuild.runtime.config.AgentDynamicConfig = {
         // Apply the user's execution preference (快速/平衡/深度) over the snapshot so every
@@ -829,7 +831,7 @@ internal class ProviderExecutionEngine(
             } else {
                 null
             },
-            allowWebSearch = forcedToolName == null && "web_search" in capability.features,
+            allowWebSearch = forcedToolName == null && "web_search" in capability.features && webSearchOptIn(),
             attachments = input.attachments.map { attachment ->
                 com.zhiban.rebuild.runtime.provider.ModelAttachment(
                     attachment.attachmentId, attachment.kind, attachment.mimeType, attachment.byteLength,

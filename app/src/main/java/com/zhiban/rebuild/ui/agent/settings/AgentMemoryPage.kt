@@ -608,4 +608,5 @@ data class AgentToolsState(
     val remoteTools: List<McpRemoteTool> = emptyList(),
     val busy: Boolean = false,
     val message: String? = null,
+    val webSearchOptIn: Boolean = false,
 )

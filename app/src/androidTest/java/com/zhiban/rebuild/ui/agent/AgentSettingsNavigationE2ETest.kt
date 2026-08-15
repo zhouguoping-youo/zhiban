@@ -61,8 +61,10 @@ class AgentSettingsNavigationE2ETest {
         compose.onNodeWithText("服务 ID，如 feishu").assertIsDisplayed()
         compose.onNodeWithText("取消").performClick()
         compose.onNodeWithText("创建日程").assertIsDisplayed()
-        val firstSwitch = compose.onAllNodes(isToggleable())[0]
-        firstSwitch.assertIsOn().performClick().assertIsOff()
+        // Target the 创建日程 tool's own switch via a text+toggleable selector that stays stable
+        // across the toggle — not "the first switch", which is now the web-search opt-in switch.
+        val toolSwitch = compose.onAllNodes(isToggleable() and hasText("创建日程"))[0]
+        toolSwitch.assertIsOn().performClick().assertIsOff()
         assertFalse(
             compose.activity.getSharedPreferences("agent_controls", android.content.Context.MODE_PRIVATE)
                 .getStringSet("disabled_tools", emptySet()).orEmpty().isEmpty(),

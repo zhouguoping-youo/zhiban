@@ -257,6 +257,7 @@ object AgentDataModule {
             memoryPolicy = controls::memory,
             feedbackPolicy = controls::feedback,
             toolEnabled = controls::isToolAvailable,
+            webSearchOptIn = controls::webSearchOptIn,
             networkQuality = networkQuality::current,
             dynamicConfig = dynamicConfig::snapshot,
             executionPreference = controls::execution,

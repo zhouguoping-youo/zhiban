@@ -229,7 +229,7 @@ data class MemoryUiState(
     private val _state = MutableStateFlow(snapshot())
     val state = _state.asStateFlow()
     private fun snapshot(busy: Boolean = false, message: String? = null) =
-        AgentToolsState(names.associateWith(controls::isToolEnabled), mcp.servers(), mcp.tools(), busy, message)
+        AgentToolsState(names.associateWith(controls::isToolEnabled), mcp.servers(), mcp.tools(), busy, message, controls.webSearchOptIn())
     fun enabled(name: String, value: Boolean) {
         controls.saveToolEnabled(name, value)
         _state.update {
@@ -238,6 +238,10 @@ data class MemoryUiState(
                     it.enabled + (name to value),
             )
         }
+    }
+    fun webSearchOptIn(value: Boolean) {
+        controls.saveWebSearchOptIn(value)
+        _state.update { it.copy(webSearchOptIn = value) }
     }
     fun serverEnabled(id: String, value: Boolean) {
         viewModelScope.launch {
@@ -297,6 +301,14 @@ data class MemoryUiState(
                 contentPadding = PaddingValues(bottom = ZhiBanSpacing.PageBottom),
                 verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.ContentGap),
             ) {
+                item { ZhiBanSectionTitle("联网") }
+                item {
+                    ToggleRow(
+                        "联网搜索",
+                        "把提问发给搜索服务联网查询；默认关闭",
+                        state.webSearchOptIn,
+                    ) { vm.webSearchOptIn(it) }
+                }
                 item {
                     ZhiBanSectionTitle(
                         title = "外部服务",

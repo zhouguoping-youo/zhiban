@@ -59,6 +59,15 @@ class AgentControlStore @Inject constructor(@ApplicationContext context: Context
     fun saveExecution(value: ExecutionPreference) {
         check(store.edit().putString("execution_preference", value.name).commit())
     }
+
+    // Native provider web search sends the query text to the model's search backend, so it is
+    // gated behind an explicit user opt-in (default off) rather than auto-enabled per model.
+    fun webSearchOptIn(): Boolean = store.getBoolean("web_search_opt_in", false)
+
+    fun saveWebSearchOptIn(enabled: Boolean) {
+        check(store.edit().putBoolean("web_search_opt_in", enabled).commit())
+    }
+
     fun isToolEnabled(name: String): Boolean = name !in (store.getStringSet("disabled_tools", emptySet()) ?: emptySet())
     fun saveToolEnabled(name: String, enabled: Boolean) {
         val disabled = (store.getStringSet("disabled_tools", emptySet()) ?: emptySet()).toMutableSet()
