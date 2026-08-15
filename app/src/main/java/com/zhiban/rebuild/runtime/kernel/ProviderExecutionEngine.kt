@@ -132,6 +132,7 @@ private const val LEASE_DURATION_MS = 120_000L
 private const val DEFAULT_TOTAL_TIMEOUT_MS = 120_000L
 private const val DEFAULT_IDLE_TIMEOUT_MS = 30_000L
 private const val DEFAULT_HEARTBEAT_INTERVAL_MS = 10_000L
+private const val DEFAULT_RERANK_TIMEOUT_MS = 2_500L
 
 /**
  * 运行期可变的引擎配置（超时 + 策略 lambda）。从原本散列在构造函数里的十几个参数收敛而来，
@@ -142,6 +143,7 @@ internal data class ProviderEngineConfig(
     val idleTimeoutMs: Long = DEFAULT_IDLE_TIMEOUT_MS,
     val heartbeatIntervalMs: Long = DEFAULT_HEARTBEAT_INTERVAL_MS,
     val leaseDurationMs: Long = LEASE_DURATION_MS,
+    val rerankTimeoutMs: Long = DEFAULT_RERANK_TIMEOUT_MS,
     val personalization: () -> String? = { null },
     val ownerProfile: () -> ContactOwnerProfileSnapshot = { ContactOwnerProfileSnapshot() },
     val memoryPolicy: () -> com.zhiban.rebuild.runtime.config.MemoryPolicy = {
@@ -188,6 +190,7 @@ internal class ProviderExecutionEngine(
     private val idleTimeoutMs: Long = config.idleTimeoutMs
     private val heartbeatIntervalMs: Long = config.heartbeatIntervalMs
     private val leaseDurationMs: Long = config.leaseDurationMs
+    private val rerankTimeoutMs: Long = config.rerankTimeoutMs
     private val personalization: () -> String? = config.personalization
     private val memoryPolicy: () -> com.zhiban.rebuild.runtime.config.MemoryPolicy = config.memoryPolicy
     private val feedbackPolicy: () -> com.zhiban.rebuild.runtime.config.FeedbackPolicy = config.feedbackPolicy
@@ -1707,7 +1710,7 @@ internal class ProviderExecutionEngine(
         val requestId = "rerank-$attemptId"
         val started = clock()
         val outcome = try {
-            withTimeout(RERANK_TIMEOUT_MS) {
+            withTimeout(rerankTimeoutMs) {
                 retrievalReranker.rerank(query, retrieval.items, profile, capability, requestId)
             }
         } catch (_: TimeoutCancellationException) {
@@ -1783,7 +1786,6 @@ internal class ProviderExecutionEngine(
             RuntimeRunStatus.OBSERVING.name,
         )
         const val ENTITY_EXTRACTION_TIMEOUT_MS = 50L
-        const val RERANK_TIMEOUT_MS = 200L
         const val DEFAULT_MAX_OUTPUT_TOKENS = 2_048
         const val MIN_MULTIMODAL_IDLE_TIMEOUT_MS = 60_000L
         const val WORK_SYSTEM_PROMPT =

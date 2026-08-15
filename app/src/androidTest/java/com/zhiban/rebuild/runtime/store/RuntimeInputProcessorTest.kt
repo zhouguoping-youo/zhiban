@@ -996,9 +996,14 @@ class RuntimeInputProcessorTest {
             }
             override fun cancel(requestId: String) = true
         }
-        KernelCommandProcessor(database, "processor", {
-            true
-        }, { now++ }, provider = provider, profiles = fixedProfileStore()).processNext()
+        KernelCommandProcessor(
+            database,
+            "processor",
+            { true },
+            { now++ },
+            provider = provider,
+            profiles = fixedProfileStore(),
+        ).processNext()
         awaitRunStatus("r-rerank", "SUCCEEDED")
         assertEquals(2, requests.size)
         val context = requests.single { !it.requestId.startsWith("rerank-") }.messages.joinToString("\n") { it.content }
@@ -1060,9 +1065,15 @@ class RuntimeInputProcessorTest {
                 return true
             }
         }
-        KernelCommandProcessor(database, "processor", {
-            true
-        }, { now++ }, provider = provider, profiles = fixedProfileStore()).processNext()
+        KernelCommandProcessor(
+            database,
+            "processor",
+            { true },
+            { now++ },
+            provider = provider,
+            profiles = fixedProfileStore(),
+            config = com.zhiban.rebuild.runtime.kernel.ProviderEngineConfig(rerankTimeoutMs = 50),
+        ).processNext()
         awaitRunStatus("r-rerank-timeout", "SUCCEEDED")
         assertTrue(rerankCancelled.get())
         assertTrue(
