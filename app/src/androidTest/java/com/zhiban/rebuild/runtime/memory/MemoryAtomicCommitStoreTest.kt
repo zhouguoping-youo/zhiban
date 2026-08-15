@@ -97,6 +97,26 @@ class MemoryAtomicCommitStoreTest {
         assertEquals(listOf("memory_fts:failure"), search.degradationReasons)
     }
 
+    @Test fun naturalChineseQuestionRecallsMemoryByMeaningfulSubstring() = runBlocking {
+        store.ensureNamespace(namespace())
+        val memoryText = "张三在知伴科技负责数据库项目"
+        val candidateId = stage("chinese-recall", memoryText)
+        store.commit(commitRequest(candidateId, memoryText))
+
+        val search = MemorySearch(database) { now++ }.search(
+            MemorySearchQuery(
+                "namespace-1",
+                "owner-1",
+                "profile-1",
+                "做数据库的是谁",
+                limit = 10,
+                tokenBudget = 1_000,
+            ),
+        )
+
+        assertEquals(listOf(memoryText), search.items.map { it.canonicalText })
+    }
+
     @Test fun commitFailureRollsBackRecordReceiptEventOutboxAndCandidateConsumption() = runBlocking {
         store.ensureNamespace(namespace())
         val candidateId = stage()
@@ -259,12 +279,12 @@ class MemoryAtomicCommitStoreTest {
         assertEquals(1, scalar("SELECT COUNT(*) FROM memory_records WHERE memoryId='memory-$candidateId'"))
     }
 
-    private suspend fun stage(idHint: String = "candidate"): String {
+    private suspend fun stage(idHint: String = "candidate", content: String = "value"): String {
         val stagedStore = RoomStagedMemoryCandidateStore(database)
         val candidate = stagedStore.stage(
             scope = MemoryScope.PERSON,
             scopeId = "user-1",
-            content = "  value  ",
+            content = "  $content  ",
             sourceIds = listOf("source-1"),
             sensitivity = Sensitivity.PERSONAL,
             nowEpochMs = now++,
@@ -279,7 +299,7 @@ class MemoryAtomicCommitStoreTest {
         "namespace-1", "owner-1", "profile-1", "PERSON", "user-1", "ACTIVE", 0, 0, now++,
     )
 
-    private suspend fun commitRequest(candidateId: String) = MemoryCommitRequest(
+    private suspend fun commitRequest(candidateId: String, canonicalText: String = "value") = MemoryCommitRequest(
         namespaceId = "namespace-1",
         candidateId = candidateId,
         approvalRef = requireNotNull(database.stagedMemoryCandidateDao().find(candidateId)?.approvalRef),
@@ -289,8 +309,8 @@ class MemoryAtomicCommitStoreTest {
         memoryType = "SEMANTIC",
         subjectKey = "subject",
         predicateKey = "predicate",
-        canonicalText = "value",
-        canonicalDigest = digest("value"),
+        canonicalText = canonicalText,
+        canonicalDigest = digest(canonicalText),
         sourceSetDigest = digest("source-1"),
     )
 

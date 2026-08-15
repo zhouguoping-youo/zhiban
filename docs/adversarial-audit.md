@@ -306,6 +306,7 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | 17.6 | 上下文含敏感信息脱敏 | ⚪ | — | 最终 `ModelRequest` 经过 `PolicyEnforcingProviderAdapter`，自动召回手机号/邮箱被掩码或阻断；用户主动输入保持原意 | 审计提交 | `OutboundDataPolicyTest` |
 | 17.7 | 上下文含错误信息过滤 | ⚪ | — | 检索/快照异常只进入固定原因码，不带 exception message/SQL/用户正文；不可信工具/模型内容只能成为 DATA 角色，不能伪造 SYSTEM | 审计提交 | `RetrievalAttemptTest` + `GatewayRuntimeUiClientTest.malformedEventPayloadEmitsAFixedDegradationReason` + `ContextModuleTest.delimiterInjectionStaysDataAndCannotCreateSystemMessage` |
 | 17.8 | LLM 重排失败降级 FTS | ⚪ | — | 重排超时、能力缺失或响应非法均保留原 RRF/FTS 顺序并记录 `rerank_skipped:*`，主 run 继续完成 | 审计提交 | `ProviderRetrievalRerankerTest` + `RuntimeInputProcessorTest.rerankTimeoutCancelsOnlyRerankAndFallsBackToRrf` |
+| 17.9 | 中文自然问法可召回相关记忆 | ✅ | 功能不可用 | 旧检索把整句中文视为一个 unicode61 token，且所有词用 AND 连接；“做数据库的是谁”无法召回“张三在知伴科技负责数据库项目”。现保留 FTS 并改为 OR，同时在相同 namespace、当前版本、未过期、无 tombstone 约束下，以受限中文片段补充本地召回 | 本提交 `fix(17.9)` | `MemoryAtomicCommitStoreTest.naturalChineseQuestionRecallsMemoryByMeaningfulSubstring`（SM-W7023：空结果红→正确记忆绿） |
 
 ## 维度 18 · 工具执行与确认
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |

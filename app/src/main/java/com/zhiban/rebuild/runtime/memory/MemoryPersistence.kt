@@ -389,6 +389,18 @@ internal interface MemoryPersistenceDao {
     suspend fun ftsCandidates(namespaceId: String, ftsQuery: String, trustedNow: Long, limit: Int): List<MemoryRecordEntity>
 
     @Query(
+        """
+        SELECT r.* FROM memory_current_versions c
+        JOIN memory_records r ON r.namespaceId=c.namespaceId AND r.memoryId=c.memoryId AND r.recordVersion=c.recordVersion
+        WHERE c.namespaceId=:namespaceId AND instr(lower(r.canonicalText), lower(:fragment)) > 0 AND r.status='ACTIVE'
+          AND (r.expiresAtEpochMs IS NULL OR r.expiresAtEpochMs>:trustedNow)
+          AND NOT EXISTS (SELECT 1 FROM memory_tombstones t WHERE t.namespaceId=c.namespaceId AND t.logicalMemoryId=c.logicalMemoryId)
+        ORDER BY r.confidence DESC, r.observedAtEpochMs DESC LIMIT :limit
+    """,
+    )
+    suspend fun substringCandidates(namespaceId: String, fragment: String, trustedNow: Long, limit: Int): List<MemoryRecordEntity>
+
+    @Query(
         "SELECT * FROM memory_evidence WHERE namespaceId=:namespaceId AND memoryId=:memoryId AND recordVersion=:recordVersion ORDER BY evidenceId LIMIT :limit",
     )
     suspend fun evidence(namespaceId: String, memoryId: String, recordVersion: Long, limit: Int): List<MemoryEvidenceEntity>
