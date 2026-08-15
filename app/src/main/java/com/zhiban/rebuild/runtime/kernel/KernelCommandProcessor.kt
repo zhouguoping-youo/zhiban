@@ -4,6 +4,7 @@ import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.runtime.provider.ProviderAdapter
 import com.zhiban.rebuild.runtime.provider.ProviderProfileStore
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
+import com.zhiban.rebuild.runtime.store.RuntimeCommandInboxEntity
 
 private const val SESSION_LEASE_MS = 30_000L
 
@@ -43,20 +44,19 @@ internal class KernelCommandProcessor(
             ?: return if (providerEngine?.recoverNext() == true) Outcome.PROCESSED else Outcome.IDLE
         val lease = store.claimSession(command.sessionId, ownerId, now, SESSION_LEASE_MS)
         if (!store.claimCommand(command.commandId, ownerId, lease.leaseEpoch, now)) return Outcome.IDLE
-        return if (store.processClaimedCommand(command.commandId, ownerId, lease.leaseEpoch, clock())) {
-            val runId = command.runId
-            if (command.commandType in setOf("Start", "Retry") && runId != null && providerEngine != null) {
-                providerEngine.launch(runId, command.sessionId, lease.leaseEpoch)
-            } else if (command.commandType == "Approve" && runId != null && providerEngine != null) {
-                providerEngine.launchApprovedTool(runId, command.sessionId, lease.leaseEpoch)
-            } else if (command.commandType == "Cancel" && runId != null && providerEngine != null) {
-                providerEngine.cancel(runId, command.sessionId, lease.leaseEpoch)
-            } else if (command.commandType == "Resume" && runId != null && providerEngine != null) {
-                providerEngine.resume(runId, command.sessionId, lease.leaseEpoch)
-            }
-            Outcome.PROCESSED
-        } else {
-            Outcome.FAILED
+        if (!store.processClaimedCommand(command.commandId, ownerId, lease.leaseEpoch, clock())) return Outcome.FAILED
+        return if (dispatchRuntimeWork(command, lease.leaseEpoch)) Outcome.PROCESSED else Outcome.FAILED
+    }
+
+    private suspend fun dispatchRuntimeWork(command: RuntimeCommandInboxEntity, fencingEpoch: Long): Boolean {
+        val runId = command.runId ?: return true
+        val engine = providerEngine ?: return true
+        return when (command.commandType) {
+            "Start", "Retry" -> engine.launchAfterCurrent(runId, command.sessionId, fencingEpoch)
+            "Approve" -> engine.launchApprovedToolAfterCurrent(runId, command.sessionId, fencingEpoch)
+            "Cancel" -> engine.cancel(runId, command.sessionId, fencingEpoch)
+            "Resume" -> engine.resumeAfterCurrent(runId, command.sessionId, fencingEpoch)
+            else -> true
         }
     }
 

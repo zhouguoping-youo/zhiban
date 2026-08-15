@@ -429,6 +429,21 @@ internal class ProviderExecutionEngine(
         execute(runId, sessionId, fencingEpoch)
     }
 
+    suspend fun launchAfterCurrent(runId: String, sessionId: String, fencingEpoch: Long): Boolean =
+        launchWhenRunIsIdle(runId) { launch(runId, sessionId, fencingEpoch) }
+
+    suspend fun launchApprovedToolAfterCurrent(runId: String, sessionId: String, fencingEpoch: Long): Boolean =
+        launchWhenRunIsIdle(runId) { launchApprovedTool(runId, sessionId, fencingEpoch) }
+
+    suspend fun resumeAfterCurrent(runId: String, sessionId: String, fencingEpoch: Long): Boolean =
+        launchWhenRunIsIdle(runId) { resume(runId, sessionId, fencingEpoch) }
+
+    private suspend fun launchWhenRunIsIdle(runId: String, launch: suspend () -> Boolean): Boolean {
+        while (true) {
+            activeJobs[runId]?.join() ?: return launch()
+        }
+    }
+
     private suspend fun finishFailure(runId: String, fencingEpoch: Long, failure: Throwable): Boolean {
         val providerFailure = failure as? ProviderFailure
         val retryable = providerFailure?.retryable ?: (failure is IOException)

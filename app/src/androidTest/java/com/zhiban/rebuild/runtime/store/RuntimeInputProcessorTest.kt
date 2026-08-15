@@ -40,15 +40,20 @@ import com.zhiban.rebuild.runtime.spi.CommandReceiptStatus
 import com.zhiban.rebuild.runtime.spi.RuntimeAction
 import com.zhiban.rebuild.runtime.spi.RuntimeUiCommand
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -504,6 +509,84 @@ class RuntimeInputProcessorTest {
         assertNull(database.scheduleDao().findById(scheduleId))
         assertNull(database.factDao().find("schedule:$scheduleId"))
         assertEquals("UNDONE", database.changeLogDao().find(change.changeId)?.undoState)
+    }
+
+    @Test fun approvalWaitsForPreviousRunJobToExitBeforeLaunchingExecution() = runBlocking {
+        val staged = RoomTextInputGateway(database, { true }, { now }).stage(
+            """{"schemaVersion":1,"text":"记住我喜欢简洁回答","mode":"Work","model":"M2.7","level":"高"}""",
+        )
+        val gateway = RoomRuntimeGateways(database, "test") { now++ }
+        gateway.accept(
+            RuntimeUiCommand.Start(
+                "s-approval-race", staged.inputRef, "c-approval-race", "a-approval-race",
+                0, "chat", "r-approval-race",
+            ),
+        )
+        val cancelEntered = CompletableDeferred<Unit>()
+        val releaseOldJob = CountDownLatch(1)
+        val holdFirstCancel = AtomicBoolean(true)
+        val requestCount = AtomicInteger()
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile) = capability(profile)
+            override fun stream(request: ModelRequest): kotlinx.coroutines.flow.Flow<ModelEvent> =
+                if (requestCount.incrementAndGet() > 1) {
+                    flowOf(ModelEvent.Delta(0, "日程已经创建。"), ModelEvent.Final("stop"))
+                } else {
+                    flowOf(
+                        ModelEvent.ToolCall(
+                            0,
+                            "call-approval-race",
+                            "memory.remember",
+                            """{"content":"用户喜欢简洁回答","memoryType":"PREFERENCE","subjectKey":"user","predicateKey":"response_style"}""",
+                        ),
+                        ModelEvent.Final("tool_calls"),
+                    )
+                }
+
+            override fun cancel(requestId: String): Boolean {
+                if (holdFirstCancel.compareAndSet(true, false)) {
+                    cancelEntered.complete(Unit)
+                    check(releaseOldJob.await(5, TimeUnit.SECONDS))
+                }
+                return true
+            }
+        }
+        val processor = KernelCommandProcessor(
+            database, "processor", { true }, { now++ }, provider = provider, profiles = fixedProfileStore(),
+            config = com.zhiban.rebuild.runtime.kernel.ProviderEngineConfig(
+                dynamicConfig = {
+                    com.zhiban.rebuild.runtime.config.AgentDynamicConfig(enableLlmRerank = false)
+                },
+            ),
+        )
+
+        assertEquals(KernelCommandProcessor.Outcome.PROCESSED, processor.processNext())
+        withTimeout(5_000) { cancelEntered.await() }
+        awaitRunStatus("r-approval-race", "AWAITING_CONFIRMATION")
+        val approval = approvalPlan("r-approval-race")
+        val revision = database.runtimeSessionDao().find("s-approval-race")!!.nextSequence - 1
+        gateway.accept(
+            RuntimeUiCommand.RunAction(
+                RuntimeAction.APPROVE,
+                "s-approval-race",
+                "r-approval-race",
+                "approve-race",
+                "approve-race-action",
+                revision,
+                "chat",
+                approval.getValue("proposalId").jsonPrimitive.content,
+                approval.getValue("payloadRef").jsonPrimitive.content,
+            ),
+        )
+
+        val approvalProcessing = async { processor.processNext() }
+        awaitRunStatus("r-approval-race", "EXECUTING")
+        assertFalse(approvalProcessing.isCompleted)
+        releaseOldJob.countDown()
+
+        assertEquals(KernelCommandProcessor.Outcome.PROCESSED, approvalProcessing.await())
+        awaitRunStatus("r-approval-race", "SUCCEEDED")
+        assertEquals(1, database.runtimeToolExecutionDao().listByRunId("r-approval-race").size)
     }
 
     @Test fun explicitCalendarIntentFallsBackToLocalConfirmedPlanWhenProviderReturnsEmpty() = runBlocking {

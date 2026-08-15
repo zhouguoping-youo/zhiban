@@ -296,6 +296,7 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | 16.14 | 观察期可继续调用不同的读取工具 | ✅ | 功能不可用 | 旧递归保护在工具写入后才读取 completedTools，新工具因此也被误判成重复；当前 attempt 已结束后又用它终结，run 永久停在 OBSERVING。现与观察流启动前快照比较，新工具进入下一观察 attempt，只有真实重复调用走兜底 | 本提交 `fix(16.14)` | `RuntimeInputProcessorTest.observationCanExecuteADifferentReadToolWithoutLeavingRunStuck`（SM-W7023：OBSERVING 红→SUCCEEDED 绿） |
 | 16.15 | 确认后工具超时可安全重试 | ✅ | 功能不可用 | `runSuspendCatching` 会按取消语义直接重抛 `TimeoutCancellationException`，旧代码因此绕过 TIMEOUT 映射并被外层收容成 `RUNTIME_INTERRUPTED/FAILED_FINAL`。现显式区分超时与协作取消：超时落 `TIMEOUT/FAILED_RETRYABLE`、保留原输入、清理旧审批暂存，领域事务不产生半写 | 本提交 `fix(16.15)` | `RuntimeInputProcessorTest.approvedToolTimeoutIsRetryableInsteadOfRuntimeInterrupted`（SM-W7023：异常外逃红→FAILED_RETRYABLE 绿） |
 | 16.16 | 模型工具参数错误可受控自纠 | ✅ | 功能不可用 | 工具名有效但参数缺失/非法时，旧引擎直接把 run 终结为 `FAILED_FINAL`，模型看不到错误也无法修正。现原子记录脱敏 `ToolFailed`，只把固定错误码回灌并仅开放原工具重试一次；修正成功继续观察链，连续第二次错误明确终结，不会循环或假报成功 | 本提交 `fix(16.16)` | `RuntimeInputProcessorTest.invalidToolArgumentsAreReturnedToModelForOneCorrection`（SM-W7023：FAILED_FINAL 红→三段 ReAct 成功绿）+ `repeatedInvalidToolArgumentsStopAfterOneCorrection`（两次后有界终结） |
+| 16.17 | 审批与旧 Job 收尾竞态 | ✅ | 功能不可用 | 审批命令已完成但旧推理 Job 尚未退出时，新执行 Job 原先注册失败且返回值被忽略，run 会停在 `EXECUTING`。现同一 run 的后续阶段等待旧 Job 真正退出后再注册启动；命令仅在执行已启动时报告 `PROCESSED` | 待提交 `fix(16.17)` | `RuntimeInputProcessorTest.approvalWaitsForPreviousRunJobToExitBeforeLaunchingExecution`（人为阻塞旧 Job 收尾） |
 
 ## 维度 17 · 检索与上下文
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |
