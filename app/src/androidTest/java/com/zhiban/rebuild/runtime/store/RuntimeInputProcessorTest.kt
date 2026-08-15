@@ -2074,22 +2074,12 @@ class RuntimeInputProcessorTest {
                     request.messages.any { it.content.contains("不可信数据") } ->
                         flowOf(ModelEvent.Delta(0, "我会按你的偏好回答。"), ModelEvent.Final("stop"))
 
-                    all.contains("\"tool\":\"calendar.schedule.search\"") -> flowOf(
+                    else -> flowOf(
                         ModelEvent.ToolCall(
                             0,
                             "call-memory",
                             "memory.remember",
                             """{"content":"用户喜欢简洁回答","memoryType":"PREFERENCE","subjectKey":"user","predicateKey":"response_style"}""",
-                        ),
-                        ModelEvent.Final("tool_calls"),
-                    )
-
-                    else -> flowOf(
-                        ModelEvent.ToolCall(
-                            0,
-                            "call-dag-read",
-                            "calendar.schedule.search",
-                            """{"fromEpochMs":0,"toEpochMs":4000000,"limit":10}""",
                         ),
                         ModelEvent.Final("tool_calls"),
                     )
@@ -2722,12 +2712,22 @@ class RuntimeInputProcessorTest {
                         ModelEvent.Final("tool_calls"),
                     )
 
-                    else -> flowOf(
+                    all.contains("\"tool\":\"calendar.schedule.search\"") -> flowOf(
                         ModelEvent.ToolCall(
                             0,
                             "call-dag-schedule",
                             "calendar.schedule.create",
                             """{"title":"复盘会","startAtEpochMs":3000000,"durationMinutes":30}""",
+                        ),
+                        ModelEvent.Final("tool_calls"),
+                    )
+
+                    else -> flowOf(
+                        ModelEvent.ToolCall(
+                            0,
+                            "call-dag-read",
+                            "calendar.schedule.search",
+                            """{"fromEpochMs":0,"toEpochMs":4000000,"limit":10}""",
                         ),
                         ModelEvent.Final("tool_calls"),
                     )
