@@ -41,7 +41,8 @@ class AgentControlStore @Inject constructor(@ApplicationContext context: Context
     fun isToolAvailable(name: String): Boolean {
         if (!isToolEnabled(name)) return false
         val policy = memory()
-        return name != "memory.remember" || (policy.learnFromConversations && !policy.temporaryModeEnabled)
+        return name !in setOf("memory.remember", "memory.upsert") ||
+            (policy.learnFromConversations && !policy.temporaryModeEnabled)
     }
     fun feedback() = FeedbackPolicy(store.getBoolean("human_feedback", true), store.getBoolean("preference_improvement", true))
     fun saveFeedback(value: FeedbackPolicy) {

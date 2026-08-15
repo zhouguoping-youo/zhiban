@@ -9,6 +9,7 @@ internal object AutoWriteToolNames {
     const val CONTACT_TAG_ADD = "contact.tag.add"
     const val CONTACT_IDENTITY_AUTO_LINK = "contact.identity.autoLink"
     const val SCHEDULE_CREATE = "calendar.schedule.autoCreate"
+    const val MEMORY_UPSERT = "memory.upsert"
     const val CRM_LEAD_CANDIDATE = "crm.lead.createCandidate"
     const val CRM_ACTIVITY_APPEND = "crm.activity.append"
     const val CRM_NEXT_ACTION_CREATE = "crm.nextAction.create"
@@ -24,6 +25,7 @@ internal object AutoWriteToolNames {
         CONTACT_TAG_ADD,
         CONTACT_IDENTITY_AUTO_LINK,
         SCHEDULE_CREATE,
+        MEMORY_UPSERT,
         CRM_LEAD_CANDIDATE,
         CRM_ACTIVITY_APPEND,
         CRM_NEXT_ACTION_CREATE,

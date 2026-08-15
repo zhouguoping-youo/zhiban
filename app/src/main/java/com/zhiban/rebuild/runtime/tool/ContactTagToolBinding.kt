@@ -30,7 +30,7 @@ internal class ContactTagToolBinding(override val spec: RuntimeToolSpec, private
 
     override suspend fun requestApproval(request: RuntimeToolCallRequest, context: RuntimeToolRouteContext): Boolean {
         val plan = buildPlan(request, context)
-        return store.requestContactTagApproval(
+        return store.requestReversibleWriteApproval(
             plan.toString(),
             request.providerCallId,
             context.sessionId,

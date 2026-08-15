@@ -74,6 +74,8 @@ import com.zhiban.rebuild.runtime.tool.MemoryRememberPlanValidator
 import com.zhiban.rebuild.runtime.tool.MemoryRememberToolBinding
 import com.zhiban.rebuild.runtime.tool.MemoryRememberToolCall
 import com.zhiban.rebuild.runtime.tool.MemorySearchToolBinding
+import com.zhiban.rebuild.runtime.tool.MemoryUpsertDomainWriter
+import com.zhiban.rebuild.runtime.tool.MemoryUpsertToolBinding
 import com.zhiban.rebuild.runtime.tool.RelationshipCreateCandidateToolBinding
 import com.zhiban.rebuild.runtime.tool.RelationshipEvidenceToolBinding
 import com.zhiban.rebuild.runtime.tool.RelationshipSearchToolBinding
@@ -254,6 +256,11 @@ internal class ProviderExecutionEngine(
                 toolCatalog.requireRegistered(MemoryRememberPlanValidator.TOOL_NAME),
                 store,
                 memoryExecutor,
+            ),
+            MemoryUpsertToolBinding(
+                toolCatalog.requireRegistered(MemoryUpsertToolBinding.TOOL_NAME),
+                store,
+                MemoryUpsertDomainWriter(database, store),
             ),
             MemorySearchToolBinding(toolCatalog.requireRegistered("memory.search"), RoomMemoryGate(database, clock)),
             MemoryDeleteToolBinding(toolCatalog.requireRegistered("memory.delete"), store),

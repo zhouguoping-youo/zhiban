@@ -190,10 +190,10 @@ internal fun AutoWriteContent(
             LaunchedEffect(receipt.changeId) {
                 correcting = null
                 showSnackbar(
-                    if (receipt.correctionRoute == "CALENDAR") {
-                        "请到日历修改这条安排"
-                    } else {
-                        "请到联系人或个人 CRM 页面修改这条内容"
+                    when (receipt.correctionRoute) {
+                        "CALENDAR" -> "请到日历修改这条安排"
+                        "MEMORY_MANAGER" -> "请到记忆管理修改这条内容"
+                        else -> "请到联系人或个人 CRM 页面修改这条内容"
                     },
                 )
             }
@@ -208,6 +208,7 @@ private fun AutoWriteReceiptCard(receipt: AutoWriteReceiptRow, onUndo: () -> Uni
         "CONTACT_TAG" -> "补充了联系人标签"
         "CONTACT_IDENTITY_LINK" -> "合并了重复联系人"
         "SCHEDULE_CREATE" -> "创建了一条日程"
+        "MEMORY" -> "更新了一条长期记忆"
         "CRM_LEAD_CANDIDATE" -> "发现了一条候选线索"
         "CRM_ACTIVITY" -> "记录了一次客户互动"
         "CRM_NEXT_ACTION" -> "创建了下一步动作"

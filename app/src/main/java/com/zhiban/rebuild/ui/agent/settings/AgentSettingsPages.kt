@@ -483,6 +483,7 @@ private fun toolDisplayName(name: String) = when (name) {
     "contact.identity.resolve" -> "关联社交身份"
     "contact.tag.add" -> "自动补充联系人标签"
     "memory.remember" -> "保存长期记忆"
+    "memory.upsert" -> "自动更新长期记忆"
     "memory.search" -> "搜索长期记忆"
     "memory.delete" -> "删除长期记忆"
     "relationship.createCandidate" -> "建立联系人关系"

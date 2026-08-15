@@ -727,7 +727,7 @@ internal class RoomRuntimeStore(private val database: AgentDatabase, private val
         nowEpochMs,
     )
 
-    suspend fun requestContactTagApproval(
+    suspend fun requestReversibleWriteApproval(
         payloadJson: String,
         providerCallId: String,
         sessionId: String,
@@ -736,7 +736,7 @@ internal class RoomRuntimeStore(private val database: AgentDatabase, private val
         ownerId: String,
         fencingEpoch: Long,
         nowEpochMs: Long,
-    ): Boolean = approvals.requestContactTagApproval(
+    ): Boolean = approvals.requestReversibleWriteApproval(
         payloadJson,
         providerCallId,
         sessionId,

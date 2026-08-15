@@ -53,11 +53,12 @@ class CrmMutationToolBindingTest {
     }
 
     @Test
-    fun `production catalog exposes thirty tools including CRM writes contact tag and identity resolution`() {
+    fun `production catalog exposes thirty one tools including reversible memory upsert`() {
         val catalog = RuntimeToolCatalog.production()
-        assertEquals(30, catalog.names().size)
+        assertEquals(31, catalog.names().size)
         assertTrue(catalog.names().containsAll(CrmMutationToolBinding.TOOL_NAMES))
         assertTrue(ContactTagToolBinding.TOOL_NAME in catalog.names())
+        assertTrue(MemoryUpsertToolBinding.TOOL_NAME in catalog.names())
     }
 
     @Test

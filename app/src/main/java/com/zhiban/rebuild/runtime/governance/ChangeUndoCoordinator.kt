@@ -4,6 +4,7 @@ import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.ScheduleEntity
 import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.context.FactIndex
+import com.zhiban.rebuild.runtime.memory.MemoryAtomicStore
 import com.zhiban.rebuild.runtime.runSuspendCatching
 import com.zhiban.rebuild.runtime.tool.sha256
 import kotlinx.serialization.json.Json
@@ -67,6 +68,8 @@ internal class ChangeUndoCoordinator(private val database: AgentDatabase) {
         AutoWriteToolNames.CONTACT_IDENTITY_AUTO_LINK -> undoAutomaticIdentityLink(change, nowEpochMs)
 
         AutoWriteToolNames.SCHEDULE_CREATE -> undoAutomaticSchedule(change)
+
+        AutoWriteToolNames.MEMORY_UPSERT -> undoAutomaticMemory(change)
 
         AutoWriteToolNames.CRM_LEAD_CANDIDATE -> undoCrmLeadCandidate(change)
 
@@ -155,6 +158,24 @@ internal class ChangeUndoCoordinator(private val database: AgentDatabase) {
         val current = database.scheduleDao().findById(change.targetId) ?: return false
         if (!changeDigestMatches(change.afterDigest, canonicalChangeDigest(current), current)) return false
         return database.scheduleDao().deleteById(change.targetId) == 1
+    }
+
+    private suspend fun undoAutomaticMemory(change: ChangeLogEntity): Boolean {
+        val inverse = parseInverse(change.inversePayloadJson) ?: return false
+        val namespaceId = inverse["namespaceId"]?.jsonPrimitive?.content ?: return false
+        val logicalMemoryId = inverse["logicalMemoryId"]?.jsonPrimitive?.content ?: return false
+        val memoryId = inverse["memoryId"]?.jsonPrimitive?.content ?: return false
+        val expectedVersion = inverse["expectedVersion"]?.jsonPrimitive?.content?.toLongOrNull() ?: return false
+        val previousVersion = inverse["previousVersion"]?.jsonPrimitive?.content?.toLongOrNull()
+        val expectedDigest = change.afterDigest ?: return false
+        return MemoryAtomicStore(database).undoReversible(
+            namespaceId,
+            logicalMemoryId,
+            memoryId,
+            expectedVersion,
+            expectedDigest,
+            previousVersion,
+        )
     }
 
     private suspend fun undoCrmLeadCandidate(change: ChangeLogEntity): Boolean {

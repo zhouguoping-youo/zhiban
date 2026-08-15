@@ -1063,6 +1063,7 @@ private fun autoWriteActionTitle(presentationType: String): String = when (prese
     "CONTACT_TAG" -> "补充了联系人标签"
     "CONTACT_IDENTITY_LINK" -> "合并了重复联系人"
     "SCHEDULE_CREATE" -> "创建了一条日程"
+    "MEMORY" -> "更新了一条长期记忆"
     "CRM_LEAD_CANDIDATE" -> "发现了一条候选线索"
     "CRM_ACTIVITY" -> "记录了一次客户互动"
     "CRM_NEXT_ACTION" -> "创建了下一步动作"

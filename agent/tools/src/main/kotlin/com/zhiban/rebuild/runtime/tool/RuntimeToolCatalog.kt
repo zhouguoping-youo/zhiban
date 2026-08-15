@@ -89,6 +89,13 @@ class RuntimeToolCatalog(val specs: Map<String, RuntimeToolSpec>) {
                     4,
                 ),
                 RuntimeToolSpec(
+                    "memory.upsert",
+                    1,
+                    RuntimeToolRisk.REVERSIBLE_AUTO_WRITE,
+                    """{"type":"function","function":{"name":"memory.upsert","description":"当用户明确表达稳定偏好或关于自己的稳定事实时，新增或更新一条长期记忆。改口时使用同一个 predicateKey 覆盖旧值。只处理低敏本地记忆；高置信时自动执行且可见可撤，否则转为确认。不要记录一次性任务、项目规则、手机号、邮箱、地址或账号。","parameters":{"type":"object","additionalProperties":false,"required":["content","memoryType","subjectKey","predicateKey","sensitivity","evidenceSummary","confidence","sourceRef"],"properties":{"content":{"type":"string","minLength":1,"maxLength":500},"memoryType":{"type":"string","enum":["PREFERENCE","FACT"]},"subjectKey":{"type":"string","enum":["user"]},"predicateKey":{"type":"string","pattern":"^[a-z][a-z0-9_.-]{1,63}$"},"sensitivity":{"type":"string","enum":["PUBLIC","PERSONAL"]},"evidenceSummary":{"type":"string","minLength":1,"maxLength":500},"confidence":{"type":"number","minimum":0,"maximum":1},"sourceRef":{"type":"string","minLength":1,"maxLength":500}}}}}""",
+                    4,
+                ),
+                RuntimeToolSpec(
                     "memory.search",
                     1,
                     RuntimeToolRisk.READ_ONLY,

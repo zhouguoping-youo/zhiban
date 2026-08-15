@@ -477,7 +477,7 @@ internal class RoomApprovalStore(
         )
     }
 
-    suspend fun requestContactTagApproval(
+    suspend fun requestReversibleWriteApproval(
         payloadJson: String,
         providerCallId: String,
         sessionId: String,
@@ -487,9 +487,9 @@ internal class RoomApprovalStore(
         fencingEpoch: Long,
         nowEpochMs: Long,
     ): Boolean = database.withTransaction {
-        require(payloadJson.toByteArray().size <= 16 * 1024) { "CONTACT_TAG_PLAN_TOO_LARGE" }
+        require(payloadJson.toByteArray().size <= 16 * 1024) { "REVERSIBLE_WRITE_PLAN_TOO_LARGE" }
         val tool = Json.parseToJsonElement(payloadJson).jsonObject["toolName"]?.jsonPrimitive?.content
-        require(tool == "contact.tag.add") { "CONTACT_TAG_PLAN_INVALID" }
+        require(tool in setOf("contact.tag.add", "memory.upsert")) { "REVERSIBLE_WRITE_PLAN_INVALID" }
         requestToolApprovalInTransaction(
             payloadJson,
             providerCallId,
