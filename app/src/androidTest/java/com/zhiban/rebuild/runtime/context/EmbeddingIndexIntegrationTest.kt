@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.ContactAgentDataRepository
+import com.zhiban.rebuild.data.contact.ContactEntity
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -27,6 +28,7 @@ class EmbeddingIndexIntegrationTest {
                 ApplicationProvider.getApplicationContext<Context>(),
                 AgentDatabase::class.java,
             )
+                .addCallback(AgentDatabase.CALLBACK)
                 .allowMainThreadQueries().build()
     }
 
@@ -126,6 +128,42 @@ class EmbeddingIndexIntegrationTest {
             .map { it.candidate.summary }
         assertTrue(summaries.any { it.contains("当前任职") && it.contains("现在的公司") })
         assertTrue(summaries.any { it.contains("过往任职") && it.contains("上一家公司") })
+    }
+
+    @Test fun naturalChineseQuestionRecallsContactByCompanyAndNote() = runBlocking {
+        database.contactDao().insert(
+            ContactEntity(
+                contactId = "contact-database-customer",
+                displayName = "张三",
+                normalizedName = "张三",
+                phone = null,
+                email = null,
+                wechatId = null,
+                company = "银河数据库科技有限公司",
+                title = "采购负责人",
+                aliasesJson = "[]",
+                tagsJson = "[\"客户\"]",
+                note = "负责数据库采购项目",
+                avatarUri = null,
+                source = "USER",
+                deletedAtEpochMs = null,
+                createdAtEpochMs = now,
+                updatedAtEpochMs = now,
+            ),
+        )
+        val pipeline = RoomContextRetrievalPipeline(database, clock = { now }, pathTimeoutMs = 5_000)
+
+        val result = pipeline.retrieve(
+            inputText = "做数据库的那家客户是谁",
+            queryContext = QueryContext(IntentLabel.CONTACT_QUERY, .9, emptyList(), null, emptyList()),
+            includeMemory = false,
+            allowRemoteVector = false,
+        )
+
+        assertTrue(
+            "items=${result.items}, degradation=${result.degradationPath}",
+            result.items.any { it.candidate.sourceRef == "contact-database-customer" },
+        )
     }
 
     @Test fun sensitiveFactsAreNeverOfferedToEmbeddingGatewayOrCountedAsPending() = runTest {

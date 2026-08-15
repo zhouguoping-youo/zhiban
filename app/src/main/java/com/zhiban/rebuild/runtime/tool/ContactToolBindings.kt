@@ -12,6 +12,7 @@ import com.zhiban.rebuild.data.contact.IdentityResolutionDecision
 import com.zhiban.rebuild.data.contact.OwnerContactLinkEntity
 import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
+import com.zhiban.rebuild.data.contact.searchNatural
 import com.zhiban.rebuild.relationship.RelationshipGroup
 import com.zhiban.rebuild.relationship.RelationshipTaxonomy
 import java.text.Normalizer
@@ -32,7 +33,7 @@ internal class ContactSearchToolBinding(override val spec: RuntimeToolSpec, priv
         val query = args["query"]?.jsonPrimitive?.content?.trim().orEmpty()
         require(query.isNotBlank() && query.length <= 100) { "INVALID_TOOL_ARGUMENTS" }
         val limit = (args["limit"]?.jsonPrimitive?.content?.toIntOrNull() ?: 20).coerceIn(1, 50)
-        val results = contacts.search(query, normalizeContactQuery(query), limit)
+        val results = contacts.searchNatural(query, limit)
         val safe = buildJsonObject {
             put("query", query)
             put("count", results.size)

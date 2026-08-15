@@ -5,6 +5,7 @@ import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.ScheduleProjection
 import com.zhiban.rebuild.data.contact.ContactSearchProjection
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
+import com.zhiban.rebuild.data.contact.searchNatural
 import com.zhiban.rebuild.data.notification.MessageCollectionPreferences
 import com.zhiban.rebuild.runtime.memory.RoomMemoryGate
 import kotlin.math.ceil
@@ -176,7 +177,7 @@ internal class RoomContextRetrievalPipeline(
             return emptyList()
         }
         if (query.isBlank()) return emptyList()
-        return database.contactDao().search(query, query.lowercase(), 20).map { contact ->
+        return database.contactDao().searchNatural(query, 20).map { contact ->
             RetrievalCandidate(
                 "contact:${contact.contactId}",
                 "contact",

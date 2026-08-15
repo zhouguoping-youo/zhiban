@@ -126,7 +126,11 @@ interface ContactDao {
                   WHERE m.sourceContactId = f.contactId AND m.undoneAtEpochMs IS NULL),
                  f.contactId
                )
-               FROM contact_search_fts f WHERE f.content MATCH :query
+               FROM (
+                 SELECT contactId FROM contact_search_fts WHERE content MATCH :query
+                 UNION
+                 SELECT contactId FROM contact_search_fts WHERE instr(lower(content), lower(:normalizedQuery)) > 0
+               ) f
              )
            ORDER BY CASE WHEN canonical.normalizedName = :normalizedQuery THEN 0 ELSE 1 END, canonical.updatedAtEpochMs DESC
            LIMIT :limit""",
