@@ -114,6 +114,7 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | 5.11 | 创建冲突检测误报 | ⚪ | — | 未复现：本地冲突条件为 existing.start < new.end 且 existing.end > new.start，相邻不重叠；Agent 写入在任何副作用前检查冲突 | — | `RoomScheduleToolExecutorTest.overlappingScheduleIsRejectedBeforeAnyAgentSideEffect`、`CalendarSearchToolBindingTest.conflict tool includes device calendar events` |
 | 5.12 | 时间已过(昨天)是否警告 | ✅ | 数据正确性 | 消息候选会拒绝过期时间，但手动保存和 Agent 最终执行只校验 epoch>0，昨天的误解析可无警告落库。两个最终写入口现统一拒绝超过 5 分钟容差的过去时间；确认延迟不误伤，失败无任何副作用 | 本提交 `fix(5.12)` | `AgentDataRepositoryTest.manualScheduleFromYesterdayIsRejectedWithoutWrite`、`RoomScheduleToolExecutorTest.confirmedScheduleFromThePastIsRejectedBeforeAnySideEffect` |
 | 5.13 | 系统日历同步重复事件实例去重 | ⚪ | — | 未复现：读取端和导入端均按 eventId+instanceStart 的 sourceId 去重；同一实例单批只创建一次，重复导入更新同一稳定 ID | — | `CalendarPersistenceEdgeTest.duplicateSystemCalendarInstancesInOneImportAreStoredOnce`、`AgentDataRepositoryTest.confirmedSystemCalendarImportIsIdempotent` |
+| 5.14 | 查询现有安排被误判为创建日程 | ✅ | 数据正确性 | 旧意图分类先按“安排”命中写入，再判断问句；“我明天下午3点有安排吗”因此进入创建确认。现先识别已有日程/空闲查询，并保留“可以帮我安排……吗”等礼貌创建语义 | 本提交 `fix(5.14)` | `EntityExtractionTest.futureTimeQuestionsAreNotCalendarCreate`（查询矩阵 + 礼貌创建反例） |
 
 ## 维度 7 · 设置链路
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |

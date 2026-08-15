@@ -172,6 +172,9 @@ class LocalEntityExtractor(private val zoneId: ZoneId = ZoneId.systemDefault()) 
         text.containsAny("联系方式", "联系人", "电话是多少", "查一下") && text.containsAny("谁", "电话", "联系", "查") ->
             IntentLabel.CONTACT_QUERY to CONTACT_QUERY_CONFIDENCE
 
+        isCalendarReadQuestion(text) ->
+            IntentLabel.CALENDAR_QUERY to CALENDAR_QUERY_CONFIDENCE
+
         text.containsAny("创建日程", "安排", "提醒我", "加到日历", "预约", "新建日程", "建个日程", "加个日程") ||
             text.lowercase().containsAny("create a calendar", "add to calendar", "remind me", "schedule a meeting") ->
             IntentLabel.CALENDAR_CREATE to CALENDAR_CREATE_CONFIDENCE
@@ -392,6 +395,17 @@ private val QUERY_INTENT = Regex("""什么|哪些|有没有|有木有|查一下|
  */
 private fun hasFutureScheduleSignal(text: String): Boolean =
     FUTURE_DAY.containsMatchIn(text) && CLOCK_PRESENT.containsMatchIn(text) && !QUERY_INTENT.containsMatchIn(text)
+
+private fun isCalendarReadQuestion(text: String): Boolean {
+    if (!QUERY_INTENT.containsMatchIn(text)) return false
+    val asksAboutExistingSchedule = listOf(
+        "有安排", "有日程", "有会议", "有什么安排", "有什么日程", "哪些安排", "哪些日程",
+        "几点有空", "什么时候有空", "有空", "空闲", "有事",
+    ).any(text::contains)
+    val explicitlyReadsCalendar = listOf("查看", "查一下", "列出").any(text::contains) &&
+        listOf("日程", "安排", "会议").any(text::contains)
+    return asksAboutExistingSchedule || explicitlyReadsCalendar
+}
 
 private fun chineseWeekday(value: String): DayOfWeek? = when (value) {
     "一" -> DayOfWeek.MONDAY

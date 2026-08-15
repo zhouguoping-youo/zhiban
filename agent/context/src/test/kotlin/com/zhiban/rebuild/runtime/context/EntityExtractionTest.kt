@@ -131,9 +131,12 @@ class EntityExtractionTest {
 
     // The same future-day + time shape must NOT be hijacked when the user is clearly asking a question.
     @Test fun futureTimeQuestionsAreNotCalendarCreate() {
-        // Query phrasing excludes the casual-create signal; without create keywords it stays GENERAL_WORK.
-        assertEquals(IntentLabel.GENERAL_WORK, extractor.extract("明晚8点我有事吗", "Work", now).intentLabel)
-        assertEquals(IntentLabel.GENERAL_WORK, extractor.extract("明天几点有空", "Work", now).intentLabel)
+        assertEquals(IntentLabel.CALENDAR_QUERY, extractor.extract("明晚8点我有事吗", "Work", now).intentLabel)
+        assertEquals(IntentLabel.CALENDAR_QUERY, extractor.extract("明天几点有空", "Work", now).intentLabel)
+        assertEquals(IntentLabel.CALENDAR_QUERY, extractor.extract("我明天下午3点有安排吗", "Work", now).intentLabel)
+        assertEquals(IntentLabel.CALENDAR_QUERY, extractor.extract("明天有什么日程", "Work", now).intentLabel)
+        // A polite creation request remains a write intent despite ending in a question particle.
+        assertEquals(IntentLabel.CALENDAR_CREATE, extractor.extract("可以帮我安排明天下午3点的会议吗", "Work", now).intentLabel)
         // Chat mode never widens into CALENDAR_CREATE via the casual signal.
         assertEquals(IntentLabel.GENERAL_CHAT, extractor.extract("明晚8点健身", "Chat", now).intentLabel)
     }
