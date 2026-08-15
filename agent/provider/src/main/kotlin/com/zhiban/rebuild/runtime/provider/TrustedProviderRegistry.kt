@@ -57,7 +57,7 @@ class TrustedProviderRegistry(private val endpoints: Map<String, TrustedProvider
 
         private fun contracts(models: List<String>, context: Int = 131_072, output: Int = 32_768, modalities: Set<String> = setOf("text", "image")) =
             models.associateWith {
-                TrustedModelContract(modalities, setOf("stream", "tools", "usage", "cancel", "rerank"), context, output)
+                TrustedModelContract(modalities, setOf("stream", "tools", "usage", "cancel", "rerank", "web_search"), context, output)
             }
 
         private fun defaults() = listOf(
@@ -69,13 +69,13 @@ class TrustedProviderRegistry(private val endpoints: Map<String, TrustedProvider
                 modelContracts = mapOf(
                     STEPFUN_TEXT_MODEL to TrustedModelContract(
                         modalities = setOf("text"),
-                        features = setOf("stream", "tools", "usage", "cancel", "rerank"),
+                        features = setOf("stream", "tools", "usage", "cancel", "rerank", "web_search"),
                         maxContextTokens = 256_000,
                         maxOutputTokens = 8_192,
                     ),
                     STEPFUN_VISION_MODEL to TrustedModelContract(
                         modalities = setOf("text", "image"),
-                        features = setOf("stream", "tools", "usage", "cancel"),
+                        features = setOf("stream", "tools", "usage", "cancel", "web_search"),
                         maxContextTokens = 64_000,
                         maxOutputTokens = 8_192,
                     ),

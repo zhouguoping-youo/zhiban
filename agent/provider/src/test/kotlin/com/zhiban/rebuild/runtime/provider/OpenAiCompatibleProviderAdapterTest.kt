@@ -5,6 +5,11 @@ import java.io.IOException
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.MediaType
@@ -113,14 +118,47 @@ class OpenAiCompatibleProviderAdapterTest {
         assertEquals("tool_calls", events.filterIsInstance<ModelEvent.Final>().single().finishReason)
     }
 
-    private fun adapter(body: ResponseBody): OpenAiCompatibleProviderAdapter = OpenAiCompatibleProviderAdapter(
-        FixedCallFactory(body),
+    @Test fun webSearchIsSentAsProviderToolAndSourcesDoNotBecomeRuntimeToolCalls() = runTest {
+        val body = listOf(
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"web-1","type":"web_search","function":{"name":"step_websearch","results":[{"url":"https://example.com/news#section","title":"可靠来源"},{"url":"javascript:alert(1)","title":"恶意来源"}]}}]}}]}""",
+            """data: {"choices":[{"delta":{"content":"这是最新结果"},"finish_reason":"stop"}]}""",
+            "data: [DONE]",
+        ).joinToString("\n\n", postfix = "\n")
+        val calls = FixedCallFactory(body.toResponseBody(SSE_TYPE))
+
+        val events = adapter(calls).stream(request("web", allowWebSearch = true)).toList()
+
+        val requestBody = calls.lastRequestBody()
+        val tools = (Json.parseToJsonElement(requestBody) as JsonObject)["tools"] as JsonArray
+        assertEquals("web_search", ((tools.single() as JsonObject)["type"] as JsonPrimitive).contentOrNull)
+        assertTrue(events.none { it is ModelEvent.ToolCall })
+        assertEquals(
+            "这是最新结果\n\n来源：\n- [可靠来源](https://example.com/news)",
+            events.filterIsInstance<ModelEvent.Delta>().joinToString("") { it.text },
+        )
+    }
+
+    @Test fun webSearchRequiresAnAdvertisedCapability() = runTest {
+        val failure = runSuspendCatching {
+            adapter("data: [DONE]\n".toResponseBody(SSE_TYPE))
+                .stream(request("unsupported-web", allowWebSearch = true, webSearchCapability = false))
+                .collect()
+        }.exceptionOrNull()
+
+        assertTrue(failure is IllegalStateException)
+        assertEquals("WEB_SEARCH_UNSUPPORTED", failure?.message)
+    }
+
+    private fun adapter(body: ResponseBody): OpenAiCompatibleProviderAdapter = adapter(FixedCallFactory(body))
+
+    private fun adapter(calls: Call.Factory): OpenAiCompatibleProviderAdapter = OpenAiCompatibleProviderAdapter(
+        calls,
         resolver,
         registry,
         clock = { 10L },
     )
 
-    private fun request(id: String) = ModelRequest(
+    private fun request(id: String, allowWebSearch: Boolean = false, webSearchCapability: Boolean = true) = ModelRequest(
         requestId = id,
         channel = OutboundChannel.LLM_INFERENCE,
         profile = profile,
@@ -136,20 +174,36 @@ class OpenAiCompatibleProviderAdapterTest {
         capability = CapabilitySnapshot(
             registry.digest(profile),
             setOf("text"),
-            setOf("stream", "tools"),
+            buildSet {
+                add("stream")
+                add("tools")
+                if (webSearchCapability) add("web_search")
+            },
             256_000,
             8_192,
             0,
             1_000,
         ),
         maxTokens = 10,
+        allowWebSearch = allowWebSearch,
     )
 
     private fun toolCallFrame(id: String): String =
         "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"$id\",\"function\":{\"name\":\"calendar.create\",\"arguments\":\"{\\\"title\\\":\\\"demo\\\"}\"}}]}}]}\n"
 
     private class FixedCallFactory(private val body: ResponseBody) : Call.Factory {
+        private var request: Request? = null
+
+        fun lastRequestBody(): String {
+            val buffer = Buffer()
+            checkNotNull(request).body?.writeTo(buffer)
+            return buffer.readUtf8()
+        }
+
         override fun newCall(request: Request): Call = object : Call {
+            init {
+                this@FixedCallFactory.request = request
+            }
             private var isExecuted = false
             private var isCancelled = false
 

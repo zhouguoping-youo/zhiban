@@ -40,6 +40,7 @@ class ProviderModuleTest {
         )
         assertTrue("image" in endpoint.modelContracts.getValue(TrustedProviderRegistry.STEPFUN_VISION_MODEL).modalities)
         assertTrue("stream" in endpoint.modelContracts.getValue(TrustedProviderRegistry.STEPFUN_TEXT_MODEL).features)
+        assertTrue("web_search" in endpoint.modelContracts.getValue(TrustedProviderRegistry.STEPFUN_TEXT_MODEL).features)
         assertEquals(1, registry.presets().size)
     }
 

@@ -820,6 +820,7 @@ internal class ProviderExecutionEngine(
             } else {
                 null
             },
+            allowWebSearch = forcedToolName == null && "web_search" in capability.features,
             attachments = input.attachments.map { attachment ->
                 com.zhiban.rebuild.runtime.provider.ModelAttachment(
                     attachment.attachmentId, attachment.kind, attachment.mimeType, attachment.byteLength,

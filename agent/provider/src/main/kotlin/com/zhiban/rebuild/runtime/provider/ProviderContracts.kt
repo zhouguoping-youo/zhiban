@@ -79,6 +79,8 @@ data class ModelRequest(
     val jsonSchema: String? = null,
     /** Provider-neutral OpenAI-compatible tool definitions. Null means plain chat. */
     val toolsJson: String? = null,
+    /** Allow the trusted provider's built-in public web search for the primary answer. */
+    val allowWebSearch: Boolean = false,
     val attachments: List<ModelAttachment> = emptyList(),
     /** Provider-facing function name to require for an explicit high-confidence write intent. */
     val forcedToolName: String? = null,

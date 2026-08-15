@@ -113,6 +113,7 @@ class OpenAiCompatibleProviderAdapter(
         }
         if (request.jsonSchema != null) check("json_schema" in request.capability.features) { "SCHEMA_UNSUPPORTED" }
         if (request.toolsJson != null) check("tools" in request.capability.features) { "TOOLS_UNSUPPORTED" }
+        if (request.allowWebSearch) check("web_search" in request.capability.features) { "WEB_SEARCH_UNSUPPORTED" }
     }
 
     private suspend fun createStreamingCall(request: ModelRequest, endpoint: TrustedProviderEndpoint): Call {
@@ -218,8 +219,8 @@ class OpenAiCompatibleProviderAdapter(
                 },
             )
         }
-        request.toolsJson?.let { tools ->
-            put("tools", json.parseToJsonElement(tools))
+        providerTools(json, request.toolsJson, request.allowWebSearch)?.let { tools ->
+            put("tools", tools)
             val forcedName = request.forcedToolName
             if (forcedName != null) {
                 put(
@@ -352,6 +353,7 @@ class OpenAiCompatibleProviderAdapter(
     private inner class StreamDecoder(private val requestId: String) {
         private val pendingTools = linkedMapOf<Int, PendingToolCall>()
         private val toolIdIndexes = mutableMapOf<String, Int>()
+        private val webSearchEvidence = WebSearchEvidenceCollector()
         private val reasoningFilter = ReasoningTagFilter()
         private var usageEmitted = false
         private var finalEmitted = false
@@ -447,7 +449,10 @@ class OpenAiCompatibleProviderAdapter(
 
         private fun accumulateTools(delta: JsonObject?) {
             val calls = delta?.get("tool_calls") as? JsonArray ?: return
-            calls.forEach { item -> accumulateTool(item as? JsonObject ?: return@forEach) }
+            calls.forEach { item ->
+                val tool = item as? JsonObject ?: return@forEach
+                if (!webSearchEvidence.accept(tool)) accumulateTool(tool)
+            }
         }
 
         private fun accumulateTool(item: JsonObject) {
@@ -502,6 +507,7 @@ class OpenAiCompatibleProviderAdapter(
             // Pending structured calls are authoritative even when StepFun reports "stop".
             pendingTools.toSortedMap().values.forEach { pending -> add(finalizeTool(pending)) }
             pendingTools.clear()
+            webSearchEvidence.takeMarkdown()?.let { add(ModelEvent.Delta(ordinal++, it)) }
             add(ModelEvent.Final(finishReason))
             finalEmitted = true
         }
