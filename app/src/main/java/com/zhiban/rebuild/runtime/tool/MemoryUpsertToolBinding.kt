@@ -257,7 +257,9 @@ internal class MemoryUpsertDomainWriter(private val database: AgentDatabase, pri
                     persisted.inversePayloadJson,
                     "RUNTIME_TOOL",
                     null,
-                    "USER_AUTHORED",
+                    // This is a model-initiated auto write, not something the user typed; label it
+                    // AGENT_AUTO (the CRM auto-write convention) rather than falsely USER_AUTHORED.
+                    "AGENT_AUTO",
                     plan.requiredText("sourceRef"),
                     plan.requiredText("confidence").toDouble(),
                     "MEMORY",

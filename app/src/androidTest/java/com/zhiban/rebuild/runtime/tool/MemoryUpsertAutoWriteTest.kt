@@ -50,7 +50,10 @@ class MemoryUpsertAutoWriteTest {
             database.memoryPersistenceDao().recall(RoomMemoryToolExecutor.GLOBAL_NAMESPACE, 100).map { it.canonicalText },
         )
         val change = database.changeLogDao().listByRun(route.runId).single()
-        assertNotNull(database.changeLogDao().findAutoWriteReceipt(change.changeId))
+        val receipt = database.changeLogDao().findAutoWriteReceipt(change.changeId)
+        assertNotNull(receipt)
+        // A model-initiated auto write must not be mislabeled as something the user authored.
+        assertEquals("AGENT_AUTO", receipt?.sourceType)
         assertTrue(result.safeResultJson.contains("undoAvailable"))
         assertTrue(AutoWriteRepository(database, context).undo(change.changeId, 101))
         assertTrue(database.memoryPersistenceDao().recall(RoomMemoryToolExecutor.GLOBAL_NAMESPACE, 102).isEmpty())
