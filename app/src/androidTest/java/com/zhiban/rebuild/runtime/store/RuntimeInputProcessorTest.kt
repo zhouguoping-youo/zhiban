@@ -2594,8 +2594,8 @@ class RuntimeInputProcessorTest {
         val feedbackContext = requests.last().messages.joinToString("\n") { it.content }
         assertTrue(feedbackContext.contains("需改进=1"))
         assertTrue(feedbackContext.contains("不授予任何权限"))
-        assertTrue(feedbackContext.contains("user: hello"))
-        assertTrue(feedbackContext.contains("assistant: 你好"))
+        assertTrue(requests.last().messages.any { it.role == "user" && it.content == "hello" })
+        assertTrue(requests.last().messages.any { it.role == "assistant" && it.content == "你好" })
         val turns = database.runtimeConversationTurnDao().recent("s-feedback", "r-feedback-2", 12)
         assertEquals(listOf("user", "assistant"), turns.map { it.role })
     }
@@ -3734,7 +3734,8 @@ class RuntimeInputProcessorTest {
         database.openHelper.writableDatabase.execSQL("UPDATE runtime_runs SET status='SUCCEEDED' WHERE runId='r1'")
 
         val processor = KernelCommandProcessor(database, "processor", { true }, { now++ })
-        assertTrue(runCatching { processor.processNext() }.isFailure)
+        assertEquals(KernelCommandProcessor.Outcome.FAILED, processor.processNext())
+        assertEquals("FAILED", database.runtimeCommandInboxDao().find("c1")?.status)
         assertEquals("recover me", database.runtimeInputStagingDao().find(staged.inputRef)?.rawText)
         assertFalse(database.runtimeEventDao().listAfter("s1", 0).any { it.eventType == "InputCommitted" })
     }
