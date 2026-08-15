@@ -92,6 +92,7 @@ import com.zhiban.rebuild.runtime.tool.ScheduleCreateToolCall
 import com.zhiban.rebuild.runtime.tool.SchedulePlanValidator
 import com.zhiban.rebuild.runtime.tool.ToolConfirmation
 import com.zhiban.rebuild.runtime.tool.ToolDisposition
+import com.zhiban.rebuild.runtime.tool.WebSearchToolBinding
 import com.zhiban.rebuild.runtime.tool.canonicalMemoryDigest
 import com.zhiban.rebuild.runtime.tool.canonicalMemoryIdempotencyKey
 import com.zhiban.rebuild.runtime.tool.canonicalScheduleDigest
@@ -179,6 +180,7 @@ internal data class ProviderEngineInfrastructure(
     val communicationHandoffLauncher: com.zhiban.rebuild.data.communication.CommunicationHandoffLauncher? = null,
     val externalCalendarConflicts: com.zhiban.rebuild.data.calendar.ExternalCalendarConflictSource? = null,
     val perception: PerceptionGateway? = null,
+    val webSearchGateway: com.zhiban.rebuild.runtime.provider.WebSearchGateway? = null,
 )
 
 internal class ProviderExecutionEngine(
@@ -214,6 +216,7 @@ internal class ProviderExecutionEngine(
     private val communicationHandoffLauncher = infrastructure.communicationHandoffLauncher
     private val externalCalendarConflicts = infrastructure.externalCalendarConflicts
     private val perception = infrastructure.perception
+    private val webSearchGateway = infrastructure.webSearchGateway
     private val store = RoomRuntimeStore(database, producerVersion = "runtime-v2-provider")
     private val events = RuntimeEventAppender(store, ownerId, clock)
     private val deterministicObservation = DeterministicObservationCompleter(store, ownerId, clock, ::perceiveForObservation)
@@ -236,6 +239,12 @@ internal class ProviderExecutionEngine(
     private val toolCatalog = RuntimeToolCatalog.production()
     private val capabilityRouter = CapabilityRouter(
         bindings = listOf(
+            webSearchGateway?.let {
+                WebSearchToolBinding(
+                    toolCatalog.requireRegistered(WebSearchToolBinding.TOOL_NAME),
+                    it,
+                )
+            },
             CalendarSearchToolBinding(
                 toolCatalog.requireRegistered("calendar.schedule.search"),
                 database.scheduleDao(),
@@ -796,15 +805,19 @@ internal class ProviderExecutionEngine(
         val attemptId = ready.attemptId
         val profile = ready.profile
         val allowedTools = toolAllowlist(activatedSkills)
-        val forcedCanonicalTool = if (
+        val forcedCanonicalTool = when {
             input.mode == "Work" &&
-            queryContext.intentLabel == com.zhiban.rebuild.runtime.context.IntentLabel.CALENDAR_CREATE &&
-            (allowedTools == null || "calendar.schedule.create" in allowedTools) &&
-            toolEnabled("calendar.schedule.create")
-        ) {
-            "calendar.schedule.create"
-        } else {
-            null
+                queryContext.intentLabel == com.zhiban.rebuild.runtime.context.IntentLabel.CALENDAR_CREATE &&
+                (allowedTools == null || "calendar.schedule.create" in allowedTools) &&
+                toolEnabled("calendar.schedule.create") -> "calendar.schedule.create"
+
+            input.mode == "Work" &&
+                shouldForceWebSearch(input.text) &&
+                WebSearchToolBinding.TOOL_NAME in capabilityRouter.canonicalNames() &&
+                (allowedTools == null || WebSearchToolBinding.TOOL_NAME in allowedTools) &&
+                toolEnabled(WebSearchToolBinding.TOOL_NAME) -> WebSearchToolBinding.TOOL_NAME
+
+            else -> null
         }
         val forcedToolName = forcedCanonicalTool?.let(capabilityRouter::providerName)
         val request = ModelRequest(

@@ -451,9 +451,33 @@ internal fun requiredReadToolCall(toolName: String, input: String, nowEpochMs: L
     )
 }
 
+internal fun shouldForceWebSearch(input: String): Boolean {
+    val normalized = input.trim().lowercase()
+    return EXPLICIT_WEB_SEARCH_PATTERNS.any(normalized::contains)
+}
+
 private val CONTACT_COUNT_PATTERNS = listOf("联系人数量", "联系人总数", "多少联系人", "多少位联系人", "统计联系人", "count my contact", "how many contact")
 private val CALENDAR_QUERY_PATTERNS = listOf("今天日程", "今日日程", "今天安排", "今日安排", "today's schedule", "today%27s schedule", "today schedule")
 private val CALENDAR_QUERY_TOOLS = setOf("calendar.search", "calendar.schedule.search")
+private val EXPLICIT_WEB_SEARCH_PATTERNS = listOf(
+    "联网搜索",
+    "联网查询",
+    "搜索互联网",
+    "搜索网络",
+    "网上查",
+    "上网查",
+    "查一下最新",
+    "最新新闻",
+    "实时天气",
+    "当前天气",
+    "今天的天气",
+    "search the web",
+    "search online",
+    "look up online",
+    "latest news",
+    "current weather",
+    "today's weather",
+)
 
 internal data class AssembledModelContext(val messages: List<ModelMessage>, val sources: List<String>)
 

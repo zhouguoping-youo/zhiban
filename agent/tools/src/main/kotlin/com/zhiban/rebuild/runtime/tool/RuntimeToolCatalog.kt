@@ -47,6 +47,13 @@ class RuntimeToolCatalog(val specs: Map<String, RuntimeToolSpec>) {
         fun production(): RuntimeToolCatalog = RuntimeToolCatalog(
             listOf(
                 RuntimeToolSpec(
+                    "web.search",
+                    1,
+                    RuntimeToolRisk.READ_ONLY,
+                    """{"type":"function","function":{"name":"web.search","description":"搜索互联网公开信息并返回可核验来源。用户明确要求联网、搜索网络、查询实时天气、最新新闻或当前公开资料时必须调用。不得在查询词中包含联系人、日历、记忆、消息里的私密信息、手机号、邮箱或账号。","parameters":{"type":"object","additionalProperties":false,"required":["query"],"properties":{"query":{"type":"string","minLength":2,"maxLength":500},"limit":{"type":"integer","minimum":1,"maximum":5}}}}}""",
+                    4,
+                ),
+                RuntimeToolSpec(
                     "calendar.schedule.search",
                     1,
                     RuntimeToolRisk.READ_ONLY,

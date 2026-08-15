@@ -233,6 +233,7 @@ object AgentDataModule {
         skillPackages: com.zhiban.rebuild.runtime.skills.SkillPackageManager,
         communicationHandoffLauncher: com.zhiban.rebuild.data.communication.CommunicationHandoffLauncher,
         systemCalendarReader: com.zhiban.rebuild.data.calendar.SystemCalendarReader,
+        webSearchGateway: com.zhiban.rebuild.runtime.provider.WebSearchGateway,
     ): KernelCommandProcessor = KernelCommandProcessor(
         database,
         ownerId = "app-process",
@@ -288,6 +289,7 @@ object AgentDataModule {
             messageCollectionPreferences = collectionPreferences,
             communicationHandoffLauncher = communicationHandoffLauncher,
             externalCalendarConflicts = systemCalendarReader,
+            webSearchGateway = webSearchGateway,
         ),
     )
 

@@ -28,6 +28,8 @@ import com.zhiban.rebuild.runtime.provider.ProviderConfigurationManager
 import com.zhiban.rebuild.runtime.provider.ProviderEnvironmentManager
 import com.zhiban.rebuild.runtime.provider.ProviderProfileStore
 import com.zhiban.rebuild.runtime.provider.ResilientProviderAdapter
+import com.zhiban.rebuild.runtime.provider.StepFunWebSearchGateway
+import com.zhiban.rebuild.runtime.provider.WebSearchGateway
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -93,6 +95,19 @@ object ProviderModule {
         configuration,
         adapter,
         healthCache = AndroidProviderHealthCache(context),
+    )
+
+    @Provides @Singleton
+    internal fun provideWebSearchGateway(
+        environment: ProviderEnvironmentManager,
+        credentials: CredentialResolver,
+        client: OkHttpClient,
+        outboundGate: OutboundExportGate,
+    ): WebSearchGateway = StepFunWebSearchGateway(
+        environment,
+        credentials,
+        client,
+        outboundGate,
     )
 
     @Provides @Singleton

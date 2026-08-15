@@ -49,8 +49,8 @@ internal class WebSearchEvidenceCollector {
         results.forEach { result ->
             if (sourcesByUrl.size >= MAX_WEB_SOURCES) return@forEach
             val source = result as? JsonObject ?: return@forEach
-            val url = safeUrl((source["url"] as? JsonPrimitive)?.contentOrNull) ?: return@forEach
-            val title = safeTitle((source["title"] as? JsonPrimitive)?.contentOrNull, url)
+            val url = sanitizeWebSourceUrl((source["url"] as? JsonPrimitive)?.contentOrNull) ?: return@forEach
+            val title = sanitizeWebSourceTitle((source["title"] as? JsonPrimitive)?.contentOrNull, url)
             sourcesByUrl.putIfAbsent(url, title)
         }
         return true
@@ -64,28 +64,29 @@ internal class WebSearchEvidenceCollector {
         ) { (url, title) -> "- [$title]($url)" }.also { sourcesByUrl.clear() }
     }
 
-    private fun safeUrl(raw: String?): String? {
-        if (raw == null || raw.length > MAX_WEB_SOURCE_URL_LENGTH) return null
-        val parsed = raw.toHttpUrlOrNull() ?: return null
-        if (parsed.scheme !in setOf("http", "https")) return null
-        if (parsed.username.isNotEmpty() || parsed.password.isNotEmpty()) return null
-        return parsed.newBuilder().fragment(null).build().toString()
-    }
-
-    private fun safeTitle(raw: String?, fallbackUrl: String): String {
-        val normalized = raw.orEmpty()
-            .replace(Regex("[\\r\\n\\t]+"), " ")
-            .replace("[", "")
-            .replace("]", "")
-            .trim()
-            .take(MAX_WEB_SOURCE_TITLE_LENGTH)
-        return normalized.ifBlank { fallbackUrl.toHttpUrlOrNull()?.host ?: "网页来源" }
-    }
-
     private companion object {
         const val WEB_SEARCH_TYPE = "web_search"
         const val MAX_WEB_SOURCES = 5
-        const val MAX_WEB_SOURCE_URL_LENGTH = 2_048
-        const val MAX_WEB_SOURCE_TITLE_LENGTH = 120
     }
 }
+
+internal fun sanitizeWebSourceUrl(raw: String?): String? {
+    if (raw == null || raw.length > MAX_WEB_SOURCE_URL_LENGTH) return null
+    val parsed = raw.toHttpUrlOrNull() ?: return null
+    if (parsed.scheme !in setOf("http", "https")) return null
+    if (parsed.username.isNotEmpty() || parsed.password.isNotEmpty()) return null
+    return parsed.newBuilder().fragment(null).build().toString()
+}
+
+internal fun sanitizeWebSourceTitle(raw: String?, fallbackUrl: String): String {
+    val normalized = raw.orEmpty()
+        .replace(Regex("[\\r\\n\\t]+"), " ")
+        .replace("[", "")
+        .replace("]", "")
+        .trim()
+        .take(MAX_WEB_SOURCE_TITLE_LENGTH)
+    return normalized.ifBlank { fallbackUrl.toHttpUrlOrNull()?.host ?: "网页来源" }
+}
+
+private const val MAX_WEB_SOURCE_URL_LENGTH = 2_048
+private const val MAX_WEB_SOURCE_TITLE_LENGTH = 120

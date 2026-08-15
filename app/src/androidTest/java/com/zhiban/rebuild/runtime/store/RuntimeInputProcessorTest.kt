@@ -2771,6 +2771,67 @@ class RuntimeInputProcessorTest {
         )
     }
 
+    @Test fun explicitWebRequestUsesGovernedSearchAndReturnsSources() = runBlocking {
+        val input = RoomTextInputGateway(database, { true }, { now }).stage(
+            """{"schemaVersion":1,"text":"Search the web for current Beijing weather","mode":"Work","model":"M2.7","level":"高"}""",
+        )
+        RoomRuntimeGateways(database, "test") { now++ }.accept(
+            RuntimeUiCommand.Start("s-web", input.inputRef, "c-web", "a-web", 0, "chat", "r-web"),
+        )
+        val requestedQueries = mutableListOf<String>()
+        val observedRequests = mutableListOf<ModelRequest>()
+        val webGateway = com.zhiban.rebuild.runtime.provider.WebSearchGateway { query, _ ->
+            requestedQueries += query
+            listOf(
+                com.zhiban.rebuild.runtime.provider.WebSearchHit(
+                    "Official weather",
+                    "https://example.com/weather",
+                    "Sunny, 28 C",
+                ),
+            )
+        }
+        val provider = object : ProviderAdapter {
+            override suspend fun probe(profile: ProviderProfile) = capability(profile)
+            override fun stream(request: ModelRequest): kotlinx.coroutines.flow.Flow<ModelEvent> {
+                observedRequests += request
+                return if (request.messages.any { it.content.contains("\"tool\":\"web.search\"") }) {
+                    flowOf(ModelEvent.Delta(0, "Beijing is sunny. Source: example.com"), ModelEvent.Final("stop"))
+                } else {
+                    assertEquals("web_search", request.forcedToolName)
+                    flowOf(
+                        ModelEvent.ToolCall(
+                            0,
+                            "call-web",
+                            "web_search",
+                            """{"query":"current Beijing weather","limit":5}""",
+                        ),
+                        ModelEvent.Final("tool_calls"),
+                    )
+                }
+            }
+            override fun cancel(requestId: String) = true
+        }
+        val processor = KernelCommandProcessor(
+            database,
+            "processor",
+            { true },
+            { now++ },
+            provider = provider,
+            profiles = fixedProfileStore(),
+            infrastructure = com.zhiban.rebuild.runtime.kernel.ProviderEngineInfrastructure(
+                webSearchGateway = webGateway,
+            ),
+        )
+
+        processor.processNext()
+        awaitRunStatus("r-web", "SUCCEEDED")
+
+        assertEquals(listOf("current Beijing weather"), requestedQueries)
+        assertEquals(listOf("web.search"), database.runtimeToolExecutionDao().listByRunId("r-web").map { it.toolName })
+        assertTrue(observedRequests.last().messages.any { it.content.contains("https://example.com/weather") })
+        assertEquals(1, database.planDao().nodesForDefinition("runtime-plan-r-web").size)
+    }
+
     @Test fun hangingProbeIsCancelledByCancelCommand() = runBlocking {
         val probeCancelled = AtomicBoolean(false)
         val staged = RoomTextInputGateway(database, { true }, { now }).stage("probe cancel")
