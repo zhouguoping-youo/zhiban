@@ -299,6 +299,7 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | 16.17 | 审批与旧 Job 收尾竞态 | ✅ | 功能不可用 | 审批命令已完成但旧推理 Job 尚未退出时，新执行 Job 原先注册失败且返回值被忽略，run 会停在 `EXECUTING`。现同一 run 的后续阶段等待旧 Job 真正退出后再注册启动；命令仅在执行已启动时报告 `PROCESSED` | `b89425d` | `RuntimeInputProcessorTest.approvalWaitsForPreviousRunJobToExitBeforeLaunchingExecution`（人为阻塞旧 Job 收尾） |
 | 16.18 | 审批后的外部调用在途时保持租约 | ✅ | 数据一致性 | 已确认工具执行未运行租约心跳，超过命令阶段的 30 秒租约后可被恢复 owner 接管，旧外部调用仍在继续，形成重复副作用窗口。现执行前校验 owner+epoch 并在整个审批工具执行期间按同一 fencing epoch 续租，恢复扫描不能偷走在途调用 | 本提交 `fix(16.18)` | `RuntimeInputProcessorTest.approvedRemoteToolRenewsLeaseUntilExternalCallCompletes`（SM-W7023：外部调用跨越短租约后第二 owner 仍无法 claim） |
 | 16.19 | 崩溃恢复不重复外部副作用 | ✅ | 数据一致性 | 原实现先调用远程 MCP/拉起消息 App，之后才写幂等记录；进程若在两步之间退出，恢复会再次执行真实副作用。现外部调用前原子写入 `IN_PROGRESS` 预留，成功后同事务完成记录；恢复发现结果未知时以固定错误终结且绝不盲目重放。明确发生在启动前的本地失败会释放预留，允许用户重试 | 本提交 `fix(16.19)` | `RuntimeInputProcessorTest.recoveredRemoteToolDoesNotRepeatAnUnresolvedExternalSideEffect`（SM-W7023：模拟预留后崩溃并换 owner 恢复，MCP 调用次数保持 0，run 明确终结） |
+| 16.20 | 异常命令进入死信而非永久重放 | ✅ | 功能不可用 | 已 claim 的命令若在解析/状态处理时抛出意外异常，runner 只返回 `FAILED`，命令仍为 `CLAIMED` 并在每次租约到期后重复失败。现保留取消语义，其余逃逸异常在同一租约下以固定脱敏原因终结命令；`Start` 命令同时把尚未启动的 run 原子转为 `FAILED_FINAL` | 本提交 `fix(16.20)` | `RuntimeInputProcessorTest.malformedClaimedCommandIsDeadLetteredInsteadOfRetriedForever`（SM-W7023：损坏已接收命令后只处理一次，命令 `FAILED`、run `FAILED_FINAL`，队列随后空闲） |
 
 ## 维度 17 · 检索与上下文
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |

@@ -46,10 +46,53 @@ import kotlinx.serialization.json.put
 internal class RoomCommandStore(
     private val database: AgentDatabase,
     private val producerVersion: String,
+    private val requireActiveLease: suspend (String, String, Long, Long) -> Unit,
     private val allocateSequence: suspend (String, Long) -> Long,
     private val currentRevision: suspend (String) -> Long,
     private val appendEventInTransaction: suspend (RuntimeEventDraft, Long) -> RuntimeEventEntity,
 ) {
+    suspend fun containClaimedCommandFailure(commandId: String, ownerId: String, fencingEpoch: Long, nowEpochMs: Long): Boolean = database.withTransaction {
+        val command = database.runtimeCommandInboxDao().find(commandId) ?: return@withTransaction false
+        requireActiveLease(command.sessionId, ownerId, fencingEpoch, nowEpochMs)
+        if (command.status != RuntimeCommandStatus.CLAIMED.name) return@withTransaction false
+        if (command.commandType == "Start") {
+            val run = command.runId?.let { database.runtimeRunDao().find(it) }
+            if (run?.status == RuntimeRunStatus.RECEIVED.name) {
+                val event = appendEventInTransaction(
+                    RuntimeEventDraft(
+                        "event-command-failed-$commandId",
+                        "RunFailedFinal",
+                        command.sessionId,
+                        run.runId,
+                        null,
+                        commandId,
+                        run.runId,
+                        "{\"errorCode\":\"COMMAND_PROCESSING_FAILED\"}",
+                        nowEpochMs,
+                    ),
+                    fencingEpoch,
+                )
+                check(
+                    database.runtimeRunDao().transition(
+                        run.runId,
+                        RuntimeRunStatus.RECEIVED.name,
+                        RuntimeRunStatus.FAILED_FINAL.name,
+                        event.sequence,
+                        nowEpochMs,
+                    ) == 1,
+                )
+            }
+        }
+        check(
+            database.runtimeCommandInboxDao().fail(
+                commandId,
+                "{\"errorCode\":\"COMMAND_PROCESSING_FAILED\"}",
+                nowEpochMs,
+            ) == 1,
+        )
+        true
+    }
+
     suspend fun consumeRunInput(runId: String): Boolean = database.withTransaction {
         database.runtimeRunInputDao().deleteByRunId(runId) == 1
     }

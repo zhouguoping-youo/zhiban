@@ -778,9 +778,10 @@ internal class RoomRuntimeStore(private val database: AgentDatabase, private val
     suspend fun saveAssistantTurn(sessionId: String, runId: String, content: String, nowEpochMs: Long) =
         approvals.saveAssistantTurn(sessionId, runId, content, nowEpochMs)
 
-    private val commands = RoomCommandStore(
+    internal val commands = RoomCommandStore(
         database = database,
         producerVersion = producerVersion,
+        requireActiveLease = ::requireActiveLease,
         allocateSequence = ::allocateSequence,
         currentRevision = ::currentRevision,
         appendEventInTransaction = ::appendEventInTransaction,

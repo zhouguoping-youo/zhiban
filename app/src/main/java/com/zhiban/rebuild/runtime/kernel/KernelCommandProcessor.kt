@@ -5,6 +5,8 @@ import com.zhiban.rebuild.runtime.provider.ProviderAdapter
 import com.zhiban.rebuild.runtime.provider.ProviderProfileStore
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
 import com.zhiban.rebuild.runtime.store.RuntimeCommandInboxEntity
+import com.zhiban.rebuild.runtime.store.containClaimedCommandFailure
+import kotlinx.coroutines.CancellationException
 
 private const val SESSION_LEASE_MS = 30_000L
 
@@ -44,7 +46,15 @@ internal class KernelCommandProcessor(
             ?: return if (providerEngine?.recoverNext() == true) Outcome.PROCESSED else Outcome.IDLE
         val lease = store.claimSession(command.sessionId, ownerId, now, SESSION_LEASE_MS)
         if (!store.claimCommand(command.commandId, ownerId, lease.leaseEpoch, now)) return Outcome.IDLE
-        if (!store.processClaimedCommand(command.commandId, ownerId, lease.leaseEpoch, clock())) return Outcome.FAILED
+        val processed = try {
+            store.processClaimedCommand(command.commandId, ownerId, lease.leaseEpoch, clock())
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Throwable) {
+            store.containClaimedCommandFailure(command.commandId, ownerId, lease.leaseEpoch, clock())
+            return Outcome.FAILED
+        }
+        if (!processed) return Outcome.FAILED
         return if (dispatchRuntimeWork(command, lease.leaseEpoch)) Outcome.PROCESSED else Outcome.FAILED
     }
 

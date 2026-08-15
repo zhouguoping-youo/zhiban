@@ -3357,6 +3357,38 @@ class RuntimeInputProcessorTest {
         )
     }
 
+    @Test fun malformedClaimedCommandIsDeadLetteredInsteadOfRetriedForever() = runBlocking {
+        val staged = RoomTextInputGateway(database, { true }, { now }).stage("poison command")
+        RoomRuntimeGateways(database, "test") { now++ }
+            .accept(
+                RuntimeUiCommand.Start(
+                    "s-poison-command",
+                    staged.inputRef,
+                    "c-poison-command",
+                    "a-poison-command",
+                    0,
+                    "chat",
+                    "r-poison-command",
+                ),
+            )
+        database.openHelper.writableDatabase.execSQL(
+            "UPDATE runtime_command_inbox SET payloadJson = ? WHERE commandId = ?",
+            arrayOf<Any>("{", "c-poison-command"),
+        )
+        val processor = KernelCommandProcessor(database, "processor", { true }, { now++ })
+
+        assertEquals(KernelCommandProcessor.Outcome.FAILED, processor.processNext())
+        assertEquals("FAILED", database.runtimeCommandInboxDao().find("c-poison-command")?.status)
+        assertTrue(
+            database.runtimeCommandInboxDao().find("c-poison-command")
+                ?.resultJson
+                .orEmpty()
+                .contains("COMMAND_PROCESSING_FAILED"),
+        )
+        assertEquals("FAILED_FINAL", database.runtimeRunDao().find("r-poison-command")?.status)
+        assertEquals(KernelCommandProcessor.Outcome.IDLE, processor.processNext())
+    }
+
     @Test fun resumeCommandImmediatelyRelaunchesInterruptedInference() = runBlocking {
         val staged = RoomTextInputGateway(database, { true }, { now }).stage("resume interrupted inference")
         val gateway = RoomRuntimeGateways(database, "test") { now++ }
