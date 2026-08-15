@@ -162,6 +162,14 @@ class EntityExtractionTest {
         )
     }
 
+    @Test fun mixedWeekdayReferencesUseTheMatchedWeekPrefix() {
+        val result = extractor.extract("下周三前把下下周五的方案准备好", "Work", now)
+        val expected = LocalDateTime.of(2026, 7, 29, 0, 0).atZone(zone).toInstant().toEpochMilli()
+
+        assertEquals("下周三", result.timeRange?.expression)
+        assertEquals(expected, result.timeRange?.startEpochMs)
+    }
+
     @Test fun resolvesThisWeekAndBareWeekdayToUpcomingLocalDay() {
         val thisWeek = extractor.extract("本周三上午10点开会", "Work", now)
         assertEquals(

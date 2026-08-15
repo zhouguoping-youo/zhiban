@@ -214,15 +214,16 @@ class LocalEntityExtractor(private val zoneId: ZoneId = ZoneId.systemDefault()) 
         // deterministic calendar path can validate them instead of trusting provider relative-date math.
         val match = WEEKDAY.find(text) ?: return null
         val target = chineseWeekday(match.groupValues[1]) ?: return null
+        val matchedExpression = match.value.replace(" ", "")
         val currentMonday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
         val resolvedDay = when {
-            text.contains("下下周") || text.contains("下下星期") ->
+            matchedExpression.startsWith("下下周") || matchedExpression.startsWith("下下星期") ->
                 currentMonday.plusWeeks(2).plusDays((target.value - 1).toLong())
 
-            text.contains("下周") || text.contains("下星期") ->
+            matchedExpression.startsWith("下周") || matchedExpression.startsWith("下星期") ->
                 currentMonday.plusWeeks(1).plusDays((target.value - 1).toLong())
 
-            text.contains("本周") || text.contains("这周") ->
+            matchedExpression.startsWith("本周") || matchedExpression.startsWith("这周") ->
                 currentMonday.plusDays((target.value - 1).toLong())
 
             else -> today.with(TemporalAdjusters.nextOrSame(target))
