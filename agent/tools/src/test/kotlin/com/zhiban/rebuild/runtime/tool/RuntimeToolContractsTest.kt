@@ -191,6 +191,7 @@ class RuntimeToolContractsTest {
     fun `schedule plan validator accepts with and without optional fields`() {
         SchedulePlanValidator.validate(schedulePlan(note = null, reminder = null))
         SchedulePlanValidator.validate(schedulePlan(note = "提醒", reminder = 60))
+        SchedulePlanValidator.validate(schedulePlan(note = "自定义提醒", reminder = 15))
     }
 
     @Test
@@ -215,7 +216,10 @@ class RuntimeToolContractsTest {
             scheduleCall().copy(durationMinutes = 0)
         }
         assertThrows(IllegalArgumentException::class.java) {
-            scheduleCall().copy(reminderMinutesBefore = 5)
+            scheduleCall().copy(reminderMinutesBefore = 0)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            scheduleCall().copy(reminderMinutesBefore = 1_441)
         }
         assertThrows(IllegalArgumentException::class.java) {
             scheduleCall().copy(title = "x".repeat(201))

@@ -231,7 +231,7 @@ internal fun deterministicCalendarToolCall(input: DecodedInput, queryContext: Qu
     val reminder = ENGLISH_REMINDER.find(input.text)?.groupValues?.get(1)?.toIntOrNull()
         ?: CHINESE_REMINDER.find(input.text)?.groupValues?.get(1)?.toIntOrNull()
         ?: if (input.text.contains("提醒") || input.text.contains("remind", ignoreCase = true)) 10 else null
-    val safeReminder = reminder?.takeIf { it in setOf(10, 30, 60, 1_440) }
+    val safeReminder = reminder?.takeIf { it in 1..1_440 }
     val arguments = buildJsonObject {
         put("title", normalizedTitle)
         put("startAtEpochMs", startAt)

@@ -117,6 +117,7 @@ CRM 强制联系人、message.compose 弹选择器、覆盖安装丢 key、记�
 | 5.14 | 查询现有安排被误判为创建日程 | ✅ | 数据正确性 | 旧意图分类先按“安排”命中写入，再判断问句；“我明天下午3点有安排吗”因此进入创建确认。现先识别已有日程/空闲查询，并保留“可以帮我安排……吗”等礼貌创建语义 | 本提交 `fix(5.14)` | `EntityExtractionTest.futureTimeQuestionsAreNotCalendarCreate`（查询矩阵 + 礼貌创建反例） |
 | 5.15 | “今晚/明晚12点”落成中午 | ✅ | 数据正确性 | 夜间 12 点旧逻辑既未转为 00:00，也未跨到下一自然日；“今晚12点”因此落成当天 12:00。现仅对晚/夜 12 点执行跨日，凌晨 12 点和中午 12 点保持各自语义 | 本提交 `fix(5.15)` | `EntityExtractionTest.resolvesNightTwelveToTheFollowingMidnight`（今晚、明晚、明天凌晨矩阵） |
 | 5.16 | “下下周”被提前一周 | ✅ | 数据正确性 | 星期正则只认识“下周/下星期”，会从“下下周三”第二个“下”开始匹配并错误解析为下一周。现最长词优先识别下下周/下下星期并按当前周一顺延两周 | 本提交 `fix(5.16)` | `EntityExtractionTest.resolvesWeekAfterNextWithoutCollapsingItToNextWeek`（周/星期同义词矩阵） |
+| 5.17 | 自定义提前分钟数被静默删除 | ✅ | 数据正确性 | 本地解析能读到“提前15分钟”，但确定性调用、工具 schema、领域校验只接受 10/30/60/1440，导致明确提醒要求无提示消失。现创建链统一接受 1–1440 分钟并原样持久化 | 本提交 `fix(5.17)` | `CalendarTimeResolutionTest.deterministicCalendarCallKeepsAnExplicitCustomReminderOffset` + `RuntimeToolContractsTest.schedule plan validator accepts with and without optional fields` + `CalendarPersistenceEdgeTest.explicitCustomReminderOffsetIsPersisted`（SM-W7023） |
 
 ## 维度 7 · 设置链路
 | ID | 检查点 | 状态 | 严重度 | 根因/说明 | commit | 测试 |

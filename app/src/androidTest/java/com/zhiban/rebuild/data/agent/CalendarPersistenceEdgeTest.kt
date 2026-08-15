@@ -40,6 +40,13 @@ class CalendarPersistenceEdgeTest {
         assertEquals("备注 ✅", calendar.findSchedule(id)?.note)
     }
 
+    @Test fun explicitCustomReminderOffsetIsPersisted() = runBlocking {
+        val start = System.currentTimeMillis() + 60 * 60_000L
+        val id = calendar.saveUserSchedule(null, "十五分钟后提醒", start, 30, null, 15)
+
+        assertEquals(15, calendar.findSchedule(id)?.reminderMinutesBefore)
+    }
+
     @Test fun deletingScheduleNullsCrmActionReferenceButPreservesAction() = runBlocking {
         val scheduleId = calendar.saveUserSchedule(null, "跟进提醒", 1_000_000L, 30, null, null, nowEpochMs = 1L)
         db.crmDao().insertOpportunity(opportunity())

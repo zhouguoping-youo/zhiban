@@ -157,6 +157,15 @@ class CalendarTimeResolutionTest {
         assertEquals(10, toolCall.intArgument("reminderMinutesBefore"))
     }
 
+    @Test fun deterministicCalendarCallKeepsAnExplicitCustomReminderOffset() {
+        val text = "明天晚上8点复盘，提前15分钟提醒我"
+        val queryContext = extractor.extract(text, "Work", now)
+
+        val toolCall = requireNotNull(deterministicCalendarToolCall(DecodedInput(text, "Work"), queryContext, now))
+
+        assertEquals(15, toolCall.intArgument("reminderMinutesBefore"))
+    }
+
     @Test fun exactConflictQuestionBuildsAReadOnlyCheckForTomorrowAt10pm() {
         val reportedNow = LocalDateTime.of(2026, 8, 14, 8, 0).atZone(zone).toInstant().toEpochMilli()
         val text = "明天有晚上10点的会议冲突吗"

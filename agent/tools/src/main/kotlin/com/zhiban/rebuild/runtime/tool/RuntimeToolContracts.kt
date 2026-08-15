@@ -37,7 +37,7 @@ data class ScheduleCreateToolCall(
         require(startAtEpochMs > 0)
         require(durationMinutes in 1..1440)
         require(note == null || note.length <= 2_000)
-        require(reminderMinutesBefore == null || reminderMinutesBefore in setOf(10, 30, 60, 1_440))
+        require(reminderMinutesBefore == null || reminderMinutesBefore in 1..1_440)
         require(crmActionId == null || (crmActionId.isNotBlank() && crmActionId.length <= 128))
     }
 }
