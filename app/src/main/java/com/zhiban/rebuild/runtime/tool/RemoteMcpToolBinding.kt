@@ -37,6 +37,8 @@ internal class RemoteMcpToolBinding(private val remote: McpRemoteTool, private v
             )
         }.toString(),
         maxCallsPerRun = 4,
+        // MCP results come from a third-party server, so they are untrusted external content.
+        returnsExternalContent = true,
     )
 
     override suspend fun requestApproval(request: RuntimeToolCallRequest, context: RuntimeToolRouteContext): Boolean {

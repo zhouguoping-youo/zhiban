@@ -144,6 +144,39 @@ class CapabilityRouterTest {
         )
     }
 
+    @Test fun silentAutoWriteIsDowngradedToConfirmationAfterExternalContent() = runTest {
+        val auto = spec.copy(name = "contact.tag.add", risk = RuntimeToolRisk.REVERSIBLE_AUTO_WRITE)
+        val externalRead = spec.copy(name = "web.search", risk = RuntimeToolRisk.READ_ONLY, returnsExternalContent = true)
+        val router = CapabilityRouter(
+            listOf(FakeAutoBinding(auto, ReversibleWriteReadiness(true, true, true)), FakeBinding(externalRead)),
+            proposalCount = { _, _ -> 0 },
+            completedToolNames = { setOf("web.search") },
+            policy = CapabilityPolicy(autoUndoTools = setOf(auto.name), autoPresentationTools = setOf(auto.name)),
+        )
+
+        val disposition = router.disposition(RuntimeToolCallRequest("auto-1", auto.name, "{}"), routeContext())
+
+        assertEquals(
+            ToolDisposition.ConfirmationRequired(false, "auto_write:untrusted_provenance"),
+            disposition,
+        )
+    }
+
+    @Test fun autoWriteStaysSilentWhenRunConsumedOnlyLocalData() = runTest {
+        val auto = spec.copy(name = "contact.tag.add", risk = RuntimeToolRisk.REVERSIBLE_AUTO_WRITE)
+        val externalRead = spec.copy(name = "web.search", risk = RuntimeToolRisk.READ_ONLY, returnsExternalContent = true)
+        val router = CapabilityRouter(
+            listOf(FakeAutoBinding(auto, ReversibleWriteReadiness(true, true, true)), FakeBinding(externalRead)),
+            proposalCount = { _, _ -> 0 },
+            completedToolNames = { setOf("contact.search") },
+            policy = CapabilityPolicy(autoUndoTools = setOf(auto.name), autoPresentationTools = setOf(auto.name)),
+        )
+
+        val disposition = router.disposition(RuntimeToolCallRequest("auto-1", auto.name, "{}"), routeContext())
+
+        assertEquals(ToolDisposition.ReversibleAutoWrite, disposition)
+    }
+
     @Test fun approvedExecutionReturnsOnlySafeBindingResult() = runTest {
         val binding = FakeBinding(spec)
         val router = CapabilityRouter(listOf(binding), proposalCount = { _, _ -> 0 })

@@ -61,6 +61,7 @@ internal class CapabilityRouter(
     bindings: List<RuntimeToolBinding>,
     private val proposalCount: suspend (runId: String, canonicalName: String) -> Int,
     private val totalCallCount: suspend (runId: String) -> Int = { 0 },
+    private val completedToolNames: suspend (runId: String) -> Set<String> = { emptySet() },
     private val timeoutMs: Long = 30_000L,
     private val policy: CapabilityPolicy = CapabilityPolicy(),
     private val dynamicBindings: () -> List<RuntimeToolBinding> = { emptyList() },
@@ -240,11 +241,30 @@ internal class CapabilityRouter(
         if (binding.spec.risk != RuntimeToolRisk.REVERSIBLE_AUTO_WRITE) return ReversibleWriteReadiness.Unavailable
         val reversible = binding as? ReversibleAutoWriteBinding ?: return ReversibleWriteReadiness.Unavailable
         val declared = reversible.reversibleWriteReadiness(request, context)
-        return declared.copy(
-            inverseSupported = declared.inverseSupported && binding.spec.name in policy.autoUndoTools,
-            visibleUndoSupported = declared.visibleUndoSupported && binding.spec.name in policy.autoPresentationTools,
+        // Provenance gate: readiness rests only on model-self-reported fields, so it cannot be
+        // trusted when this run consumed untrusted external content (web.search / remote MCP).
+        // Downgrade a would-be silent write to a confirmation so injected instructions cannot
+        // persist themselves; runs that never left the user's own data stay silent.
+        val gated = if (declared.ready && runConsumedExternalContent(context.runId)) {
+            declared.copy(rejectionReason = EXTERNAL_PROVENANCE_REJECTION)
+        } else {
+            declared
+        }
+        return gated.copy(
+            inverseSupported = gated.inverseSupported && binding.spec.name in policy.autoUndoTools,
+            visibleUndoSupported = gated.visibleUndoSupported && binding.spec.name in policy.autoPresentationTools,
         )
     }
+
+    private suspend fun runConsumedExternalContent(runId: String): Boolean {
+        val external = externalContentToolNames()
+        if (external.isEmpty()) return false
+        return completedToolNames(runId).any { it in external }
+    }
+
+    private fun externalContentToolNames(): Set<String> = registry().canonical.values
+        .filter { it.spec.returnsExternalContent }
+        .mapTo(mutableSetOf()) { it.spec.name }
 
     private suspend fun requireGlobalBudget(runId: String) {
         if (totalCallCount(runId) >= MAX_TOOL_CALLS_PER_RUN) {
@@ -263,5 +283,6 @@ internal class CapabilityRouter(
         const val MAX_TOOL_CALLS_PER_RUN = 12
         const val MAX_PROVIDER_TOOL_NAME_LENGTH = 64
         const val MAX_SAFE_RESULT_BYTES = 1024 * 1024
+        const val EXTERNAL_PROVENANCE_REJECTION = "auto_write:untrusted_provenance"
     }
 }

@@ -10,7 +10,17 @@ import kotlinx.serialization.json.put
 
 enum class RuntimeToolRisk { READ_ONLY, REVERSIBLE_AUTO_WRITE, WRITE_CONFIRMATION_REQUIRED, HIGH_RISK }
 
-data class RuntimeToolSpec(val name: String, val version: Int, val risk: RuntimeToolRisk, val providerDefinitionJson: String, val maxCallsPerRun: Int)
+data class RuntimeToolSpec(
+    val name: String,
+    val version: Int,
+    val risk: RuntimeToolRisk,
+    val providerDefinitionJson: String,
+    val maxCallsPerRun: Int,
+    // True when the tool's result content originates outside the user's own data (web search,
+    // remote MCP). The auto-write provenance gate requires confirmation when a run that consumed
+    // external content attempts a silent reversible write.
+    val returnsExternalContent: Boolean = false,
+)
 
 /** Single authoritative allowlist shared by prompt exposure, validation and policy. */
 class RuntimeToolCatalog(val specs: Map<String, RuntimeToolSpec>) {
@@ -52,6 +62,7 @@ class RuntimeToolCatalog(val specs: Map<String, RuntimeToolSpec>) {
                     RuntimeToolRisk.READ_ONLY,
                     """{"type":"function","function":{"name":"web.search","description":"搜索互联网公开信息并返回可核验来源。用户明确要求联网、搜索网络、查询实时天气、最新新闻或当前公开资料时必须调用。不得在查询词中包含联系人、日历、记忆、消息里的私密信息、手机号、邮箱或账号。","parameters":{"type":"object","additionalProperties":false,"required":["query"],"properties":{"query":{"type":"string","minLength":2,"maxLength":500},"limit":{"type":"integer","minimum":1,"maximum":5}}}}}""",
                     4,
+                    returnsExternalContent = true,
                 ),
                 RuntimeToolSpec(
                     "calendar.schedule.search",

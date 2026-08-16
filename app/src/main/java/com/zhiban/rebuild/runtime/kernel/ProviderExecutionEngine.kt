@@ -403,6 +403,7 @@ internal class ProviderExecutionEngine(
         ).filterNotNull(),
         proposalCount = store::toolProposalCount,
         totalCallCount = store::totalToolInvocationCount,
+        completedToolNames = store::completedToolNames,
         policy = CapabilityPolicy(
             isEnabled = toolEnabled,
             autoUndoTools = ChangeUndoCoordinator.AUTO_TOOL_NAMES,
