@@ -93,11 +93,13 @@ fun ZhiBanPage(modifier: Modifier = Modifier, content: @Composable BoxScope.() -
  */
 @Composable
 fun ZhiBanPrimaryTabHeader(title: String, subtitle: String, modifier: Modifier = Modifier, trailing: @Composable RowScope.() -> Unit = {}) {
+    // Top-aligned so the title's fixed slot (and the 48 dp trailing actions) sit at the same
+    // offset on every page; the title block reserves the row's minimum height.
     Row(
         modifier = modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = ZhiBanSize.TopBar),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
     ) {
         ZhiBanHeaderTitleBlock(
             title = title,
@@ -111,27 +113,31 @@ fun ZhiBanPrimaryTabHeader(title: String, subtitle: String, modifier: Modifier =
 /**
  * One title block for primary, secondary and conversation headers.
  *
- * The block wraps its own content height: a header without a subtitle is exactly
- * as tall as its title, so the title's optical centre lands on the same row as the
- * leading back/action icons. Reserving an empty subtitle line pushed a bare title
- * above that icon row, which is the misalignment this avoids.
+ * The title is pinned to a fixed [ZhiBanSize.TouchTarget] slot at the top of the block, so the
+ * title's optical centre lands on the same line as the 48 dp back/action icons on EVERY page —
+ * with or without a subtitle. The subtitle hangs below that slot and never shifts the title,
+ * which is what keeps the title at one vertical offset across primary and secondary pages.
  */
 @Composable
 fun ZhiBanHeaderTitleBlock(title: String, subtitle: String?, modifier: Modifier = Modifier, horizontalAlignment: Alignment.Horizontal = Alignment.Start) {
     val subtitleStyle = MaterialTheme.typography.bodySmall
     Column(
-        modifier = modifier.wrapContentHeight(),
+        modifier = modifier,
         horizontalAlignment = horizontalAlignment,
-        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Text(
-            title,
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onBackground,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Box(
+            modifier = Modifier.height(ZhiBanSize.TouchTarget).fillMaxWidth(),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Text(
+                title,
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onBackground,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         if (!subtitle.isNullOrBlank()) {
             Text(
                 subtitle,
@@ -246,12 +252,14 @@ fun ZhiBanGlassCard(
  */
 @Composable
 fun ZhiBanTopBar(title: String, onBack: (() -> Unit)?, modifier: Modifier = Modifier, subtitle: String? = null, trailing: (@Composable () -> Unit)? = null) {
+    // Uniform TopBar height (no taller row when a subtitle is present) and top alignment, so the
+    // title slot and the back/action icons land on the same line as the primary-tab headers.
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = if (subtitle == null) ZhiBanSize.TopBar else ZhiBanSize.ListRowWithSubtitle)
+            .defaultMinSize(minHeight = ZhiBanSize.TopBar)
             .padding(horizontal = ZhiBanSpacing.PageHorizontal),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
     ) {
         if (onBack != null) {
             IconButton(onClick = onBack, modifier = Modifier.size(ZhiBanSize.TouchTarget)) {
