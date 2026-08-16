@@ -23,4 +23,12 @@ class NetworkModuleTest {
             NetworkModule.loggingLevel(isDebuggable = false),
         )
     }
+
+    @Test
+    fun `client does not follow redirects so certificate pins are not dropped cross-host`() {
+        val client = NetworkModule.buildClient(isDebuggable = false)
+
+        assertFalse(client.followRedirects)
+        assertFalse(client.followSslRedirects)
+    }
 }
