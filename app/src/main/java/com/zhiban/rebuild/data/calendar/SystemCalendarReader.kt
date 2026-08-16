@@ -10,6 +10,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -109,9 +110,7 @@ class SystemCalendarReader @Inject constructor(@ApplicationContext private val c
                 }
             }.orEmpty()
             SystemCalendarReadResult(values.distinctBy(SystemCalendarEvent::sourceId))
-        }.getOrElse {
-            SystemCalendarReadResult(emptyList(), it.message ?: "读取系统日历失败")
-        }
+        }.getOrElse(::queryFailureResult)
     }
 
     private companion object {
@@ -123,3 +122,9 @@ class SystemCalendarReader @Inject constructor(@ApplicationContext private val c
 internal val ACTIVE_INSTANCE_SELECTION =
     "${CalendarContract.Instances.VISIBLE} = 1 AND " +
         "(${CalendarContract.Instances.STATUS} IS NULL OR ${CalendarContract.Instances.STATUS} != ?)"
+
+// R15: never swallow cancellation — only genuine query failures become an error result.
+internal fun queryFailureResult(failure: Throwable): SystemCalendarReadResult {
+    if (failure is CancellationException) throw failure
+    return SystemCalendarReadResult(emptyList(), failure.message ?: "读取系统日历失败")
+}
