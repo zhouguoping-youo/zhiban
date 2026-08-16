@@ -238,7 +238,8 @@ internal fun ContactDetailDialog(
                             color = RelationInk,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
+                            // Match the list row: wrap long names to 2 lines first; only clip beyond that.
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
                         contact.firstKnownTag()?.let {
@@ -627,7 +628,9 @@ internal fun ContactActionButton(icon: androidx.compose.ui.graphics.vector.Image
     ) {
         Icon(icon, null, tint = RelationInk, modifier = Modifier.size(ZhiBanIconSize.Inline))
         Spacer(Modifier.width(6.dp))
-        Text(label, color = RelationInk, style = MaterialTheme.typography.labelLarge)
+        // Single line keeps a row of these action buttons the same height; ellipsis is the
+        // narrow-screen fallback instead of one button wrapping taller than its neighbours.
+        Text(label, color = RelationInk, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

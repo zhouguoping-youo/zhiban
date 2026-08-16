@@ -3,6 +3,8 @@ package com.zhiban.rebuild.ui.tabs
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -51,6 +53,7 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun ScheduleEditorDialog(
     selectedDate: LocalDate,
@@ -195,25 +198,30 @@ internal fun ScheduleEditorDialog(
                     Text("提醒我", color = CalendarInk, style = MaterialTheme.typography.titleSmall)
                 }
                 Spacer(Modifier.height(8.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Flat list + FlowRow so chips wrap to as many rows as the width allows,
+                // instead of a fixed 3+2 split that overflows on narrow screens / large fonts.
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     listOf(
-                        listOf(null to "不提醒", 10 to "提前 10 分钟", 30 to "提前 30 分钟"),
-                        listOf(60 to "提前 1 小时", 1_440 to "提前 1 天"),
-                    ).forEach { row ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            row.forEach { (minutes, label) ->
-                                val selected = reminderMinutes == minutes
-                                ZhiBanChip(
-                                    text = label,
-                                    selected = selected,
-                                    color = CalendarAccent,
-                                    onClick = {
-                                        reminderMinutes = minutes
-                                        if (minutes != null && !notificationsAllowed) onRequestNotificationPermission()
-                                    },
-                                )
-                            }
-                        }
+                        null to "不提醒",
+                        10 to "提前 10 分钟",
+                        30 to "提前 30 分钟",
+                        60 to "提前 1 小时",
+                        1_440 to "提前 1 天",
+                    ).forEach { (minutes, label) ->
+                        val selected = reminderMinutes == minutes
+                        ZhiBanChip(
+                            text = label,
+                            selected = selected,
+                            color = CalendarAccent,
+                            onClick = {
+                                reminderMinutes = minutes
+                                if (minutes != null && !notificationsAllowed) onRequestNotificationPermission()
+                            },
+                        )
                     }
                 }
                 error?.let {

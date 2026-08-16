@@ -2,7 +2,8 @@ package com.zhiban.rebuild.ui.tabs
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,6 +19,7 @@ import com.zhiban.rebuild.relationship.RelationshipGroup
 import com.zhiban.rebuild.relationship.RelationshipTaxonomy
 import com.zhiban.rebuild.ui.components.ZhiBanChip
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun RelationshipTypePicker(selectedType: String, enabled: Boolean = true, onSelect: (String) -> Unit) {
     val initialGroup = RelationshipTaxonomy.find(selectedType)?.group
@@ -29,52 +31,48 @@ internal fun RelationshipTypePicker(selectedType: String, enabled: Boolean = tru
     val definitions = remember(selectedGroup) { selectedGroup?.let(RelationshipTaxonomy::definitionsFor).orEmpty() }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        groups.chunked(GROUP_COLUMNS).forEach { rowGroups ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                rowGroups.forEach { group ->
-                    RelationshipChoice(
-                        label = group.displayName,
-                        selected = selectedGroup == group,
-                        enabled = enabled,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        if (selectedGroup != group && RelationshipTaxonomy.find(selectedType)?.group != group) {
-                            onSelect("")
-                        }
-                        selectedGroup = group
+        // Content-sized chips in a FlowRow: every group/type label renders in full and wraps to the
+        // next line on narrow screens, instead of being ellipsised inside a fixed-width grid cell.
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            groups.forEach { group ->
+                RelationshipChoice(
+                    label = group.displayName,
+                    selected = selectedGroup == group,
+                    enabled = enabled,
+                ) {
+                    if (selectedGroup != group && RelationshipTaxonomy.find(selectedType)?.group != group) {
+                        onSelect("")
                     }
+                    selectedGroup = group
                 }
-                repeat(GROUP_COLUMNS - rowGroups.size) { Spacer(Modifier.weight(1f)) }
             }
         }
         if (selectedGroup == null) return@Column
         Spacer(Modifier.height(2.dp))
-        definitions.chunked(TYPE_COLUMNS).forEach { rowDefinitions ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                rowDefinitions.forEach { definition ->
-                    RelationshipChoice(
-                        label = definition.displayName,
-                        selected = selectedType == definition.code,
-                        enabled = enabled,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        onSelect(definition.code)
-                    }
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            definitions.forEach { definition ->
+                RelationshipChoice(
+                    label = definition.displayName,
+                    selected = selectedType == definition.code,
+                    enabled = enabled,
+                ) {
+                    onSelect(definition.code)
                 }
-                repeat(TYPE_COLUMNS - rowDefinitions.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
 }
 
 @Composable
-private fun RelationshipChoice(label: String, selected: Boolean, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
+private fun RelationshipChoice(label: String, selected: Boolean, enabled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     ZhiBanChip(
         text = label,
         selected = selected,
@@ -97,6 +95,3 @@ internal fun graphRelationLabel(type: String, isHistorical: Boolean = false): St
         else -> relationLabel(type)
     }
 }
-
-private const val GROUP_COLUMNS = 3
-private const val TYPE_COLUMNS = 3
