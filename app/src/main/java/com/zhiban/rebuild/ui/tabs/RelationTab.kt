@@ -76,6 +76,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -210,20 +211,27 @@ fun RelationTab(
     var tag by remember { mutableStateOf("全部") }
     var mode by remember { mutableStateOf("list") }
     var selected by remember { mutableStateOf<ContactEntity?>(null) }
-    var editing by remember { mutableStateOf<ContactEntity?>(null) }
-    var showEditor by remember { mutableStateOf(false) }
+    // Form dialogs keep their open/target state as a saveable contact id (not the entity, which
+    // is not saveable) and re-derive the entity from page.contacts, so an in-progress edit
+    // survives a configuration change. pageSnapshot is a ViewModel StateFlow, so contacts is
+    // populated synchronously on the first frame after rotation.
+    var editingId by rememberSaveable { mutableStateOf<String?>(null) }
+    val editing = editingId?.let { id -> contacts.firstOrNull { it.contactId == id } }
+    var showEditor by rememberSaveable { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<ContactEntity?>(null) }
     var markingAsOwner by remember { mutableStateOf<ContactEntity?>(null) }
-    var showRelationEditor by remember { mutableStateOf(false) }
+    var showRelationEditor by rememberSaveable { mutableStateOf(false) }
     var showOwnerEmploymentEditor by remember { mutableStateOf(false) }
     var deletingEdge by remember { mutableStateOf<RelationshipEdgeEntity?>(null) }
     var selectedEdge by remember { mutableStateOf<RelationshipEdgeEntity?>(null) }
-    var addFactFor by remember { mutableStateOf<ContactEntity?>(null) }
+    var addFactForId by rememberSaveable { mutableStateOf<String?>(null) }
+    val addFactFor = addFactForId?.let { id -> contacts.firstOrNull { it.contactId == id } }
     var addEventFor by remember { mutableStateOf<ContactEntity?>(null) }
     var editingEvent by remember { mutableStateOf<RelationshipEventWithParticipants?>(null) }
     var selectedEvent by remember { mutableStateOf<RelationshipEventWithParticipants?>(null) }
     var showImportDialog by remember { mutableStateOf(false) }
-    var identityEditorFor by remember { mutableStateOf<ContactEntity?>(null) }
+    var identityEditorForId by rememberSaveable { mutableStateOf<String?>(null) }
+    val identityEditorFor = identityEditorForId?.let { id -> contacts.firstOrNull { it.contactId == id } }
     var showContactPermissionIntro by remember { mutableStateOf(false) }
     var showPermissionExplanation by remember { mutableStateOf(false) }
     var showNotificationCandidates by remember { mutableStateOf(false) }
@@ -380,7 +388,7 @@ fun RelationTab(
                         icon = Icons.Outlined.Add,
                         contentDescription = "添加联系人",
                         onClick = {
-                            editing = null
+                            editingId = null
                             showEditor = true
                         },
                         tint = RelationInk,
@@ -562,7 +570,7 @@ fun RelationTab(
                             searching = false,
                             onImport = openContactImport,
                             onAdd = {
-                                editing = null
+                                editingId = null
                                 showEditor = true
                             },
                         )
@@ -573,7 +581,7 @@ fun RelationTab(
                             searching = query.isNotBlank() || tag != "全部",
                             onImport = openContactImport,
                             onAdd = {
-                                editing = null
+                                editingId = null
                                 showEditor = true
                             },
                         )
@@ -630,7 +638,7 @@ fun RelationTab(
             onDismiss = { selected = null },
             onEdit = { contact ->
                 selected = null
-                editing = contact
+                editingId = contact.contactId
                 showEditor = true
             },
             onMarkAsOwner = { contact ->
@@ -641,9 +649,9 @@ fun RelationTab(
                 selected = null
                 deleting = contact
             },
-            onAddFact = { addFactFor = it },
+            onAddFact = { addFactForId = it.contactId },
             onAddEvent = { addEventFor = it },
-            onAddIdentity = { identityEditorFor = it },
+            onAddIdentity = { identityEditorForId = it.contactId },
             onInspectEvent = { selectedEvent = it },
             onRequestPhoneSync = { contact ->
                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) ==
@@ -708,12 +716,12 @@ fun RelationTab(
     identityEditorFor?.let { contact ->
         ContactIdentityEditorDialog(
             contact = contact,
-            onDismiss = { identityEditorFor = null },
+            onDismiss = { identityEditorForId = null },
             onSaveAlias = { value, result ->
                 viewModel.addAlias(contact.contactId, value) { error ->
                     result(error)
                     if (error == null) {
-                        identityEditorFor = null
+                        identityEditorForId = null
                         showFeedback("称呼已保存")
                     }
                 }
@@ -722,7 +730,7 @@ fun RelationTab(
                 viewModel.addPlatformIdentity(contact.contactId, platform, handle) { error ->
                     result(error)
                     if (error == null) {
-                        identityEditorFor = null
+                        identityEditorForId = null
                         showFeedback("联系方式已保存")
                     }
                 }
@@ -984,12 +992,12 @@ fun RelationTab(
     addFactFor?.let { contact ->
         ContactFactEditorDialog(
             contact = contact,
-            onDismiss = { addFactFor = null },
+            onDismiss = { addFactForId = null },
             onSave = { text, type, result ->
                 viewModel.saveContactFact(contact.contactId, text, type) { error ->
                     result(error)
                     if (error == null) {
-                        addFactFor = null
+                        addFactForId = null
                         showFeedback("联系人信息已保存")
                     }
                 }

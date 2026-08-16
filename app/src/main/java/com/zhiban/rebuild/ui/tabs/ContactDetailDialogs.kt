@@ -74,6 +74,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -795,9 +796,9 @@ internal fun ContactIdentityEditorDialog(
     onSaveAlias: (String, (String?) -> Unit) -> Unit,
     onSavePlatform: (String, String, (String?) -> Unit) -> Unit,
 ) {
-    var mode by remember { mutableStateOf("ALIAS") }
-    var platform by remember { mutableStateOf("WECHAT") }
-    var value by remember { mutableStateOf("") }
+    var mode by rememberSaveable { mutableStateOf("ALIAS") }
+    var platform by rememberSaveable { mutableStateOf("WECHAT") }
+    var value by rememberSaveable { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     ZhiBanDialogHost(onDismissRequest = onDismiss) {
@@ -958,8 +959,8 @@ internal fun ProfileSectionHeader(title: String, action: String? = null, onActio
 
 @Composable
 internal fun ContactFactEditorDialog(contact: ContactEntity, onDismiss: () -> Unit, onSave: (String, String, (String?) -> Unit) -> Unit) {
-    var text by remember { mutableStateOf("") }
-    var type by remember { mutableStateOf("CONTACT_MEMORY") }
+    var text by rememberSaveable { mutableStateOf("") }
+    var type by rememberSaveable { mutableStateOf("CONTACT_MEMORY") }
     var error by remember { mutableStateOf<String?>(null) }
     ZhiBanDialogHost(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Dialog)).background(RelationSurface).padding(20.dp)) {

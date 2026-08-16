@@ -32,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,7 +63,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun EventPlanningPage(onBack: () -> Unit, onOpenAll: () -> Unit, onOpenPlan: (String) -> Unit, viewModel: EventPlanningViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    var createOpen by remember { mutableStateOf(false) }
+    var createOpen by rememberSaveable { mutableStateOf(false) }
     EventPlanningWorkbench(
         state = state,
         onBack = onBack,
@@ -127,7 +128,7 @@ fun EventPlanningListPage(onBack: () -> Unit, onOpenPlan: (String) -> Unit, view
 fun EventPlanningDetailPage(planId: String, onBack: () -> Unit, onAskAgent: (String) -> Unit, viewModel: EventPlanningViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val item = state.plans.firstOrNull { it.plan.planId == planId }
-    var contactPickerOpen by remember { mutableStateOf(false) }
+    var contactPickerOpen by rememberSaveable { mutableStateOf(false) }
     var responseContact by remember { mutableStateOf<ContactEntity?>(null) }
     var deleteConfirmOpen by remember { mutableStateOf(false) }
     ZhiBanPage {

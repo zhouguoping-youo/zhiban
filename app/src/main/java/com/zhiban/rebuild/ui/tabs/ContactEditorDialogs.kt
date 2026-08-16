@@ -78,6 +78,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -341,13 +342,13 @@ internal fun ContactEditorDialog(
     onDismiss: () -> Unit,
     onSave: (String?, String, String?, String?, String?, String?, String?, String?, (String?) -> Unit) -> Unit,
 ) {
-    var name by remember(contact?.contactId) { mutableStateOf(contact?.displayName.orEmpty()) }
-    var phone by remember(contact?.contactId) { mutableStateOf(contact?.phone.orEmpty()) }
-    var wechat by remember(contact?.contactId) { mutableStateOf(contact?.wechatId.orEmpty()) }
-    var company by remember(contact?.contactId) { mutableStateOf(contact?.company.orEmpty()) }
-    var title by remember(contact?.contactId) { mutableStateOf(contact?.title.orEmpty()) }
-    var tag by remember(contact?.contactId) { mutableStateOf(contact?.firstKnownTag() ?: RelationshipGroup.SOCIAL.displayName) }
-    var note by remember(contact?.contactId) { mutableStateOf(contact?.note.orEmpty()) }
+    var name by rememberSaveable(contact?.contactId) { mutableStateOf(contact?.displayName.orEmpty()) }
+    var phone by rememberSaveable(contact?.contactId) { mutableStateOf(contact?.phone.orEmpty()) }
+    var wechat by rememberSaveable(contact?.contactId) { mutableStateOf(contact?.wechatId.orEmpty()) }
+    var company by rememberSaveable(contact?.contactId) { mutableStateOf(contact?.company.orEmpty()) }
+    var title by rememberSaveable(contact?.contactId) { mutableStateOf(contact?.title.orEmpty()) }
+    var tag by rememberSaveable(contact?.contactId) { mutableStateOf(contact?.firstKnownTag() ?: RelationshipGroup.SOCIAL.displayName) }
+    var note by rememberSaveable(contact?.contactId) { mutableStateOf(contact?.note.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
     val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
 

@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -30,11 +31,11 @@ import java.time.format.DateTimeFormatter
 
 @Composable
 internal fun CreateEventPlanDialog(onDismiss: () -> Unit, onCreate: (EventPlanDraft) -> Unit) {
-    var title by remember { mutableStateOf("") }
-    var dateText by remember { mutableStateOf(LocalDate.now().plusDays(7).format(DateTimeFormatter.ISO_LOCAL_DATE)) }
-    var timeText by remember { mutableStateOf("18:30") }
-    var durationText by remember { mutableStateOf("120") }
-    var location by remember { mutableStateOf("") }
+    var title by rememberSaveable { mutableStateOf("") }
+    var dateText by rememberSaveable { mutableStateOf(LocalDate.now().plusDays(7).format(DateTimeFormatter.ISO_LOCAL_DATE)) }
+    var timeText by rememberSaveable { mutableStateOf("18:30") }
+    var durationText by rememberSaveable { mutableStateOf("120") }
+    var location by rememberSaveable { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     val date = runCatching { LocalDate.parse(dateText) }.getOrNull()
     val time = runCatching { LocalTime.parse(timeText) }.getOrNull()
@@ -85,7 +86,7 @@ internal fun CreateEventPlanDialog(onDismiss: () -> Unit, onCreate: (EventPlanDr
 
 @Composable
 internal fun EventContactPicker(contacts: List<ContactEntity>, onDismiss: () -> Unit, onSelect: (ContactEntity) -> Unit) {
-    var query by remember { mutableStateOf("") }
+    var query by rememberSaveable { mutableStateOf("") }
     val visible = remember(contacts, query) {
         contacts.filter { query.isBlank() || it.displayName.contains(query, ignoreCase = true) || it.company.orEmpty().contains(query, ignoreCase = true) }
     }

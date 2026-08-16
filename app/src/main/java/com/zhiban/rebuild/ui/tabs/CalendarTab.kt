@@ -58,6 +58,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -137,11 +138,14 @@ fun CalendarTab(
     }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var monthExpanded by remember { mutableStateOf(false) }
-    var editing by remember { mutableStateOf<ScheduleProjection?>(null) }
-    var showEditor by remember { mutableStateOf(false) }
+    var editingId by rememberSaveable { mutableStateOf<String?>(null) }
+    var showEditor by rememberSaveable { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<ScheduleProjection?>(null) }
     var completing by remember { mutableStateOf<ScheduleProjection?>(null) }
     val schedules by viewModel.schedules.collectAsState()
+    // The editor's target is a saveable schedule id re-derived from the (rotation-surviving)
+    // schedules StateFlow, so an in-progress create/edit survives a configuration change.
+    val editing = editingId?.let { id -> schedules.firstOrNull { it.id == id } }
     val pendingFeedback by viewModel.pendingFeedback.collectAsState()
     val messageScheduleCandidates by viewModel.messageScheduleCandidates.collectAsState()
     val auxiliaryUiState by viewModel.auxiliaryUiState.collectAsState()
@@ -218,7 +222,7 @@ fun CalendarTab(
                         }
                     },
                     onAdd = {
-                        editing = null
+                        editingId = null
                         showEditor = true
                     },
                 )
@@ -299,7 +303,7 @@ fun CalendarTab(
             if (schedules.isEmpty()) {
                 item {
                     EmptyDay(onAdd = {
-                        editing = null
+                        editingId = null
                         showEditor = true
                     })
                 }
@@ -308,7 +312,7 @@ fun CalendarTab(
                     ScheduleRow(
                         schedule = schedules[index],
                         onClick = {
-                            editing = schedules[index]
+                            editingId = schedules[index].id
                             showEditor = true
                         },
                         onProgress = { completing = schedules[index] },
@@ -341,7 +345,7 @@ fun CalendarTab(
                 onPostpone = {
                     viewModel.reopen(schedule.id) {
                         completing = null
-                        editing = schedule.copy(status = ScheduleStatus.PENDING, outcomeNote = null, completedAtEpochMs = null)
+                        editingId = schedule.id
                         showEditor = true
                     }
                 },

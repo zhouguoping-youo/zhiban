@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,11 +72,11 @@ internal fun ScheduleEditorDialog(
     ) -> Unit,
 ) {
     val original = schedule?.let { Instant.ofEpochMilli(it.startAtEpochMs).atZone(ZoneId.systemDefault()) }
-    var title by remember(schedule?.id) { mutableStateOf(schedule?.title.orEmpty()) }
-    var dateText by remember(schedule?.id) {
+    var title by rememberSaveable(schedule?.id) { mutableStateOf(schedule?.title.orEmpty()) }
+    var dateText by rememberSaveable(schedule?.id) {
         mutableStateOf((original?.toLocalDate() ?: selectedDate).format(DateTimeFormatter.ISO_LOCAL_DATE))
     }
-    var timeText by remember(schedule?.id) {
+    var timeText by rememberSaveable(schedule?.id) {
         mutableStateOf(
             (
                 original?.toLocalTime()
@@ -83,10 +84,10 @@ internal fun ScheduleEditorDialog(
                 ).format(DateFormats.Time),
         )
     }
-    var durationText by remember(schedule?.id) { mutableStateOf((schedule?.durationMinutes ?: 60).toString()) }
-    var note by remember(schedule?.id) { mutableStateOf(schedule?.note.orEmpty()) }
+    var durationText by rememberSaveable(schedule?.id) { mutableStateOf((schedule?.durationMinutes ?: 60).toString()) }
+    var note by rememberSaveable(schedule?.id) { mutableStateOf(schedule?.note.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
-    var reminderMinutes by remember(schedule?.id) { mutableStateOf(schedule?.reminderMinutesBefore) }
+    var reminderMinutes by rememberSaveable(schedule?.id) { mutableStateOf(schedule?.reminderMinutesBefore) }
     var pendingConflict by remember { mutableStateOf<String?>(null) }
     val formValid = title.isNotBlank() &&
         runCatching { LocalDate.parse(dateText) }.isSuccess &&

@@ -72,6 +72,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -162,13 +163,13 @@ internal fun RelationshipEditorDialog(
         add(RelationshipPersonUi(RelationshipPersonIds.SELF, owner.displayNameOrMe(), true))
         contacts.forEach { add(RelationshipPersonUi(it.contactId, it.displayName, false)) }
     }
-    var fromId by remember(contacts, owner.name) { mutableStateOf(RelationshipPersonIds.SELF) }
-    var toId by remember(contacts) { mutableStateOf("") }
-    var fromQuery by remember { mutableStateOf("") }
-    var toQuery by remember { mutableStateOf("") }
-    var chooseContactAsSource by remember { mutableStateOf(false) }
-    var type by remember { mutableStateOf("") }
-    var temporalState by remember { mutableStateOf("CURRENT") }
+    var fromId by rememberSaveable(contacts, owner.name) { mutableStateOf(RelationshipPersonIds.SELF) }
+    var toId by rememberSaveable(contacts) { mutableStateOf("") }
+    var fromQuery by rememberSaveable { mutableStateOf("") }
+    var toQuery by rememberSaveable { mutableStateOf("") }
+    var chooseContactAsSource by rememberSaveable { mutableStateOf(false) }
+    var type by rememberSaveable { mutableStateOf("") }
+    var temporalState by rememberSaveable { mutableStateOf("CURRENT") }
     var error by remember { mutableStateOf<String?>(null) }
     val editorScrollState = rememberScrollState()
     LaunchedEffect(type, editorScrollState.maxValue) {
