@@ -203,8 +203,15 @@ fun AgentConversationScreen(
                 )
             }
         }
+        // Only surface a candidate while this bar still has an action it can perform: an unlinked
+        // contact suggestion, or a schedule insight not yet added. A schedule-only candidate whose
+        // schedule was just created (and whose sender matched no contact) has nothing left for this
+        // bar to do — without these guards it would stay on screen with a 确认安排 button that taps
+        // to a no-op, reading as "stuck" (the candidate legitimately stays PENDING for a manual
+        // contact link in 关系, but it must not keep offering a dead action here).
         perceptionCandidates.firstOrNull { candidate ->
-            candidate.suggestedContactId != null || ScheduleInsight.from(candidate) != null
+            (candidate.suggestedContactId != null && candidate.linkedContactId == null) ||
+                (ScheduleInsight.from(candidate) != null && candidate.createdScheduleId == null)
         }?.let { candidate ->
             PerceptionConfirmationBar(
                 candidate = candidate,
