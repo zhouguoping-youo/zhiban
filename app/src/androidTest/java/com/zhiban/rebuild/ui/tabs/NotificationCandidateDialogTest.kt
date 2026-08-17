@@ -35,6 +35,10 @@ class NotificationCandidateDialogTest {
                     enabled = true,
                     candidates = listOf(candidate),
                     contacts = emptyList(),
+                    replySuggestions = emptyList(),
+                    onForwardReply = { _, _ -> },
+                    onDismissReply = {},
+                    onOptOutReply = {},
                     onEnable = {},
                     onDismissCandidate = {},
                     onConfirmCandidate = { _, _, done -> done(null) },
@@ -62,5 +66,48 @@ class NotificationCandidateDialogTest {
 
         compose.onNodeWithContentDescription("消息感知设置").performClick()
         compose.onNodeWithText("采集来源").assertIsDisplayed()
+    }
+
+    @Test
+    fun replySuggestionGroupRendersCardAndForwardsChosenDraft() {
+        val forwarded = AtomicReference<String>()
+        val suggestion = ReplySuggestionCardModel(
+            candidateId = "cand-1",
+            contactId = "contact-1",
+            platform = "WECHAT",
+            contactName = "张三",
+            incomingExcerpt = "明天上午的合同能发我一份吗？",
+            drafts = listOf("好的张总，明早十点前发您", "收到，明天上午给您回复"),
+            createdAtEpochMs = 1_700_000_000_000L,
+        )
+        compose.setContent {
+            ZhiBanTheme {
+                NotificationCandidateDialog(
+                    enabled = true,
+                    candidates = emptyList(),
+                    contacts = emptyList(),
+                    replySuggestions = listOf(suggestion),
+                    onForwardReply = { model, draft -> forwarded.set("${model.contactName}|$draft") },
+                    onDismissReply = {},
+                    onOptOutReply = {},
+                    onEnable = {},
+                    onDismissCandidate = {},
+                    onConfirmCandidate = { _, _, done -> done(null) },
+                    onCreateContact = { _, _, done -> done(null) },
+                    onConfirmSchedule = { _, done -> done(null) },
+                    enabledPlatforms = emptySet(),
+                    onPlatformEnabled = { _, _ -> },
+                    outgoingCollectionEnabled = false,
+                    outgoingAccessibilityEnabled = false,
+                    onOutgoingCollectionEnabled = {},
+                    onDismiss = {},
+                )
+            }
+        }
+
+        compose.onNodeWithText("AI 回复建议").assertIsDisplayed()
+        compose.onNodeWithText("收到，明天上午给您回复").performClick()
+        compose.onNodeWithText("转发给 张三").performClick()
+        assertEquals("张三|收到，明天上午给您回复", forwarded.get())
     }
 }

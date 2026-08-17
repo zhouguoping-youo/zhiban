@@ -22,6 +22,7 @@ import com.zhiban.rebuild.data.calendar.ScheduleReminderWorker
 import com.zhiban.rebuild.data.calllog.CallHangupReconcileWorker
 import com.zhiban.rebuild.data.calllog.CallLogSyncCoordinator
 import com.zhiban.rebuild.data.notification.sharedTextCandidate
+import com.zhiban.rebuild.data.reply.ReplySuggestionCoordinator
 import com.zhiban.rebuild.navigation.ZhiBanNavHost
 import com.zhiban.rebuild.ui.theme.ThemePreferenceStore
 import com.zhiban.rebuild.ui.theme.ZhiBanTheme
@@ -39,6 +40,8 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var repository: AgentDataRepository
 
     @Inject lateinit var callLogSyncCoordinator: CallLogSyncCoordinator
+
+    @Inject internal lateinit var replySuggestionCoordinator: ReplySuggestionCoordinator
 
     @Inject lateinit var themePreferenceStore: ThemePreferenceStore
 
@@ -89,6 +92,9 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         lifecycleScope.launch { callLogSyncCoordinator.syncNow() }
+        // T2: foreground sweep — catch any WeChat message that arrived while the app was backgrounded
+        // (e.g. the listener was briefly suspended). Cheap, debounced and conflated in the coordinator.
+        replySuggestionCoordinator.onIncomingWechatActivity()
     }
 
     private fun acceptSharedContent(intent: Intent?) {

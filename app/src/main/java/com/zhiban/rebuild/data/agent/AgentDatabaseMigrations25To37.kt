@@ -569,4 +569,30 @@ internal object AgentDatabaseMigrations25To37 {
             )
         }
     }
+
+    val MIGRATION_39_40 = object : Migration(39, 40) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS `reply_suggestions` (
+                    `suggestionId` TEXT NOT NULL,
+                    `candidateId` TEXT NOT NULL,
+                    `threadKey` TEXT NOT NULL,
+                    `contactId` TEXT,
+                    `draft` TEXT NOT NULL,
+                    `draftIndex` INTEGER NOT NULL,
+                    `status` TEXT NOT NULL,
+                    `createdAtEpochMs` INTEGER NOT NULL,
+                    `forwardedAtEpochMs` INTEGER,
+                    `confirmedAtEpochMs` INTEGER,
+                    `contactName` TEXT,
+                    `incomingExcerpt` TEXT NOT NULL DEFAULT '',
+                    PRIMARY KEY(`suggestionId`)
+                )""",
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_reply_suggestions_candidateId` ON `reply_suggestions` (`candidateId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_reply_suggestions_threadKey` ON `reply_suggestions` (`threadKey`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_reply_suggestions_status` ON `reply_suggestions` (`status`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_reply_suggestions_createdAtEpochMs` ON `reply_suggestions` (`createdAtEpochMs`)")
+        }
+    }
 }

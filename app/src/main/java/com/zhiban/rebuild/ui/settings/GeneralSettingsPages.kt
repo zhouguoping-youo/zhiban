@@ -72,12 +72,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.zhiban.rebuild.BuildConfig
 import com.zhiban.rebuild.data.agent.AGENT_DATABASE_FILE_NAME
+import com.zhiban.rebuild.data.agent.AgentDataRepository
 import com.zhiban.rebuild.data.calllog.CallLogAccessProbe
 import com.zhiban.rebuild.data.calllog.CallLogAccessStatus
+import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.export.AgentDataExportService
 import com.zhiban.rebuild.data.notification.NotificationCategory
 import com.zhiban.rebuild.data.notification.NotificationCategoryPreferences
 import com.zhiban.rebuild.data.notification.OutgoingMessageAccessibilityService
+import com.zhiban.rebuild.runtime.config.AgentControlStore
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
 import com.zhiban.rebuild.ui.components.ZhiBanPage
@@ -99,7 +102,11 @@ import java.util.Locale
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -119,10 +126,13 @@ fun PrivacySecurityPage(
     onBack: () -> Unit,
     outboundViewModel: OutboundPrivacyViewModel = hiltViewModel(),
     callCollectionViewModel: CallCollectionViewModel = hiltViewModel(),
+    replySuggestionViewModel: ReplySuggestionSettingsViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val outboundState by outboundViewModel.state.collectAsStateWithLifecycle()
     val callCollectionState by callCollectionViewModel.state.collectAsStateWithLifecycle()
+    val replySuggestionsEnabled by replySuggestionViewModel.enabled.collectAsStateWithLifecycle()
+    val replyOptedOutContacts by replySuggestionViewModel.optedOutContacts.collectAsStateWithLifecycle()
     var callLogAccessStatus by remember { mutableStateOf(CallLogAccessStatus.NOT_GRANTED) }
     var refreshVersion by remember { mutableIntStateOf(0) }
     RefreshPermissionsOnResume { refreshVersion += 1 }
@@ -274,6 +284,31 @@ fun PrivacySecurityPage(
             }
             item {
                 Text(
+                    "回复建议",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = ZhiBanTextSecondary,
+                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.Xs, vertical = ZhiBanSpacing.Sm),
+                )
+            }
+            item {
+                SettingsCard {
+                    SettingsToggleRow(
+                        title = "为待回复的消息起草回复",
+                        subtitle = "在消息收件箱给出草稿；转发和发送都由你亲自完成",
+                        checked = replySuggestionsEnabled,
+                        onCheckedChange = replySuggestionViewModel::setEnabled,
+                    )
+                    replyOptedOutContacts.forEachIndexed { index, contact ->
+                        Divider()
+                        SettingsActionRow(
+                            "恢复为 ${contact.displayName} 起草建议",
+                            onClick = { replySuggestionViewModel.restoreContact(contact.contactId) },
+                        )
+                    }
+                }
+            }
+            item {
+                Text(
                     "AI 服务",
                     style = MaterialTheme.typography.labelMedium,
                     color = ZhiBanTextSecondary,
@@ -332,6 +367,32 @@ class NotificationCategoryViewModel @Inject constructor(private val preferences:
     fun setEnabled(category: NotificationCategory, enabled: Boolean) {
         mutableStates.update { it + (category to enabled) }
         viewModelScope.launch { preferences.setEnabled(category, enabled) }
+    }
+}
+
+/**
+ * Backs the "回复建议" settings block: the global toggle plus the review list of contacts the user has
+ * opted out (via a card's "不再建议"), so that per-contact choice stays reversible from settings.
+ */
+@HiltViewModel
+class ReplySuggestionSettingsViewModel @Inject constructor(private val controls: AgentControlStore, repository: AgentDataRepository) : ViewModel() {
+    private val mutableEnabled = MutableStateFlow(controls.replySuggestionsEnabled())
+    val enabled: StateFlow<Boolean> = mutableEnabled.asStateFlow()
+    private val mutableOptOutIds = MutableStateFlow(controls.replyOptedOutContactIds())
+    val optedOutContacts: StateFlow<List<ContactEntity>> = combine(
+        repository.observeContacts(),
+        mutableOptOutIds,
+    ) { contacts, optOutIds -> contacts.filter { it.contactId in optOutIds } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun setEnabled(enabled: Boolean) {
+        controls.saveReplySuggestionsEnabled(enabled)
+        mutableEnabled.value = enabled
+    }
+
+    fun restoreContact(contactId: String) {
+        controls.setReplyOptOut(contactId, false)
+        mutableOptOutIds.value = controls.replyOptedOutContactIds()
     }
 }
 

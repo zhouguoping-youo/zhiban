@@ -92,6 +92,7 @@ class AgentDataRepository internal constructor(
     domains: AgentRepositoryDomains,
     private val externalCalendarConflicts: ExternalCalendarConflictSource = ExternalCalendarConflictSource { _, _, _, _ -> emptyList() },
     private val scheduleReminderSink: ScheduleReminderSink = ScheduleReminderSink { },
+    private val replySuggestionSink: () -> Unit = { },
 ) {
     private val daos = infrastructure.daos
     private val transactions = infrastructure.transactions
@@ -171,6 +172,12 @@ class AgentDataRepository internal constructor(
             createdSchedule
         }
         automaticSchedule?.let(scheduleReminderSink::replace)
+        // T1: a fresh incoming WeChat message may warrant an AI reply suggestion. Fired outside the
+        // transaction so the coordinator reads the committed candidate; the coordinator re-gates on
+        // attribution and reply-worthiness, so this is only a cheap "go look" nudge.
+        if (candidate.direction == "INCOMING" && candidate.platform == "WECHAT") {
+            replySuggestionSink()
+        }
     }
 
     suspend fun dismissNotificationCandidate(candidateId: String): Boolean = daos.notificationCandidateDao.dismiss(candidateId) == 1

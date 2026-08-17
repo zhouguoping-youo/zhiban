@@ -105,6 +105,23 @@ interface NotificationCandidateDao {
     suspend fun recentPendingByPlatform(platform: String, sinceEpochMs: Long): List<NotificationCandidateEntity>
 
     @Query(
+        """SELECT * FROM notification_candidates
+           WHERE platform = :platform
+             AND (conversationTitle = :conversationTitle OR (conversationTitle IS NULL AND :conversationTitle = ''))
+             AND postedAtEpochMs > :sinceEpochMs
+           ORDER BY postedAtEpochMs ASC LIMIT :limit""",
+    )
+    suspend fun threadMessages(platform: String, conversationTitle: String, sinceEpochMs: Long, limit: Int): List<NotificationCandidateEntity>
+
+    @Query(
+        """SELECT * FROM notification_candidates
+           WHERE direction = 'INCOMING' AND platform = :platform AND postedAtEpochMs > :sinceEpochMs
+             AND (linkedContactId IS NOT NULL OR suggestedContactId IS NOT NULL)
+           ORDER BY postedAtEpochMs DESC LIMIT :limit""",
+    )
+    suspend fun recentIncomingAttributed(platform: String, sinceEpochMs: Long, limit: Int): List<NotificationCandidateEntity>
+
+    @Query(
         "UPDATE notification_candidates SET status = 'DISMISSED' WHERE candidateId = :candidateId AND status = 'PENDING'",
     )
     suspend fun dismiss(candidateId: String): Int

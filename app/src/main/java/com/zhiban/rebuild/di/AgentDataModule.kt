@@ -92,6 +92,7 @@ object AgentDataModule {
                     AgentDatabase.MIGRATION_36_37,
                     AgentDatabase.MIGRATION_37_38,
                     AgentDatabase.MIGRATION_38_39,
+                    AgentDatabase.MIGRATION_39_40,
                 )
                 .addCallback(AgentDatabase.CALLBACK).build()
         }
@@ -104,6 +105,7 @@ object AgentDataModule {
         domains: com.zhiban.rebuild.data.agent.AgentRepositoryDomains,
         systemCalendarReader: com.zhiban.rebuild.data.calendar.SystemCalendarReader,
         reminderScheduler: com.zhiban.rebuild.data.calendar.ScheduleReminderScheduler,
+        replySuggestionCoordinator: com.zhiban.rebuild.data.reply.ReplySuggestionCoordinator,
     ): AgentDataRepository = AgentDataRepository(
         infrastructure,
         domains,
@@ -115,6 +117,7 @@ object AgentDataModule {
                 schedule.reminderMinutesBefore,
             )
         },
+        replySuggestionSink = replySuggestionCoordinator::onIncomingWechatActivity,
     )
 
     @Provides
@@ -302,6 +305,20 @@ object AgentDataModule {
     @Singleton
     internal fun provideLocationGateway(@ApplicationContext context: Context): com.zhiban.rebuild.runtime.provider.LocationGateway =
         com.zhiban.rebuild.data.location.SystemLocationGateway(context)
+
+    @Provides
+    @Singleton
+    internal fun provideReplyDeliveryExecutor(
+        impl: com.zhiban.rebuild.data.reply.HandoffDeliveryExecutor,
+    ): com.zhiban.rebuild.data.reply.ReplyDeliveryExecutor = impl
+
+    @Provides
+    @Singleton
+    internal fun provideReplySuggestionRepository(
+        database: AgentDatabase,
+        deliveryExecutor: com.zhiban.rebuild.data.reply.ReplyDeliveryExecutor,
+        controls: com.zhiban.rebuild.runtime.config.AgentControlStore,
+    ): com.zhiban.rebuild.data.reply.ReplySuggestionRepository = com.zhiban.rebuild.data.reply.ReplySuggestionRepository(database, deliveryExecutor, controls)
 
     @Provides
     @Singleton

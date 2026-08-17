@@ -31,6 +31,7 @@ import com.zhiban.rebuild.data.contact.normalizeContactPhone
 import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
 import com.zhiban.rebuild.data.notification.MessageCollectionPreferences
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
+import com.zhiban.rebuild.data.reply.ReplySuggestionRepository
 import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.governance.OutboundDataPreferences
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
@@ -49,6 +50,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -107,6 +109,7 @@ class RelationCollectionServices @Inject constructor(
 class RelationViewModel @Inject constructor(
     private val repository: AgentDataRepository,
     private val userProfileStore: UserProfileStore,
+    private val replySuggestionRepository: ReplySuggestionRepository,
     contactServices: RelationContactServices,
     collectionServices: RelationCollectionServices,
 ) : ViewModel() {
@@ -190,6 +193,25 @@ class RelationViewModel @Inject constructor(
         messageCollectionPreferences.outgoingCollectionEnabled
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
     val userProfile = userProfileStore.profile
+    val replySuggestions: StateFlow<List<ReplySuggestionCardModel>> = replySuggestionRepository.observePending()
+        .map { rows ->
+            rows.groupBy { it.candidateId }.map { (candidateId, group) ->
+                val sorted = group.sortedBy { it.draftIndex }
+                val first = sorted.first()
+                ReplySuggestionCardModel(
+                    candidateId = candidateId,
+                    contactId = first.contactId,
+                    platform = first.threadKey.substringBefore('|'),
+                    contactName = first.contactName
+                        ?: first.threadKey.substringAfter('|', "").ifBlank { "对方" },
+                    incomingExcerpt = first.incomingExcerpt,
+                    drafts = sorted.map { it.draft },
+                    createdAtEpochMs = first.createdAtEpochMs,
+                )
+            }.sortedByDescending { it.createdAtEpochMs }
+        }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val pendingCallNotes: StateFlow<List<CallRecordEntity>> = callLogRepository.observePendingNotes()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     private val mutableCloudAsrAvailability = MutableStateFlow(CloudAsrAvailability.CONSENT_REQUIRED)
@@ -344,6 +366,24 @@ class RelationViewModel @Inject constructor(
                 .onSuccess { onResult(null) }
                 .onFailure { onResult(it.message ?: "添加日程失败，请重试") }
         }
+    }
+
+    fun forwardReplySuggestion(model: ReplySuggestionCardModel, draft: String, onResult: (String?) -> Unit) {
+        viewModelScope.launch {
+            runSuspendCatching {
+                replySuggestionRepository.forward(model.candidateId, model.platform, model.contactName, draft)
+            }
+                .onSuccess { result -> onResult(if (result.launched) null else "无法拉起${model.platform}，请稍后再试") }
+                .onFailure { onResult(it.message ?: "转发失败，请重试") }
+        }
+    }
+
+    fun dismissReplySuggestion(candidateId: String) {
+        viewModelScope.launch { replySuggestionRepository.dismiss(candidateId) }
+    }
+
+    fun optOutReplySuggestion(contactId: String) {
+        viewModelScope.launch { replySuggestionRepository.optOutContact(contactId) }
     }
 
     fun loadSystemContacts() {

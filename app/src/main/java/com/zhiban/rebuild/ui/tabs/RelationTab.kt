@@ -205,6 +205,7 @@ fun RelationTab(
     val pendingCallNotes = page.pendingCallNotes
     val cloudAsrAvailability = page.cloudAsrAvailability
     val ownerProfile by viewModel.userProfile.collectAsStateWithLifecycle()
+    val replySuggestions by viewModel.replySuggestions.collectAsStateWithLifecycle()
     val autoWriteState by autoWriteViewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var query by remember { mutableStateOf("") }
@@ -805,6 +806,19 @@ fun RelationTab(
             enabled = notificationAccessEnabled,
             candidates = notificationCandidates,
             contacts = contacts,
+            replySuggestions = replySuggestions,
+            onForwardReply = { model, draft ->
+                viewModel.forwardReplySuggestion(model, draft) { error ->
+                    error?.let(showFeedback)
+                }
+            },
+            onDismissReply = { model -> viewModel.dismissReplySuggestion(model.candidateId) },
+            onOptOutReply = { model ->
+                model.contactId?.let {
+                    viewModel.optOutReplySuggestion(it)
+                    showFeedback("已不再为 ${model.contactName} 生成回复建议")
+                }
+            },
             onEnable = {
                 context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
             },

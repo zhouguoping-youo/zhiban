@@ -68,6 +68,23 @@ class AgentControlStore @Inject constructor(@ApplicationContext context: Context
         check(store.edit().putBoolean("web_search_opt_in", enabled).commit())
     }
 
+    // AI 回复建议：全局总开关（默认开）+ 按联系人"不再建议"。
+    fun replySuggestionsEnabled(): Boolean = store.getBoolean("reply_suggestions_enabled", true)
+
+    fun saveReplySuggestionsEnabled(enabled: Boolean) {
+        check(store.edit().putBoolean("reply_suggestions_enabled", enabled).commit())
+    }
+
+    fun isReplyOptedOut(contactId: String): Boolean = contactId in (store.getStringSet("reply_opt_out_contacts", emptySet()) ?: emptySet())
+
+    fun replyOptedOutContactIds(): Set<String> = store.getStringSet("reply_opt_out_contacts", emptySet()) ?: emptySet()
+
+    fun setReplyOptOut(contactId: String, optedOut: Boolean) {
+        val current = (store.getStringSet("reply_opt_out_contacts", emptySet()) ?: emptySet()).toMutableSet()
+        if (optedOut) current.add(contactId) else current.remove(contactId)
+        check(store.edit().putStringSet("reply_opt_out_contacts", current).commit())
+    }
+
     fun isToolEnabled(name: String): Boolean = name !in (store.getStringSet("disabled_tools", emptySet()) ?: emptySet())
     fun saveToolEnabled(name: String, enabled: Boolean) {
         val disabled = (store.getStringSet("disabled_tools", emptySet()) ?: emptySet()).toMutableSet()

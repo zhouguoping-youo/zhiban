@@ -394,6 +394,10 @@ internal fun NotificationCandidateDialog(
     enabled: Boolean,
     candidates: List<NotificationCandidateEntity>,
     contacts: List<ContactEntity>,
+    replySuggestions: List<ReplySuggestionCardModel>,
+    onForwardReply: (ReplySuggestionCardModel, String) -> Unit,
+    onDismissReply: (ReplySuggestionCardModel) -> Unit,
+    onOptOutReply: (ReplySuggestionCardModel) -> Unit,
     onEnable: () -> Unit,
     onDismissCandidate: (String) -> Unit,
     onConfirmCandidate: (String, String, (String?) -> Unit) -> Unit,
@@ -522,6 +526,33 @@ internal fun NotificationCandidateDialog(
                     style = MaterialTheme.typography.labelSmall,
                 )
                 Spacer(Modifier.height(8.dp))
+            }
+            if (linking == null && !showCollectionSettings && replySuggestions.isNotEmpty()) {
+                Text(
+                    "AI 回复建议",
+                    color = RelationAccent,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.height(6.dp))
+                LazyColumn(
+                    Modifier.fillMaxWidth().heightIn(max = 360.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    items(replySuggestions.size, key = { replySuggestions[it].candidateId }) { index ->
+                        ReplySuggestionCard(
+                            model = replySuggestions[index],
+                            onForward = onForwardReply,
+                            onDismiss = onDismissReply,
+                            onOptOut = onOptOutReply,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                if (candidates.isNotEmpty()) {
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(RelationLine))
+                    Spacer(Modifier.height(4.dp))
+                }
             }
             if (showCollectionSettings && linking == null) {
                 TextButton(
@@ -767,7 +798,7 @@ internal fun NotificationCandidateDialog(
                     colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
                     shape = RoundedCornerShape(ZhiBanRadius.Card),
                 ) { Text("开启消息感知") }
-            } else if (candidates.isEmpty()) {
+            } else if (candidates.isEmpty() && replySuggestions.isEmpty()) {
                 Text(
                     "暂无待确认内容",
                     modifier = Modifier.fillMaxWidth().padding(vertical = 44.dp),
