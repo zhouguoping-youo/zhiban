@@ -124,6 +124,17 @@ class AgentDataRepository internal constructor(
             val existing = daos.notificationCandidateDao.findBySourceKey(candidate.sourceKey)
             if (existing?.status in setOf("CONFIRMED", "DISMISSED")) return@runInTransaction null
             var enriched = enrichNotificationCandidate(candidate)
+            // Dedup against the calendar: if this message's schedule is already on the calendar
+            // (e.g. the same message re-received), link the candidate to that existing schedule and
+            // mark it handled, so it never surfaces again as a fresh "加入日程" offer for an event
+            // the user already has. A genuine change (different time or title) does not match the
+            // equivalence check, so it still surfaces normally for the user to review.
+            scheduleDuplicateOf(enriched)?.let { existingSchedule ->
+                daos.notificationCandidateDao.upsert(
+                    enriched.copy(createdScheduleId = existingSchedule.id, status = "CONFIRMED"),
+                )
+                return@runInTransaction null
+            }
             var automaticallyProcessed = false
             if (isLikelyReplyContext(enriched, nowEpochMs) &&
                 recordInferredInteractionEvidence(enriched, nowEpochMs)
@@ -305,6 +316,19 @@ class AgentDataRepository internal constructor(
         }
 
         return "待确认安排"
+    }
+
+    /**
+     * Returns the calendar schedule this candidate's schedule insight duplicates, or null when it is
+     * a genuinely new (or changed) event. Equivalence is decided by [calendar]'s title+time+duration
+     * match, so a re-sent message about an event already on the calendar matches, while a real
+     * reschedule (different time) or a different event (different title) does not.
+     */
+    private suspend fun scheduleDuplicateOf(candidate: NotificationCandidateEntity): ScheduleProjection? {
+        if (candidate.createdScheduleId != null) return null
+        val insight = ScheduleInsight.from(candidate) ?: return null
+        val title = resolveScheduleTitleFromCandidate(candidate, insight, candidate.senderName ?: candidate.conversationTitle)
+        return calendar.findEquivalentSchedule(title, insight.startAtEpochMs, insight.durationMinutes)
     }
 
     private suspend fun enrichNotificationCandidate(candidate: NotificationCandidateEntity): NotificationCandidateEntity {
