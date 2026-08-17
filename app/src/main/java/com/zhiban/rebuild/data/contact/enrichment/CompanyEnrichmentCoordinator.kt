@@ -29,20 +29,22 @@ internal class CompanyEnrichmentCoordinator(private val database: AgentDatabase,
         var queriedCompanies = 0
         var stagedCandidates = 0
         val degradationCodes = mutableSetOf<String>()
-        eligible.groupBy { normalizeCompanyHint(requireNotNull(it.company)) }.values.forEach { contacts ->
-            val companyHint = contacts.first().company.orEmpty().trim()
-            queriedCompanies += 1
-            runSuspendCatching { gateway.search(companyHint) }
-                .onSuccess { matches ->
-                    stagedCandidates += stageMatches(
-                        contacts = contacts,
-                        companyHint = companyHint,
-                        matches = matches,
-                        nowEpochMs = nowEpochMs,
-                    )
-                }
-                .onFailure { degradationCodes += "company_registry:failure" }
-        }
+        eligible.groupBy { normalizeCompanyHint(requireNotNull(it.company)) }.values
+            .take(MAX_QUERIES_PER_REFRESH)
+            .forEach { contacts ->
+                val companyHint = contacts.first().company.orEmpty().trim()
+                queriedCompanies += 1
+                runSuspendCatching { gateway.search(companyHint) }
+                    .onSuccess { matches ->
+                        stagedCandidates += stageMatches(
+                            contacts = contacts,
+                            companyHint = companyHint,
+                            matches = matches,
+                            nowEpochMs = nowEpochMs,
+                        )
+                    }
+                    .onFailure { degradationCodes += "company_registry:failure" }
+            }
         return CompanyEnrichmentRefreshResult(
             queriedCompanies = queriedCompanies,
             stagedCandidates = stagedCandidates,
@@ -55,9 +57,10 @@ internal class CompanyEnrichmentCoordinator(private val database: AgentDatabase,
         return database.contactDao().listActiveForIntelligence().filter { contact ->
             val company = contact.company?.trim()
             company != null && company.length >= MIN_QUERY_CHARS &&
+                CompanyShortNameDetector.classify(company) == CompanyShortNameDetector.Classification.SUSPECTED_SHORT &&
                 knowledge.countActiveEnrichmentCandidates(
                     contactId = contact.contactId,
-                    providerId = PROVIDER_ID,
+                    providerId = gateway.providerId,
                     fieldKind = FIELD_KIND,
                     nowEpochMs = nowEpochMs,
                 ) == 0
@@ -83,10 +86,10 @@ internal class CompanyEnrichmentCoordinator(private val database: AgentDatabase,
         val candidate = ContactEnrichmentCandidateEntity(
             candidateId = "registry-org-${sha256(evidenceKey).take(24)}",
             contactId = contact.contactId,
-            providerId = PROVIDER_ID,
+            providerId = gateway.providerId,
             fieldKind = FIELD_KIND,
             proposedValueJson = proposedValue(companyHint, match),
-            sourceRef = SOURCE_LABEL,
+            sourceRef = gateway.sourceLabel,
             confidence = match.confidence,
             status = "PENDING",
             observedAtEpochMs = nowEpochMs,
@@ -106,6 +109,7 @@ internal class CompanyEnrichmentCoordinator(private val database: AgentDatabase,
         match.creditCode?.let { put("creditCode", it) }
         match.registrationStatus?.let { put("registrationStatus", it) }
         match.registeredAddress?.let { put("registeredAddress", it) }
+        match.sourceUrl?.let { put("sourceUrl", it) }
         put(
             "matchReasons",
             buildJsonArray { match.matchReasons.forEach { add(JsonPrimitive(it)) } },
@@ -118,12 +122,11 @@ internal class CompanyEnrichmentCoordinator(private val database: AgentDatabase,
         .filterNot(Char::isWhitespace)
 
     private companion object {
-        const val PROVIDER_ID = "company-registry:qichacha"
         const val FIELD_KIND = "ORGANIZATION"
-        const val SOURCE_LABEL = "企查查 · 工商主体"
         const val MIN_QUERY_CHARS = 2
         const val MIN_STAGED_CONFIDENCE = 0.65
         const val MAX_STAGED_MATCHES = 3
+        const val MAX_QUERIES_PER_REFRESH = 20
         const val CANDIDATE_TTL_MS = 30L * 24 * 60 * 60 * 1_000
     }
 }

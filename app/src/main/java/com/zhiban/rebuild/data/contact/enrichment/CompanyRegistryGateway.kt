@@ -24,10 +24,18 @@ data class CompanyRegistryMatch(
     val registeredAddress: String?,
     val confidence: Double,
     val matchReasons: List<String>,
+    /** Where the user can inspect this evidence. Null for sources without a per-record page. */
+    val sourceUrl: String? = null,
 )
 
 interface CompanyRegistryGateway {
     val isConfigured: Boolean
+
+    /** Stable provenance id stamped on every staged candidate so the source stays auditable. */
+    val providerId: String
+
+    /** Human-facing source label shown on the confirmation card. */
+    val sourceLabel: String
 
     /** Sends only a company-name hint. Contact names, phones and emails are forbidden here. */
     suspend fun search(companyHint: String): List<CompanyRegistryMatch>
@@ -35,6 +43,8 @@ interface CompanyRegistryGateway {
 
 object UnavailableCompanyRegistryGateway : CompanyRegistryGateway {
     override val isConfigured: Boolean = false
+    override val providerId: String = "company-registry:unavailable"
+    override val sourceLabel: String = "不可用"
 
     override suspend fun search(companyHint: String): List<CompanyRegistryMatch> = emptyList()
 }
@@ -48,6 +58,8 @@ internal class HttpCompanyRegistryGateway(private val client: OkHttpClient, base
         ?.build()
 
     override val isConfigured: Boolean = searchUrl != null
+    override val providerId: String = STAGED_PROVIDER_ID
+    override val sourceLabel: String = SOURCE_LABEL
 
     override suspend fun search(companyHint: String): List<CompanyRegistryMatch> {
         val query = companyHint.trim()
@@ -121,6 +133,8 @@ internal class HttpCompanyRegistryGateway(private val client: OkHttpClient, base
 
     private companion object {
         const val PROVIDER_ID = "qichacha"
+        const val STAGED_PROVIDER_ID = "company-registry:qichacha"
+        const val SOURCE_LABEL = "企查查 · 工商主体"
         const val MIN_QUERY_CHARS = 2
         const val MAX_QUERY_CHARS = 80
         const val MAX_MATCHES = 5

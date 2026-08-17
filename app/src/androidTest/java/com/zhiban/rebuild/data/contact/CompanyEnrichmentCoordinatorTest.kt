@@ -84,6 +84,8 @@ class CompanyEnrichmentCoordinatorTest {
     private class RecordingGateway : CompanyRegistryGateway {
         val queries = mutableListOf<String>()
         override val isConfigured: Boolean = true
+        override val providerId: String = "company-registry:qichacha"
+        override val sourceLabel: String = "企查查 · 工商主体"
 
         override suspend fun search(companyHint: String): List<CompanyRegistryMatch> {
             queries += companyHint
