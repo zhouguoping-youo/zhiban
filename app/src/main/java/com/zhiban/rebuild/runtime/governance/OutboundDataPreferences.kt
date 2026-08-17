@@ -20,6 +20,7 @@ class OutboundDataPreferences @Inject constructor(@ApplicationContext context: C
         allowCloudSpeech = preferences.getBoolean(KEY_ALLOW_CLOUD_SPEECH, true),
         allowRemoteMcp = preferences.getBoolean(KEY_ALLOW_REMOTE_MCP, false),
         allowRemoteEmbedding = preferences.getBoolean(KEY_ALLOW_REMOTE_EMBEDDING, false),
+        allowWechatIlink = preferences.getBoolean(KEY_ALLOW_WECHAT_ILINK, false),
     )
 
     fun setAllowRedactedAutomaticPersonalContext(enabled: Boolean) {
@@ -38,11 +39,16 @@ class OutboundDataPreferences @Inject constructor(@ApplicationContext context: C
         check(preferences.edit().putBoolean(KEY_ALLOW_REMOTE_EMBEDDING, enabled).commit())
     }
 
+    fun setAllowWechatIlink(enabled: Boolean) {
+        check(preferences.edit().putBoolean(KEY_ALLOW_WECHAT_ILINK, enabled).commit())
+    }
+
     private companion object {
         const val KEY_ALLOW_REDACTED_AUTOMATIC_PERSONAL_CONTEXT =
             "allow_redacted_automatic_personal_context"
         const val KEY_ALLOW_CLOUD_SPEECH = "allow_cloud_speech"
         const val KEY_ALLOW_REMOTE_MCP = "allow_remote_mcp"
         const val KEY_ALLOW_REMOTE_EMBEDDING = "allow_remote_embedding"
+        const val KEY_ALLOW_WECHAT_ILINK = "allow_wechat_ilink"
     }
 }

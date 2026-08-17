@@ -176,6 +176,50 @@ class OutboundDataPolicyTest {
         assertEquals(2, audits.single().omittedMessageCount)
     }
 
+    @Test fun wechatIlinkSendDefaultsClosedWithoutConsent() = runTest {
+        val audits = mutableListOf<OutboundAuditEvent>()
+        val gate = OutboundExportGate(
+            settings = { OutboundPolicySettings() },
+            auditSink = OutboundAuditSink(audits::add),
+        )
+
+        val decision = gate.evaluate(
+            OutboundExportDescriptor(
+                requestId = "wechat-send",
+                channel = OutboundChannel.WECHAT_ILINK,
+                purpose = OutboundPurpose.USER_AUTHORED,
+                sensitivities = setOf(OutboundSensitivity.SENSITIVE),
+                payloadCount = 1,
+                byteCount = 64,
+            ),
+        )
+
+        assertEquals(OutboundExportDecision.CONSENT_REQUIRED, decision)
+        assertEquals(OutboundAuditOutcome.BLOCKED_CONSENT, audits.single().outcome)
+    }
+
+    @Test fun wechatIlinkSendAllowedAfterConsent() = runTest {
+        val audits = mutableListOf<OutboundAuditEvent>()
+        val gate = OutboundExportGate(
+            settings = { OutboundPolicySettings(allowWechatIlink = true) },
+            auditSink = OutboundAuditSink(audits::add),
+        )
+
+        val decision = gate.evaluate(
+            OutboundExportDescriptor(
+                requestId = "wechat-send",
+                channel = OutboundChannel.WECHAT_ILINK,
+                purpose = OutboundPurpose.USER_AUTHORED,
+                sensitivities = setOf(OutboundSensitivity.SENSITIVE),
+                payloadCount = 1,
+                byteCount = 64,
+            ),
+        )
+
+        assertEquals(OutboundExportDecision.ALLOWED, decision)
+        assertEquals(OutboundAuditOutcome.EXPORT_ATTEMPTED, audits.single().outcome)
+    }
+
     @Test fun embeddingDetectorFindsDirectIdentifiersButNotOrdinaryCompanyContext() {
         assertTrue(OutboundPiiDetector.containsDirectIdentifier("电话 13800000000"))
         assertTrue(OutboundPiiDetector.containsDirectIdentifier("邮箱 zhang@example.com"))

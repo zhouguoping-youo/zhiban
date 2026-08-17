@@ -27,6 +27,7 @@ enum class OutboundChannel {
     ASR_REALTIME,
     MCP_REMOTE,
     EMBEDDING,
+    WECHAT_ILINK,
 }
 
 /** Export classification. Callers must classify every outbound value explicitly. */

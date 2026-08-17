@@ -39,6 +39,7 @@ data class OutboundPolicySettings(
     val allowCloudSpeech: Boolean = false,
     val allowRemoteMcp: Boolean = false,
     val allowRemoteEmbedding: Boolean = false,
+    val allowWechatIlink: Boolean = false,
 )
 
 data class OutboundExportDescriptor(
@@ -82,6 +83,8 @@ class OutboundExportGate(
         OutboundChannel.MCP_REMOTE -> settings().allowRemoteMcp
 
         OutboundChannel.EMBEDDING -> settings().allowRemoteEmbedding
+
+        OutboundChannel.WECHAT_ILINK -> settings().allowWechatIlink
     }
 
     suspend fun evaluate(descriptor: OutboundExportDescriptor, contentAllowed: Boolean = true): OutboundExportDecision {
