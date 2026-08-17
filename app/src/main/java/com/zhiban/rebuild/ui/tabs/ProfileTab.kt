@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.ChevronRight
@@ -111,6 +112,7 @@ fun ProfileTab(
     onNavigateToData: () -> Unit = {},
     onNavigateToReportError: () -> Unit = {},
     onNavigateToAbout: () -> Unit = {},
+    onNavigateToWechatChannel: () -> Unit = {},
     modifier: Modifier = Modifier,
     isDataEmpty: Boolean = false,
     viewModel: ProfileTabViewModel = hiltViewModel(),
@@ -158,6 +160,7 @@ fun ProfileTab(
         ),
     )
     val appItems = listOf(
+        ProfileSettingItem(Icons.AutoMirrored.Outlined.Chat, "微信", "绑定后收发微信消息", onClick = onNavigateToWechatChannel),
         ProfileSettingItem(Icons.Outlined.DarkMode, "外观", "跟随手机显示设置", onClick = onNavigateToAppearance),
         ProfileSettingItem(
             Icons.Outlined.NotificationsNone,
