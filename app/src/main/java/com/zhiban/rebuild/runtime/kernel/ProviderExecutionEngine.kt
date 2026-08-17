@@ -425,6 +425,7 @@ internal class ProviderExecutionEngine(
         timeoutMs = config.toolExecutionTimeoutMs,
     )
     private val calendarConflictGuard = CalendarConflictGuard(capabilityRouter)
+    private val wechatSendComposeRedirect = WechatSendComposeRedirect(capabilityRouter, ilinkWechatChannel)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val activeJobs = ConcurrentHashMap<String, Job>()
     private val activeRequests = ConcurrentHashMap<String, String>()
@@ -1818,8 +1819,8 @@ internal class ProviderExecutionEngine(
 
     private suspend fun requestToolApproval(event: ModelEvent.ToolCall, runId: String, sessionId: String, attemptId: String, fencingEpoch: Long): Boolean {
         val revision = store.projectionSnapshot(sessionId, "ui").currentRevision + 2
-        return capabilityRouter.requestApproval(
-            RuntimeToolCallRequest(event.providerCallId, event.name, event.argumentsJson),
+        return wechatSendComposeRedirect.requestApproval(
+            event,
             RuntimeToolRouteContext(runId, sessionId, attemptId, ownerId, fencingEpoch, revision, clock()),
         )
     }
