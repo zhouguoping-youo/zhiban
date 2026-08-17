@@ -424,6 +424,34 @@ internal class RoomApprovalStore(
         )
     }
 
+    /** Real WeChat sends via the iLink channel are confirmation-gated on the same durable plan path. */
+    suspend fun requestWechatSendApproval(
+        payloadJson: String,
+        providerCallId: String,
+        sessionId: String,
+        runId: String,
+        attemptId: String,
+        ownerId: String,
+        fencingEpoch: Long,
+        nowEpochMs: Long,
+    ): Boolean = database.withTransaction {
+        require(payloadJson.toByteArray().size <= 16 * 1024) { "WECHAT_SEND_PLAN_TOO_LARGE" }
+        val payload = Json.parseToJsonElement(payloadJson).jsonObject
+        require(payload["toolName"]?.jsonPrimitive?.content == "communication.wechat.send") {
+            "WECHAT_SEND_PLAN_INVALID"
+        }
+        requestToolApprovalInTransaction(
+            payloadJson,
+            providerCallId,
+            sessionId,
+            runId,
+            attemptId,
+            ownerId,
+            fencingEpoch,
+            nowEpochMs,
+        )
+    }
+
     suspend fun requestCalendarMutationApproval(
         payloadJson: String,
         providerCallId: String,
@@ -877,6 +905,7 @@ internal class RoomApprovalStore(
 
     private fun genericApprovalTitle(toolName: String): String = when {
         toolName == "communication.message.compose" -> "确认发送内容"
+        toolName == "communication.wechat.send" -> "确认微信发送"
         toolName.startsWith("calendar.") -> "确认日程变更"
         toolName.startsWith("contact.") -> "确认联系人变更"
         toolName.startsWith("relationship.") -> "确认联系人关系"

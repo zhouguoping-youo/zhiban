@@ -234,6 +234,7 @@ object AgentDataModule {
         communicationHandoffLauncher: com.zhiban.rebuild.data.communication.CommunicationHandoffLauncher,
         systemCalendarReader: com.zhiban.rebuild.data.calendar.SystemCalendarReader,
         webSearchGateway: com.zhiban.rebuild.runtime.provider.WebSearchGateway,
+        ilinkWechatChannel: com.zhiban.rebuild.runtime.kernel.IlinkWechatChannel,
     ): KernelCommandProcessor = KernelCommandProcessor(
         database,
         ownerId = "app-process",
@@ -291,6 +292,7 @@ object AgentDataModule {
             communicationHandoffLauncher = communicationHandoffLauncher,
             externalCalendarConflicts = systemCalendarReader,
             webSearchGateway = webSearchGateway,
+            ilinkWechatChannel = ilinkWechatChannel,
         ),
     )
 

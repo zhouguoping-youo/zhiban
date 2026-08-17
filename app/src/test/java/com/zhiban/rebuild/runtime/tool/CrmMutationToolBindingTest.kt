@@ -53,13 +53,14 @@ class CrmMutationToolBindingTest {
     }
 
     @Test
-    fun `production catalog exposes thirty two tools including memory upsert and web search`() {
+    fun `production catalog exposes thirty three tools including memory upsert and web search`() {
         val catalog = RuntimeToolCatalog.production()
-        assertEquals(32, catalog.names().size)
+        assertEquals(33, catalog.names().size)
         assertTrue(catalog.names().containsAll(CrmMutationToolBinding.TOOL_NAMES))
         assertTrue(ContactTagToolBinding.TOOL_NAME in catalog.names())
         assertTrue(MemoryUpsertToolBinding.TOOL_NAME in catalog.names())
         assertTrue(WebSearchToolBinding.TOOL_NAME in catalog.names())
+        assertTrue(WechatSendToolBinding.TOOL_NAME in catalog.names())
     }
 
     @Test

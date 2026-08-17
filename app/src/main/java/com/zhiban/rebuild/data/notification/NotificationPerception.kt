@@ -98,6 +98,13 @@ interface NotificationCandidateDao {
     suspend fun findBySourceKey(sourceKey: String): NotificationCandidateEntity?
 
     @Query(
+        """SELECT * FROM notification_candidates
+           WHERE status = 'PENDING' AND platform = :platform AND postedAtEpochMs >= :sinceEpochMs
+           ORDER BY postedAtEpochMs DESC""",
+    )
+    suspend fun recentPendingByPlatform(platform: String, sinceEpochMs: Long): List<NotificationCandidateEntity>
+
+    @Query(
         "UPDATE notification_candidates SET status = 'DISMISSED' WHERE candidateId = :candidateId AND status = 'PENDING'",
     )
     suspend fun dismiss(candidateId: String): Int

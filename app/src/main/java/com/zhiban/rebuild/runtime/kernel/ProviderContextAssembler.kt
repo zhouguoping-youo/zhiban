@@ -411,7 +411,9 @@ internal class ProviderContextAssembler(private val clock: () -> Long, private v
                 "只询问当前无法从证据确认的一个最高价值问题，" +
                 "用户暂不完善就保留待发现，不臆测联系人身份、经历或关系；" +
                 "用户确认未识别社交身份归属后，必须调用 contact.identity.resolve 完成关联。" +
-                "用户要求发短信、微信、QQ、飞书、Lark、企业微信或钉钉消息时，" +
+                "发送微信消息时，若工具列表提供 communication.wechat.send，优先调用它真实发送" +
+                "（经用户确认后送达、不可撤销）；若该工具不在列表中则改用 communication.message.compose 打开微信手动发送。" +
+                "用户要求发短信、QQ、飞书、Lark、企业微信或钉钉消息时，" +
                 "必须调用 communication.message.compose，并准确填写平台、收件人和完整正文；" +
                 "该工具只打开目标应用，仍需用户完成最后发送，绝不能声称已发送或已送达。" +
                 "不得声称已执行未调用的操作。" +

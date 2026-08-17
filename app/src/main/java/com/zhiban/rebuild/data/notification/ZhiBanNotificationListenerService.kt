@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.zhiban.rebuild.data.agent.AgentDataRepository
+import com.zhiban.rebuild.data.ilink.IlinkFetchCoordinator
 import com.zhiban.rebuild.runtime.runSuspendCatching
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -21,9 +22,10 @@ import kotlinx.coroutines.launch
 class ZhiBanNotificationListenerService : NotificationListenerService() {
     @EntryPoint
     @InstallIn(SingletonComponent::class)
-    interface Dependencies {
+    internal interface Dependencies {
         fun repository(): AgentDataRepository
         fun collectionPreferences(): MessageCollectionPreferences
+        fun ilinkFetchCoordinator(): IlinkFetchCoordinator
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -32,6 +34,9 @@ class ZhiBanNotificationListenerService : NotificationListenerService() {
     }
     private val collectionPreferences by lazy {
         EntryPointAccessors.fromApplication(applicationContext, Dependencies::class.java).collectionPreferences()
+    }
+    private val ilinkFetchCoordinator by lazy {
+        EntryPointAccessors.fromApplication(applicationContext, Dependencies::class.java).ilinkFetchCoordinator()
     }
     private val notifications = Channel<StatusBarNotification>(
         capacity = NOTIFICATION_BUFFER_CAPACITY,
@@ -111,6 +116,10 @@ class ZhiBanNotificationListenerService : NotificationListenerService() {
         ) ?: return
         if (!collectionPreferences.isEnabled(candidate.platform)) return
         repository.stageNotificationCandidate(candidate)
+        if (candidate.platform == WECHAT_PLATFORM_CODE) {
+            // The notification text is truncated; trigger a full-message pull (best-effort, debounced).
+            ilinkFetchCoordinator.onWechatMessageActivity()
+        }
     }
 
     override fun onDestroy() {
@@ -141,5 +150,6 @@ class ZhiBanNotificationListenerService : NotificationListenerService() {
         const val ACTIVE_NOTIFICATION_RECOVERY_WINDOW_MS = 15 * 60_000L
         const val NOTIFICATION_GAP_THRESHOLD_MS = 30 * 60_000L
         const val MAX_NOTIFICATION_TEXT = 2_000
+        const val WECHAT_PLATFORM_CODE = "WECHAT"
     }
 }

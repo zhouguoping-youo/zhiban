@@ -269,6 +269,20 @@ interface ContactIdentityDao {
     suspend fun findContactByPlatformHandle(platform: String, normalizedHandle: String): ContactEntity?
 
     @Query(
+        """SELECT canonical.* FROM contact_platform_identities
+           INNER JOIN contacts source ON source.contactId = contact_platform_identities.contactId
+           LEFT JOIN contact_merge_links link
+             ON link.sourceContactId = source.contactId AND link.undoneAtEpochMs IS NULL
+           INNER JOIN contacts canonical ON canonical.contactId = COALESCE(link.canonicalContactId, source.contactId)
+           WHERE contact_platform_identities.platform = :platform
+             AND contact_platform_identities.platformUserId = :platformUserId
+             AND canonical.deletedAtEpochMs IS NULL
+           ORDER BY contact_platform_identities.updatedAtEpochMs DESC
+           LIMIT 1""",
+    )
+    suspend fun findContactByPlatformUserId(platform: String, platformUserId: String): ContactEntity?
+
+    @Query(
         """SELECT canonical.* FROM contact_aliases
            INNER JOIN contacts source ON source.contactId = contact_aliases.contactId
            LEFT JOIN contact_merge_links link

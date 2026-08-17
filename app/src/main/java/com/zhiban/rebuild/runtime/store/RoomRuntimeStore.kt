@@ -536,7 +536,7 @@ internal class RoomRuntimeStore(private val database: AgentDatabase, private val
         database.runtimeRunInputDao().findByRunId(runId)?.rawText
     }
 
-    private val approvals = RoomApprovalStore(
+    internal val approvals = RoomApprovalStore(
         database = database,
         producerVersion = producerVersion,
         requireActiveLease = ::requireActiveLease,

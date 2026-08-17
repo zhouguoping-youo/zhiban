@@ -93,6 +93,7 @@ import com.zhiban.rebuild.runtime.tool.SchedulePlanValidator
 import com.zhiban.rebuild.runtime.tool.ToolConfirmation
 import com.zhiban.rebuild.runtime.tool.ToolDisposition
 import com.zhiban.rebuild.runtime.tool.WebSearchToolBinding
+import com.zhiban.rebuild.runtime.tool.WechatSendToolBinding
 import com.zhiban.rebuild.runtime.tool.canonicalMemoryDigest
 import com.zhiban.rebuild.runtime.tool.canonicalMemoryIdempotencyKey
 import com.zhiban.rebuild.runtime.tool.canonicalScheduleDigest
@@ -182,6 +183,7 @@ internal data class ProviderEngineInfrastructure(
     val externalCalendarConflicts: com.zhiban.rebuild.data.calendar.ExternalCalendarConflictSource? = null,
     val perception: PerceptionGateway? = null,
     val webSearchGateway: com.zhiban.rebuild.runtime.provider.WebSearchGateway? = null,
+    val ilinkWechatChannel: IlinkWechatChannel? = null,
 )
 
 internal class ProviderExecutionEngine(
@@ -219,6 +221,7 @@ internal class ProviderExecutionEngine(
     private val externalCalendarConflicts = infrastructure.externalCalendarConflicts
     private val perception = infrastructure.perception
     private val webSearchGateway = infrastructure.webSearchGateway
+    private val ilinkWechatChannel = infrastructure.ilinkWechatChannel
     private val store = RoomRuntimeStore(database, producerVersion = "runtime-v2-provider")
     private val events = RuntimeEventAppender(store, ownerId, clock)
     private val deterministicObservation = DeterministicObservationCompleter(store, ownerId, clock, ::perceiveForObservation)
@@ -400,6 +403,7 @@ internal class ProviderExecutionEngine(
                     it,
                 )
             },
+            ilinkWechatChannel?.sendBinding(toolCatalog.requireRegistered(WechatSendToolBinding.TOOL_NAME), store),
         ).filterNotNull(),
         proposalCount = store::toolProposalCount,
         totalCallCount = store::totalToolInvocationCount,
@@ -819,6 +823,12 @@ internal class ProviderExecutionEngine(
             ),
         )
         val forcedToolName = forcedCanonicalTool?.let(capabilityRouter::providerName)
+        val toolRestriction = WorkToolVisibility.resolveRestriction(
+            forcedCanonicalTool,
+            allowedTools,
+            ilinkWechatChannel?.credentialStore,
+            capabilityRouter.canonicalNames(),
+        )
         val request = ModelRequest(
             requestId = attemptId,
             channel = OutboundChannel.LLM_INFERENCE,
@@ -826,9 +836,7 @@ internal class ProviderExecutionEngine(
             messages = assembledMessages.messages, capability = capability,
             maxTokens = minOf(DEFAULT_MAX_OUTPUT_TOKENS, capability.maxOutputTokens),
             toolsJson = if (input.mode == "Work" && "tools" in capability.features) {
-                capabilityRouter.providerToolsJson(
-                    forcedCanonicalTool?.let(::setOf) ?: allowedTools,
-                )
+                capabilityRouter.providerToolsJson(toolRestriction)
             } else {
                 null
             },
@@ -1867,6 +1875,10 @@ internal class ProviderExecutionEngine(
             "CAPABILITY_UNAVAILABLE",
             "TARGET_APP_UNAVAILABLE",
             "INSUFFICIENT_QUOTA", "INPUT_SENSITIVE", "OUTPUT_SENSITIVE", "INVALID_REQUEST",
+            // WeChat iLink channel (communication.wechat.send). Surfaced verbatim so the conversation
+            // can tell the user to bind/re-bind or link the recipient instead of a generic failure.
+            "ILINK_NOT_BOUND", "ILINK_SESSION_EXPIRED", "WECHAT_ILINK_CONSENT_REQUIRED",
+            "ILINK_CONTACT_NOT_FOUND", "ILINK_RECIPIENT_NOT_LINKED", "ILINK_MESSAGE_INVALID",
         )
         val ENGLISH_CALLED_TITLE = Regex(
             """\bcalled\s+(.+?)(?=,\s*remind\b|,\s*with\b|[.!?]\s*$|$)""",
