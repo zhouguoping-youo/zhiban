@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.ui.settings
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,9 +20,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -35,6 +37,7 @@ import com.zhiban.rebuild.data.ilink.IlinkBotBinding
 import com.zhiban.rebuild.data.ilink.IlinkBotBindingController
 import com.zhiban.rebuild.data.ilink.IlinkBotCredentialStore
 import com.zhiban.rebuild.data.ilink.IlinkCursorStore
+import com.zhiban.rebuild.data.ilink.IlinkFetchCoordinator
 import com.zhiban.rebuild.runtime.governance.OutboundDataPreferences
 import com.zhiban.rebuild.ui.components.ZhiBanToggleRow
 import com.zhiban.rebuild.ui.theme.ZhiBanRadius
@@ -67,6 +70,7 @@ internal class WechatChannelViewModel @Inject constructor(
     private val bindingController: IlinkBotBindingController,
     private val cursorStore: IlinkCursorStore,
     private val contextTokenCache: ContextTokenCache,
+    private val fetchCoordinator: IlinkFetchCoordinator,
 ) : ViewModel() {
     private val _state = MutableStateFlow(WechatChannelState())
     val state = _state.asStateFlow()
@@ -125,6 +129,14 @@ internal class WechatChannelViewModel @Inject constructor(
             preferences.setAllowWechatIlink(false)
             _state.update { it.copy(enabled = false, binding = null, bindUi = null) }
         }
+    }
+
+    /**
+     * Force an immediate inbound pull. Manual fallback for when no WeChat notification fires — most
+     * commonly because WeChat is also logged in on a desktop, which mutes the phone's notifications.
+     */
+    fun syncNow() {
+        fetchCoordinator.syncNow()
     }
 }
 
@@ -204,6 +216,13 @@ private fun BindStatusCard(state: WechatChannelState, viewModel: WechatChannelVi
                 WechatInfoRow("微信", binding.ilinkUserId)
                 WechatInfoRow("绑定时间", formatEpochMs(binding.boundAtEpochMs))
                 Spacer(Modifier.height(ZhiBanSpacing.Sm))
+                Button(onClick = viewModel::syncNow, modifier = Modifier.fillMaxWidth()) { Text("立即同步消息") }
+                Text(
+                    "电脑登录微信时手机不弹通知，收不到可点上方手动拉取",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ZhiBanTextSecondary,
+                    modifier = Modifier.padding(top = ZhiBanSpacing.Xs),
+                )
                 TextButton(onClick = viewModel::unbind, modifier = Modifier.fillMaxWidth()) { Text("解绑") }
             }
         }
@@ -214,7 +233,19 @@ private fun BindStatusCard(state: WechatChannelState, viewModel: WechatChannelVi
 private fun BindFlowCard(bindUi: IlinkBindUiState, onCancel: () -> Unit, onRetry: () -> Unit) {
     SettingsCard {
         when (bindUi) {
-            is IlinkBindUiState.ShowQrcode -> {
+            is IlinkBindUiState.Bound -> Unit
+
+            // handled via `binding`
+            is IlinkBindUiState.Failed -> {
+                WechatInfoRow("绑定失败", bindFailureMessage(bindUi.reasonCode))
+                Spacer(Modifier.height(ZhiBanSpacing.Sm))
+                Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) { Text("重试") }
+                TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text("取消") }
+            }
+
+            // ShowQrcode / WaitingScan / Scanned: the QR stays on screen for the entire scan, with
+            // only the line beneath it changing as the handshake progresses.
+            else -> {
                 Text(
                     "用微信扫描下方二维码完成绑定",
                     style = MaterialTheme.typography.bodyLarge,
@@ -225,26 +256,18 @@ private fun BindFlowCard(bindUi: IlinkBindUiState, onCancel: () -> Unit, onRetry
                     WechatQrImage(bindUi.qrcodeImgUrl)
                 }
                 Spacer(Modifier.height(ZhiBanSpacing.Sm))
-                TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text("取消") }
-            }
-
-            IlinkBindUiState.WaitingScan -> {
-                WechatWaitingRow("等待扫码…")
-                TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text("取消") }
-            }
-
-            IlinkBindUiState.Scanned -> {
-                WechatWaitingRow("已扫码，请在手机上确认")
-                TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text("取消") }
-            }
-
-            is IlinkBindUiState.Bound -> Unit
-
-            // handled via `binding`
-            is IlinkBindUiState.Failed -> {
-                WechatInfoRow("绑定失败", bindFailureMessage(bindUi.reasonCode))
+                if (bindUi is IlinkBindUiState.Scanned) {
+                    WechatWaitingRow("已扫码，请在手机上确认")
+                } else {
+                    Text(
+                        "同一台手机：先截图，再到微信「扫一扫 → 相册」选这张截图即可",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ZhiBanTextSecondary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 Spacer(Modifier.height(ZhiBanSpacing.Sm))
-                Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) { Text("重试") }
                 TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text("取消") }
             }
         }
@@ -271,31 +294,30 @@ private fun WechatInfoRow(title: String, text: String) {
     }
 }
 
-/** Renders the QR from whatever the server returned: an http(s) URL, or base64 image bytes. */
+/**
+ * Renders the bind QR by encoding the server's `qrcode_img_content` payload locally. That payload is
+ * a landing-page URL, not a displayable image (see [rememberQrcodeBitmap]), so it must be encoded
+ * into a QR, not fetched. White background + no filtering keeps the modules crisp and scannable.
+ */
 @Composable
 private fun WechatQrImage(content: String?) {
-    val model: Any? = remember(content) {
-        when {
-            content.isNullOrBlank() -> null
-            content.startsWith("http://") || content.startsWith("https://") -> content
-            else -> runCatching { android.util.Base64.decode(content, android.util.Base64.DEFAULT) }.getOrNull()
-        }
-    }
-    if (model == null) {
+    val bitmap = rememberQrcodeBitmap(content, QR_CODE_SIZE_PX)
+    if (bitmap == null) {
         Text(
-            "二维码加载失败，请重试",
+            "二维码生成失败，请重试",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.error,
             textAlign = TextAlign.Center,
         )
     } else {
-        coil.compose.AsyncImage(
-            model = model,
+        Image(
+            bitmap = bitmap,
             contentDescription = "微信绑定二维码",
             modifier = Modifier
                 .size(220.dp)
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(ZhiBanRadius.Card)),
+                .background(Color.White, RoundedCornerShape(ZhiBanRadius.Card)),
             contentScale = ContentScale.Fit,
+            filterQuality = FilterQuality.None,
         )
     }
 }
@@ -307,3 +329,7 @@ private fun bindFailureMessage(reasonCode: String): String = when (reasonCode) {
 }
 
 private fun formatEpochMs(epochMs: Long): String = if (epochMs <= 0L) "—" else SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(epochMs))
+
+// The QR is generated at a fixed pixel size well above its on-screen dp size; FilterQuality.None
+// then downscales without smoothing so the modules stay sharp enough for WeChat to scan.
+private const val QR_CODE_SIZE_PX = 512

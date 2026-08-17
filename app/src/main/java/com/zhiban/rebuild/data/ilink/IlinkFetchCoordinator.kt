@@ -48,6 +48,18 @@ internal class IlinkFetchCoordinator @Inject constructor(
         triggers.trySend(Unit)
     }
 
+    /**
+     * Force an immediate pull (the settings "sync now" action), bypassing the debounce. This is the
+     * fallback for when no notification fires — e.g. WeChat is also logged in on a desktop, which by
+     * default mutes the phone's message notifications so the listener never sees a trigger.
+     */
+    fun syncNow() {
+        scope.launch {
+            runCatching { fetchOnce() }
+                .onFailure { if (it is CancellationException) throw it }
+        }
+    }
+
     @Synchronized
     private fun ensureConsumerStarted() {
         if (consumerStarted) return

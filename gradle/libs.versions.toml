@@ -18,6 +18,7 @@ work = "2.10.0"
 coil = "2.7.0"
 ksp = "2.1.0-1.0.29"
 mlkitTextRecognition = "16.0.1"
+zxingCore = "3.5.3"
 detekt = "1.23.8"
 ktlintGradle = "14.2.0"
 
@@ -62,6 +63,7 @@ kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serialization" }
 desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", version = "2.1.4" }
 mlkit-text-recognition-chinese = { group = "com.google.mlkit", name = "text-recognition-chinese", version.ref = "mlkitTextRecognition" }
+zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxingCore" }
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutinesTest" }

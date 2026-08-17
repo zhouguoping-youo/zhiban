@@ -12,14 +12,21 @@ import kotlinx.coroutines.flow.flow
 
 /** UI-facing states of the QR bind flow, collected by the settings screen. */
 sealed interface IlinkBindUiState {
+    /**
+     * The QR payload to show, carried by every pre-bound phase. The code must stay on screen for
+     * the whole scan — if a later phase (waiting / scanned) dropped it, the QR would vanish the
+     * instant it appeared and the user could never scan it.
+     */
+    val qrcodeImgUrl: String? get() = null
+
     /** Show this QR image so the user can scan it with WeChat. */
-    data class ShowQrcode(val qrcodeImgUrl: String?, val attempt: Int) : IlinkBindUiState
+    data class ShowQrcode(override val qrcodeImgUrl: String?, val attempt: Int) : IlinkBindUiState
 
     /** Code on screen, waiting for the user to scan it. */
-    data object WaitingScan : IlinkBindUiState
+    data class WaitingScan(override val qrcodeImgUrl: String?) : IlinkBindUiState
 
     /** Scanned; waiting for the user to confirm on their phone. */
-    data object Scanned : IlinkBindUiState
+    data class Scanned(override val qrcodeImgUrl: String?) : IlinkBindUiState
 
     /** Confirmed and credentials saved; the channel is ready. */
     data class Bound(val binding: IlinkBotBinding) : IlinkBindUiState
@@ -65,7 +72,7 @@ internal class IlinkBotBindingController @Inject constructor(
         gate.requireBindAllowed("ilink-bind-qrcode-${System.currentTimeMillis()}")
         val qrcode = transport.getBotQrcode()
         emit(IlinkBindUiState.ShowQrcode(qrcode.qrcodeImgUrl, attempt))
-        emit(IlinkBindUiState.WaitingScan)
+        emit(IlinkBindUiState.WaitingScan(qrcode.qrcodeImgUrl))
         var scanned = false
         while (System.currentTimeMillis() < deadline) {
             delay(POLL_INTERVAL_MS)
@@ -79,7 +86,7 @@ internal class IlinkBotBindingController @Inject constructor(
 
                 is IlinkBindStatus.Scanned -> if (!scanned) {
                     scanned = true
-                    emit(IlinkBindUiState.Scanned)
+                    emit(IlinkBindUiState.Scanned(qrcode.qrcodeImgUrl))
                 }
 
                 is IlinkBindStatus.Waiting -> Unit
