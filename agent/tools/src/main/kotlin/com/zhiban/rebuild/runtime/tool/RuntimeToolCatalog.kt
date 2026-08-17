@@ -20,6 +20,10 @@ data class RuntimeToolSpec(
     // remote MCP). The auto-write provenance gate requires confirmation when a run that consumed
     // external content attempts a silent reversible write.
     val returnsExternalContent: Boolean = false,
+    // True when the Agent may call this tool autonomously during a proactive run without the user
+    // explicitly requesting it in the current turn. Only READ_ONLY tools should set this to true.
+    // Write tools must always remain false — writes require explicit user confirmation.
+    val autonomousSafe: Boolean = false,
 )
 
 /** Single authoritative allowlist shared by prompt exposure, validation and policy. */
