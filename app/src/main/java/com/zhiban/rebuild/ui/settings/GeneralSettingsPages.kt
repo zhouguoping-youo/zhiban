@@ -32,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Contacts
+import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Phone
@@ -187,6 +188,12 @@ fun PrivacySecurityPage(
                         "麦克风",
                         permissions.microphone.withPurpose("语音输入和通话备注"),
                     ) { requestOrOpen(Manifest.permission.RECORD_AUDIO, permissions.microphone.isGranted) }
+                    Divider()
+                    SettingsPermissionRow(
+                        Icons.Outlined.LocationOn,
+                        "位置",
+                        permissions.location.withPurpose("回答位置、天气和附近地点"),
+                    ) { requestOrOpen(Manifest.permission.ACCESS_FINE_LOCATION, permissions.location.isGranted) }
                     Divider()
                     SettingsPermissionRow(
                         Icons.Outlined.Phone,
@@ -899,6 +906,7 @@ private data class PermissionSnapshot(
     val contacts: PermissionStatus,
     val calendar: PermissionStatus,
     val callLog: PermissionStatus,
+    val location: PermissionStatus,
     val isNotificationListener: Boolean,
     val outgoingAccessibility: Boolean,
 ) {
@@ -908,6 +916,7 @@ private data class PermissionSnapshot(
             contacts = PermissionStatus(false),
             calendar = PermissionStatus(false),
             callLog = PermissionStatus(false),
+            location = PermissionStatus(false),
             isNotificationListener = false,
             outgoingAccessibility = false,
         )
@@ -917,6 +926,10 @@ private data class PermissionSnapshot(
             contacts = context.permissionStatus(Manifest.permission.READ_CONTACTS),
             calendar = context.permissionStatus(Manifest.permission.READ_CALENDAR),
             callLog = context.permissionStatus(Manifest.permission.READ_CALL_LOG),
+            location = PermissionStatus(
+                context.permissionStatus(Manifest.permission.ACCESS_COARSE_LOCATION).isGranted ||
+                    context.permissionStatus(Manifest.permission.ACCESS_FINE_LOCATION).isGranted,
+            ),
             isNotificationListener = NotificationManagerCompat.getEnabledListenerPackages(context)
                 .contains(context.packageName),
             outgoingAccessibility = Settings.Secure.getString(

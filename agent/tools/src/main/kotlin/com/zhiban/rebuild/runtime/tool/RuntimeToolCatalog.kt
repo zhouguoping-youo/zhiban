@@ -69,6 +69,13 @@ class RuntimeToolCatalog(val specs: Map<String, RuntimeToolSpec>) {
                     returnsExternalContent = true,
                 ),
                 RuntimeToolSpec(
+                    "location.current",
+                    1,
+                    RuntimeToolRisk.READ_ONLY,
+                    """{"type":"function","function":{"name":"location.current","description":"读取本机当前位置（一次性快照，不做持续轨迹）。仅在用户明确询问当前位置、天气、附近地点、距离或路线等需要位置的场景调用；否则不要主动调用。返回 GCJ-02 坐标（可直接对接国内地图），含精度与采集时间；坐标是用户敏感数据，只能用于回答本次问题，不得写入联系人、消息或对外发送。","parameters":{"type":"object","additionalProperties":false,"properties":{}}}}""",
+                    2,
+                ),
+                RuntimeToolSpec(
                     "calendar.schedule.search",
                     1,
                     RuntimeToolRisk.READ_ONLY,

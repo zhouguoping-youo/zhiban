@@ -98,6 +98,7 @@ import com.zhiban.rebuild.runtime.tool.canonicalMemoryDigest
 import com.zhiban.rebuild.runtime.tool.canonicalMemoryIdempotencyKey
 import com.zhiban.rebuild.runtime.tool.canonicalScheduleDigest
 import com.zhiban.rebuild.runtime.tool.canonicalToolIdempotencyKey
+import com.zhiban.rebuild.runtime.tool.locationToolBindings
 import com.zhiban.rebuild.runtime.tool.sha256
 import java.io.IOException
 import java.time.Instant
@@ -184,6 +185,7 @@ internal data class ProviderEngineInfrastructure(
     val perception: PerceptionGateway? = null,
     val webSearchGateway: com.zhiban.rebuild.runtime.provider.WebSearchGateway? = null,
     val ilinkWechatChannel: IlinkWechatChannel? = null,
+    val locationGateway: com.zhiban.rebuild.runtime.provider.LocationGateway? = null,
 )
 
 internal class ProviderExecutionEngine(
@@ -414,13 +416,12 @@ internal class ProviderExecutionEngine(
             autoPresentationTools = AutoWritePresentationRegistry.toolNames,
         ),
         dynamicBindings = {
-            if (!dynamicConfig().enableMcpRemote) {
-                emptyList()
+            val mcp = if (dynamicConfig().enableMcpRemote) {
+                mcpEnvironment?.tools()?.map { RemoteMcpToolBinding(it, mcpEnvironment, store) }.orEmpty()
             } else {
-                mcpEnvironment?.tools()?.map { remote ->
-                    RemoteMcpToolBinding(remote, mcpEnvironment, store)
-                }.orEmpty()
+                emptyList()
             }
+            mcp + locationToolBindings(toolCatalog, infrastructure.locationGateway)
         },
         timeoutMs = config.toolExecutionTimeoutMs,
     )

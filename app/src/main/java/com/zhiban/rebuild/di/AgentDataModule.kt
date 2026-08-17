@@ -235,6 +235,7 @@ object AgentDataModule {
         systemCalendarReader: com.zhiban.rebuild.data.calendar.SystemCalendarReader,
         webSearchGateway: com.zhiban.rebuild.runtime.provider.WebSearchGateway,
         ilinkWechatChannel: com.zhiban.rebuild.runtime.kernel.IlinkWechatChannel,
+        locationGateway: com.zhiban.rebuild.runtime.provider.LocationGateway,
     ): KernelCommandProcessor = KernelCommandProcessor(
         database,
         ownerId = "app-process",
@@ -293,8 +294,14 @@ object AgentDataModule {
             externalCalendarConflicts = systemCalendarReader,
             webSearchGateway = webSearchGateway,
             ilinkWechatChannel = ilinkWechatChannel,
+            locationGateway = locationGateway,
         ),
     )
+
+    @Provides
+    @Singleton
+    internal fun provideLocationGateway(@ApplicationContext context: Context): com.zhiban.rebuild.runtime.provider.LocationGateway =
+        com.zhiban.rebuild.data.location.SystemLocationGateway(context)
 
     @Provides
     @Singleton
