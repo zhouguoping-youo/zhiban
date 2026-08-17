@@ -179,6 +179,13 @@ class LocalEntityExtractor(private val zoneId: ZoneId = ZoneId.systemDefault()) 
             text.lowercase().containsAny("create a calendar", "add to calendar", "remind me", "schedule a meeting") ->
             IntentLabel.CALENDAR_CREATE to CALENDAR_CREATE_CONFIDENCE
 
+        // An explicit message-send ("给X发条微信/发短信/发消息…") is a communication task, not a calendar
+        // write — even when the message body itself carries a time ("周五下午三点老地方见"). Checked after
+        // the explicit calendar verbs (so "提醒我…发微信" stays a reminder) but before the casual
+        // future-time signal below, which would otherwise hijack the timestamp in the *content*.
+        MESSAGE_SEND.containsMatchIn(text) ->
+            IntentLabel.GENERAL_WORK to GENERAL_WORK_CONFIDENCE
+
         // A future-dated wall-clock ("明晚8点健身", "后天上午10点复诊") with no explicit verb is still a
         // schedule-creation request in Work mode — the user stated a time plus an activity. Detecting it
         // here routes to the deterministic confirmation path instead of letting the model free-text a
@@ -408,6 +415,15 @@ private val CALENDAR_READ_QUESTION = Regex(
     "(?:有啥|有何|有什么|有哪些|有没有)\\s*(?:安排|日程|会议|事)|" +
         "(?:安排|日程|会议).{0,8}(?:是什么|有哪些|有啥|有何|哪些事)|" +
         "(?:有安排|有日程|有会议|有事)\\s*(?:吗|么|嘛|吧|呢|[?？])",
+)
+
+// A send verb followed by a messaging platform/noun — "发条微信", "发一条短信", "发消息", "发QQ",
+// "微信发给X". The optional measure word (条/个/封) keeps it from matching "发现"/"出发"/"开发", which
+// carry no messaging intent. Used to keep message-sends out of the calendar-write intent.
+private val MESSAGE_SEND = Regex(
+    """发\s*(?:一?\s*[条个封]\s*)?(?:微信|短信|消息|信息|QQ|飞书|钉钉|企业微信|Lark)|""" +
+        """(?:微信|短信|消息|信息|QQ|飞书|钉钉|企业微信|Lark)\s*发给""",
+    RegexOption.IGNORE_CASE,
 )
 
 /**

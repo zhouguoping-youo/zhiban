@@ -104,6 +104,32 @@ class EntityExtractionTest {
         assertEquals(IntentLabel.CALENDAR_CREATE, extractor.extract("今晚7点跟客户吃饭", "Work", now).intentLabel)
     }
 
+    // A message-send whose *content* carries a time ("就说周五下午三点老地方见") must not be hijacked into
+    // CALENDAR_CREATE by the casual future-time signal — it is a communication task (GENERAL_WORK) so the
+    // model picks wechat.send / communication.message.compose instead of force-creating a schedule.
+    @Test fun messageSendWithTimeInContentIsNotCalendarCreate() {
+        assertEquals(
+            IntentLabel.GENERAL_WORK,
+            extractor.extract("给汪戈发条微信，就说周五下午三点老地方见", "Work", now).intentLabel,
+        )
+        assertEquals(
+            IntentLabel.GENERAL_WORK,
+            extractor.extract("发短信给张三，明天下午三点见", "Work", now).intentLabel,
+        )
+        assertEquals(
+            IntentLabel.GENERAL_WORK,
+            extractor.extract("帮我发条消息：明晚8点老地方见", "Work", now).intentLabel,
+        )
+        // An explicit reminder/schedule verb still wins over an embedded send — "提醒我…发微信" is a
+        // reminder, not a message-send.
+        assertEquals(
+            IntentLabel.CALENDAR_CREATE,
+            extractor.extract("提醒我周五下午三点给汪戈发微信", "Work", now).intentLabel,
+        )
+        // No send verb: a bare future time + activity stays a calendar write (no regression).
+        assertEquals(IntentLabel.CALENDAR_CREATE, extractor.extract("明晚8点健身", "Work", now).intentLabel)
+    }
+
     @Test fun compactDayPeriodAnchorsResolveDateAndClockTogether() {
         val cases = listOf(
             "今晚7点跟客户吃饭" to LocalDateTime.of(2026, 7, 21, 19, 0),
