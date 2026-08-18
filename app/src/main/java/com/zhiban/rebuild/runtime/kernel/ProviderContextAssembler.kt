@@ -118,23 +118,30 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+/** 查询与检索结果,打包进 [assembleMessages] 以守住参数 ≤5 红线。 */
+internal data class QueryAssemblyContext(val query: QueryContext, val retrieval: ContextRetrievalResult)
+
+/** 会话级上下文素材(记忆/摘要/近轮/反馈),打包进 [assembleMessages] 以守住参数 ≤5 红线。 */
+internal data class SessionAssemblyContext(
+    val memories: List<String>,
+    val summary: String?,
+    val recentTurns: List<com.zhiban.rebuild.runtime.store.RuntimeConversationTurnEntity>,
+    val feedback: List<String>,
+)
+
 /** Executes only the provider portion of a Runtime v2 run. It never exposes credential material. */
 internal class ProviderContextAssembler(private val clock: () -> Long, private val personalization: () -> String?) {
     internal fun assembleMessages(
         input: DecodedInput,
-        queryContext: QueryContext,
-        retrieval: ContextRetrievalResult,
-        memories: List<String>,
-        sessionSummary: String?,
-        recentConversation: List<com.zhiban.rebuild.runtime.store.RuntimeConversationTurnEntity>,
-        feedback: List<String>,
+        query: QueryAssemblyContext,
+        session: SessionAssemblyContext,
         activatedSkills: List<SkillActivation>,
         maxContextTokens: Int,
     ): AssembledModelContext {
         val blocks = buildList {
             addAll(systemContextBlocks(input, activatedSkills))
-            addAll(retrievalContextBlocks(queryContext, retrieval))
-            addAll(sessionContextBlocks(sessionSummary, recentConversation, memories, feedback))
+            addAll(retrievalContextBlocks(query.query, query.retrieval))
+            addAll(sessionContextBlocks(session.summary, session.recentTurns, session.memories, session.feedback))
             add(
                 ContextBlock(
                     "input",
@@ -150,7 +157,7 @@ internal class ProviderContextAssembler(private val clock: () -> Long, private v
         }
         val reserved = minOf(DEFAULT_MAX_OUTPUT_TOKENS, maxContextTokens / 2)
         val assembly = PromptAssembler().assemble(blocks, PromptBudget(maxContextTokens, reserved))
-        val conversationRoles = recentConversation.associate { it.turnId to it.role }
+        val conversationRoles = session.recentTurns.associate { it.turnId to it.role }
         val messages = blocksToMessages(assembly.included, conversationRoles)
         return AssembledModelContext(
             messages,

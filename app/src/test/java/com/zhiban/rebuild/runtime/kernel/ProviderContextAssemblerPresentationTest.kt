@@ -19,12 +19,16 @@ class ProviderContextAssemblerPresentationTest {
     fun systemPolicyHidesImplementationDetailsUnlessTheUserAsks() {
         val result = ProviderContextAssembler(clock = { 0L }, personalization = { null }).assembleMessages(
             input = DecodedInput(text = "今天有什么安排", mode = "Work"),
-            queryContext = QueryContext(IntentLabel.CALENDAR_QUERY, 1.0, emptyList(), null, emptyList()),
-            retrieval = ContextRetrievalResult(emptyList(), 0, emptyList(), 0),
-            memories = emptyList(),
-            sessionSummary = null,
-            recentConversation = emptyList(),
-            feedback = emptyList(),
+            query = QueryAssemblyContext(
+                QueryContext(IntentLabel.CALENDAR_QUERY, 1.0, emptyList(), null, emptyList()),
+                ContextRetrievalResult(emptyList(), 0, emptyList(), 0),
+            ),
+            session = SessionAssemblyContext(
+                memories = emptyList(),
+                summary = null,
+                recentTurns = emptyList(),
+                feedback = emptyList(),
+            ),
             activatedSkills = emptyList(),
             maxContextTokens = 4_096,
         )
@@ -48,12 +52,16 @@ class ProviderContextAssemblerPresentationTest {
         val currentInput = "请根据刚才的信息安排明晚八点的日程".repeat(30)
         val result = ProviderContextAssembler(clock = { 0L }, personalization = { null }).assembleMessages(
             input = DecodedInput(text = currentInput, mode = "Work"),
-            queryContext = QueryContext(IntentLabel.CALENDAR_CREATE, 1.0, emptyList(), null, emptyList()),
-            retrieval = ContextRetrievalResult(emptyList(), 0, emptyList(), 0),
-            memories = listOf("历史上下文".repeat(300)),
-            sessionSummary = "会话摘要".repeat(300),
-            recentConversation = emptyList(),
-            feedback = emptyList(),
+            query = QueryAssemblyContext(
+                QueryContext(IntentLabel.CALENDAR_CREATE, 1.0, emptyList(), null, emptyList()),
+                ContextRetrievalResult(emptyList(), 0, emptyList(), 0),
+            ),
+            session = SessionAssemblyContext(
+                memories = listOf("历史上下文".repeat(300)),
+                summary = "会话摘要".repeat(300),
+                recentTurns = emptyList(),
+                feedback = emptyList(),
+            ),
             activatedSkills = emptyList(),
             maxContextTokens = 2_000,
         )
@@ -120,12 +128,16 @@ class ProviderContextAssemblerPresentationTest {
     private fun assembleWithHistory(history: List<RuntimeConversationTurnEntity>) =
         ProviderContextAssembler(clock = { 0L }, personalization = { null }).assembleMessages(
             input = DecodedInput(text = "接着上面说", mode = "Chat"),
-            queryContext = QueryContext(IntentLabel.GENERAL_CHAT, 0.0, emptyList(), null, emptyList()),
-            retrieval = ContextRetrievalResult(emptyList(), 0, emptyList(), 0),
-            memories = emptyList(),
-            sessionSummary = null,
-            recentConversation = history,
-            feedback = emptyList(),
+            query = QueryAssemblyContext(
+                QueryContext(IntentLabel.GENERAL_CHAT, 0.0, emptyList(), null, emptyList()),
+                ContextRetrievalResult(emptyList(), 0, emptyList(), 0),
+            ),
+            session = SessionAssemblyContext(
+                memories = emptyList(),
+                summary = null,
+                recentTurns = history,
+                feedback = emptyList(),
+            ),
             activatedSkills = emptyList(),
             maxContextTokens = 4_096,
         )

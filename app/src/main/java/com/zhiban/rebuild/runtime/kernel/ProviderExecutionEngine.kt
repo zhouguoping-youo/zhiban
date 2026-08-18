@@ -779,8 +779,10 @@ internal class ProviderExecutionEngine(
         }
         if (unsupportedAttachment != null) throw ProviderFailure("CAPABILITY_UNAVAILABLE", false)
         val assembledMessages = contextAssembler.assembleMessages(
-            input, queryContext, retrieval, approvedMemories, conversationContext.summary,
-            conversationContext.recentTurns, feedback, activatedSkills,
+            input,
+            QueryAssemblyContext(queryContext, retrieval),
+            SessionAssemblyContext(approvedMemories, conversationContext.summary, conversationContext.recentTurns, feedback),
+            activatedSkills,
             minOf(
                 capability.maxContextTokens,
                 config.maxContextTokens,
@@ -1391,7 +1393,10 @@ internal class ProviderExecutionEngine(
             completedTools,
         )
         val baseMessages = contextAssembler.assembleMessages(
-            input, queryContext, retrieval, approvedMemories, conversationContext.summary, conversationContext.recentTurns, feedback, activatedSkills,
+            input,
+            QueryAssemblyContext(queryContext, retrieval),
+            SessionAssemblyContext(approvedMemories, conversationContext.summary, conversationContext.recentTurns, feedback),
+            activatedSkills,
             minOf(
                 capability.maxContextTokens,
                 config.maxContextTokens,
