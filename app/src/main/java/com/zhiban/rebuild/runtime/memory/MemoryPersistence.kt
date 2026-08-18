@@ -9,6 +9,9 @@ import androidx.room.Index
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.RawQuery
+import androidx.sqlite.db.SimpleSQLiteQuery
+import androidx.sqlite.db.SupportSQLiteQuery
 
 @Entity(
     tableName = "memory_namespaces",
@@ -403,17 +406,18 @@ internal interface MemoryPersistenceDao {
     )
     suspend fun ftsCandidates(namespaceId: String, ftsQuery: String, trustedNow: Long, limit: Int): List<MemoryRecordEntity>
 
-    @Query(
-        """
-        SELECT r.* FROM memory_current_versions c
-        JOIN memory_records r ON r.namespaceId=c.namespaceId AND r.memoryId=c.memoryId AND r.recordVersion=c.recordVersion
-        WHERE c.namespaceId=:namespaceId AND instr(lower(r.canonicalText), lower(:fragment)) > 0 AND r.status='ACTIVE'
-          AND (r.expiresAtEpochMs IS NULL OR r.expiresAtEpochMs>:trustedNow)
-          AND NOT EXISTS (SELECT 1 FROM memory_tombstones t WHERE t.namespaceId=c.namespaceId AND t.logicalMemoryId=c.logicalMemoryId)
-        ORDER BY r.confidence DESC, r.observedAtEpochMs DESC LIMIT :limit
-    """,
-    )
-    suspend fun substringCandidates(namespaceId: String, fragment: String, trustedNow: Long, limit: Int): List<MemoryRecordEntity>
+    // 子串检索曾每 term 一次全表 instr 扫描(最多 16 次);改为一条 SQL、全部片段 OR 拼接,
+    // 一次扫描(P1-性能5)。SQL 含动态片段数,走 @RawQuery(Room 不校验其 SQL)。
+    @RawQuery
+    suspend fun substringCandidatesRaw(query: SupportSQLiteQuery): List<MemoryRecordEntity>
+
+    suspend fun substringCandidates(namespaceId: String, fragments: List<String>, trustedNow: Long, limit: Int): List<MemoryRecordEntity> {
+        if (fragments.isEmpty()) return emptyList()
+        val ors = fragments.joinToString(" OR ") { "instr(lower(r.canonicalText), lower(?)) > 0" }
+        val sql = SUBSTRING_CANDIDATES_SQL_TEMPLATE.replace(":FRAGMENT_ORS", ors)
+        val args = arrayOf(namespaceId, *fragments.toTypedArray(), trustedNow, limit)
+        return substringCandidatesRaw(SimpleSQLiteQuery(sql, args))
+    }
 
     @Query(
         "SELECT * FROM memory_evidence WHERE namespaceId=:namespaceId AND memoryId=:memoryId AND recordVersion=:recordVersion ORDER BY evidenceId LIMIT :limit",
@@ -437,3 +441,12 @@ internal interface MemoryPersistenceDao {
     )
     suspend fun recall(namespaceId: String, trustedNow: Long): List<MemoryRecordEntity>
 }
+
+private const val SUBSTRING_CANDIDATES_SQL_TEMPLATE = """
+    SELECT r.* FROM memory_current_versions c
+    JOIN memory_records r ON r.namespaceId=c.namespaceId AND r.memoryId=c.memoryId AND r.recordVersion=c.recordVersion
+    WHERE c.namespaceId=? AND (:FRAGMENT_ORS) AND r.status='ACTIVE'
+      AND (r.expiresAtEpochMs IS NULL OR r.expiresAtEpochMs>?)
+      AND NOT EXISTS (SELECT 1 FROM memory_tombstones t WHERE t.namespaceId=c.namespaceId AND t.logicalMemoryId=c.logicalMemoryId)
+    ORDER BY r.confidence DESC, r.observedAtEpochMs DESC LIMIT ?
+"""

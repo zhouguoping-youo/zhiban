@@ -42,9 +42,7 @@ internal class MemorySearch(private val database: AgentDatabase, private val clo
             dao.ftsCandidates(request.namespaceId, ftsQuery, now, 64)
         }
         val substringAttempt = attemptRetrieval("memory_substring") {
-            terms.flatMap { fragment ->
-                dao.substringCandidates(request.namespaceId, fragment, now, 64)
-            }.distinctBy { it.memoryId to it.recordVersion }
+            dao.substringCandidates(request.namespaceId, terms, now, 64)
         }
         val fts = ftsAttempt.value.orEmpty()
         val substring = substringAttempt.value.orEmpty()
