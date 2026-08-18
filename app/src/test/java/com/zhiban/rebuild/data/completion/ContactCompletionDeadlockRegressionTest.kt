@@ -3,8 +3,6 @@ package com.zhiban.rebuild.data.completion
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.contact.ContactEnrichmentCandidateEntity
 import com.zhiban.rebuild.data.contact.ContactKnowledgeDao
-import com.zhiban.rebuild.data.notification.NotificationCandidateDao
-import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.runtime.config.AgentControlStore
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -38,14 +36,11 @@ class ContactCompletionDeadlockRegressionTest {
         val database = mockk<AgentDatabase>(relaxed = true)
         val requestDao = mockk<ContactCompletionRequestDao>(relaxed = true)
         val knowledgeDao = mockk<ContactKnowledgeDao>(relaxed = true)
-        val notificationDao = mockk<NotificationCandidateDao>(relaxed = true)
         val parser = mockk<ContactCompletionResponseParser>(relaxed = true)
         val controls = mockk<AgentControlStore>(relaxed = true)
 
-        coEvery { controls.contactCompletionEnabled() } returns true
         coEvery { database.contactCompletionRequestDao() } returns requestDao
         coEvery { database.contactKnowledgeDao() } returns knowledgeDao
-        coEvery { database.notificationCandidateDao() } returns notificationDao
 
         val request = ContactCompletionRequestEntity(
             requestId = "ccr-1",
@@ -57,21 +52,6 @@ class ContactCompletionDeadlockRegressionTest {
             createdAtEpochMs = 1L,
             expiresAtEpochMs = Long.MAX_VALUE,
             updatedAtEpochMs = 1L,
-        )
-        val reply = NotificationCandidateEntity(
-            candidateId = "reply-1",
-            sourceKey = "sk-reply-1",
-            packageName = "com.tencent.mm",
-            appLabel = "微信",
-            title = "王五",
-            body = "我电话13800138000",
-            postedAtEpochMs = 2_000L,
-            platform = "WECHAT",
-            conversationTitle = "王五",
-            senderName = "王五",
-            direction = "INCOMING",
-            isGroupChat = false,
-            linkedContactId = "c1",
         )
         // 与旧周期完全相同的确定性候选 PK:过去会 IGNORE 返回 -1、状态永远不推进。
         val staged = ContactEnrichmentCandidateEntity(
@@ -88,12 +68,10 @@ class ContactCompletionDeadlockRegressionTest {
             createdAtEpochMs = 2_000L,
             updatedAtEpochMs = 2_000L,
         )
-        coEvery { notificationDao.recentIncomingAttributed(any(), any(), any()) } returns listOf(reply)
-        coEvery { requestDao.findAwaitingForContact("c1", any()) } returns request
-        coEvery { parser.extract(request, any()) } returns CompletionExtraction(phone = "13800138000")
-        coEvery { parser.buildCompletionCandidates(request, any(), any()) } returns listOf(staged)
+        val coordinator = ContactCompletionCoordinator(database, parser, controls)
 
-        ContactCompletionCoordinator(database, parser, controls).processOnce()
+        // 事务包装由 processCandidate 的 withTransaction 承担(R10),这里直测事务体内的落库+状态推进。
+        coordinator.stageCandidatesAndMark(request, listOf(staged), 2_000L)
 
         coVerify { knowledgeDao.upsertEnrichmentCandidate(staged) }
         coVerify { requestDao.markResponseReceived("ccr-1", "cc-ccr-1-COMMUNICATION_METHOD", any()) }

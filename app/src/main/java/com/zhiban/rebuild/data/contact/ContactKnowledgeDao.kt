@@ -184,6 +184,12 @@ interface ContactKnowledgeDao {
     )
     suspend fun countPendingBySourceRefPrefix(prefix: String, nowEpochMs: Long): Int
 
+    /** 某补全请求下已采纳(APPROVED)的候选数——对账判据:有采纳即视为回复兑现成资料。 */
+    @Query(
+        "SELECT COUNT(*) FROM contact_enrichment_candidates WHERE sourceRef LIKE :prefix || '%' AND status = 'APPROVED'",
+    )
+    suspend fun countApprovedBySourceRefPrefix(prefix: String): Int
+
     @Query(
         "UPDATE contact_enrichment_candidates SET status = :status, updatedAtEpochMs = :nowEpochMs WHERE candidateId = :candidateId AND status = 'PENDING'",
     )

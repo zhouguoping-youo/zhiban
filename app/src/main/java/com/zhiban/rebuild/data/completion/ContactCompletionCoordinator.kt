@@ -1,9 +1,11 @@
 package com.zhiban.rebuild.data.completion
 
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.contact.ContactEnrichmentCandidateEntity
 import com.zhiban.rebuild.data.contact.ContactProfileCompletenessEvaluator
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.runtime.config.AgentControlStore
+import com.zhiban.rebuild.runtime.runSuspendCatching
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
@@ -15,6 +17,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import android.util.Log
+import androidx.room.withTransaction
 
 /**
  * 补全闭环的回复检测。触发驱动（新微信消息 T1 / 前台兜底 T2),CONFLATED + 3s 防抖 + Mutex 串行，
@@ -51,8 +55,11 @@ internal class ContactCompletionCoordinator @Inject constructor(
         scope.launch {
             for (trigger in triggers) {
                 delay(TRIGGER_DEBOUNCE_MS)
-                runCatching { processOnce() }
-                    .onFailure { if (it is CancellationException) throw it }
+                runSuspendCatching { processOnce() }
+                    .onFailure { failure ->
+                        if (failure is CancellationException) throw failure
+                        Log.w(TAG, "completion:scan_failure", failure)
+                    }
             }
         }
     }
@@ -62,32 +69,47 @@ internal class ContactCompletionCoordinator @Inject constructor(
             val now = System.currentTimeMillis()
             val dao = database.contactCompletionRequestDao()
             dao.expireAwaitingBefore(now) // 超时收尾与开关无关,总要跑
-            reconcileCompleted(now) // 已收到回复的请求:候选都处理完(或用户已手改补齐)就收敛 COMPLETED
+            reconcileCompleted(now) // 已收到回复的请求:候选都处理完(或用户已手改补齐)就收敛
             if (!controls.contactCompletionEnabled()) return
             database.notificationCandidateDao()
                 .recentIncomingAttributed(WECHAT_PLATFORM, now - CANDIDATE_WINDOW_MS, CANDIDATE_LIMIT)
                 .forEach { candidate ->
-                    runCatching { processCandidate(candidate, now) }
-                        .onFailure { if (it is CancellationException) throw it }
+                    runSuspendCatching { processCandidate(candidate, now) }
+                        .onFailure { failure ->
+                            if (failure is CancellationException) throw failure
+                            Log.w(TAG, "completion:candidate_failure", failure)
+                        }
                 }
         }
     }
 
     /**
-     * RESPONSE_RECEIVED → COMPLETED 的懒对账。两种收敛:候选全部不再 actionable(已采纳/已驳回/已过期),
-     * 或联系人资料已被填满(用户绕过候选直接手改)。刚 markResponseReceived 的请求其候选仍 PENDING,不会被
-     * 误判完成;用户逐项确认/驳回后,下一次扫描即收敛。
+     * RESPONSE_RECEIVED → COMPLETED/EXPIRED 的懒对账。判据:
+     * 资料已被填满(用户绕过候选直接手改)→ COMPLETED;候选仍待确认→继续等;
+     * 有候选被采纳(APPROVED)→ COMPLETED;候选全过期/全驳回且资料仍未补全→ EXPIRED
+     * (回复没兑现成资料,如实标记,不再误标 COMPLETED,P2-6)。
      */
     private suspend fun reconcileCompleted(now: Long) {
         database.contactCompletionRequestDao().responseReceivedRequests().forEach { request ->
-            runCatching {
-                val actionablePending = database.contactKnowledgeDao()
-                    .countPendingBySourceRefPrefix("completion:${request.requestId}", now)
-                if (actionablePending == 0 || contactProfileComplete(request.contactId)) {
-                    database.contactCompletionRequestDao()
-                        .markStatus(request.requestId, ContactCompletionStatus.COMPLETED, now)
+            runSuspendCatching {
+                val prefix = "completion:${request.requestId}"
+                val knowledge = database.contactKnowledgeDao()
+                val requestDao = database.contactCompletionRequestDao()
+                when {
+                    contactProfileComplete(request.contactId) ->
+                        requestDao.markStatus(request.requestId, ContactCompletionStatus.COMPLETED, now)
+
+                    knowledge.countPendingBySourceRefPrefix(prefix, now) > 0 -> Unit
+
+                    knowledge.countApprovedBySourceRefPrefix(prefix) > 0 ->
+                        requestDao.markStatus(request.requestId, ContactCompletionStatus.COMPLETED, now)
+
+                    else -> requestDao.markStatus(request.requestId, ContactCompletionStatus.EXPIRED, now)
                 }
-            }.onFailure { if (it is CancellationException) throw it }
+            }.onFailure { failure ->
+                if (failure is CancellationException) throw failure
+                Log.w(TAG, "completion:reconcile_failure", failure)
+            }
         }
     }
 
@@ -108,15 +130,30 @@ internal class ContactCompletionCoordinator @Inject constructor(
 
         val extraction = parser.extract(request, candidate.body.orEmpty())
         val candidates = parser.buildCompletionCandidates(request, extraction, now)
-        // 抽到字段就转 RESPONSE_RECEIVED 并挂上溯源候选;抽不到保持 AWAITING(7 天后 EXPIRED)。
-        // 用 REPLACE 落候选而非 IGNORE:请求过期后重新触达复用同一确定性 candidateId,二次回复的新值必须
-        // 覆盖旧 PENDING 候选,且状态推进不依赖插入是否成功——否则候选 PK 全冲突时请求卡 AWAITING、
-        // 二次回复丢失(P1-1)。重扫同一回复 REPLACE 同值,依然幂等。
+        // 候选表+请求表跨表写,同一事务(R10/P2-1):候选与状态转换要么一起落地,要么都不落。
+        database.withTransaction { stageCandidatesAndMark(request, candidates, now) }
+    }
+
+    /**
+     * 抽到字段就转 RESPONSE_RECEIVED 并挂上溯源候选;抽不到保持 AWAITING(7 天后 EXPIRED)。
+     * 用 REPLACE 落候选而非 IGNORE:请求过期后重新触达复用同一确定性 candidateId,二次回复的新值必须
+     * 覆盖旧 PENDING 候选,且状态推进不依赖插入是否成功——否则候选 PK 全冲突时请求卡 AWAITING、
+     * 二次回复丢失(P1-1)。重扫同一回复 REPLACE 同值,依然幂等。事务边界由调用方
+     * [processCandidate] 包好(R10)。
+     */
+    internal suspend fun stageCandidatesAndMark(
+        request: ContactCompletionRequestEntity,
+        candidates: List<ContactEnrichmentCandidateEntity>,
+        now: Long,
+    ) {
         candidates.forEach { staged -> database.contactKnowledgeDao().upsertEnrichmentCandidate(staged) }
-        candidates.firstOrNull()?.let { dao.markResponseReceived(request.requestId, it.candidateId, now) }
+        candidates.firstOrNull()?.let {
+            database.contactCompletionRequestDao().markResponseReceived(request.requestId, it.candidateId, now)
+        }
     }
 
     private companion object {
+        const val TAG = "ContactCompletion"
         const val WECHAT_PLATFORM = "WECHAT"
         const val CANDIDATE_LIMIT = 20
         const val ATTRIBUTION_THRESHOLD = 0.6
