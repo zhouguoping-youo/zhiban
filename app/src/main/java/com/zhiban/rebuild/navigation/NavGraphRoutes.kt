@@ -55,152 +55,7 @@ import com.zhiban.rebuild.ui.tabs.ProfileTab
 import com.zhiban.rebuild.ui.tabs.RelationTab
 import com.zhiban.rebuild.ui.tabs.SkillTab
 
-@Composable
-fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L, callNoteRequest: Long = 0L, calendarFocusRequest: Long = 0L) {
-    val navController = rememberNavController()
-    var lastHandledRelationInboxRequest by rememberSaveable { mutableLongStateOf(0L) }
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentDestination = navBackStackEntry?.destination
-    ExternalRequestEffects(navController, relationInboxRequest, callNoteRequest, calendarFocusRequest)
-    val showBottomBar = TAB_ROUTES.any { routeClass ->
-        currentDestination?.hasRoute(routeClass) == true
-    }
-
-    ZhiBanScaffold(
-        showBottomBar = showBottomBar,
-        currentDestination = currentDestination,
-        onTabSelected = { route ->
-            if (route == Home) {
-                // 问问进入独立全屏对话，不恢复之前离开时保存的设置子页面。
-                // Home 不属于 TAB_ROUTES，因此对话页不会显示底部 TabBar。
-                navController.navigate(Home) {
-                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                    launchSingleTop = true
-                }
-            } else {
-                navController.navigate(route) {
-                    // The five main tabs are flat destinations rather than nested tab graphs.
-                    // Saving/restoring a flat destination also restores routes opened from it
-                    // (for example Skill -> CRM -> Relation), which made tapping Ability reopen
-                    // Relation. A tab tap must always resolve to that tab's root destination.
-                    popUpTo(navController.graph.findStartDestination().id) { saveState = false }
-                    launchSingleTop = true
-                }
-            }
-        },
-        modifier = modifier,
-    ) { _ ->        ZhiBanNavContent(
-            navController = navController,
-            relationInboxRequest = relationInboxRequest,
-            lastHandledRelationInboxRequest = lastHandledRelationInboxRequest,
-            setLastHandledRelationInboxRequest = { lastHandledRelationInboxRequest = it },
-            callNoteRequest = callNoteRequest,
-        )
-    }
-}
-
-
-@Composable
-private fun ExternalRequestEffects(
-    navController: NavHostController,
-    relationInboxRequest: Long,
-    callNoteRequest: Long,
-    calendarFocusRequest: Long,
-) {
-    LaunchedEffect(relationInboxRequest) {
-        if (relationInboxRequest > 0L) {
-            navController.navigate(Relation) {
-                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                launchSingleTop = true
-            }
-        }
-    }
-    LaunchedEffect(callNoteRequest) {
-        if (callNoteRequest > 0L) {
-            navController.navigate(Relation) {
-                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                launchSingleTop = true
-            }
-        }
-    }
-    LaunchedEffect(calendarFocusRequest) {
-        if (calendarFocusRequest > 0L) {
-            navController.navigate(Calendar(calendarFocusRequest)) {
-                popUpTo(navController.graph.findStartDestination().id) { saveState = false }
-                launchSingleTop = true
-            }
-        }
-    }
-
-}
-
-@Composable
-private fun ZhiBanNavContent(
-    navController: NavHostController,
-    relationInboxRequest: Long,
-    lastHandledRelationInboxRequest: Long,
-    setLastHandledRelationInboxRequest: (Long) -> Unit,
-    callNoteRequest: Long,
-) {
-    var lastHandled = lastHandledRelationInboxRequest
-        NavHost(
-            navController = navController,
-            startDestination = Calendar(),
-            enterTransition = { EnterTransition.None },
-            exitTransition = { ExitTransition.None },
-        ) {
-            // 问问 TAB 直接进入全屏对话，不经过独立引导页。
-            composable<Home> {
-                AgentConversationRoute(
-                    initialDraft = "",
-                    onBackToHome = {
-                        navController.navigate(Calendar()) {
-                            popUpTo(navController.graph.findStartDestination().id) { saveState = false }
-                            launchSingleTop = true
-                        }
-                    },
-                    onNavigateToSettings = { navController.navigate(ModelConfig) { launchSingleTop = true } },
-                    onManagePlugins = { navController.navigate(Skill) { launchSingleTop = true } },
-                )
-            }
-            composable<Calendar> { entry ->
-                val route = entry.toRoute<Calendar>()
-                CalendarTab(focusDateEpochMs = route.focusDateEpochMs.takeIf { it > 0L })
-            }
-            composable<Relation> {
-                RelationTab(
-                    openInboxRequest = relationInboxRequest.takeIf { it > lastHandled } ?: 0L,
-                    onInboxRequestHandled = { request ->
-                        lastHandled = maxOf(lastHandled, request)
-                        setLastHandledRelationInboxRequest(lastHandled)
-                    },
-                    openCallNoteRequest = callNoteRequest,
-                    onOwnerClick = { navController.navigate(ProfileEdit) },
-                    onOpenAutoWrites = { navController.navigate(AutoWrites) },
-                    onOpenContactMaintenance = { navController.navigate(ContactMaintenance) },
-                )
-            }
-            composable<Skill> {
-                SkillTab(
-                    onOpenCrm = { navController.navigate(CrmCapability) },
-                    onOpenLifeAssistant = { navController.navigate(LifeAssistant) },
-                    onOpenEventPlanning = { navController.navigate(EventPlanning) },
-                )
-            }
-            composable<Profile> {
-                ProfileTab(
-                    onNavigateToAgentSettings = { navController.navigate(AgentSettings) },
-                    onNavigateToAutoWrites = { navController.navigate(AutoWrites) },
-                    onNavigateToProfileEdit = { navController.navigate(ProfileEdit) },
-                    onNavigateToPrivacySecurity = { navController.navigate(PrivacySecurity) },
-                    onNavigateToAppearance = { navController.navigate(Appearance) },
-                    onNavigateToNotificationSettings = { navController.navigate(NotificationSettings) },
-                    onNavigateToStorage = { navController.navigate(StorageSettings) },
-                    onNavigateToData = { navController.navigate(DataSettings) },
-                    onNavigateToReportError = { navController.navigate(ReportErrorSettings) },
-                    onNavigateToAbout = { navController.navigate(AboutZhiBan) },
-                )
-            }
+internal fun NavGraphBuilder.agentSettingsRoutes(navController: NavHostController) {
 
             composable<AgentSettings> {
                 AgentSettingsPage(
@@ -256,6 +111,9 @@ private fun ZhiBanNavContent(
             }
             composable<AboutZhiBan> { AboutZhiBanPage(onBack = { navController.popBackStack() }) }
             composable<Appearance> { AppearanceSettingsPage(onBack = { navController.popBackStack() }) }
+}
+
+internal fun NavGraphBuilder.featureRoutes(navController: NavHostController) {
 
             composable<CrmCapability> {
                 CrmCapabilityPage(
@@ -369,36 +227,4 @@ private fun ZhiBanNavContent(
                     },
                 )
             }
-
-            composable<AssistantChat> { entry ->
-                val route = entry.toRoute<AssistantChat>()
-                AgentConversationRoute(
-                    initialDraft = route.draft,
-                    initialMode = if (route.workContext) "Work" else "Chat",
-                    onManagePlugins = { navController.navigate(Skill) { launchSingleTop = true } },
-                    onNavigateToSettings = { navController.navigate(ModelConfig) { launchSingleTop = true } },
-                    onBackToHome = {
-                        if (route.returnTarget == "BACK" && navController.popBackStack()) {
-                            Unit
-                        } else {
-                            navController.navigate(Calendar()) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = false }
-                                launchSingleTop = true
-                            }
-                        }
-                    },
-                )
-            }
-
-            composable<ModelConfig> {
-                ModelConfigPage(
-                    onBack = {
-                        if (!navController.popBackStack()) {
-                            navController.navigate(Profile) { launchSingleTop = true }
-                        }
-                    },
-                )
-            }
-            debugAcceptanceRoute(navController)
-        }
 }
