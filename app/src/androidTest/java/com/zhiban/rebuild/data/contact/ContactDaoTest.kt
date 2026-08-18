@@ -42,6 +42,28 @@ class ContactDaoTest {
         assertTrue(dao.findById("missing") == null)
     }
 
+    @Test fun naturalSearchMergesTermsInOneQuery() = runBlocking {
+        val contacts = db.contactDao()
+        contacts.insert(
+            ContactEntity("c-zhang", "张三丰", "张三丰", null, null, null, "知伴科技", null, "[]", "[]", null, null, "USER", null, 1, 2),
+        )
+        contacts.insert(
+            ContactEntity("c-li", "李四", "李四", "13800138001", null, null, null, null, "[]", "[]", null, null, "USER", null, 1, 3),
+        )
+
+        // 多词一次检索:两词分别命中两个联系人;显示名精确匹配优先。
+        val multi = contacts.searchNatural("张三丰 李四", 20)
+        assertTrue(multi.any { it.contactId == "c-zhang" })
+        assertTrue(multi.any { it.contactId == "c-li" })
+        // 命中词数多者优先("张三丰" 命中整词+bigram 两个 term)。
+        assertEquals("c-zhang", multi.first().contactId)
+
+        // 中文 bigram 走 instr 链仍可命中(FTS simple tokenizer 不分词)。
+        assertEquals(listOf("c-zhang"), contacts.searchNatural("三丰", 20).map { it.contactId })
+        // 电话号码(在 FTS 内容里)同样命中。
+        assertEquals(listOf("c-li"), contacts.searchNatural("13800138001", 20).map { it.contactId })
+    }
+
     @Test fun mergedSourceIsHiddenFromSearchAndGraphUntilUndo() = runBlocking {
         val contacts = db.contactDao()
         val identities = db.contactIdentityDao()

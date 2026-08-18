@@ -4,6 +4,8 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.RawQuery
+import androidx.sqlite.db.SupportSQLiteQuery
 import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
@@ -156,6 +158,10 @@ interface ContactDao {
            LIMIT :limit""",
     )
     suspend fun search(query: String, normalizedQuery: String, limit: Int): List<ContactSearchProjection>
+
+    /** 多词一次检索(P1-性能2):OR'd FTS + OR'd instr + termMask,替代每 term 一次 search()。 */
+    @RawQuery
+    suspend fun searchNaturalMultiTermRaw(query: SupportSQLiteQuery): List<ContactSearchProjectionWithMask>
 
     /** 提及匹配的姓名清单(含合并源名),匹配改在内存做——过去每条用户输入一次全表 instr 扫描(P1-性能3)。 */
     @Query(

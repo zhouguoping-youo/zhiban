@@ -188,6 +188,19 @@ data class ContactSearchProjection(
     val note: String?,
 )
 
+/** 多词检索投影:比 ContactSearchProjection 多一个 termMask(每位一个 term,1=命中)。 */
+data class ContactSearchProjectionWithMask(
+    val contactId: String,
+    val displayName: String,
+    val phone: String?,
+    val email: String?,
+    val wechatId: String?,
+    val company: String?,
+    val title: String?,
+    val note: String?,
+    val termMask: String,
+)
+
 /** 提及匹配的姓名行(见 ContactDao.mentionCandidateNames/mentionSourceNames)。 */
 data class ContactMentionNameRow(
     val contactId: String,
