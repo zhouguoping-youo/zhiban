@@ -166,13 +166,15 @@ class ProviderModuleTest {
         val sentBody = requireNotNull(sent.body).let { body -> okio.Buffer().also(body::writeTo).readUtf8() }
         assertTrue(sentBody.contains("max_tokens"))
         assertFalse(sentBody.contains("stream_options"))
+        // The endpoint now advertises json_schema (verified live), so exercise the fail-closed guard with a
+        // capability that lacks the feature rather than the probed one.
         val unsupportedSchema =
             ModelRequest(
                 "schema",
                 OutboundChannel.LLM_INFERENCE,
                 profile,
                 listOf(userMessage("hello")),
-                capability,
+                capability(100),
                 20,
                 "{\"type\":\"object\"}",
             )

@@ -69,7 +69,8 @@ class TrustedProviderRegistry(private val endpoints: Map<String, TrustedProvider
                 modelContracts = mapOf(
                     STEPFUN_TEXT_MODEL to TrustedModelContract(
                         modalities = setOf("text"),
-                        features = setOf("stream", "tools", "usage", "cancel", "rerank", "web_search"),
+                        // json_schema verified live against api.stepfun.com (response_format accepted, no 400).
+                        features = setOf("stream", "tools", "usage", "cancel", "rerank", "web_search", "json_schema"),
                         maxContextTokens = 256_000,
                         maxOutputTokens = 8_192,
                     ),

@@ -76,6 +76,21 @@ class ReplyDraftGeneratorTest {
         assertTrue(generator.generateDrafts(context).isEmpty())
     }
 
+    @Test fun requestsStructuredOutputSchema() = runBlocking {
+        val adapter = FakeAdapter("""["好的","收到"]""")
+        ReplyDraftGenerator(adapter, FakeProfileStore(DUMMY_PROFILE)).generateDrafts(context)
+        val schema = adapter.lastRequest?.jsonSchema
+        // The reliability fix hinges on constraining the model to a JSON object; lock the wiring in.
+        assertTrue(schema != null && schema.contains("reply_drafts") && schema.contains("\"drafts\""))
+    }
+
+    @Test fun malformedBatchIsRetried() = runBlocking {
+        val adapter = FakeAdapter("no json here at all")
+        ReplyDraftGenerator(adapter, FakeProfileStore(DUMMY_PROFILE)).generateDrafts(context)
+        // First attempt parses empty -> a second attempt is made before giving up.
+        assertEquals(2, adapter.streamCalls)
+    }
+
     private suspend fun generate(rawModelOutput: String, emitFinal: Boolean = true): List<String> =
         ReplyDraftGenerator(FakeAdapter(rawModelOutput, emitFinal), FakeProfileStore(DUMMY_PROFILE)).generateDrafts(context)
 
@@ -86,12 +101,21 @@ class ReplyDraftGeneratorTest {
     }
 
     private class FakeAdapter(private val rawText: String?, private val emitFinal: Boolean = true) : ProviderAdapter {
+        var lastRequest: ModelRequest? = null
+            private set
+        var streamCalls = 0
+            private set
+
         override suspend fun probe(profile: ProviderProfile): CapabilitySnapshot =
             CapabilitySnapshot("digest", setOf("TEXT"), setOf("CHAT"), 8_000, 2_048, 0L, Long.MAX_VALUE)
 
-        override fun stream(request: ModelRequest): Flow<ModelEvent> = flow {
-            rawText?.chunked(7)?.forEachIndexed { index, chunk -> emit(ModelEvent.Delta(index.toLong(), chunk)) }
-            if (emitFinal) emit(ModelEvent.Final("stop"))
+        override fun stream(request: ModelRequest): Flow<ModelEvent> {
+            lastRequest = request
+            streamCalls++
+            return flow {
+                rawText?.chunked(7)?.forEachIndexed { index, chunk -> emit(ModelEvent.Delta(index.toLong(), chunk)) }
+                if (emitFinal) emit(ModelEvent.Final("stop"))
+            }
         }
 
         override fun cancel(requestId: String): Boolean = true
