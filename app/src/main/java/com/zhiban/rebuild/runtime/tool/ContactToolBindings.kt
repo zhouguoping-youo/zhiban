@@ -7,10 +7,12 @@ import com.zhiban.rebuild.data.contact.ContactIntelligenceDao
 import com.zhiban.rebuild.data.contact.ContactKnowledgeDao
 import com.zhiban.rebuild.data.contact.ContactMaintenanceEvaluator
 import com.zhiban.rebuild.data.contact.ContactMaintenanceIssue
+import com.zhiban.rebuild.data.contact.ContactMaintenanceItem
 import com.zhiban.rebuild.data.contact.ContactMaintenanceOverview
 import com.zhiban.rebuild.data.contact.IdentityResolutionDecision
 import com.zhiban.rebuild.data.contact.OwnerContactLinkEntity
 import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
+import com.zhiban.rebuild.data.contact.SourceIdentityEntity
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.data.contact.searchNatural
 import com.zhiban.rebuild.relationship.RelationshipGroup
@@ -132,76 +134,86 @@ internal class ContactMaintenanceToolBinding(
         val items = actionableItems.take(limit)
         val unresolvedIdentities = if (issue == null) intelligence.listUnresolvedIdentities(limit) else emptyList()
         val unresolvedIdentityCount = if (issue == null) intelligence.countUnresolvedIdentities() else 0
-        val result = buildJsonObject {
-            put("totalContactCount", snapshot.overview.items.size)
-            put("totalIssueCount", actionableItems.size)
-            put("returnedCount", items.size)
-            put("truncated", actionableItems.size > items.size)
-            put("count", items.size)
-            put("duplicateReviewCount", snapshot.overview.duplicateReviewCount)
-            put("automaticallyResolvedDuplicateCount", snapshot.automaticallyResolvedDuplicateCount)
-            put("userConfirmedMergeCount", snapshot.userConfirmedMergeCount)
-            put("enrichmentReviewCount", snapshot.overview.enrichmentReviewCount)
-            put("deferredRelationshipEvidenceCount", snapshot.deferredRelationshipEvidenceCount)
-            put("unresolvedIdentityCount", unresolvedIdentityCount)
-            put("unresolvedIdentityReturnedCount", unresolvedIdentities.size)
-            put("unresolvedIdentityTruncated", unresolvedIdentityCount > unresolvedIdentities.size)
-            put("ownerProfile", ownerProfileJson(ownerProfile(), snapshot.ownerLinks, snapshot.employments))
-            put(
-                "interactionPolicy",
-                buildJsonObject {
-                    put("askAtMostOneQuestion", true)
-                    put("doNotAskEveryContactEmploymentDate", true)
-                    put("deferUnknownRelationships", true)
-                },
-            )
-            put(
-                "issueCounts",
-                buildJsonObject {
-                    ContactMaintenanceIssue.entries.forEach { issueKind ->
-                        put(issueKind.name, snapshot.overview.items.count { issueKind in it.issues })
-                    }
-                },
-            )
-            put(
-                "items",
-                buildJsonArray {
-                    items.forEach { item ->
-                        add(
-                            buildJsonObject {
-                                put("contactId", item.contact.contactId)
-                                put("displayName", item.contact.displayName)
-                                put("qualityScore", item.quality.score)
-                                put(
-                                    "issues",
-                                    buildJsonArray {
-                                        item.issues.sortedBy(ContactMaintenanceIssue::name).forEach { add(JsonPrimitive(it.name)) }
-                                    },
-                                )
-                            },
-                        )
-                    }
-                },
-            )
-            put(
-                "unresolvedIdentities",
-                buildJsonArray {
-                    unresolvedIdentities.forEach { identity ->
-                        add(
-                            buildJsonObject {
-                                put("sourceIdentityId", identity.sourceIdentityId)
-                                put("platform", identity.sourceType)
-                                put("visibleHandle", identity.visibleHandle)
-                                identity.conversationScopeId?.let { put("conversationScope", it) }
-                                put("confidence", identity.confidence)
-                                put("instruction", "只根据更多证据核实归属，不得凭同名合并")
-                            },
-                        )
-                    }
-                },
-            )
-        }
+        val result = maintenanceResultJson(snapshot, actionableItems, items, unresolvedIdentities, unresolvedIdentityCount)
         return RoutedToolResult(spec.name, request.providerCallId, result.toString())
+    }
+
+    private suspend fun maintenanceResultJson(
+        snapshot: ContactMaintenanceSnapshot,
+        actionableItems: List<ContactMaintenanceItem>,
+        items: List<ContactMaintenanceItem>,
+        unresolvedIdentities: List<SourceIdentityEntity>,
+        unresolvedIdentityCount: Int,
+    ): String {
+return buildJsonObject {
+    put("totalContactCount", snapshot.overview.items.size)
+    put("totalIssueCount", actionableItems.size)
+    put("returnedCount", items.size)
+    put("truncated", actionableItems.size > items.size)
+    put("count", items.size)
+    put("duplicateReviewCount", snapshot.overview.duplicateReviewCount)
+    put("automaticallyResolvedDuplicateCount", snapshot.automaticallyResolvedDuplicateCount)
+    put("userConfirmedMergeCount", snapshot.userConfirmedMergeCount)
+    put("enrichmentReviewCount", snapshot.overview.enrichmentReviewCount)
+    put("deferredRelationshipEvidenceCount", snapshot.deferredRelationshipEvidenceCount)
+    put("unresolvedIdentityCount", unresolvedIdentityCount)
+    put("unresolvedIdentityReturnedCount", unresolvedIdentities.size)
+    put("unresolvedIdentityTruncated", unresolvedIdentityCount > unresolvedIdentities.size)
+    put("ownerProfile", ownerProfileJson(ownerProfile(), snapshot.ownerLinks, snapshot.employments))
+    put(
+        "interactionPolicy",
+        buildJsonObject {
+            put("askAtMostOneQuestion", true)
+            put("doNotAskEveryContactEmploymentDate", true)
+            put("deferUnknownRelationships", true)
+        },
+    )
+    put(
+        "issueCounts",
+        buildJsonObject {
+            ContactMaintenanceIssue.entries.forEach { issueKind ->
+                put(issueKind.name, snapshot.overview.items.count { issueKind in it.issues })
+            }
+        },
+    )
+    put(
+        "items",
+        buildJsonArray {
+            items.forEach { item ->
+                add(
+                    buildJsonObject {
+                        put("contactId", item.contact.contactId)
+                        put("displayName", item.contact.displayName)
+                        put("qualityScore", item.quality.score)
+                        put(
+                            "issues",
+                            buildJsonArray {
+                                item.issues.sortedBy(ContactMaintenanceIssue::name).forEach { add(JsonPrimitive(it.name)) }
+                            },
+                        )
+                    },
+                )
+            }
+        },
+    )
+    put(
+        "unresolvedIdentities",
+        buildJsonArray {
+            unresolvedIdentities.forEach { identity ->
+                add(
+                    buildJsonObject {
+                        put("sourceIdentityId", identity.sourceIdentityId)
+                        put("platform", identity.sourceType)
+                        put("visibleHandle", identity.visibleHandle)
+                        identity.conversationScopeId?.let { put("conversationScope", it) }
+                        put("confidence", identity.confidence)
+                        put("instruction", "只根据更多证据核实归属，不得凭同名合并")
+                    },
+                )
+            }
+        },
+    )
+}.toString()
     }
 
     private suspend fun loadSnapshot(nowEpochMs: Long): ContactMaintenanceSnapshot {
@@ -327,6 +339,7 @@ private fun ownerProfileJson(profile: ContactOwnerProfileSnapshot, ownerLinks: L
             },
         )
     }
+
 
 internal fun normalizeContactQuery(value: String): String = Normalizer.normalize(value.trim(), Normalizer.Form.NFKC).lowercase()
 
