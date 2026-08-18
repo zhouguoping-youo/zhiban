@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -201,146 +202,31 @@ fun AgentMemoryPage(onBack: () -> Unit, viewModel: AgentMemoryViewModel = hiltVi
                         }
                     }
                 }
-                item {
-                    Row(
-                        Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                "已保存的记忆",
-                                fontWeight = FontWeight.SemiBold,
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                            if (s.items.isNotEmpty()) {
-                                Text(
-                                    localizedQuantity(R.plurals.item_count, s.items.size),
-                                    color = ZhiBanTextSecondary,
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                            }
-                        }
-                        FilledTonalButton(
-                            onClick = {
-                                adding = true
-                            },
-                            enabled = !s.busy,
-                            contentPadding = PaddingValues(
-                                horizontal = 14.dp,
-                                vertical = 8.dp,
-                            ),
-                            colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = ZhiBanTerracotta.copy(alpha = .13f),
-                                contentColor = ZhiBanTerracotta,
-                            ),
-                        ) {
-                            Icon(Icons.Outlined.Add, null, Modifier.size(ZhiBanIconSize.Inline))
-                            Spacer(Modifier.width(3.dp))
-                            Text("添加")
-                        }
-                    }
-                }
-                s.message?.let {
-                    item { Text(it, color = ZhiBanTerracotta, style = MaterialTheme.typography.bodySmall) }
-                }
-                s.error?.let {
-                    item {
-                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-                when {
-                    s.isLoading -> item { CircularProgressIndicator() }
-
-                    s.items.isEmpty() -> item {
-                        ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
-                            Column(
-                                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
-                            ) {
-                                Icon(
-                                    Icons.Outlined.Psychology,
-                                    null,
-                                    tint = ZhiBanTerracotta.copy(alpha = .72f),
-                                    modifier = Modifier.size(ZhiBanIconSize.Action),
-                                )
-                                Text("还没有记住任何事", fontWeight = FontWeight.SemiBold)
-                                Text("可以手动添加", color = ZhiBanTextSecondary, style = MaterialTheme.typography.bodySmall)
-                            }
-                        }
-                    }
-
-                    else -> items(s.items, key = { it.id }) { m ->
-                        SettingRow(memoryIcon(m.type), m.text, m.categoryLabel) {
-                            editing =
-                                m
-                        }
-                    }
-                }
-                if (s.items.isNotEmpty()) {
-                    item {
-                        TextButton(onClick = {
-                            clearing = true
-                        }, enabled = !s.busy, modifier = Modifier.fillMaxWidth()) {
-                            Text("让知伴忘掉全部", color = MaterialTheme.colorScheme.error)
-                        }
-                    }
-                }
+            memoryListSection(
+                s = s,
+                onAdd = { adding = true },
+                onEdit = { editing = it },
+                onClear = { clearing = true },
+            )
                 item { Spacer(Modifier.height(24.dp)) }
             }
         }
     }
-    editing?.let { memory ->
-        EditMemoryDialog(memory, s.busy, onDismiss = { editing = null }, onSave = { text, type ->
-            viewModel.update(memory, text, type)
-            editing =
-                null
-        }, onDelete = {
-            viewModel.delete(memory.id)
-            editing = null
-        })
-    }
-    if (adding) {
-        AddMemoryDialog(busy = s.busy, onDismiss = { adding = false }, onSave = { text, type ->
-            viewModel.add(text, type)
-            adding =
-                false
-        })
-    }
-    if (clearing) {
-        ZhiBanAlertDialog(
-            onDismissRequest = {
-                clearing = false
-            },
-            shape = RoundedCornerShape(
-                ZhiBanRadius.Dialog,
-            ),
-            containerColor = MaterialTheme.colorScheme.surface,
-            tonalElevation = 0.dp,
-            title = {
-                Text("让知伴忘掉全部？")
-            },
-            text = { Text("知伴记住的内容会全部删除，无法恢复。你的聊天记录不会被删除。") },
-            dismissButton = {
-                TextButton(
-                    onClick = { clearing = false },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    ),
-                ) {
-                    Text("取消")
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.clear()
-                    clearing =
-                        false
-                }) { Text("全部忘掉", color = MaterialTheme.colorScheme.error) }
-            },
-        )
-    }
+    MemoryPageDialogs(
+        MemoryDialogSlots(
+            state = s,
+            viewModel = viewModel,
+            editing = editing,
+            setEditing = { editing = it },
+            adding = adding,
+            setAdding = { adding = it },
+            clearing = clearing,
+            setClearing = { clearing = it },
+        ),
+    )
 }
+
+
 
 @Composable private fun AddMemoryDialog(busy: Boolean, onDismiss: () -> Unit, onSave: (String, String) -> Unit) {
     var text by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
@@ -610,3 +496,150 @@ data class AgentToolsState(
     val message: String? = null,
     val webSearchOptIn: Boolean = false,
 )
+
+private fun LazyListScope.memoryListSection(s: MemoryUiState, onAdd: () -> Unit, onEdit: (AgentMemoryItem) -> Unit, onClear: () -> Unit) {
+            item {
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "已保存的记忆",
+                            fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        if (s.items.isNotEmpty()) {
+                            Text(
+                                localizedQuantity(R.plurals.item_count, s.items.size),
+                                color = ZhiBanTextSecondary,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    }
+                    FilledTonalButton(
+                        onClick = {
+                            onAdd()
+                        },
+                        enabled = !s.busy,
+                        contentPadding = PaddingValues(
+                            horizontal = 14.dp,
+                            vertical = 8.dp,
+                        ),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = ZhiBanTerracotta.copy(alpha = .13f),
+                            contentColor = ZhiBanTerracotta,
+                        ),
+                    ) {
+                        Icon(Icons.Outlined.Add, null, Modifier.size(ZhiBanIconSize.Inline))
+                        Spacer(Modifier.width(3.dp))
+                        Text("添加")
+                    }
+                }
+            }
+            s.message?.let {
+                item { Text(it, color = ZhiBanTerracotta, style = MaterialTheme.typography.bodySmall) }
+            }
+            s.error?.let {
+                item {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            when {
+                s.isLoading -> item { CircularProgressIndicator() }
+
+                s.items.isEmpty() -> item {
+                    ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
+                        Column(
+                            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Icon(
+                                Icons.Outlined.Psychology,
+                                null,
+                                tint = ZhiBanTerracotta.copy(alpha = .72f),
+                                modifier = Modifier.size(ZhiBanIconSize.Action),
+                            )
+                            Text("还没有记住任何事", fontWeight = FontWeight.SemiBold)
+                            Text("可以手动添加", color = ZhiBanTextSecondary, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+
+                else -> items(s.items, key = { it.id }) { m ->
+                    SettingRow(memoryIcon(m.type), m.text, m.categoryLabel) { onEdit(m) }
+                }
+            }
+            if (s.items.isNotEmpty()) {
+                item {
+                    TextButton(onClick = onClear, enabled = !s.busy, modifier = Modifier.fillMaxWidth()) {
+                        Text("让知伴忘掉全部", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+}
+
+private data class MemoryDialogSlots(
+    val state: MemoryUiState,
+    val viewModel: AgentMemoryViewModel,
+    val editing: AgentMemoryItem?,
+    val setEditing: (AgentMemoryItem?) -> Unit,
+    val adding: Boolean,
+    val setAdding: (Boolean) -> Unit,
+    val clearing: Boolean,
+    val setClearing: (Boolean) -> Unit,
+)
+
+@Composable
+private fun MemoryPageDialogs(slots: MemoryDialogSlots) {
+    slots.editing?.let { memory ->
+        EditMemoryDialog(memory, slots.state.busy, onDismiss = { slots.setEditing(null) }, onSave = { text, type ->
+            slots.viewModel.update(memory, text, type)
+            slots.setEditing(null)
+        }, onDelete = {
+            slots.viewModel.delete(memory.id)
+            slots.setEditing(null)
+        })
+    }
+    if (slots.adding) {
+        AddMemoryDialog(busy = slots.state.busy, onDismiss = { slots.setAdding(false) }, onSave = { text, type ->
+            slots.viewModel.add(text, type)
+            slots.setAdding(false)
+        })
+    }
+    if (slots.clearing) {
+        ZhiBanAlertDialog(
+            onDismissRequest = {
+                slots.setClearing(false)
+            },
+            shape = RoundedCornerShape(
+                ZhiBanRadius.Dialog,
+            ),
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 0.dp,
+            title = {
+                Text("让知伴忘掉全部？")
+            },
+            text = { Text("知伴记住的内容会全部删除，无法恢复。你的聊天记录不会被删除。") },
+            dismissButton = {
+                TextButton(
+                    onClick = { slots.setClearing(false) },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                ) {
+                    Text("取消")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    slots.viewModel.clear()
+                    slots.setClearing(false)
+                }) { Text("全部忘掉", color = MaterialTheme.colorScheme.error) }
+            },
+        )
+    }
+}
+
+
