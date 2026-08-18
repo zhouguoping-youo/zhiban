@@ -26,12 +26,6 @@ interface EmbeddingGateway {
     suspend fun embed(inputs: List<EmbeddingInput>, space: EmbeddingSpace): List<FloatArray>
 }
 
-/** StepFun currently has no documented embedding endpoint; retrieval degrades explicitly to FTS + graph. */
-object FtsOnlyEmbeddingGateway : EmbeddingGateway {
-    override suspend fun activeSpace(): EmbeddingSpace? = null
-    override suspend fun embed(inputs: List<EmbeddingInput>, space: EmbeddingSpace): List<FloatArray> = error("EMBEDDING_UNAVAILABLE_FTS_ONLY")
-}
-
 data class RetrievalCandidate(
     val id: String,
     val sourceKind: String,
