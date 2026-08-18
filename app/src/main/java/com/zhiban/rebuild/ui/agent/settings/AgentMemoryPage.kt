@@ -144,28 +144,7 @@ fun AgentMemoryPage(onBack: () -> Unit, viewModel: AgentMemoryViewModel = hiltVi
         Column(Modifier.fillMaxSize()) {
             AgentHeader("记忆", onBack)
             LazyColumn(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                item {
-                    ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
-                        Column {
-                            ZhiBanToggleRow(
-                                "记住对话内容",
-                                "跨对话使用",
-                                s.policy.longTermMemoryEnabled,
-                                viewModel::longTerm,
-                            )
-                            HorizontalDivider(
-                                Modifier.padding(horizontal = 16.dp),
-                                color = ZhiBanTextSecondary.copy(alpha = .12f),
-                            )
-                            ZhiBanToggleRow(
-                                "自动发现新记忆",
-                                "自动提炼",
-                                s.policy.learnFromConversations,
-                                viewModel::learn,
-                            )
-                        }
-                    }
-                }
+            memoryPolicySection(s = s, viewModel = viewModel)
                 item {
                     var advanced by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
                     ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
@@ -640,6 +619,31 @@ private fun MemoryPageDialogs(slots: MemoryDialogSlots) {
             },
         )
     }
+}
+
+private fun LazyListScope.memoryPolicySection(s: MemoryUiState, viewModel: AgentMemoryViewModel) {
+            item {
+                ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
+                    Column {
+                        ZhiBanToggleRow(
+                            "记住对话内容",
+                            "跨对话使用",
+                            s.policy.longTermMemoryEnabled,
+                            viewModel::longTerm,
+                        )
+                        HorizontalDivider(
+                            Modifier.padding(horizontal = 16.dp),
+                            color = ZhiBanTextSecondary.copy(alpha = .12f),
+                        )
+                        ZhiBanToggleRow(
+                            "自动发现新记忆",
+                            "自动提炼",
+                            s.policy.learnFromConversations,
+                            viewModel::learn,
+                        )
+                    }
+                }
+            }
 }
 
 

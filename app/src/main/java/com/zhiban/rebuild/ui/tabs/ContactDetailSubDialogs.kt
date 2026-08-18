@@ -203,51 +203,19 @@ internal fun ContactMergeReviewDialog(suggestion: ContactMergeSuggestion, onDism
                 )
                 Spacer(Modifier.height(6.dp))
             }
-            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Card)).background(RelationSoft).padding(14.dp)) {
-                Text(
-                    "合并后只显示一个联系人，原始资料、记忆和关系不会删除。你可以随时在联系人详情中恢复。",
-                    color = RelationMuted,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            error?.let {
-                Text(
-                    it,
-                    color = RelationDanger,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-            }
-            Spacer(Modifier.height(18.dp))
-            Button(
-                onClick = {
-                    val sourceId = if (canonicalId ==
-                        suggestion.first.contactId
-                    ) {
-                        suggestion.second.contactId
-                    } else {
-                        suggestion.first.contactId
-                    }
+            MergeConfirmFooter(
+                saving = saving,
+                error = error,
+                onConfirmClick = {
+                    val sourceId = if (canonicalId == suggestion.first.contactId) suggestion.second.contactId else suggestion.first.contactId
                     saving = true
                     onConfirm(canonicalId, sourceId) {
                         saving = false
                         error = it
                     }
                 },
-                Modifier.fillMaxWidth().height(ZhiBanSize.Control),
-                enabled = !saving,
-                colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
-                shape = RoundedCornerShape(ZhiBanRadius.Card),
-            ) {
-                if (saving) {
-                    CircularProgressIndicator(Modifier.size(18.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
-                } else {
-                    Text("确认合并")
-                }
-            }
-            TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth(), enabled = !saving) {
-                Text("不是同一个人", color = RelationMuted)
-            }
+                onDismiss = onDismiss,
+            )
         }
     }
 }
@@ -516,3 +484,46 @@ private fun MergeContactChoiceRow(contact: ContactEntity, selected: Boolean, onS
     }
     Spacer(Modifier.height(6.dp))
 }
+
+@Composable
+private fun MergeConfirmFooter(
+    saving: Boolean,
+    error: String?,
+    onConfirmClick: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Card)).background(RelationSoft).padding(14.dp)) {
+            Text(
+                "合并后只显示一个联系人，原始资料、记忆和关系不会删除。你可以随时在联系人详情中恢复。",
+                color = RelationMuted,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        error?.let {
+            Text(
+                it,
+                color = RelationDanger,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+        Spacer(Modifier.height(18.dp))
+        Button(
+            onClick = onConfirmClick,
+            Modifier.fillMaxWidth().height(ZhiBanSize.Control),
+            enabled = !saving,
+            colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
+            shape = RoundedCornerShape(ZhiBanRadius.Card),
+        ) {
+            if (saving) {
+                CircularProgressIndicator(Modifier.size(18.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+            } else {
+                Text("确认合并")
+            }
+        }
+        TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth(), enabled = !saving) {
+            Text("不是同一个人", color = RelationMuted)
+        }
+}
+
+

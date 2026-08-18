@@ -113,28 +113,10 @@ fun ContactMaintenancePage(onBack: () -> Unit, onAsk: (String) -> Unit, viewMode
                 ) { item ->
                     ContactMaintenanceRow(item, onAsk)
                 }
-                if (completableContacts.isNotEmpty()) {
-                    item(key = "completion-header") {
-                        Text(
-                            "资料待补全",
-                            modifier = Modifier.fillMaxWidth()
-                                .padding(horizontal = ZhiBanSpacing.PageHorizontal)
-                                .padding(top = ZhiBanSpacing.Md),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                    items(
-                        completableContacts.take(MAX_VISIBLE_ITEMS),
-                        key = { "completion-${it.contact.contactId}" },
-                    ) { completeness ->
-                        ContactCompletionRow(
-                            item = completeness,
-                            onClick = { prepareCompletion(completeness.contact.contactId) },
-                            modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
-                        )
-                    }
-                }
+            if (completableContacts.isNotEmpty()) {
+                completionSection(completableContacts = completableContacts, onPrepare = { prepareCompletion(it) })
+            }
+
             }
         }
     }
@@ -409,6 +391,30 @@ private fun MaintenanceDialogs(slots: MaintenanceDialogSlots) {
             text = { Text(message) },
         )
     }
+}
+
+private fun LazyListScope.completionSection(completableContacts: List<com.zhiban.rebuild.data.contact.ContactCompleteness>, onPrepare: (String) -> Unit) {
+
+        item(key = "completion-header") {
+            Text(
+                "资料待补全",
+                modifier = Modifier.fillMaxWidth()
+                    .padding(horizontal = ZhiBanSpacing.PageHorizontal)
+                    .padding(top = ZhiBanSpacing.Md),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        items(
+            completableContacts.take(MAX_VISIBLE_ITEMS),
+            key = { "completion-${it.contact.contactId}" },
+        ) { completeness ->
+            ContactCompletionRow(
+                item = completeness,
+                onClick = { onPrepare(completeness.contact.contactId) },
+                modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+            )
+        }
 }
 
 

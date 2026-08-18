@@ -176,30 +176,7 @@ internal fun ContactImportDialog(state: ContactImportUiState, onDismiss: () -> U
                 .background(RelationSurface)
                 .padding(20.dp),
         ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = onDismiss,
-                    enabled = !state.isImporting,
-                    modifier = Modifier.size(ZhiBanIconContainer.TouchTarget),
-                ) {
-                    Icon(Icons.Rounded.Close, "关闭")
-                }
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "从手机通讯录导入",
-                        color = RelationInk,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    if (state.rowsRead > 0) {
-                        Text(
-                            "手机返回 ${localizedQuantity(R.plurals.contact_count, state.contacts.size)}",
-                            color = RelationMuted,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
-            }
+            ImportDialogHeader(state = state, onDismiss = onDismiss)
             Spacer(Modifier.height(12.dp))
 
             when {
@@ -502,6 +479,34 @@ private fun ImportSelectionSection(
                 )
             } else {
                 Text(localizedQuantity(R.plurals.import_contact_count, selected.size))
+            }
+        }
+}
+
+@Composable
+private fun ImportDialogHeader(state: ContactImportUiState, onDismiss: () -> Unit) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(
+                onClick = onDismiss,
+                enabled = !state.isImporting,
+                modifier = Modifier.size(ZhiBanIconContainer.TouchTarget),
+            ) {
+                Icon(Icons.Rounded.Close, "关闭")
+            }
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "从手机通讯录导入",
+                    color = RelationInk,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (state.rowsRead > 0) {
+                    Text(
+                        "手机返回 ${localizedQuantity(R.plurals.contact_count, state.contacts.size)}",
+                        color = RelationMuted,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             }
         }
 }
