@@ -240,7 +240,6 @@ object AgentDataModule {
         communicationHandoffLauncher: com.zhiban.rebuild.data.communication.CommunicationHandoffLauncher,
         systemCalendarReader: com.zhiban.rebuild.data.calendar.SystemCalendarReader,
         webSearchGateway: com.zhiban.rebuild.runtime.provider.WebSearchGateway,
-        ilinkWechatChannel: com.zhiban.rebuild.runtime.kernel.IlinkWechatChannel,
         locationGateway: com.zhiban.rebuild.runtime.provider.LocationGateway,
     ): KernelCommandProcessor = KernelCommandProcessor(
         database,
@@ -299,7 +298,6 @@ object AgentDataModule {
             communicationHandoffLauncher = communicationHandoffLauncher,
             externalCalendarConflicts = systemCalendarReader,
             webSearchGateway = webSearchGateway,
-            ilinkWechatChannel = ilinkWechatChannel,
             locationGateway = locationGateway,
             locationConsent = { controls.locationAccessEnabled() },
         ),

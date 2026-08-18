@@ -12,7 +12,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Shared reserve → run → commit scaffolding for approved external side effects (message handoff,
- * WeChat iLink send). Both follow the same idempotency protocol: reserve a reservation keyed by the
+ * other confirmed send). Both follow the same idempotency protocol: reserve a reservation keyed by the
  * idempotency key, run the side effect once, then commit the result under `NonCancellable` so a
  * recover replay never repeats an already-visible effect (app opened / message delivered). Callers
  * supply only what differs — the side effect and how its failure maps to a safe code.

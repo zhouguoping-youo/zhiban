@@ -25,8 +25,7 @@ class StepFunRealtimeVoiceControllerTest {
     private fun controller(allowCloudSpeech: Boolean, profile: ProviderProfile?): StepFunRealtimeVoiceController {
         val gate = OutboundExportGate(settings = { OutboundPolicySettings(allowCloudSpeech = allowCloudSpeech) })
         val credentials = object : CredentialResolver {
-            override suspend fun <T> withCredential(credentialRef: String, keyVersion: Int, block: suspend (ByteArray) -> T): T =
-                block(ByteArray(0))
+            override suspend fun <T> withCredential(credentialRef: String, keyVersion: Int, block: suspend (ByteArray) -> T): T = block(ByteArray(0))
         }
         val profiles = object : ProviderProfileStore {
             override suspend fun load(): ProviderProfile? = profile

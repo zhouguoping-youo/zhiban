@@ -2,8 +2,8 @@ package com.zhiban.rebuild
 
 import java.util.concurrent.CancellationException
 import kotlinx.coroutines.runBlocking
-import org.junit.Assert.assertSame
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Test
 
 class ZhiBanAppCancellationTest {

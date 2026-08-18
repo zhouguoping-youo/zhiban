@@ -95,7 +95,6 @@ import com.zhiban.rebuild.runtime.tool.SchedulePlanValidator
 import com.zhiban.rebuild.runtime.tool.ToolConfirmation
 import com.zhiban.rebuild.runtime.tool.ToolDisposition
 import com.zhiban.rebuild.runtime.tool.WebSearchToolBinding
-import com.zhiban.rebuild.runtime.tool.WechatSendToolBinding
 import com.zhiban.rebuild.runtime.tool.canonicalMemoryDigest
 import com.zhiban.rebuild.runtime.tool.canonicalMemoryIdempotencyKey
 import com.zhiban.rebuild.runtime.tool.canonicalScheduleDigest
@@ -186,7 +185,6 @@ internal data class ProviderEngineInfrastructure(
     val externalCalendarConflicts: com.zhiban.rebuild.data.calendar.ExternalCalendarConflictSource? = null,
     val perception: PerceptionGateway? = null,
     val webSearchGateway: com.zhiban.rebuild.runtime.provider.WebSearchGateway? = null,
-    val ilinkWechatChannel: IlinkWechatChannel? = null,
     val locationGateway: com.zhiban.rebuild.runtime.provider.LocationGateway? = null,
     /**
      * 定位读取的用户同意开关(设置 → 隐私与安全 → 定位,默认关)。null/未接线一律视为未同意——
@@ -230,7 +228,6 @@ internal class ProviderExecutionEngine(
     private val externalCalendarConflicts = infrastructure.externalCalendarConflicts
     private val perception = infrastructure.perception
     private val webSearchGateway = infrastructure.webSearchGateway
-    private val ilinkWechatChannel = infrastructure.ilinkWechatChannel
     internal val store = RoomRuntimeStore(database, producerVersion = "runtime-v2-provider")
     internal val events = RuntimeEventAppender(store, ownerId, clock)
     internal val deterministicObservation = DeterministicObservationCompleter(store, ownerId, clock, ::perceiveForObservation)
@@ -412,7 +409,6 @@ internal class ProviderExecutionEngine(
                     it,
                 )
             },
-            ilinkWechatChannel?.sendBinding(toolCatalog.requireRegistered(WechatSendToolBinding.TOOL_NAME), store),
         ).filterNotNull(),
         proposalCount = store::toolProposalCount,
         totalCallCount = store::totalToolInvocationCount,
@@ -433,7 +429,6 @@ internal class ProviderExecutionEngine(
         timeoutMs = config.toolExecutionTimeoutMs,
     )
     internal val calendarConflictGuard = CalendarConflictGuard(capabilityRouter)
-    private val wechatSendComposeRedirect = WechatSendComposeRedirect(capabilityRouter, ilinkWechatChannel)
     internal val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val activeJobs = ConcurrentHashMap<String, Job>()
     internal val activeRequests = ConcurrentHashMap<String, String>()
@@ -764,12 +759,7 @@ internal class ProviderExecutionEngine(
             ),
         )
         val forcedToolName = forcedCanonicalTool?.let(capabilityRouter::providerName)
-        val toolRestriction = WorkToolVisibility.resolveRestriction(
-            forcedCanonicalTool,
-            allowedTools,
-            ilinkWechatChannel?.credentialStore,
-            capabilityRouter.canonicalNames(),
-        )
+        val toolRestriction = forcedCanonicalTool?.let(::setOf) ?: allowedTools
         val request = ModelRequest(
             requestId = attemptId,
             channel = OutboundChannel.LLM_INFERENCE,
@@ -971,8 +961,8 @@ internal class ProviderExecutionEngine(
 
     internal suspend fun requestToolApproval(event: ModelEvent.ToolCall, runId: String, sessionId: String, attemptId: String, fencingEpoch: Long): Boolean {
         val revision = store.projectionSnapshot(sessionId, "ui").currentRevision + 2
-        return wechatSendComposeRedirect.requestApproval(
-            event,
+        return capabilityRouter.requestApproval(
+            RuntimeToolCallRequest(event.providerCallId, event.name, event.argumentsJson),
             RuntimeToolRouteContext(runId, sessionId, attemptId, ownerId, fencingEpoch, revision, clock()),
         )
     }
@@ -1026,10 +1016,6 @@ internal class ProviderExecutionEngine(
             "CAPABILITY_UNAVAILABLE",
             "TARGET_APP_UNAVAILABLE",
             "INSUFFICIENT_QUOTA", "INPUT_SENSITIVE", "OUTPUT_SENSITIVE", "INVALID_REQUEST",
-            // WeChat iLink channel (communication.wechat.send). Surfaced verbatim so the conversation
-            // can tell the user to bind/re-bind or link the recipient instead of a generic failure.
-            "ILINK_NOT_BOUND", "ILINK_SESSION_EXPIRED", "WECHAT_ILINK_CONSENT_REQUIRED",
-            "ILINK_CONTACT_NOT_FOUND", "ILINK_RECIPIENT_NOT_LINKED", "ILINK_MESSAGE_INVALID",
             // 定位读取未开启(默认关):告诉用户去哪开,而不是给个兜底失败文案。
             "LOCATION_CONSENT_REQUIRED",
         )

@@ -5,7 +5,6 @@ import android.content.ComponentName
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.zhiban.rebuild.data.agent.AgentDataRepository
-import com.zhiban.rebuild.data.ilink.IlinkFetchCoordinator
 import com.zhiban.rebuild.runtime.runSuspendCatching
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -25,7 +24,6 @@ class ZhiBanNotificationListenerService : NotificationListenerService() {
     internal interface Dependencies {
         fun repository(): AgentDataRepository
         fun collectionPreferences(): MessageCollectionPreferences
-        fun ilinkFetchCoordinator(): IlinkFetchCoordinator
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -34,9 +32,6 @@ class ZhiBanNotificationListenerService : NotificationListenerService() {
     }
     private val collectionPreferences by lazy {
         EntryPointAccessors.fromApplication(applicationContext, Dependencies::class.java).collectionPreferences()
-    }
-    private val ilinkFetchCoordinator by lazy {
-        EntryPointAccessors.fromApplication(applicationContext, Dependencies::class.java).ilinkFetchCoordinator()
     }
     private val notifications = Channel<StatusBarNotification>(
         capacity = NOTIFICATION_BUFFER_CAPACITY,
@@ -116,10 +111,6 @@ class ZhiBanNotificationListenerService : NotificationListenerService() {
         ) ?: return
         if (!collectionPreferences.isEnabled(candidate.platform)) return
         repository.stageNotificationCandidate(candidate)
-        if (candidate.platform == WECHAT_PLATFORM_CODE) {
-            // The notification text is truncated; trigger a full-message pull (best-effort, debounced).
-            ilinkFetchCoordinator.onWechatMessageActivity()
-        }
     }
 
     override fun onDestroy() {

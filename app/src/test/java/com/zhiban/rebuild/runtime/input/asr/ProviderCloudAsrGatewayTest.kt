@@ -94,8 +94,7 @@ class ProviderCloudAsrGatewayTest {
             fixture.environment,
             fixture.vault,
             object : CloudAsrTransport {
-                override suspend fun stepFun(credential: ByteArray, audio: File): CloudAsrResult =
-                    throw IOException("socket reset")
+                override suspend fun stepFun(credential: ByteArray, audio: File): CloudAsrResult = throw IOException("socket reset")
             },
             outboundGate(allowCloudSpeech = true),
         )
@@ -109,8 +108,7 @@ class ProviderCloudAsrGatewayTest {
             fixture.environment,
             fixture.vault,
             object : CloudAsrTransport {
-                override suspend fun stepFun(credential: ByteArray, audio: File): CloudAsrResult =
-                    CloudAsrResult.Success("  \n ")
+                override suspend fun stepFun(credential: ByteArray, audio: File): CloudAsrResult = CloudAsrResult.Success("  \n ")
             },
             outboundGate(allowCloudSpeech = true),
         )
@@ -124,8 +122,7 @@ class ProviderCloudAsrGatewayTest {
             fixture.environment,
             fixture.vault,
             object : CloudAsrTransport {
-                override suspend fun stepFun(credential: ByteArray, audio: File): CloudAsrResult =
-                    throw CancellationException("cancelled")
+                override suspend fun stepFun(credential: ByteArray, audio: File): CloudAsrResult = throw CancellationException("cancelled")
             },
             outboundGate(allowCloudSpeech = true),
         )

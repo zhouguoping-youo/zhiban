@@ -336,8 +336,7 @@ class CapabilityRouterTest {
         override val aliases: Set<String> = emptySet(),
         private val delayMs: Long = 0,
         private val safeResultJson: String = "{\"status\":\"ok\"}",
-    ) :
-        RuntimeToolBinding {
+    ) : RuntimeToolBinding {
         var approvalCalled = false
         var readCalled = false
         var lastRequest: RuntimeToolCallRequest? = null

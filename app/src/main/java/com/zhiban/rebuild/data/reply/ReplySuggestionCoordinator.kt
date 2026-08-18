@@ -20,7 +20,7 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * Orchestrates reply-suggestion generation. Trigger-driven (a new WeChat message, or app foreground as a
- * fallback sweep), conflated and debounced like [com.zhiban.rebuild.data.ilink.IlinkFetchCoordinator] so a
+ * fallback sweep), conflated and debounced so a
  * burst of messages collapses into one pass. Each pass scans the last 24h of attributed incoming WeChat
  * candidates, gates them through the free [ReplyWorthinessAnalyzer], and only then pays for drafting.
  * Idempotent (per-candidate and per-thread dedupe) and best-effort: any failure is swallowed so a

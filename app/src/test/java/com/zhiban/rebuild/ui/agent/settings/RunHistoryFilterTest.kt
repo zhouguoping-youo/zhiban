@@ -7,11 +7,7 @@ import org.junit.Test
 
 class RunHistoryFilterTest {
 
-    private fun trace(
-        status: String = "SUCCEEDED",
-        tools: List<String> = emptyList(),
-        degradations: List<String> = emptyList(),
-    ) = AgentRunTrace(
+    private fun trace(status: String = "SUCCEEDED", tools: List<String> = emptyList(), degradations: List<String> = emptyList()) = AgentRunTrace(
         runId = "r",
         status = status,
         durationMs = 100,

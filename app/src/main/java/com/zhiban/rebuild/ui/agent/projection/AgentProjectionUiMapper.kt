@@ -39,9 +39,8 @@ object AgentProjectionUiMapper {
             plan = projection.pendingApproval?.let { approval ->
                 val isExternalMessage = approval.platform?.isNotBlank() == true &&
                     approval.recipient?.isNotBlank() == true
-                // The iLink WeChat tool marks its plan with a distinct platform sentinel so the card
-                // warns "真实发送，不可撤销" instead of the handoff "打开目标应用" copy.
-                val deliversDirectly = approval.platform == ILINK_WECHAT_PLATFORM
+                // 所有外发计划都是"打开目标应用"式跳转,由用户完成最后发送。
+                val deliversDirectly = false
                 AgentPlanUi(
                     title = approval.title.ifBlank { "执行知伴计划" },
                     subject = approval.title,
@@ -79,54 +78,23 @@ object AgentProjectionUiMapper {
 
     private fun safeMessageFor(cancelling: Boolean, safeFailureCode: String?): String? = when {
         cancelling -> "正在取消，请稍候…"
-
         safeFailureCode == "PROVIDER_NOT_CONFIGURED" -> "尚未配置大模型服务，请先完成连接设置。"
-
         safeFailureCode == "AUTHENTICATION_FAILED" -> "大模型连接验证失败，请检查设置后重试。"
-
         safeFailureCode == "TLS_VERIFICATION_FAILED" -> "安全连接验证失败，请检查网络环境或更新知伴后重试。"
-
         safeFailureCode == "RATE_LIMITED" -> "请求较多，请稍后重试。"
-
         safeFailureCode == "INSUFFICIENT_QUOTA" -> "阶跃星辰账户余额或套餐额度不足，请检查服务商账户。"
-
         safeFailureCode == "INPUT_SENSITIVE" -> "输入内容未通过阶跃星辰安全检查，请调整后重新发送。"
-
         safeFailureCode == "OUTPUT_SENSITIVE" -> "阶跃星辰未能安全生成回复，请换一种方式提问。"
-
         safeFailureCode == "INVALID_REQUEST" -> "当前请求参数不受阶跃星辰支持，请调整内容后重试。"
-
         safeFailureCode == "NETWORK_OFFLINE" -> "当前没有网络，仍可查看本地日程、联系人和记忆。连接网络后可重试对话。"
-
         safeFailureCode == "NETWORK_TOO_SLOW" -> "当前网络较差，AI 对话暂不可用。"
-
         safeFailureCode == "WEAK_NETWORK_MULTIMODAL_DISABLED" -> "网络较慢，图片和文件分析已暂停，请恢复网络后重试。"
-
         safeFailureCode in setOf("TIMEOUT", "PROVIDER_UNAVAILABLE") -> "暂时无法连接大模型，请检查网络后重试。"
-
         safeFailureCode == "EMPTY_RESPONSE" -> "AI 没有返回内容，请重新发送。"
-
         safeFailureCode == "INVALID_TOOL_CALL" -> "AI 没有生成可安全执行的操作，请换一种说法重新发送。"
-
         safeFailureCode == "TARGET_APP_UNAVAILABLE" -> "没有找到目标消息应用，或该应用暂时无法打开。请确认已安装并登录后重试。"
-
-        safeFailureCode == "ILINK_NOT_BOUND" -> "还没有绑定微信，请先到“我的 → 微信”完成绑定。"
-
-        safeFailureCode == "ILINK_SESSION_EXPIRED" -> "微信登录已过期，请到“我的 → 微信”重新绑定后再发。"
-
-        safeFailureCode == "WECHAT_ILINK_CONSENT_REQUIRED" -> "微信机器人还没开启，请先到“我的 → 微信”打开开关。"
-
-        safeFailureCode == "ILINK_CONTACT_NOT_FOUND" -> "没有找到这个联系人，先检查一下称呼或备注。"
-
-        safeFailureCode == "ILINK_RECIPIENT_NOT_LINKED" ->
-            "对方还没和你绑定的微信机器人聊过天，暂时拿不到直接发送的通道，可以改用普通消息手动发。"
-
-        safeFailureCode == "ILINK_MESSAGE_INVALID" -> "这条消息内容不符合发送要求（过长或为空），请调整后重试。"
-
         safeFailureCode == "LOCATION_CONSENT_REQUIRED" -> "定位读取还没开启，请到“设置 → 隐私与安全 → 定位”打开开关后再试。"
-
         safeFailureCode != null -> "大模型暂时无法完成请求，请稍后重试。"
-
         else -> null
     }
 
@@ -159,10 +127,6 @@ object AgentProjectionUiMapper {
         RuntimeRunStatus.FAILED_RETRYABLE,
         RuntimeRunStatus.FAILED_FINAL,
     )
-
-    // Matches WechatSendToolBinding.PLATFORM_VALUE; kept as a local literal to avoid coupling the
-    // UI mapper to the tool binding.
-    private const val ILINK_WECHAT_PLATFORM = "WECHAT_ILINK"
 
     // "8月10日 10:00 · 60分钟" plus an optional note line, so the user can verify the resolved
     // date/time/duration before confirming a schedule write. Blank when there is nothing to show.

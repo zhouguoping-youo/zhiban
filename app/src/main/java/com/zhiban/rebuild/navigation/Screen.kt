@@ -70,8 +70,6 @@ import kotlinx.serialization.Serializable
 
 @Serializable data object AboutZhiBan
 
-@Serializable data object WechatChannel
-
 @Serializable data object NotificationSettings
 
 @Serializable data object PrivacySecurity

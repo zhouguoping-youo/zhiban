@@ -196,8 +196,7 @@ private class FakeProjectionGateway(
     private val snapshot: StoredProjectionSnapshot,
     private val events: List<StoredRuntimeEvent> = emptyList(),
     private val assistantTurn: String? = null,
-) :
-    RuntimeProjectionGateway {
+) : RuntimeProjectionGateway {
     override suspend fun snapshotAndObserve(sessionId: String, projectionName: String, afterSequenceExclusive: Long) =
         RuntimeProjectionStream(snapshot, flowOf(events.filter { it.sequence > afterSequenceExclusive }))
 

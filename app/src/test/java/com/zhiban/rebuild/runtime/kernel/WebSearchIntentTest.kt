@@ -41,5 +41,4 @@ class WebSearchIntentTest {
         assertTrue(select("Search the web for current weather") == "web.search")
         assertTrue(select("Remember that I prefer concise answers") == "memory.upsert")
     }
-
 }

@@ -112,7 +112,6 @@ fun ProfileTab(
     onNavigateToData: () -> Unit = {},
     onNavigateToReportError: () -> Unit = {},
     onNavigateToAbout: () -> Unit = {},
-    onNavigateToWechatChannel: () -> Unit = {},
     modifier: Modifier = Modifier,
     isDataEmpty: Boolean = false,
     viewModel: ProfileTabViewModel = hiltViewModel(),
@@ -160,7 +159,6 @@ fun ProfileTab(
         ),
     )
     val appItems = listOf(
-        ProfileSettingItem(Icons.AutoMirrored.Outlined.Chat, "微信", "绑定微信机器人（iLink Bot）", onClick = onNavigateToWechatChannel),
         ProfileSettingItem(Icons.Outlined.DarkMode, "外观", "跟随手机显示设置", onClick = onNavigateToAppearance),
         ProfileSettingItem(
             Icons.Outlined.NotificationsNone,

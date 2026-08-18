@@ -28,10 +28,7 @@ class ReplyForwardedRevertRegressionTest {
         forwardedAtEpochMs = forwardedAtEpochMs,
     )
 
-    private fun coordinator(
-        replyDao: ReplySuggestionDao,
-        notificationDao: NotificationCandidateDao,
-    ): ReplySuggestionCoordinator {
+    private fun coordinator(replyDao: ReplySuggestionDao, notificationDao: NotificationCandidateDao): ReplySuggestionCoordinator {
         val database = mockk<AgentDatabase>(relaxed = true)
         coEvery { database.replySuggestionDao() } returns replyDao
         coEvery { database.notificationCandidateDao() } returns notificationDao

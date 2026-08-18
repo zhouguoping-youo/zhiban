@@ -9,7 +9,7 @@ data class ReplyDeliveryResult(val requiresUserSend: Boolean, val launched: Bool
 
 /**
  * The "last mile" of a reply: get a draft to the user so THEY can send it. The interface exists so a
- * future iLink executor (auto-send once the bot's userId cold-start is solved, §8) can replace the
+ * future direct-send executor can replace the
  * handoff without touching the suggestion pipeline. MVP ships only the handoff executor, which always
  * requires the user to press send in the target app — the draft is never auto-sent.
  */

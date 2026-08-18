@@ -36,7 +36,6 @@ import com.zhiban.rebuild.ui.settings.NotificationSettingsPage
 import com.zhiban.rebuild.ui.settings.PrivacySecurityPage
 import com.zhiban.rebuild.ui.settings.ReportErrorSettingsPage
 import com.zhiban.rebuild.ui.settings.StorageSettingsPage
-import com.zhiban.rebuild.ui.settings.WechatChannelPage
 import com.zhiban.rebuild.ui.tabs.CalendarTab
 import com.zhiban.rebuild.ui.tabs.ContactMaintenancePage
 import com.zhiban.rebuild.ui.tabs.CrmCapabilityPage
@@ -169,7 +168,6 @@ fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L
                     onNavigateToData = { navController.navigate(DataSettings) },
                     onNavigateToReportError = { navController.navigate(ReportErrorSettings) },
                     onNavigateToAbout = { navController.navigate(AboutZhiBan) },
-                    onNavigateToWechatChannel = { navController.navigate(WechatChannel) },
                 )
             }
 
@@ -226,7 +224,6 @@ fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L
                 )
             }
             composable<AboutZhiBan> { AboutZhiBanPage(onBack = { navController.popBackStack() }) }
-            composable<WechatChannel> { WechatChannelPage(onBack = { navController.popBackStack() }) }
             composable<Appearance> { AppearanceSettingsPage(onBack = { navController.popBackStack() }) }
 
             composable<CrmCapability> {

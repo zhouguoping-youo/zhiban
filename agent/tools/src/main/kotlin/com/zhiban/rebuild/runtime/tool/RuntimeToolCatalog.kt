@@ -292,13 +292,7 @@ class RuntimeToolCatalog(val specs: Map<String, RuntimeToolSpec>) {
                     """{"type":"function","function":{"name":"communication.message.compose","description":"准备一条消息，经用户逐次确认后打开目标应用的发送界面。个人微信、QQ、短信等仍由用户在目标应用中完成最后发送，不得声称已经送达。","parameters":{"type":"object","additionalProperties":false,"required":["platform","recipient","message"],"properties":{"platform":{"type":"string","enum":["SMS","WECHAT","QQ","TIM","FEISHU","LARK","WEWORK","DINGTALK"]},"recipient":{"type":"string","description":"用户可识别的收件人姓名；短信使用电话号码"},"message":{"type":"string","minLength":1,"maxLength":2000}}}}}""",
                     4,
                 ),
-                RuntimeToolSpec(
-                    "communication.wechat.send",
-                    1,
-                    RuntimeToolRisk.WRITE_CONFIRMATION_REQUIRED,
-                    """{"type":"function","function":{"name":"communication.wechat.send","description":"通过微信官方 iLink Bot API 向指定微信联系人真实发送一条文本消息，经用户逐次确认后真实送达、不可撤销。仅在已绑定微信通道且该联系人已关联微信时可用；若返回 ILINK_CONTACT_NOT_FOUND 或 ILINK_RECIPIENT_NOT_LINKED，改用 communication.message.compose 并提示用户。","parameters":{"type":"object","additionalProperties":false,"required":["recipient","message"],"properties":{"recipient":{"type":"string","description":"通讯录中联系人的显示名（不得使用手机号或邮箱）"},"message":{"type":"string","minLength":1,"maxLength":2000,"description":"消息文本，原样发送"}}}}}""",
-                    2,
-                ),
+
             ).associateBy { it.name },
         )
     }

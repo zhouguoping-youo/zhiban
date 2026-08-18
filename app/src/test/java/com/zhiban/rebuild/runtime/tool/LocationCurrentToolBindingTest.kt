@@ -26,10 +26,14 @@ class LocationCurrentToolBindingTest {
 
     @Test fun `consent off rejects the call before touching the gateway`() = runTest {
         var calls = 0
-        val binding = LocationCurrentToolBinding(spec, LocationGateway {
-            calls += 1
-            LocationSnapshot(1.0, 2.0, 1f, 1L)
-        }, consent = { false })
+        val binding = LocationCurrentToolBinding(
+            spec,
+            LocationGateway {
+                calls += 1
+                LocationSnapshot(1.0, 2.0, 1f, 1L)
+            },
+            consent = { false },
+        )
         val failure = runCatching {
             binding.executeReadOnly(RuntimeToolCallRequest("c", spec.name, """{}"""), context())
         }.exceptionOrNull()

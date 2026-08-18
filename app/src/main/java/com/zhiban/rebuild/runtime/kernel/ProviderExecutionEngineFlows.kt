@@ -95,7 +95,6 @@ import com.zhiban.rebuild.runtime.tool.SchedulePlanValidator
 import com.zhiban.rebuild.runtime.tool.ToolConfirmation
 import com.zhiban.rebuild.runtime.tool.ToolDisposition
 import com.zhiban.rebuild.runtime.tool.WebSearchToolBinding
-import com.zhiban.rebuild.runtime.tool.WechatSendToolBinding
 import com.zhiban.rebuild.runtime.tool.canonicalMemoryDigest
 import com.zhiban.rebuild.runtime.tool.canonicalMemoryIdempotencyKey
 import com.zhiban.rebuild.runtime.tool.canonicalScheduleDigest
