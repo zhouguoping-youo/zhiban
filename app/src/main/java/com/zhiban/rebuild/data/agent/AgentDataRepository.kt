@@ -167,9 +167,6 @@ class AgentDataRepository internal constructor(
             enriched.suggestedContactId?.let { matchedContactId ->
                 crm.suggestNewLeadFromNotification(matchedContactId, enriched.candidateId, nowEpochMs)
             }
-            daos.notificationCandidateDao.clearExpiredOrDismissed(
-                nowEpochMs - 30L * 24 * 60 * 60 * 1_000,
-            )
             createdSchedule
         }
         automaticSchedule?.let(scheduleReminderSink::replace)

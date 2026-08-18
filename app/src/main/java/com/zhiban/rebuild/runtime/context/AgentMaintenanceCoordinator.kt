@@ -16,6 +16,7 @@ data class AgentMaintenanceResult(
     val factFtsRebuilt: Boolean,
     val crmSuggestionsExpired: Int,
     val enrichmentExpired: Int,
+    val notificationExpired: Int = 0,
     val degradationReasons: Set<String> = emptySet(),
 )
 
@@ -48,6 +49,10 @@ internal class AgentMaintenanceCoordinator @Inject constructor(private val datab
         val crmSuggestionsExpired = database.crmDao()
             .expirePendingSuggestionsBefore(nowEpochMs - CrmAgentDataRepository.SUGGESTION_TTL_MS, nowEpochMs)
         val enrichmentExpired = database.contactKnowledgeDao().purgeExpiredEnrichment(nowEpochMs)
+        // 通知候选的过期/DISMISSED 清理从"每条通知的暂存事务内"移到维护周期(P2:暂存事务不再
+        // 夹带 30 天前的批量 DELETE,每条通知的事务更短)。
+        val notificationExpired = database.notificationCandidateDao()
+            .clearExpiredOrDismissed(nowEpochMs - 30L * 24 * 60 * 60 * 1_000)
         // One bounded batch per startup; retrieval remains FTS-only until every active fact is rebuilt.
         val degradationReasons = try {
             EmbeddingIndex(database, embeddingGateway) { nowEpochMs }.backfillBatch(32)
@@ -66,6 +71,7 @@ internal class AgentMaintenanceCoordinator @Inject constructor(private val datab
             factFtsRebuilt,
             crmSuggestionsExpired,
             enrichmentExpired,
+            notificationExpired,
             degradationReasons,
         )
     }
