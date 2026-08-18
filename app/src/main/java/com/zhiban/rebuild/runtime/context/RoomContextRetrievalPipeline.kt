@@ -140,8 +140,15 @@ internal class RoomContextRetrievalPipeline(
                 )
             }
             .toList()
-        val contacts = context.entities.mapNotNull { it.linkedId }.distinct().mapNotNull { id ->
-            database.contactDao().findById(id)?.let { contact ->
+        // 两步批量解析替代逐实体 findById(N 条单查→2 条查询,P2-structured 路):输入 id 先解析
+        // 到 canonical(合并源→canonical),再一次 findByIds 取全。
+        val linkedIds = context.entities.mapNotNull { it.linkedId }.distinct()
+        val canonicalById = database.contactDao().resolveCanonicalIds(linkedIds)
+            .associate { it.inputId to it.canonicalId }
+        val byId = database.contactDao().findByIds(canonicalById.values.distinct())
+            .associateBy { it.contactId }
+        val contacts = linkedIds.mapNotNull { id ->
+            canonicalById[id]?.let(byId::get)?.let { contact ->
                 RetrievalCandidate(
                     "contact:${contact.contactId}",
                     "contact",

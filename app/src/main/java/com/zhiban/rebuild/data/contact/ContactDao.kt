@@ -58,6 +58,25 @@ interface ContactDao {
         ) AND canonical.deletedAtEpochMs IS NULL""",
     )
     suspend fun findById(contactId: String): ContactEntity?
+    /** 批量版 findById(同样 canonical 解析 + fill-only 语义),一条查询替代 N 条单查(P2-structured 路)。 */
+    @Query(
+        """SELECT canonical.contactId, canonical.displayName, canonical.normalizedName,
+        COALESCE(canonical.phone, (SELECT source.phone FROM contact_merge_links link INNER JOIN contacts source ON source.contactId = link.sourceContactId WHERE link.canonicalContactId = canonical.contactId AND link.undoneAtEpochMs IS NULL AND source.phone IS NOT NULL LIMIT 1)) AS phone,
+        COALESCE(canonical.email, (SELECT source.email FROM contact_merge_links link INNER JOIN contacts source ON source.contactId = link.sourceContactId WHERE link.canonicalContactId = canonical.contactId AND link.undoneAtEpochMs IS NULL AND source.email IS NOT NULL LIMIT 1)) AS email,
+        COALESCE(canonical.wechatId, (SELECT source.wechatId FROM contact_merge_links link INNER JOIN contacts source ON source.contactId = link.sourceContactId WHERE link.canonicalContactId = canonical.contactId AND link.undoneAtEpochMs IS NULL AND source.wechatId IS NOT NULL LIMIT 1)) AS wechatId,
+        COALESCE(canonical.company, (SELECT source.company FROM contact_merge_links link INNER JOIN contacts source ON source.contactId = link.sourceContactId WHERE link.canonicalContactId = canonical.contactId AND link.undoneAtEpochMs IS NULL AND source.company IS NOT NULL LIMIT 1)) AS company,
+        COALESCE(canonical.title, (SELECT source.title FROM contact_merge_links link INNER JOIN contacts source ON source.contactId = link.sourceContactId WHERE link.canonicalContactId = canonical.contactId AND link.undoneAtEpochMs IS NULL AND source.title IS NOT NULL LIMIT 1)) AS title,
+        COALESCE(canonical.responsibilities, (SELECT source.responsibilities FROM contact_merge_links link INNER JOIN contacts source ON source.contactId = link.sourceContactId WHERE link.canonicalContactId = canonical.contactId AND link.undoneAtEpochMs IS NULL AND source.responsibilities IS NOT NULL LIMIT 1)) AS responsibilities,
+        canonical.aliasesJson, canonical.tagsJson,
+        COALESCE(canonical.note, (SELECT source.note FROM contact_merge_links link INNER JOIN contacts source ON source.contactId = link.sourceContactId WHERE link.canonicalContactId = canonical.contactId AND link.undoneAtEpochMs IS NULL AND source.note IS NOT NULL LIMIT 1)) AS note,
+        COALESCE(canonical.avatarUri, (SELECT source.avatarUri FROM contact_merge_links link INNER JOIN contacts source ON source.contactId = link.sourceContactId WHERE link.canonicalContactId = canonical.contactId AND link.undoneAtEpochMs IS NULL AND source.avatarUri IS NOT NULL LIMIT 1)) AS avatarUri,
+        canonical.source, canonical.deletedAtEpochMs, canonical.createdAtEpochMs, canonical.updatedAtEpochMs
+        FROM contacts canonical
+        WHERE canonical.contactId IN (:canonicalIds) AND canonical.deletedAtEpochMs IS NULL""",
+    )
+    suspend fun findByIds(canonicalIds: List<String>): List<ContactEntity>
+
+
 
     @Query("SELECT * FROM contacts WHERE contactId = :contactId AND deletedAtEpochMs IS NULL")
     suspend fun findRawById(contactId: String): ContactEntity?
@@ -138,25 +157,30 @@ interface ContactDao {
     )
     suspend fun search(query: String, normalizedQuery: String, limit: Int): List<ContactSearchProjection>
 
+    /** 提及匹配的姓名清单(含合并源名),匹配改在内存做——过去每条用户输入一次全表 instr 扫描(P1-性能3)。 */
     @Query(
-        """SELECT * FROM contacts canonical
-           WHERE canonical.deletedAtEpochMs IS NULL
-             AND canonical.contactId NOT IN (SELECT sourceContactId FROM contact_merge_links WHERE undoneAtEpochMs IS NULL)
-             AND canonical.displayName != ''
-             AND (
-               instr(:input, canonical.displayName) > 0 OR instr(:input, canonical.normalizedName) > 0 OR
-               EXISTS (
-                 SELECT 1 FROM contact_merge_links link
-                 INNER JOIN contacts source ON source.contactId = link.sourceContactId
-                 WHERE link.canonicalContactId = canonical.contactId
-                   AND link.undoneAtEpochMs IS NULL
-                   AND (instr(:input, source.displayName) > 0 OR instr(:input, source.normalizedName) > 0)
-               )
-             )
-           ORDER BY length(canonical.displayName) DESC, canonical.updatedAtEpochMs DESC
-           LIMIT :limit""",
+        """SELECT contactId, displayName, normalizedName, updatedAtEpochMs FROM contacts
+           WHERE deletedAtEpochMs IS NULL
+             AND contactId NOT IN (SELECT sourceContactId FROM contact_merge_links WHERE undoneAtEpochMs IS NULL)
+             AND displayName != ''""",
     )
-    suspend fun findMentionedIn(input: String, limit: Int = 10): List<ContactEntity>
+    suspend fun mentionCandidateNames(): List<ContactMentionNameRow>
+
+    /** 合并源联系人的姓名(按 canonical 分组),提及匹配同样要命中源名。 */
+    @Query(
+        """SELECT link.canonicalContactId AS contactId, source.displayName AS displayName, source.normalizedName AS normalizedName, source.updatedAtEpochMs AS updatedAtEpochMs
+           FROM contact_merge_links link INNER JOIN contacts source ON source.contactId = link.sourceContactId
+           WHERE link.undoneAtEpochMs IS NULL AND source.displayName != ''""",
+    )
+    suspend fun mentionSourceNames(): List<ContactMentionNameRow>
+
+    /** 输入 id → canonical id 解析(合并源解析到 canonical),用于批量查询前的两步解析。 */
+    @Query(
+        """SELECT c.contactId AS inputId, COALESCE(m.canonicalContactId, c.contactId) AS canonicalId
+           FROM contacts c LEFT JOIN contact_merge_links m ON m.sourceContactId = c.contactId AND m.undoneAtEpochMs IS NULL
+           WHERE c.contactId IN (:contactIds)""",
+    )
+    suspend fun resolveCanonicalIds(contactIds: List<String>): List<ContactIdResolution>
 
     @Query(
         """SELECT COUNT(*) FROM contacts WHERE deletedAtEpochMs IS NULL
@@ -530,4 +554,36 @@ interface RelationshipEventDao {
            )""",
     )
     suspend fun deactivateForContacts(contactIds: List<String>, nowEpochMs: Long): Int
+}
+
+/**
+ * 提及匹配(P1-性能3):过去是每条用户输入一次全表 instr 扫描(参数在左、索引失效);
+ * 现在把姓名清单(含合并源名)一次取回、内存匹配。语义不变:大小写敏感 contains、
+ * 按显示名长度降序、同长按更新时间降序,取前 [limit]。
+ */
+internal suspend fun ContactDao.findMentionedCandidates(input: String, limit: Int = 10): List<ContactEntity> {
+    if (input.isBlank()) return emptyList()
+    val sourceNames = mentionSourceNames().groupBy(ContactMentionNameRow::contactId)
+    val matches = mutableListOf<ContactMentionNameRow>()
+    mentionCandidateNames().forEach { row ->
+        val names = buildList {
+            add(row.displayName)
+            add(row.normalizedName)
+            sourceNames[row.contactId].orEmpty().forEach {
+                add(it.displayName)
+                add(it.normalizedName)
+            }
+        }.filter(String::isNotBlank)
+        if (names.any(input::contains)) matches += row
+    }
+    val orderedIds = matches
+        .sortedWith(
+            compareByDescending<ContactMentionNameRow> { it.displayName.length }
+                .thenByDescending(ContactMentionNameRow::updatedAtEpochMs),
+        )
+        .map(ContactMentionNameRow::contactId)
+        .take(limit)
+    if (orderedIds.isEmpty()) return emptyList()
+    val byId = findByIds(orderedIds).associateBy(ContactEntity::contactId)
+    return orderedIds.mapNotNull(byId::get)
 }
