@@ -110,29 +110,52 @@ fun CrmLeadListPage(onBack: () -> Unit, onOpenOpportunity: (String) -> Unit, vie
         }
     }
 
-    candidateToPromote?.let { lead ->
+    LeadConversionDialogs(
+        LeadConversionDialogSlots(
+            candidateToPromote = candidateToPromote,
+            setCandidateToPromote = { candidateToPromote = it },
+            leadToConvert = leadToConvert,
+            setLeadToConvert = { leadToConvert = it },
+            viewModel = viewModel,
+            onOpenOpportunity = onOpenOpportunity,
+        ),
+    )
+}
+
+private data class LeadConversionDialogSlots(
+    val candidateToPromote: CrmLeadEntity?,
+    val setCandidateToPromote: (CrmLeadEntity?) -> Unit,
+    val leadToConvert: CrmLeadEntity?,
+    val setLeadToConvert: (CrmLeadEntity?) -> Unit,
+    val viewModel: CrmCapabilityViewModel,
+    val onOpenOpportunity: (String) -> Unit,
+)
+
+@Composable
+private fun LeadConversionDialogs(slots: LeadConversionDialogSlots) {
+    slots.candidateToPromote?.let { lead ->
         ZhiBanAlertDialog(
-            onDismissRequest = { candidateToPromote = null },
+            onDismissRequest = { slots.setCandidateToPromote(null) },
             title = { Text("转为正式线索？") },
             text = { Text("${lead.displayNameSnapshot} 将进入正式线索列表，之后可参与推进判断。") },
-            dismissButton = { TextButton(onClick = { candidateToPromote = null }) { Text("取消") } },
+            dismissButton = { TextButton(onClick = { slots.setCandidateToPromote(null) }) { Text("取消") } },
             confirmButton = {
                 TextButton(onClick = {
-                    candidateToPromote = null
-                    viewModel.promoteCandidateLead(lead.leadId)
+                    slots.setCandidateToPromote(null)
+                    slots.viewModel.promoteCandidateLead(lead.leadId)
                 }) { Text("确认转正", color = ZhiBanTerracotta) }
             },
         )
     }
 
-    leadToConvert?.let { lead ->
+    slots.leadToConvert?.let { lead ->
         CrmConvertLeadDialog(
             lead = lead,
-            onDismiss = { leadToConvert = null },
+            onDismiss = { slots.setLeadToConvert(null) },
             onConfirm = { input ->
                 val converting = lead
-                leadToConvert = null
-                viewModel.convertLeadToOpportunity(converting.leadId, input, onConverted = onOpenOpportunity)
+                slots.setLeadToConvert(null)
+                slots.viewModel.convertLeadToOpportunity(converting.leadId, input, onConverted = slots.onOpenOpportunity)
             },
         )
     }
@@ -268,4 +291,5 @@ private fun buildConversionInput(title: String, account: String, amountText: Str
         valueMinor = valueMinor,
         expectedCloseAtEpochMs = closeAt,
     )
+
 }

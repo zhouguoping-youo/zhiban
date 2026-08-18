@@ -208,48 +208,21 @@ fun EventPlanningDetailPage(planId: String, onBack: () -> Unit, onAskAgent: (Str
             }
         }
     }
-    if (contactPickerOpen && item != null) {
-        EventContactPicker(
-            contacts = state.contacts.filterNot { contact -> item.participants.any { it.contact.contactId == contact.contactId } },
-            onDismiss = { contactPickerOpen = false },
-            onSelect = { contact ->
-                viewModel.addParticipant(planId, contact.contactId)
-                contactPickerOpen = false
-            },
-        )
-    }
-    responseContact?.let { contact ->
-        ResponseStatusDialog(
-            contactName = contact.displayName,
-            onDismiss = { responseContact = null },
-            onSelect = { status ->
-                viewModel.updateResponse(planId, contact.contactId, status)
-                responseContact = null
-            },
-        )
-    }
-    if (deleteConfirmOpen && item != null) {
-        ZhiBanAlertDialog(
-            onDismissRequest = { deleteConfirmOpen = false },
-            title = { Text("删除这项安排？") },
-            text = {
-                Text(
-                    if (item.plan.status == EventPlanStatus.CONFIRMED) {
-                        "“${item.plan.title}”将被删除，已加入日历的对应日程也会一并移除。"
-                    } else {
-                        "“${item.plan.title}”及其参与人将被删除。"
-                    },
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    deleteConfirmOpen = false
-                    viewModel.deletePlan(item) { onBack() }
-                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = { TextButton(onClick = { deleteConfirmOpen = false }) { Text("保留") } },
-        )
-    }
+    EventPlanningDetailDialogs(
+        EventPlanningDetailDialogSlots(
+            contactPickerOpen = contactPickerOpen,
+            setContactPickerOpen = { contactPickerOpen = it },
+            responseContact = responseContact,
+            setResponseContact = { responseContact = it },
+            deleteConfirmOpen = deleteConfirmOpen,
+            setDeleteConfirmOpen = { deleteConfirmOpen = it },
+            item = item,
+            state = state,
+            planId = planId,
+            viewModel = viewModel,
+            onBack = onBack,
+        ),
+    )
 }
 
 @Composable
@@ -479,3 +452,64 @@ private fun responseLabel(status: String): String = when (status) {
 }
 
 private val EVENT_DATE_FORMAT = DateTimeFormatter.ofPattern("M月d日 E HH:mm")
+
+private data class EventPlanningDetailDialogSlots(
+    val contactPickerOpen: Boolean,
+    val setContactPickerOpen: (Boolean) -> Unit,
+    val responseContact: ContactEntity?,
+    val setResponseContact: (ContactEntity?) -> Unit,
+    val deleteConfirmOpen: Boolean,
+    val setDeleteConfirmOpen: (Boolean) -> Unit,
+    val item: EventPlanUi?,
+    val state: EventPlanningState,
+    val planId: String,
+    val viewModel: EventPlanningViewModel,
+    val onBack: () -> Unit,
+)
+
+@Composable
+private fun EventPlanningDetailDialogs(slots: EventPlanningDetailDialogSlots) {
+    if (slots.contactPickerOpen && slots.item != null) {
+        EventContactPicker(
+            contacts = slots.state.contacts.filterNot { contact -> slots.item!!.participants.any { it.contact.contactId == contact.contactId } },
+            onDismiss = { slots.setContactPickerOpen(false) },
+            onSelect = { contact ->
+                slots.viewModel.addParticipant(slots.planId, contact.contactId)
+                slots.setContactPickerOpen(false)
+            },
+        )
+    }
+    slots.responseContact?.let { contact ->
+        ResponseStatusDialog(
+            contactName = contact.displayName,
+            onDismiss = { slots.setResponseContact(null) },
+            onSelect = { status ->
+                slots.viewModel.updateResponse(slots.planId, contact.contactId, status)
+                slots.setResponseContact(null)
+            },
+        )
+    }
+    if (slots.deleteConfirmOpen && slots.item != null) {
+        ZhiBanAlertDialog(
+            onDismissRequest = { slots.setDeleteConfirmOpen(false) },
+            title = { Text("删除这项安排？") },
+            text = {
+                Text(
+                    if (slots.item!!.plan.status == EventPlanStatus.CONFIRMED) {
+                        "“${slots.item!!.plan.title}”将被删除，已加入日历的对应日程也会一并移除。"
+                    } else {
+                        "“${slots.item!!.plan.title}”及其参与人将被删除。"
+                    },
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    slots.setDeleteConfirmOpen(false)
+                    slots.viewModel.deletePlan(slots.item!!) { slots.onBack() }
+                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { slots.setDeleteConfirmOpen(false) }) { Text("保留") } },
+        )
+    }
+}
+
