@@ -5,6 +5,8 @@ import androidx.room.RoomDatabase
 import com.zhiban.rebuild.data.calllog.CallLogDao
 import com.zhiban.rebuild.data.calllog.CallNoteEntity
 import com.zhiban.rebuild.data.calllog.CallRecordEntity
+import com.zhiban.rebuild.data.completion.ContactCompletionRequestDao
+import com.zhiban.rebuild.data.completion.ContactCompletionRequestEntity
 import com.zhiban.rebuild.data.contact.AndroidRawContactLinkEntity
 import com.zhiban.rebuild.data.contact.ContactAddressEntity
 import com.zhiban.rebuild.data.contact.ContactAliasEntity
@@ -67,7 +69,7 @@ import com.zhiban.rebuild.runtime.store.*
 
 /** 知伴本机数据库文件名，供数据层以外的只读场景（如存储页显示大小）使用，避免引用 internal 的 AgentDatabase。 */
 const val AGENT_DATABASE_FILE_NAME = "zhiban-agent.db"
-const val AGENT_DATABASE_SCHEMA_VERSION = 40
+const val AGENT_DATABASE_SCHEMA_VERSION = 41
 
 @Database(
     entities = [
@@ -122,6 +124,7 @@ const val AGENT_DATABASE_SCHEMA_VERSION = 40
         EventPlanEntity::class,
         EventPlanParticipantEntity::class,
         com.zhiban.rebuild.data.reply.ReplySuggestionEntity::class,
+        ContactCompletionRequestEntity::class,
     ],
     version = AGENT_DATABASE_SCHEMA_VERSION,
     exportSchema = true,
@@ -159,6 +162,7 @@ internal abstract class AgentDatabase : RoomDatabase() {
     internal abstract fun contactKnowledgeDao(): ContactKnowledgeDao
     abstract fun notificationCandidateDao(): NotificationCandidateDao
     abstract fun replySuggestionDao(): com.zhiban.rebuild.data.reply.ReplySuggestionDao
+    abstract fun contactCompletionRequestDao(): ContactCompletionRequestDao
     abstract fun crmDao(): CrmDao
     abstract fun callLogDao(): CallLogDao
     abstract fun eventPlanningDao(): EventPlanningDao
@@ -204,6 +208,7 @@ internal abstract class AgentDatabase : RoomDatabase() {
         val MIGRATION_37_38 = AgentDatabaseSchema.MIGRATION_37_38
         val MIGRATION_38_39 = AgentDatabaseSchema.MIGRATION_38_39
         val MIGRATION_39_40 = AgentDatabaseSchema.MIGRATION_39_40
+        val MIGRATION_40_41 = AgentDatabaseSchema.MIGRATION_40_41
         val CALLBACK = AgentDatabaseSchema.CALLBACK
     }
 }

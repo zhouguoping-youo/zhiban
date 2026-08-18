@@ -340,7 +340,7 @@ internal fun ContactImportDialog(state: ContactImportUiState, onDismiss: () -> U
 internal fun ContactEditorDialog(
     contact: ContactEntity?,
     onDismiss: () -> Unit,
-    onSave: (String?, String, String?, String?, String?, String?, String?, String?, (String?) -> Unit) -> Unit,
+    onSave: (String?, String, String?, String?, String?, String?, String?, String?, String?, String?, (String?) -> Unit) -> Unit,
 ) {
     var name by rememberSaveable(contact?.contactId) { mutableStateOf(contact?.displayName.orEmpty()) }
     var phone by rememberSaveable(contact?.contactId) { mutableStateOf(contact?.phone.orEmpty()) }
@@ -349,6 +349,8 @@ internal fun ContactEditorDialog(
     var title by rememberSaveable(contact?.contactId) { mutableStateOf(contact?.title.orEmpty()) }
     var tag by rememberSaveable(contact?.contactId) { mutableStateOf(contact?.firstKnownTag() ?: RelationshipGroup.SOCIAL.displayName) }
     var note by rememberSaveable(contact?.contactId) { mutableStateOf(contact?.note.orEmpty()) }
+    var email by rememberSaveable(contact?.contactId) { mutableStateOf(contact?.email.orEmpty()) }
+    var responsibilities by rememberSaveable(contact?.contactId) { mutableStateOf(contact?.responsibilities.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
     val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
 
@@ -356,7 +358,7 @@ internal fun ContactEditorDialog(
         if (name.isBlank()) {
             error = "请输入联系人姓名"
         } else {
-            onSave(contact?.contactId, name, phone, wechat, company, title, tag, note) { error = it }
+            onSave(contact?.contactId, name, phone, wechat, company, title, tag, note, email, responsibilities) { error = it }
         }
     }
 
@@ -409,6 +411,10 @@ internal fun ContactEditorDialog(
                     Spacer(Modifier.height(9.dp))
                 }
                 item {
+                    ContactField("邮箱（可选）", email, { email = it })
+                    Spacer(Modifier.height(9.dp))
+                }
+                item {
                     Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                         OutlinedTextField(company, {
                             company = it
@@ -417,6 +423,12 @@ internal fun ContactEditorDialog(
                             title = it
                         }, Modifier.weight(1f), label = { Text("职位") }, singleLine = true)
                     }
+                    Spacer(Modifier.height(9.dp))
+                }
+                item {
+                    OutlinedTextField(responsibilities, {
+                        responsibilities = it
+                    }, Modifier.fillMaxWidth(), label = { Text("职责（可选）") }, minLines = 2, maxLines = 4)
                     Spacer(Modifier.height(12.dp))
                 }
                 item {

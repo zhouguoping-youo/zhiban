@@ -44,6 +44,9 @@ data class ContactEntity(
     val deletedAtEpochMs: Long?,
     val createdAtEpochMs: Long,
     val updatedAtEpochMs: Long,
+    // "负责什么"（业务范围/职责）。联系人级、可编辑的一等字段；区别于 contact_employments.jobDescription
+    // （绑任职记录、且只有系统导入会写）。带默认值以免破坏既有的位置化构造调用。
+    val responsibilities: String? = null,
 )
 
 @Entity(

@@ -742,8 +742,8 @@ fun RelationTab(
         ContactEditorDialog(
             contact = editing,
             onDismiss = { showEditor = false },
-            onSave = { id, name, phone, wechat, company, title, selectedTag, note, result ->
-                viewModel.save(id, name, phone, wechat, company, title, selectedTag, note) { error ->
+            onSave = { id, name, phone, wechat, company, title, selectedTag, note, email, responsibilities, result ->
+                viewModel.save(id, name, phone, wechat, company, title, selectedTag, note, email, responsibilities) { error ->
                     result(error)
                     if (error == null) {
                         showEditor = false

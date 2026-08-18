@@ -140,4 +140,25 @@ class ContactDaoTest {
         assertTrue(db.factDao().recent(10, 10).isEmpty())
         assertTrue(db.relationshipEdgeDao().observeActive().first().isEmpty())
     }
+
+    @Test fun findByIdReturnsResponsibilitiesAndFallsBackToMergedSource() = runBlocking {
+        val contacts = db.contactDao()
+        val identities = db.contactIdentityDao()
+        // 直接回读：联系人自身带 responsibilities，findById 不得丢（回归：曾漏列被读成 null）。
+        contacts.insert(
+            ContactEntity("direct", "张三", "张三", null, null, null, null, null, "[]", "[]", null, null, "USER", null, 1, 2, responsibilities = "湖北/湖南销售"),
+        )
+        // 合并回退：canonical 无、source 有，应回退到 source 的值（与 phone/email 等字段同策略）。
+        contacts.insert(
+            ContactEntity("canonical", "王小明", "王小明", null, null, null, null, null, "[]", "[]", null, null, "USER", null, 1, 2),
+        )
+        contacts.insert(
+            ContactEntity("source", "王老师", "王老师", null, null, null, null, null, "[]", "[]", null, null, "USER", null, 1, 3, responsibilities = "交付"),
+        )
+        identities.upsertMergeLink(ContactMergeLinkEntity("source", "canonical", "同一人", true, 4, null))
+
+        assertEquals("湖北/湖南销售", contacts.findById("direct")?.responsibilities)
+        assertEquals("交付", contacts.findById("canonical")?.responsibilities)
+        assertEquals("交付", contacts.findById("source")?.responsibilities)
+    }
 }

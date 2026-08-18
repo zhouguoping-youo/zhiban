@@ -477,11 +477,16 @@ class RelationViewModel @Inject constructor(
         title: String?,
         tag: String?,
         note: String?,
+        email: String?,
+        responsibilities: String?,
         onResult: (String?) -> Unit,
     ) {
         viewModelScope.launch {
             runSuspendCatching {
-                repository.saveUserContact(id, name, phone, wechat, company, title, tag, note)
+                repository.saveUserContact(
+                    id, name, phone, wechat, company, title, tag, note,
+                    email = email, responsibilities = responsibilities,
+                )
             }.onSuccess { onResult(null) }.onFailure { onResult(it.message ?: "保存失败") }
         }
     }

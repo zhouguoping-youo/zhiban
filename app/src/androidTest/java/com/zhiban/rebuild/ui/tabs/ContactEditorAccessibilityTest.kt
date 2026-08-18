@@ -34,7 +34,7 @@ class ContactEditorAccessibilityTest {
                     ContactEditorDialog(
                         contact = null,
                         onDismiss = {},
-                        onSave = { _, _, _, _, _, _, _, _, _ -> },
+                        onSave = { _, _, _, _, _, _, _, _, _, _, _ -> },
                     )
                 }
             }
@@ -50,7 +50,7 @@ class ContactEditorAccessibilityTest {
                 ContactEditorDialog(
                     contact = null,
                     onDismiss = {},
-                    onSave = { _, _, _, _, _, _, _, _, _ -> },
+                    onSave = { _, _, _, _, _, _, _, _, _, _, _ -> },
                 )
             }
         }
@@ -67,7 +67,7 @@ class ContactEditorAccessibilityTest {
                 ContactEditorDialog(
                     contact = null,
                     onDismiss = {},
-                    onSave = { _, _, _, _, _, _, _, _, _ -> },
+                    onSave = { _, _, _, _, _, _, _, _, _, _, _ -> },
                 )
             }
         }

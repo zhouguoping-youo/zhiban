@@ -595,4 +595,34 @@ internal object AgentDatabaseMigrations25To37 {
             db.execSQL("CREATE INDEX IF NOT EXISTS `index_reply_suggestions_createdAtEpochMs` ON `reply_suggestions` (`createdAtEpochMs`)")
         }
     }
+
+    val MIGRATION_40_41 = object : Migration(40, 41) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // CALLBACK owns this partial index, so Room's schema model cannot declare it.
+            // Remove an existing install's copy before validation; CALLBACK.onOpen restores it.
+            db.execSQL("DROP INDEX IF EXISTS `index_plan_runs_single_active_per_definition`")
+            db.execSQL("ALTER TABLE `contacts` ADD COLUMN `responsibilities` TEXT")
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS `contact_completion_requests` (
+                    `requestId` TEXT NOT NULL,
+                    `contactId` TEXT NOT NULL,
+                    `requestedFieldsJson` TEXT NOT NULL,
+                    `draftText` TEXT NOT NULL,
+                    `status` TEXT NOT NULL,
+                    `threadKey` TEXT,
+                    `responseCandidateId` TEXT,
+                    `sentAtEpochMs` INTEGER,
+                    `respondedAtEpochMs` INTEGER,
+                    `createdAtEpochMs` INTEGER NOT NULL,
+                    `expiresAtEpochMs` INTEGER NOT NULL,
+                    `updatedAtEpochMs` INTEGER NOT NULL,
+                    PRIMARY KEY(`requestId`),
+                    FOREIGN KEY(`contactId`) REFERENCES `contacts`(`contactId`) ON UPDATE NO ACTION ON DELETE CASCADE
+                )""",
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_contact_completion_requests_contactId` ON `contact_completion_requests` (`contactId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_contact_completion_requests_status` ON `contact_completion_requests` (`status`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_contact_completion_requests_expiresAtEpochMs` ON `contact_completion_requests` (`expiresAtEpochMs`)")
+        }
+    }
 }

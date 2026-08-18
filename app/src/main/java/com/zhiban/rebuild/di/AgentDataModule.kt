@@ -93,6 +93,7 @@ object AgentDataModule {
                     AgentDatabase.MIGRATION_37_38,
                     AgentDatabase.MIGRATION_38_39,
                     AgentDatabase.MIGRATION_39_40,
+                    AgentDatabase.MIGRATION_40_41,
                 )
                 .addCallback(AgentDatabase.CALLBACK).build()
         }

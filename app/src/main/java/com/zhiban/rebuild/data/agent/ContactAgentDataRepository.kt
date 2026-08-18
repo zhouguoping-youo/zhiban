@@ -307,6 +307,8 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
         tag: String?,
         note: String?,
         nowEpochMs: Long = System.currentTimeMillis(),
+        email: String? = null,
+        responsibilities: String? = null,
     ): String = database.withTransaction {
         require(displayName.isNotBlank()) { "联系人姓名不能为空" }
         val dao = database.contactDao()
@@ -317,7 +319,8 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
             displayName = displayName.trim(),
             normalizedName = displayName.trim().lowercase(),
             phone = phone.cleanContactField(),
-            email = existing?.email,
+            // fill-only：表单可补可改，但不传则保留既有值（非表单调用方如确认新建不得清空）。
+            email = email.cleanContactField() ?: existing?.email,
             wechatId = wechatId.cleanContactField(),
             company = company.cleanContactField()?.let(::normalizeOrganizationFullName),
             title = title.cleanContactField(),
@@ -331,6 +334,7 @@ internal class ContactAgentDataRepository(private val database: AgentDatabase) {
             deletedAtEpochMs = null,
             createdAtEpochMs = existing?.createdAtEpochMs ?: nowEpochMs,
             updatedAtEpochMs = nowEpochMs,
+            responsibilities = responsibilities.cleanContactField() ?: existing?.responsibilities,
         )
         if (existing == null) dao.insert(value) else check(dao.update(value) == 1)
         val knowledge = database.contactKnowledgeDao()

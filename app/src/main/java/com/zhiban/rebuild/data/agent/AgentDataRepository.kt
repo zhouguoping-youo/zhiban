@@ -893,7 +893,11 @@ class AgentDataRepository internal constructor(
         tag: String?,
         note: String?,
         nowEpochMs: Long = System.currentTimeMillis(),
-    ): String = contacts.saveUserContact(contactId, displayName, phone, wechatId, company, title, tag, note, nowEpochMs)
+        email: String? = null,
+        responsibilities: String? = null,
+    ): String = contacts.saveUserContact(
+        contactId, displayName, phone, wechatId, company, title, tag, note, nowEpochMs, email, responsibilities,
+    )
     suspend fun importConfirmedSystemContacts(
         contacts: List<SystemContactCandidate>,
         ownerPhone: String?,
