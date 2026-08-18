@@ -955,112 +955,26 @@ fun RelationTab(
             },
         )
     }
-    deletingEdge?.let { edge ->
-        val names = contacts.associate { it.contactId to it.displayName } +
-            (RelationshipPersonIds.SELF to ownerProfile.relationshipLabel())
-        ZhiBanAlertDialog(
-            onDismissRequest = { deletingEdge = null },
-            title = { Text("删除这条关系？") },
-            text = {
-                Text(
-                    "${names[edge.fromContactId].orEmpty()} 与 ${names[edge.toContactId].orEmpty()} 的“${relationLabel(
-                        edge.relationType,
-                    )}”关系将被移除。",
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.deleteRelationship(edge.edgeId) {
-                        deletingEdge = null
-                        showFeedback("关系已删除")
-                    }
-                }) {
-                    Text("删除", color = RelationDanger)
-                }
-            },
-            dismissButton = { TextButton(onClick = { deletingEdge = null }) { Text("取消", color = RelationInk) } },
-            containerColor = RelationSurface,
-        )
-    }
-    selectedEdge?.let { edge ->
-        RelationshipEvidenceDialog(
-            edge = edge,
-            personNames = contacts.associate { it.contactId to it.displayName } +
-                (RelationshipPersonIds.SELF to ownerProfile.relationshipLabel()),
-            onDismiss = { selectedEdge = null },
-            onUpdate = { type, result ->
-                viewModel.updateRelationship(edge.edgeId, type) { error ->
-                    result(error)
-                    if (error == null) {
-                        selectedEdge = null
-                        showFeedback("关系已保存")
-                    }
-                }
-            },
-            onDelete = {
-                selectedEdge = null
-                deletingEdge = edge
-            },
-        )
-    }
-    addFactFor?.let { contact ->
-        ContactFactEditorDialog(
-            contact = contact,
-            onDismiss = { addFactForId = null },
-            onSave = { text, type, result ->
-                viewModel.saveContactFact(contact.contactId, text, type) { error ->
-                    result(error)
-                    if (error == null) {
-                        addFactForId = null
-                        showFeedback("联系人信息已保存")
-                    }
-                }
-            },
-        )
-    }
-    val eventEditorSubject = addEventFor ?: editingEvent?.participants
-        ?.firstOrNull { it.participantRole == "SUBJECT" && it.contactId != null }
-        ?.contactId?.let { id -> contacts.firstOrNull { it.contactId == id } }
-    eventEditorSubject?.let { contact ->
-        RelationshipEventEditorDialog(
+    RelationEdgeDialogs(
+        RelationDialogSlots(
             contacts = contacts,
-            subject = contact,
-            existing = editingEvent,
-            onDismiss = {
-                addEventFor = null
-                editingEvent = null
-            },
-            onSave = { type, title, note, participants, result ->
-                viewModel.saveRelationshipEvent(
-                    editingEvent?.event?.eventId,
-                    type,
-                    title,
-                    note,
-                    participants,
-                ) { error ->
-                    result(error)
-                    if (error == null) {
-                        addEventFor = null
-                        editingEvent = null
-                        showFeedback("经历已保存")
-                    }
-                }
-            },
-        )
-    }
-    selectedEvent?.let { event ->
-        RelationshipEventDetailDialog(
-            value = event,
-            onDismiss = { selectedEvent = null },
-            onEdit = {
-                selectedEvent = null
-                editingEvent = event
-            },
-            onDelete = {
-                viewModel.deleteRelationshipEvent(event.event.eventId) { selectedEvent = null }
-            },
-        )
-    }
+            ownerLabel = ownerProfile.relationshipLabel(),
+            viewModel = viewModel,
+            showFeedback = showFeedback,
+            deletingEdge = deletingEdge,
+            setDeletingEdge = { deletingEdge = it },
+            selectedEdge = selectedEdge,
+            setSelectedEdge = { selectedEdge = it },
+            addFactFor = addFactFor,
+            clearAddFactFor = { addFactForId = null },
+            addEventFor = addEventFor,
+            setAddEventFor = { addEventFor = it },
+            editingEvent = editingEvent,
+            setEditingEvent = { editingEvent = it },
+            selectedEvent = selectedEvent,
+            setSelectedEvent = { selectedEvent = it },
+        ),
+    )
 }
 
 internal const val CONTACT_IMPORT_PERMISSION_INTRO =
