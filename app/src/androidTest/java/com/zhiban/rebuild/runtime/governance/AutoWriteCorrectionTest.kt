@@ -1,5 +1,7 @@
 package com.zhiban.rebuild.runtime.governance
 
+import com.zhiban.rebuild.data.autowrite.insertVisibleAutoWrite
+
 import com.zhiban.rebuild.data.autowrite.AutoWriteAuditDraft
 import com.zhiban.rebuild.data.autowrite.AutoWriteToolNames
 import com.zhiban.rebuild.data.autowrite.canonicalChangeDigest
@@ -43,7 +45,7 @@ class AutoWriteCorrectionTest {
     fun correctingInteractionMovesTheSingleFactAndClosesOriginalUndo() = runBlocking {
         insertInteractionAutoWrite("change-correct")
 
-        assertTrue(AutoWriteRepository(database, context).correctInteractionContact("change-correct", "new-contact", 20))
+        assertTrue(AutoWriteRepository(database, context, fakeUndoApplier).correctInteractionContact("change-correct", "new-contact", 20))
 
         val fact = requireNotNull(database.factDao().find("fact-interaction"))
         assertEquals("new-contact", fact.contactId)
@@ -59,7 +61,7 @@ class AutoWriteCorrectionTest {
         insertInteractionAutoWrite("change-expired")
         assertEquals(1, database.changeLogDao().expireUndoBefore(cutoffEpochMs = 11, limit = 10))
 
-        assertTrue(!AutoWriteRepository(database, context).undo("change-expired", 20))
+        assertTrue(!AutoWriteRepository(database, context, fakeUndoApplier).undo("change-expired", 20))
         assertNotNull(database.factDao().find("fact-interaction"))
         assertEquals("EXPIRED", database.changeLogDao().find("change-expired")?.undoState)
     }
@@ -115,4 +117,9 @@ class AutoWriteCorrectionTest {
             check(cursor.moveToFirst())
             cursor.getInt(0)
         }
+
+    private val fakeUndoApplier = object : com.zhiban.rebuild.data.autowrite.ChangeUndoApplier {
+        override suspend fun undoVisible(changeId: String, nowEpochMs: Long): Boolean = false
+        override suspend fun undoForRun(changeId: String, runId: String, nowEpochMs: Long): Boolean = false
+    }
 }

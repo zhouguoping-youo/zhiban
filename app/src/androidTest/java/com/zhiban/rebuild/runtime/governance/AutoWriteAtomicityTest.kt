@@ -1,5 +1,7 @@
 package com.zhiban.rebuild.runtime.governance
 
+import com.zhiban.rebuild.data.autowrite.insertVisibleAutoWrite
+
 import com.zhiban.rebuild.data.autowrite.AutoWriteAuditDraft
 import com.zhiban.rebuild.data.autowrite.AutoWriteToolNames
 

@@ -73,9 +73,9 @@ class ContactTagAutoWriteTest {
         val change = database.changeLogDao().listByRun(route.runId).single()
         assertNotNull(database.changeLogDao().findAutoWriteReceipt(change.changeId))
         assertTrue(result.safeResultJson.contains("undoAvailable"))
-        assertTrue(AutoWriteRepository(database, context).undo(change.changeId, 50))
+        assertTrue(AutoWriteRepository(database, context, fakeUndoApplier).undo(change.changeId, 50))
         assertEquals("[]", database.contactDao().findRawById("contact-tag")?.tagsJson)
-        assertTrue(!AutoWriteRepository(database, context).undo(change.changeId, 51))
+        assertTrue(!AutoWriteRepository(database, context, fakeUndoApplier).undo(change.changeId, 51))
     }
 
     @Test
@@ -107,7 +107,7 @@ class ContactTagAutoWriteTest {
         )
         assertEquals(1, database.contactDao().update(edited))
 
-        assertTrue(!AutoWriteRepository(database, context).undo(change.changeId, 50))
+        assertTrue(!AutoWriteRepository(database, context, fakeUndoApplier).undo(change.changeId, 50))
         assertEquals("[\"客户\",\"重点\"]", database.contactDao().findRawById("contact-tag")?.tagsJson)
         assertEquals("AVAILABLE", database.changeLogDao().find(change.changeId)?.undoState)
     }
@@ -124,5 +124,10 @@ class ContactTagAutoWriteTest {
             arrayOf("attempt-tag", "run-tag"),
         )
         return RuntimeToolRouteContext("run-tag", "session-tag", "attempt-tag", "owner", lease.leaseEpoch, 1, 30)
+    }
+
+    private val fakeUndoApplier = object : com.zhiban.rebuild.data.autowrite.ChangeUndoApplier {
+        override suspend fun undoVisible(changeId: String, nowEpochMs: Long): Boolean = false
+        override suspend fun undoForRun(changeId: String, runId: String, nowEpochMs: Long): Boolean = false
     }
 }

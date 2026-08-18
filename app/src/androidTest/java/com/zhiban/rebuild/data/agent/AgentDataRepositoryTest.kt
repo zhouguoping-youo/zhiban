@@ -507,10 +507,10 @@ class AgentDataRepositoryTest {
         val link = database.contactIdentityDao().observeActiveMergeLinks().first().single()
         assertFalse(link.userConfirmed)
         assertEquals("duplicate-a", link.canonicalContactId)
-        val receipt = AutoWriteRepository(database, context).observeReceipts().first().single {
+        val receipt = AutoWriteRepository(database, context, fakeUndoApplier).observeReceipts().first().single {
             it.presentationType == "CONTACT_IDENTITY_LINK"
         }
-        assertTrue(AutoWriteRepository(database, context).undo(receipt.changeId, 3_000L))
+        assertTrue(AutoWriteRepository(database, context, fakeUndoApplier).undo(receipt.changeId, 3_000L))
         assertNull(database.contactIdentityDao().activeMergeLink(link.sourceContactId))
 
         repository.refreshLocalContactIntelligence()
@@ -1010,9 +1010,9 @@ class AgentDataRepositoryTest {
         assertEquals(contactId, receipt.subjectContactId)
         assertEquals("INTERACTION_SUMMARY", receipt.presentationType)
         assertEquals("AVAILABLE", receipt.undoState)
-        assertEquals(true, AutoWriteRepository(database, context).undo(receipt.changeId, now + 3_000L))
+        assertEquals(true, AutoWriteRepository(database, context, fakeUndoApplier).undo(receipt.changeId, now + 3_000L))
         assertEquals("CORRECTED", database.changeLogDao().findAutoWriteReceipt(receipt.changeId)?.reviewState)
-        assertEquals(0, AutoWriteRepository(database, context).observeUnreviewedCount().first())
+        assertEquals(0, AutoWriteRepository(database, context, fakeUndoApplier).observeUnreviewedCount().first())
         assertEquals(
             0,
             repository.observeContactFacts(contactId).first().count {
@@ -1049,7 +1049,7 @@ class AgentDataRepositoryTest {
         assertEquals("INTERACTION_SUMMARY", fact.factType)
         val receipt = database.changeLogDao().observeAutoWriteReceipts().first().single()
         assertEquals(0.99, receipt.confidence ?: 0.0, 0.0)
-        assertTrue(AutoWriteRepository(database, context).undo(receipt.changeId, now + 1_000L))
+        assertTrue(AutoWriteRepository(database, context, fakeUndoApplier).undo(receipt.changeId, now + 1_000L))
     }
 
     @Test
@@ -1112,7 +1112,7 @@ class AgentDataRepositoryTest {
         val receipt = database.changeLogDao().observeAutoWriteReceipts().first()
             .single { it.presentationType == "SCHEDULE_CREATE" }
         assertEquals(schedule.id, receipt.targetId)
-        assertTrue(AutoWriteRepository(database, context).undo(receipt.changeId, now + 1_000L))
+        assertTrue(AutoWriteRepository(database, context, fakeUndoApplier).undo(receipt.changeId, now + 1_000L))
         assertNull(database.scheduleDao().findById(schedule.id))
     }
 
@@ -1488,4 +1488,9 @@ class AgentDataRepositoryTest {
         title = null,
         note = null,
     )
+
+    private val fakeUndoApplier = object : com.zhiban.rebuild.data.autowrite.ChangeUndoApplier {
+        override suspend fun undoVisible(changeId: String, nowEpochMs: Long): Boolean = false
+        override suspend fun undoForRun(changeId: String, runId: String, nowEpochMs: Long): Boolean = false
+    }
 }

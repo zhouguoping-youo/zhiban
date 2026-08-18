@@ -1,5 +1,7 @@
 package com.zhiban.rebuild.runtime.context
 
+import com.zhiban.rebuild.foundation.Sensitivity
+
 import com.zhiban.rebuild.data.facts.FactEntity
 import com.zhiban.rebuild.data.facts.FactIndex
 

@@ -252,13 +252,13 @@ class RoomCrmToolExecutorTest {
         assertTrue(lead.userConfirmed)
         assertTrue(database.crmDao().observeLeads().first().none { it.leadId == lead.leadId })
         assertEquals(lead.leadId, database.crmDao().observeCandidateLeads().first().single().leadId)
-        assertTrue(AutoWriteRepository(database, appContext).ignoreCandidateLead(lead.leadId, 50))
+        assertTrue(AutoWriteRepository(database, appContext, fakeUndoApplier).ignoreCandidateLead(lead.leadId, 50))
         assertEquals(null, database.crmDao().findLead(lead.leadId))
     }
 
     @Test
     fun candidatePromotionEntersFormalListAndIgnoreRemovesCandidate() = runBlocking {
-        val repository = AutoWriteRepository(database, appContext)
+        val repository = AutoWriteRepository(database, appContext, fakeUndoApplier)
         val promoted = executor.executeAuto(
             plan(
                 102,
@@ -298,7 +298,7 @@ class RoomCrmToolExecutorTest {
 
     @Test
     fun undoDoesNotOverwriteCandidateChangedAfterAutomaticWrite() = runBlocking {
-        val repository = AutoWriteRepository(database, appContext)
+        val repository = AutoWriteRepository(database, appContext, fakeUndoApplier)
         val result = executor.executeAuto(
             plan(
                 104,
@@ -322,7 +322,7 @@ class RoomCrmToolExecutorTest {
 
     @Test
     fun automaticActivityAndNextActionAreVisibleAndReversible() = runBlocking {
-        val repository = AutoWriteRepository(database, appContext)
+        val repository = AutoWriteRepository(database, appContext, fakeUndoApplier)
         val activity = executor.executeAuto(
             plan(
                 105,
@@ -503,5 +503,10 @@ class RoomCrmToolExecutorTest {
             CrmMutationToolBinding.ACTION_CREATE,
             CrmMutationToolBinding.ACTION_UPDATE,
         )
+    }
+
+    private val fakeUndoApplier = object : com.zhiban.rebuild.data.autowrite.ChangeUndoApplier {
+        override suspend fun undoVisible(changeId: String, nowEpochMs: Long): Boolean = false
+        override suspend fun undoForRun(changeId: String, runId: String, nowEpochMs: Long): Boolean = false
     }
 }

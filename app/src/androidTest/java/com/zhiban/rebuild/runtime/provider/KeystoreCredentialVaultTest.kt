@@ -1,4 +1,4 @@
-package com.zhiban.rebuild.runtime.provider
+package com.zhiban.rebuild.provider
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider

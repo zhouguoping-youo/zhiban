@@ -1,5 +1,8 @@
 package com.zhiban.rebuild.runtime.context
 
+import com.zhiban.rebuild.foundation.MemoryScope
+import com.zhiban.rebuild.foundation.Sensitivity
+
 import com.zhiban.rebuild.data.memory.RoomStagedMemoryCandidateStore
 
 import com.zhiban.rebuild.data.memory.ApprovalWriteResult
