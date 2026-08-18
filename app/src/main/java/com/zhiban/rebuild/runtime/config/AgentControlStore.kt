@@ -103,6 +103,14 @@ class AgentControlStore internal constructor(context: Context, prefsName: String
         check(store.edit().putBoolean("contact_completion_enabled", enabled).commit())
     }
 
+    // 定位读取：默认关（AGENTS.md 隐私优先——位置数据默认不出云）。开启后 location.current 才会把
+    // 一次性坐标发给大模型；工具仍然只读、无后台轨迹。
+    fun locationAccessEnabled(): Boolean = store.getBoolean("location_access_enabled", false)
+
+    fun saveLocationAccessEnabled(enabled: Boolean) {
+        check(store.edit().putBoolean("location_access_enabled", enabled).commit())
+    }
+
     fun isToolEnabled(name: String): Boolean = name !in (store.getStringSet("disabled_tools", emptySet()) ?: emptySet())
     fun saveToolEnabled(name: String, enabled: Boolean) {
         val disabled = (store.getStringSet("disabled_tools", emptySet()) ?: emptySet()).toMutableSet()

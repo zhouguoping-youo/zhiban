@@ -301,6 +301,7 @@ object AgentDataModule {
             webSearchGateway = webSearchGateway,
             ilinkWechatChannel = ilinkWechatChannel,
             locationGateway = locationGateway,
+            locationConsent = { controls.locationAccessEnabled() },
         ),
     )
 

@@ -186,6 +186,11 @@ internal data class ProviderEngineInfrastructure(
     val webSearchGateway: com.zhiban.rebuild.runtime.provider.WebSearchGateway? = null,
     val ilinkWechatChannel: IlinkWechatChannel? = null,
     val locationGateway: com.zhiban.rebuild.runtime.provider.LocationGateway? = null,
+    /**
+     * 定位读取的用户同意开关(设置 → 隐私与安全 → 定位,默认关)。null/未接线一律视为未同意——
+     * 位置数据默认不出云,宁可不读也不静默外发。
+     */
+    val locationConsent: (() -> Boolean)? = null,
 )
 
 internal class ProviderExecutionEngine(
@@ -421,7 +426,7 @@ internal class ProviderExecutionEngine(
             } else {
                 emptyList()
             }
-            mcp + locationToolBindings(toolCatalog, infrastructure.locationGateway)
+            mcp + locationToolBindings(toolCatalog, infrastructure.locationGateway, infrastructure.locationConsent ?: { false })
         },
         timeoutMs = config.toolExecutionTimeoutMs,
     )
@@ -1881,6 +1886,8 @@ internal class ProviderExecutionEngine(
             // can tell the user to bind/re-bind or link the recipient instead of a generic failure.
             "ILINK_NOT_BOUND", "ILINK_SESSION_EXPIRED", "WECHAT_ILINK_CONSENT_REQUIRED",
             "ILINK_CONTACT_NOT_FOUND", "ILINK_RECIPIENT_NOT_LINKED", "ILINK_MESSAGE_INVALID",
+            // 定位读取未开启(默认关):告诉用户去哪开,而不是给个兜底失败文案。
+            "LOCATION_CONSENT_REQUIRED",
         )
         val ENGLISH_CALLED_TITLE = Regex(
             """\bcalled\s+(.+?)(?=,\s*remind\b|,\s*with\b|[.!?]\s*$|$)""",

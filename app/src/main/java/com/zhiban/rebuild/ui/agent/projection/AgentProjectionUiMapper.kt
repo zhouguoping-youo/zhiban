@@ -123,6 +123,8 @@ object AgentProjectionUiMapper {
 
         safeFailureCode == "ILINK_MESSAGE_INVALID" -> "这条消息内容不符合发送要求（过长或为空），请调整后重试。"
 
+        safeFailureCode == "LOCATION_CONSENT_REQUIRED" -> "定位读取还没开启，请到“设置 → 隐私与安全 → 定位”打开开关后再试。"
+
         safeFailureCode != null -> "大模型暂时无法完成请求，请稍后重试。"
 
         else -> null
