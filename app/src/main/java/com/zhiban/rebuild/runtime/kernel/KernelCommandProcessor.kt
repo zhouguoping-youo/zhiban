@@ -4,6 +4,7 @@ import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.runtime.provider.ProviderAdapter
 import com.zhiban.rebuild.runtime.provider.ProviderProfileStore
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
+import com.zhiban.rebuild.runtime.store.processClaimedCommand
 import com.zhiban.rebuild.runtime.store.RuntimeCommandInboxEntity
 import com.zhiban.rebuild.runtime.store.containClaimedCommandFailure
 import com.zhiban.rebuild.runtime.store.notifyReminderAfterScheduleUndo

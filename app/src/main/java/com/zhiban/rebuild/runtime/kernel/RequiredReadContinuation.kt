@@ -4,6 +4,7 @@ import android.util.Log
 import com.zhiban.rebuild.runtime.runSuspendCatching
 import com.zhiban.rebuild.runtime.store.AttemptStartRequest
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
+import com.zhiban.rebuild.runtime.store.startObservationAttempt
 import com.zhiban.rebuild.runtime.store.RuntimeEventDraft
 import com.zhiban.rebuild.runtime.tool.CapabilityRouter
 import com.zhiban.rebuild.runtime.tool.RoutedToolResult
