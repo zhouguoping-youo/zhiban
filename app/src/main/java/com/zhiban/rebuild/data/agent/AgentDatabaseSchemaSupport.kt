@@ -386,6 +386,7 @@ internal val AGENT_DATABASE_CALLBACK = object : RoomDatabase.Callback() {
         createSingleCurrentMemoryTrigger(db)
         createSingleCurrentMemoryUpdateTrigger(db)
         createPlanRunsSingleActiveIndex(db)
+        createContactsActiveDeletedIndex(db)
         createFactFts(db)
         createContactSearchFts(db)
     }
@@ -402,6 +403,7 @@ internal val AGENT_DATABASE_CALLBACK = object : RoomDatabase.Callback() {
         createSingleCurrentMemoryTrigger(db)
         createSingleCurrentMemoryUpdateTrigger(db)
         createPlanRunsSingleActiveIndex(db)
+        createContactsActiveDeletedIndex(db)
         createFactFts(db)
         createContactSearchFts(db)
     }
@@ -459,6 +461,14 @@ internal fun createSingleCurrentMemoryUpdateTrigger(db: SupportSQLiteDatabase) {
             SELECT RAISE(ABORT, 'duplicate current memory version');
         END
         """.trimIndent(),
+    )
+}
+
+/** 部分索引:Room 无法在 @Entity 声明,由 CALLBACK 托管(同 plan_runs 先例)。 */
+internal fun createContactsActiveDeletedIndex(db: SupportSQLiteDatabase) {
+    db.execSQL(
+        "CREATE INDEX IF NOT EXISTS `index_contacts_active_deleted` ON `contacts` (`deletedAtEpochMs`) " +
+            "WHERE `deletedAtEpochMs` IS NULL",
     )
 }
 

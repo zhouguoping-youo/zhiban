@@ -25,6 +25,8 @@ object RelationshipPersonIds {
         Index(value = ["email"]),
         Index(value = ["company"]),
         Index(value = ["source"]),
+        // observeActive/search 的 deletedAtEpochMs IS NULL 过滤 + ORDER BY updatedAtEpochMs(P1-性能/索引)。
+        Index(value = ["normalizedName", "deletedAtEpochMs"]),
     ],
 )
 data class ContactEntity(

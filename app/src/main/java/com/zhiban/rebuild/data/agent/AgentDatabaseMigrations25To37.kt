@@ -625,4 +625,22 @@ internal object AgentDatabaseMigrations25To37 {
             db.execSQL("CREATE INDEX IF NOT EXISTS `index_contact_completion_requests_expiresAtEpochMs` ON `contact_completion_requests` (`expiresAtEpochMs`)")
         }
     }
+
+    /** 索引补齐(P1-性能/索引):contacts 检索排序与 notification 收件箱去重。命名与 Room 导出一致。 */
+    val MIGRATION_41_42 = object : Migration(41, 42) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_contacts_normalizedName_deletedAtEpochMs` " +
+                    "ON `contacts` (`normalizedName`, `deletedAtEpochMs`)",
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_notification_candidates_status_postedAtEpochMs` " +
+                    "ON `notification_candidates` (`status`, `postedAtEpochMs`)",
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_notification_candidates_platform_direction` " +
+                    "ON `notification_candidates` (`platform`, `direction`)",
+            )
+        }
+    }
 }

@@ -4,9 +4,12 @@ import androidx.room.Dao
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.Insert
+import androidx.room.RawQuery
 import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
+import androidx.sqlite.db.SimpleSQLiteQuery
+import androidx.sqlite.db.SupportSQLiteQuery
 import java.security.MessageDigest
 import kotlinx.coroutines.flow.Flow
 
@@ -18,6 +21,9 @@ import kotlinx.coroutines.flow.Flow
         Index("postedAtEpochMs"),
         Index("platform"),
         Index("suggestedContactId"),
+        // 收件箱查询:observePending 按 (status, postedAtEpochMs) 排序、按 (platform, direction) 分组去重(P1-性能/索引)。
+        Index("status", "postedAtEpochMs"),
+        Index("platform", "direction"),
     ],
 )
 data class NotificationCandidateEntity(
@@ -95,24 +101,14 @@ interface NotificationCandidateDao {
     // of the key: the "[N条]" tag makes it differ across captures of the same 1:1 message, so keying on it would
     // fail to dedup exactly the duplicates this targets. Direction stays in the key so my own outgoing text and an
     // identical incoming text never merge.
-    @Query(
-        """SELECT nc.* FROM notification_candidates nc
-           WHERE nc.status = 'PENDING'
-             AND NOT EXISTS (
-               SELECT 1 FROM notification_candidates newer
-               WHERE newer.status = 'PENDING'
-                 AND newer.platform = nc.platform
-                 AND newer.direction = nc.direction
-                 AND COALESCE(newer.conversationTitle, '') = COALESCE(nc.conversationTitle, '')
-                 AND COALESCE(newer.body, '') = COALESCE(nc.body, '')
-                 AND (
-                   newer.postedAtEpochMs > nc.postedAtEpochMs
-                   OR (newer.postedAtEpochMs = nc.postedAtEpochMs AND newer.rowid > nc.rowid)
-                 )
-             )
-           ORDER BY nc.postedAtEpochMs DESC LIMIT :limit""",
-    )
-    fun observePending(limit: Int = 100): Flow<List<NotificationCandidateEntity>>
+    // 原 NOT EXISTS 自连接去重对每行再扫全表(近 O(n²));窗口函数 ROW_NUMBER 按同键分组取最新,
+    // 一次排序完成,语义等价(postedAt 降序、同刻取 rowid 大者)。Room 的 @Query 校验器不支持
+    // 窗口函数,故走 @RawQuery(Room 不校验其 SQL,observedEntities 保持变更订阅)。
+    @RawQuery(observedEntities = [NotificationCandidateEntity::class])
+    fun observePendingRaw(query: SupportSQLiteQuery): Flow<List<NotificationCandidateEntity>>
+
+    fun observePending(limit: Int = 100): Flow<List<NotificationCandidateEntity>> =
+        observePendingRaw(SimpleSQLiteQuery(OBSERVE_PENDING_DEDUP_SQL, arrayOf(limit)))
 
     @Query("SELECT * FROM notification_candidates WHERE candidateId = :candidateId")
     suspend fun find(candidateId: String): NotificationCandidateEntity?
@@ -232,3 +228,16 @@ interface NotificationCandidateDao {
     )
     suspend fun hasRecentOutgoingByConversation(platform: String, conversationTitle: String, afterEpochMs: Long): Boolean
 }
+
+private const val OBSERVE_PENDING_DEDUP_SQL = """
+    SELECT * FROM (
+      SELECT nc.*, ROW_NUMBER() OVER (
+        PARTITION BY nc.platform, nc.direction, COALESCE(nc.conversationTitle, ''), COALESCE(nc.body, '')
+        ORDER BY nc.postedAtEpochMs DESC, nc.rowid DESC
+      ) AS dedup_rank
+      FROM notification_candidates nc
+      WHERE nc.status = 'PENDING'
+    )
+    WHERE dedup_rank = 1
+    ORDER BY postedAtEpochMs DESC LIMIT ?
+"""
