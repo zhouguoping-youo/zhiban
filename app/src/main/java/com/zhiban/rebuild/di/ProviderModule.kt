@@ -1,6 +1,23 @@
 package com.zhiban.rebuild.di
 
 import android.content.Context
+import com.zhiban.rebuild.provider.AndroidProviderHealthCache
+import com.zhiban.rebuild.provider.AndroidProviderProfileStore
+import com.zhiban.rebuild.provider.AppPrivateProviderAttachmentResolver
+import com.zhiban.rebuild.provider.CredentialProvisioner
+import com.zhiban.rebuild.provider.CredentialResolver
+import com.zhiban.rebuild.provider.DefaultOutboundDataPolicy
+import com.zhiban.rebuild.provider.KeystoreCredentialVault
+import com.zhiban.rebuild.provider.OpenAiCompatibleProviderAdapter
+import com.zhiban.rebuild.provider.OutboundExportGate
+import com.zhiban.rebuild.provider.PolicyEnforcingProviderAdapter
+import com.zhiban.rebuild.provider.ProviderAdapter
+import com.zhiban.rebuild.provider.ProviderConfigurationManager
+import com.zhiban.rebuild.provider.ProviderEnvironmentManager
+import com.zhiban.rebuild.provider.ProviderProfileStore
+import com.zhiban.rebuild.provider.ResilientProviderAdapter
+import com.zhiban.rebuild.provider.StepFunWebSearchGateway
+import com.zhiban.rebuild.provider.WebSearchGateway
 import com.zhiban.rebuild.runtime.context.EmbeddingGateway
 import com.zhiban.rebuild.runtime.embedding.EmbeddingConfiguration
 import com.zhiban.rebuild.runtime.embedding.VolcEmbeddingEnvironment
@@ -13,23 +30,6 @@ import com.zhiban.rebuild.runtime.input.asr.StepFunCloudAsrTransport
 import com.zhiban.rebuild.runtime.mcp.McpConnectionFactory
 import com.zhiban.rebuild.runtime.mcp.McpRemoteEnvironment
 import com.zhiban.rebuild.runtime.mcp.ProductionMcpConnectionFactory
-import com.zhiban.rebuild.runtime.provider.AndroidProviderHealthCache
-import com.zhiban.rebuild.runtime.provider.AndroidProviderProfileStore
-import com.zhiban.rebuild.runtime.provider.AppPrivateProviderAttachmentResolver
-import com.zhiban.rebuild.runtime.provider.CredentialProvisioner
-import com.zhiban.rebuild.runtime.provider.CredentialResolver
-import com.zhiban.rebuild.runtime.provider.DefaultOutboundDataPolicy
-import com.zhiban.rebuild.runtime.provider.KeystoreCredentialVault
-import com.zhiban.rebuild.runtime.provider.OpenAiCompatibleProviderAdapter
-import com.zhiban.rebuild.runtime.provider.OutboundExportGate
-import com.zhiban.rebuild.runtime.provider.PolicyEnforcingProviderAdapter
-import com.zhiban.rebuild.runtime.provider.ProviderAdapter
-import com.zhiban.rebuild.runtime.provider.ProviderConfigurationManager
-import com.zhiban.rebuild.runtime.provider.ProviderEnvironmentManager
-import com.zhiban.rebuild.runtime.provider.ProviderProfileStore
-import com.zhiban.rebuild.runtime.provider.ResilientProviderAdapter
-import com.zhiban.rebuild.runtime.provider.StepFunWebSearchGateway
-import com.zhiban.rebuild.runtime.provider.WebSearchGateway
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -45,7 +45,7 @@ object ProviderModule {
     fun provideCredentialVault(@ApplicationContext context: Context): KeystoreCredentialVault = KeystoreCredentialVault(context)
 
     @Provides @Singleton
-    fun provideSecretRedactor(): com.zhiban.rebuild.runtime.provider.SecretRedactor = com.zhiban.rebuild.runtime.provider.SecretRedactor()
+    fun provideSecretRedactor(): com.zhiban.rebuild.provider.SecretRedactor = com.zhiban.rebuild.provider.SecretRedactor()
 
     @Provides @Singleton
     fun provideAndroidProviderProfileStore(@ApplicationContext context: Context): AndroidProviderProfileStore = AndroidProviderProfileStore(context)

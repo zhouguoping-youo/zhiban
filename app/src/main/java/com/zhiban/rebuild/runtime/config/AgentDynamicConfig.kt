@@ -1,6 +1,7 @@
 package com.zhiban.rebuild.runtime.config
 
 import android.content.Context
+import com.zhiban.rebuild.data.config.ExecutionPreference
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton

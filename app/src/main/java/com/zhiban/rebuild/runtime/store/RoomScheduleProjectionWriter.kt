@@ -2,8 +2,8 @@ package com.zhiban.rebuild.runtime.store
 
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.ScheduleEntity
-import com.zhiban.rebuild.runtime.context.FactEntity
-import com.zhiban.rebuild.runtime.context.FactIndex
+import com.zhiban.rebuild.data.facts.FactEntity
+import com.zhiban.rebuild.data.facts.FactIndex
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 

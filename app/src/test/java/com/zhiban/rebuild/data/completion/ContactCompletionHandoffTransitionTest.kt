@@ -1,8 +1,8 @@
 package com.zhiban.rebuild.data.completion
 
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.config.AgentControlStore
 import com.zhiban.rebuild.data.contact.ContactEntity
-import com.zhiban.rebuild.runtime.config.AgentControlStore
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest

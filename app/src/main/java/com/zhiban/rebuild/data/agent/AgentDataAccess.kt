@@ -1,14 +1,14 @@
 package com.zhiban.rebuild.data.agent
 
 import androidx.room.withTransaction
+import com.zhiban.rebuild.data.autowrite.AutoWriteAuditDraft
+import com.zhiban.rebuild.data.autowrite.ChangeLogDao
 import com.zhiban.rebuild.data.contact.ContactDao
 import com.zhiban.rebuild.data.contact.ContactIdentityDao
 import com.zhiban.rebuild.data.contact.ContactIntelligenceDao
 import com.zhiban.rebuild.data.contact.ContactKnowledgeDao
+import com.zhiban.rebuild.data.facts.FactDao
 import com.zhiban.rebuild.data.notification.NotificationCandidateDao
-import com.zhiban.rebuild.runtime.context.FactDao
-import com.zhiban.rebuild.runtime.governance.AutoWriteAuditDraft
-import com.zhiban.rebuild.runtime.governance.ChangeLogDao
 
 /**
  * AgentDataRepository 直接使用的那几个 DAO，收拢成一个注入参数。

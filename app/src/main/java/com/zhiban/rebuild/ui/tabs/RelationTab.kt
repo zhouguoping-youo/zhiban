@@ -106,6 +106,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zhiban.rebuild.R
 import com.zhiban.rebuild.data.agent.AndroidContactSyncPreview
 import com.zhiban.rebuild.data.agent.RelationshipEventParticipantInput
+import com.zhiban.rebuild.data.autowrite.AutoWriteReceiptRow
 import com.zhiban.rebuild.data.calllog.CallRecordEntity
 import com.zhiban.rebuild.data.contact.ContactAliasEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
@@ -116,11 +117,11 @@ import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventWithParticipants
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.data.contact.SystemContactCandidate
+import com.zhiban.rebuild.data.facts.FactEntity
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.OutgoingMessageAccessibilityService
 import com.zhiban.rebuild.data.notification.ScheduleInsight
 import com.zhiban.rebuild.relationship.RelationshipGroup
-import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.personalization.UserProfile
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
@@ -237,7 +238,7 @@ fun RelationTab(
     var showPermissionExplanation by remember { mutableStateOf(false) }
     var showNotificationCandidates by remember { mutableStateOf(false) }
     var selectedCallNote by remember { mutableStateOf<CallRecordEntity?>(null) }
-    var correctingAutoWrite by remember { mutableStateOf<com.zhiban.rebuild.runtime.governance.AutoWriteReceiptRow?>(null) }
+    var correctingAutoWrite by remember { mutableStateOf<com.zhiban.rebuild.data.autowrite.AutoWriteReceiptRow?>(null) }
     var pendingPhoneSync by remember { mutableStateOf<AndroidContactSyncPreview?>(null) }
     var phoneSyncPermissionContact by remember { mutableStateOf<ContactEntity?>(null) }
     var notificationAccessEnabled by remember {

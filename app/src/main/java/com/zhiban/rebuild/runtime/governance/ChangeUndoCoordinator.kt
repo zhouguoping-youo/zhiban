@@ -2,11 +2,15 @@ package com.zhiban.rebuild.runtime.governance
 
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.ScheduleEntity
-import com.zhiban.rebuild.runtime.context.FactEntity
-import com.zhiban.rebuild.runtime.context.FactIndex
+import com.zhiban.rebuild.data.autowrite.AutoWriteToolNames
+import com.zhiban.rebuild.data.autowrite.ChangeLogEntity
+import com.zhiban.rebuild.data.autowrite.canonicalChangeDigest
+import com.zhiban.rebuild.data.autowrite.changeDigestMatches
+import com.zhiban.rebuild.data.facts.FactEntity
+import com.zhiban.rebuild.data.facts.FactIndex
+import com.zhiban.rebuild.foundation.runSuspendCatching
+import com.zhiban.rebuild.foundation.sha256
 import com.zhiban.rebuild.runtime.memory.MemoryAtomicStore
-import com.zhiban.rebuild.runtime.runSuspendCatching
-import com.zhiban.rebuild.runtime.tool.sha256
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray

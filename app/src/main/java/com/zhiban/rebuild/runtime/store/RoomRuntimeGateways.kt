@@ -1,6 +1,7 @@
 package com.zhiban.rebuild.runtime.store
 
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.store.RuntimeEventEntity
 import com.zhiban.rebuild.runtime.spi.CommandReceipt
 import com.zhiban.rebuild.runtime.spi.CommandReceiptStatus
 import com.zhiban.rebuild.runtime.spi.RuntimeCommandGateway

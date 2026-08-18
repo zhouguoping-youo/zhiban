@@ -12,9 +12,9 @@ import android.os.CancellationSignal
 import android.os.Looper
 import android.os.Process
 import androidx.core.content.ContextCompat
-import com.zhiban.rebuild.runtime.provider.LocationGateway
-import com.zhiban.rebuild.runtime.provider.LocationSnapshot
-import com.zhiban.rebuild.runtime.provider.LocationUnavailable
+import com.zhiban.rebuild.provider.LocationGateway
+import com.zhiban.rebuild.provider.LocationSnapshot
+import com.zhiban.rebuild.provider.LocationUnavailable
 import java.util.function.Consumer
 import kotlin.math.PI
 import kotlin.math.abs

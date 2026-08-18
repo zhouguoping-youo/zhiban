@@ -1,6 +1,6 @@
 package com.zhiban.rebuild.data.agent
 
-import com.zhiban.rebuild.runtime.context.FactIndex
+import com.zhiban.rebuild.data.facts.FactIndex
 
 /** Stable infrastructure seam for the cross-domain repository facade. */
 internal data class AgentRepositoryInfrastructure(

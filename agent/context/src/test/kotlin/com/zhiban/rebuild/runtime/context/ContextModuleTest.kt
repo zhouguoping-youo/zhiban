@@ -1,5 +1,9 @@
 package com.zhiban.rebuild.runtime.context
 
+import com.zhiban.rebuild.foundation.MemoryCandidateState
+import com.zhiban.rebuild.foundation.MemoryScope
+import com.zhiban.rebuild.foundation.Sensitivity
+
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

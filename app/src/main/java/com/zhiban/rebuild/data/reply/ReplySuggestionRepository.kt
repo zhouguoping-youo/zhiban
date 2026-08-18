@@ -1,7 +1,7 @@
 package com.zhiban.rebuild.data.reply
 
 import com.zhiban.rebuild.data.agent.AgentDatabase
-import com.zhiban.rebuild.runtime.config.AgentControlStore
+import com.zhiban.rebuild.data.config.AgentControlStore
 import kotlinx.coroutines.flow.Flow
 
 /**

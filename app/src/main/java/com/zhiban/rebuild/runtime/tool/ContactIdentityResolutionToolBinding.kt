@@ -2,6 +2,7 @@ package com.zhiban.rebuild.runtime.tool
 
 import com.zhiban.rebuild.data.contact.ContactDao
 import com.zhiban.rebuild.data.contact.ContactIntelligenceDao
+import com.zhiban.rebuild.foundation.RuntimeToolSpec
 import com.zhiban.rebuild.runtime.governance.ContactIdentityResolutionCall
 import com.zhiban.rebuild.runtime.governance.ContactIdentityResolutionDomainWriter
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore

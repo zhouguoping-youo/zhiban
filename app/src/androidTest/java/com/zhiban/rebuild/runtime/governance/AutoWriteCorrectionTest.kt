@@ -1,13 +1,19 @@
 package com.zhiban.rebuild.runtime.governance
 
+import com.zhiban.rebuild.data.autowrite.AutoWriteAuditDraft
+import com.zhiban.rebuild.data.autowrite.AutoWriteToolNames
+import com.zhiban.rebuild.data.autowrite.canonicalChangeDigest
+
+import com.zhiban.rebuild.data.autowrite.AutoWriteRepository
+
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.contact.ContactEntity
-import com.zhiban.rebuild.runtime.context.FactEntity
-import com.zhiban.rebuild.runtime.context.FactIndex
+import com.zhiban.rebuild.data.facts.FactEntity
+import com.zhiban.rebuild.data.facts.FactIndex
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -45,7 +51,7 @@ class AutoWriteCorrectionTest {
         assertEquals(1, database.openHelper.writableDatabase.countFacts("fact-interaction"))
         assertEquals("UNAVAILABLE", database.changeLogDao().find("change-correct")?.undoState)
         assertEquals("CORRECTED", database.changeLogDao().findAutoWriteReceipt("change-correct")?.reviewState)
-        assertNotNull(database.changeLogDao().findByIdempotencyKey(com.zhiban.rebuild.runtime.tool.sha256("correction:change-correct:new-contact")))
+        assertNotNull(database.changeLogDao().findByIdempotencyKey(com.zhiban.rebuild.foundation.sha256("correction:change-correct:new-contact")))
     }
 
     @Test

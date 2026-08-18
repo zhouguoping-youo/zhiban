@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.runtime.tool
 
+import com.zhiban.rebuild.foundation.RuntimeToolSpec
 import com.zhiban.rebuild.runtime.governance.ContactCreateCandidateCall
 import com.zhiban.rebuild.runtime.governance.ContactDomainWriter
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore

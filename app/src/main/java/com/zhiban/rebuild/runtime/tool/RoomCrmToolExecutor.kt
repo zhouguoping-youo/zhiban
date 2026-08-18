@@ -3,6 +3,10 @@ package com.zhiban.rebuild.runtime.tool
 import androidx.room.withTransaction
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.ToolAuditEntity
+import com.zhiban.rebuild.data.autowrite.AutoWriteAuditDraft
+import com.zhiban.rebuild.data.autowrite.ChangeLogEntity
+import com.zhiban.rebuild.data.autowrite.canonicalChangeDigest
+import com.zhiban.rebuild.data.autowrite.insertVisibleAutoWrite
 import com.zhiban.rebuild.data.crm.CrmActionStatus
 import com.zhiban.rebuild.data.crm.CrmActivityEntity
 import com.zhiban.rebuild.data.crm.CrmLeadEntity
@@ -12,11 +16,7 @@ import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityStage
 import com.zhiban.rebuild.data.crm.CrmRecordStatus
 import com.zhiban.rebuild.data.crm.CrmStageHistoryEntity
-import com.zhiban.rebuild.runtime.governance.AutoWriteAuditDraft
-import com.zhiban.rebuild.runtime.governance.ChangeLogEntity
-import com.zhiban.rebuild.runtime.governance.canonicalChangeDigest
-import com.zhiban.rebuild.runtime.governance.insertVisibleAutoWrite
-import com.zhiban.rebuild.runtime.runSuspendCatching
+import com.zhiban.rebuild.foundation.runSuspendCatching
 import com.zhiban.rebuild.runtime.spi.RuntimeRunStatus
 import com.zhiban.rebuild.runtime.store.ApprovedToolExecutionRequest
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore

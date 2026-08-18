@@ -1,5 +1,8 @@
 package com.zhiban.rebuild.runtime.governance
 
+import com.zhiban.rebuild.data.autowrite.AutoWriteAuditDraft
+import com.zhiban.rebuild.data.autowrite.AutoWriteToolNames
+
 import android.content.Context
 import androidx.room.Room
 import androidx.room.withTransaction

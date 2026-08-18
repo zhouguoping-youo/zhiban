@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.runtime.config
 
+import com.zhiban.rebuild.data.config.ExecutionPreference
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

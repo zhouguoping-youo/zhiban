@@ -2,6 +2,11 @@ package com.zhiban.rebuild.runtime.store
 
 import androidx.room.withTransaction
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.store.ConversationSummary
+import com.zhiban.rebuild.data.store.RuntimeConversationTurnEntity
+import com.zhiban.rebuild.data.store.RuntimeEventEntity
+import com.zhiban.rebuild.data.store.RuntimeRunEntity
+import com.zhiban.rebuild.data.store.RuntimeSessionEntity
 import com.zhiban.rebuild.runtime.spi.RUNTIME_SCHEMA_VERSION
 import com.zhiban.rebuild.runtime.spi.RuntimeRunStatus
 import java.security.MessageDigest
@@ -12,8 +17,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-
-data class ConversationSummary(val sessionId: String, val preview: String, val updatedAtEpochMs: Long)
 
 data class ConversationTurn(val turnId: String, val role: String, val text: String)
 

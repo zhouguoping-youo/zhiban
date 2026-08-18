@@ -1,9 +1,9 @@
 package com.zhiban.rebuild.data.completion
 
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.config.AgentControlStore
 import com.zhiban.rebuild.data.contact.ContactProfileCompletenessEvaluator
 import com.zhiban.rebuild.data.contact.ContactProfileField
-import com.zhiban.rebuild.runtime.config.AgentControlStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive

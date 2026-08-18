@@ -1,5 +1,7 @@
 package com.zhiban.rebuild.runtime
 
+import com.zhiban.rebuild.foundation.runSuspendCatching
+
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals

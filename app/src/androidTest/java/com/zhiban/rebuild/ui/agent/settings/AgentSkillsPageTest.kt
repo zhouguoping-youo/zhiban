@@ -9,7 +9,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.agent.skills.BuiltInSkills
-import com.zhiban.rebuild.runtime.config.AgentControlStore
+import com.zhiban.rebuild.data.config.AgentControlStore
 import com.zhiban.rebuild.ui.theme.ZhiBanTheme
 import org.junit.Assert.assertFalse
 import org.junit.Before

@@ -5,12 +5,12 @@ import com.zhiban.rebuild.data.calllog.CallLogCollectionPreferences
 import com.zhiban.rebuild.data.calllog.CallLogSyncWorker
 import com.zhiban.rebuild.data.calllog.CallNoteAudioCache
 import com.zhiban.rebuild.data.calllog.CallStateMonitor
+import com.zhiban.rebuild.foundation.runSuspendCatching
+import com.zhiban.rebuild.provider.ProviderEnvironmentManager
 import com.zhiban.rebuild.runtime.context.AgentMaintenanceCoordinator
 import com.zhiban.rebuild.runtime.context.AgentMaintenanceWorker
 import com.zhiban.rebuild.runtime.input.AttachmentStagingStartup
 import com.zhiban.rebuild.runtime.kernel.RuntimeCommandRunner
-import com.zhiban.rebuild.runtime.provider.ProviderEnvironmentManager
-import com.zhiban.rebuild.runtime.runSuspendCatching
 import com.zhiban.rebuild.ui.chat.PreferencesManager
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject

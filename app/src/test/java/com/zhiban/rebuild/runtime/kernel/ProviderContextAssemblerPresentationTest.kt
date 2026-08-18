@@ -1,15 +1,15 @@
 package com.zhiban.rebuild.runtime.kernel
 
+import com.zhiban.rebuild.data.store.RuntimeConversationTurnEntity
+import com.zhiban.rebuild.provider.CapabilitySnapshot
+import com.zhiban.rebuild.provider.DefaultOutboundDataPolicy
+import com.zhiban.rebuild.provider.ModelRequest
+import com.zhiban.rebuild.provider.OutboundChannel
+import com.zhiban.rebuild.provider.OutboundPurpose
+import com.zhiban.rebuild.provider.ProviderProfile
 import com.zhiban.rebuild.runtime.context.ContextRetrievalResult
 import com.zhiban.rebuild.runtime.context.IntentLabel
 import com.zhiban.rebuild.runtime.context.QueryContext
-import com.zhiban.rebuild.runtime.provider.CapabilitySnapshot
-import com.zhiban.rebuild.runtime.provider.DefaultOutboundDataPolicy
-import com.zhiban.rebuild.runtime.provider.ModelRequest
-import com.zhiban.rebuild.runtime.provider.OutboundChannel
-import com.zhiban.rebuild.runtime.provider.OutboundPurpose
-import com.zhiban.rebuild.runtime.provider.ProviderProfile
-import com.zhiban.rebuild.runtime.store.RuntimeConversationTurnEntity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

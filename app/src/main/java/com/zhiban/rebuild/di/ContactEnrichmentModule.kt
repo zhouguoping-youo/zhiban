@@ -5,7 +5,7 @@ import com.zhiban.rebuild.data.contact.enrichment.CompanyEnrichmentCoordinator
 import com.zhiban.rebuild.data.contact.enrichment.CompanyEnrichmentRefresher
 import com.zhiban.rebuild.data.contact.enrichment.CompanyRegistryGateway
 import com.zhiban.rebuild.data.contact.enrichment.WebSearchCompanyRegistryGateway
-import com.zhiban.rebuild.runtime.provider.WebSearchGateway
+import com.zhiban.rebuild.provider.WebSearchGateway
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

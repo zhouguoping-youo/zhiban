@@ -1,4 +1,4 @@
-package com.zhiban.rebuild.runtime.provider
+package com.zhiban.rebuild.provider
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf

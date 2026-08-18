@@ -4,7 +4,7 @@ import android.Manifest
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
-import com.zhiban.rebuild.runtime.provider.LocationUnavailable
+import com.zhiban.rebuild.provider.LocationUnavailable
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
 import org.junit.Rule

@@ -1,7 +1,8 @@
 package com.zhiban.rebuild.runtime.tool
 
-import com.zhiban.rebuild.runtime.provider.ProviderFailure
-import com.zhiban.rebuild.runtime.provider.WebSearchGateway
+import com.zhiban.rebuild.foundation.RuntimeToolSpec
+import com.zhiban.rebuild.provider.ProviderFailure
+import com.zhiban.rebuild.provider.WebSearchGateway
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive

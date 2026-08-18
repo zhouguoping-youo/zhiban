@@ -16,9 +16,9 @@ import com.zhiban.rebuild.data.contact.ContactRoleEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.data.contact.SourceIdentityEntity
-import com.zhiban.rebuild.runtime.config.FeedbackPolicy
-import com.zhiban.rebuild.runtime.config.MemoryPolicy
-import com.zhiban.rebuild.runtime.context.FactIndex
+import com.zhiban.rebuild.data.config.FeedbackPolicy
+import com.zhiban.rebuild.data.config.MemoryPolicy
+import com.zhiban.rebuild.data.facts.FactIndex
 import com.zhiban.rebuild.runtime.context.LocalEntityExtractor
 import com.zhiban.rebuild.runtime.context.PerceptionGateway
 import com.zhiban.rebuild.runtime.context.QueryContext
@@ -27,16 +27,16 @@ import com.zhiban.rebuild.runtime.kernel.ProviderEngineConfig
 import com.zhiban.rebuild.runtime.kernel.RuntimeCommandRunner
 import com.zhiban.rebuild.runtime.mcp.McpConnectionFactory
 import com.zhiban.rebuild.runtime.mcp.McpRemoteEnvironment
-import com.zhiban.rebuild.runtime.provider.CapabilitySnapshot
-import com.zhiban.rebuild.runtime.provider.CredentialProvisioner
-import com.zhiban.rebuild.runtime.provider.ModelEvent
-import com.zhiban.rebuild.runtime.provider.ModelRequest
-import com.zhiban.rebuild.runtime.provider.OutboundExportGate
-import com.zhiban.rebuild.runtime.provider.OutboundPolicySettings
-import com.zhiban.rebuild.runtime.provider.ProviderAdapter
-import com.zhiban.rebuild.runtime.provider.ProviderFailure
-import com.zhiban.rebuild.runtime.provider.ProviderProfile
-import com.zhiban.rebuild.runtime.provider.ProviderProfileStore
+import com.zhiban.rebuild.provider.CapabilitySnapshot
+import com.zhiban.rebuild.provider.CredentialProvisioner
+import com.zhiban.rebuild.provider.ModelEvent
+import com.zhiban.rebuild.provider.ModelRequest
+import com.zhiban.rebuild.provider.OutboundExportGate
+import com.zhiban.rebuild.provider.OutboundPolicySettings
+import com.zhiban.rebuild.provider.ProviderAdapter
+import com.zhiban.rebuild.provider.ProviderFailure
+import com.zhiban.rebuild.provider.ProviderProfile
+import com.zhiban.rebuild.provider.ProviderProfileStore
 import com.zhiban.rebuild.runtime.spi.CommandReceiptStatus
 import com.zhiban.rebuild.runtime.spi.RuntimeAction
 import com.zhiban.rebuild.runtime.spi.RuntimeUiCommand
@@ -2816,10 +2816,10 @@ class RuntimeInputProcessorTest {
         )
         val requestedQueries = mutableListOf<String>()
         val observedRequests = mutableListOf<ModelRequest>()
-        val webGateway = com.zhiban.rebuild.runtime.provider.WebSearchGateway { query, _ ->
+        val webGateway = com.zhiban.rebuild.provider.WebSearchGateway { query, _ ->
             requestedQueries += query
             listOf(
-                com.zhiban.rebuild.runtime.provider.WebSearchHit(
+                com.zhiban.rebuild.provider.WebSearchHit(
                     "Official weather",
                     "https://example.com/weather",
                     "Sunny, 28 C",
@@ -4080,7 +4080,7 @@ class RuntimeInputProcessorTest {
     }
 
     private fun capability(profile: ProviderProfile) = CapabilitySnapshot(
-        profileDigest = com.zhiban.rebuild.runtime.provider.TrustedProviderRegistry().digest(profile),
+        profileDigest = com.zhiban.rebuild.provider.TrustedProviderRegistry().digest(profile),
         modalities = setOf("text"),
         features = setOf("stream", "tools"),
         maxContextTokens = 32_768,

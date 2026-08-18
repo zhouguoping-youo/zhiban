@@ -1,10 +1,10 @@
 package com.zhiban.rebuild.runtime.input.asr
 
-import com.zhiban.rebuild.runtime.provider.CredentialResolver
-import com.zhiban.rebuild.runtime.provider.OutboundExportGate
-import com.zhiban.rebuild.runtime.provider.OutboundPolicySettings
-import com.zhiban.rebuild.runtime.provider.ProviderProfile
-import com.zhiban.rebuild.runtime.provider.ProviderProfileStore
+import com.zhiban.rebuild.provider.CredentialResolver
+import com.zhiban.rebuild.provider.OutboundExportGate
+import com.zhiban.rebuild.provider.OutboundPolicySettings
+import com.zhiban.rebuild.provider.ProviderProfile
+import com.zhiban.rebuild.provider.ProviderProfileStore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout

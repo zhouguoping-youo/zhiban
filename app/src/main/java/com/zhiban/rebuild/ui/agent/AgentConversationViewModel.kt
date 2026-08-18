@@ -4,11 +4,14 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zhiban.rebuild.data.agent.AgentDataRepository
+import com.zhiban.rebuild.data.config.AgentControlStore
+import com.zhiban.rebuild.data.config.ExecutionPreference
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
+import com.zhiban.rebuild.data.store.ConversationSummary
+import com.zhiban.rebuild.foundation.runSuspendCatching
 import com.zhiban.rebuild.runtime.input.AttachmentStagingGateway
 import com.zhiban.rebuild.runtime.input.asr.RealtimeVoiceState
 import com.zhiban.rebuild.runtime.input.asr.StepFunRealtimeVoiceController
-import com.zhiban.rebuild.runtime.runSuspendCatching
 import com.zhiban.rebuild.runtime.spi.RuntimeUiClient
 import com.zhiban.rebuild.runtime.spi.TextInputGateway
 import com.zhiban.rebuild.ui.agent.projection.V2AgentConversationBackend
@@ -53,8 +56,8 @@ class BackendGateways @Inject constructor(
 class AgentConversationViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
     private val preferencesManager: PreferencesManager,
-    private val agentControls: com.zhiban.rebuild.runtime.config.AgentControlStore,
-    private val providerEnvironment: com.zhiban.rebuild.runtime.provider.ProviderEnvironmentManager,
+    private val agentControls: com.zhiban.rebuild.data.config.AgentControlStore,
+    private val providerEnvironment: com.zhiban.rebuild.provider.ProviderEnvironmentManager,
     private val persistence: ConversationPersistence,
     private val voice: VoiceEntryPoints,
     private val gateways: BackendGateways,
@@ -68,8 +71,8 @@ class AgentConversationViewModel @Inject constructor(
     private var projectionJob: kotlinx.coroutines.Job? = null
     private var submissionInFlight = false
     private val _conversationHistory =
-        MutableStateFlow<List<com.zhiban.rebuild.runtime.store.ConversationSummary>>(emptyList())
-    val conversationHistory: StateFlow<List<com.zhiban.rebuild.runtime.store.ConversationSummary>> = _conversationHistory.asStateFlow()
+        MutableStateFlow<List<com.zhiban.rebuild.data.store.ConversationSummary>>(emptyList())
+    val conversationHistory: StateFlow<List<com.zhiban.rebuild.data.store.ConversationSummary>> = _conversationHistory.asStateFlow()
     val realtimeVoiceState: StateFlow<RealtimeVoiceState> = voice.realtimeVoice.state
     val perceptionCandidates: StateFlow<List<NotificationCandidateEntity>> =
         agentDataRepository.observeNotificationCandidates().stateIn(
@@ -89,9 +92,9 @@ class AgentConversationViewModel @Inject constructor(
         viewModelScope.launch {
             runSuspendCatching {
                 val activeProfile = providerEnvironment.activeProfile()
-                val preset = com.zhiban.rebuild.runtime.provider.TrustedProviderRegistry().preset(
+                val preset = com.zhiban.rebuild.provider.TrustedProviderRegistry().preset(
                     activeProfile?.providerId
-                        ?: com.zhiban.rebuild.runtime.provider.ProviderConfigurationManager.DEFAULT_PROVIDER,
+                        ?: com.zhiban.rebuild.provider.ProviderConfigurationManager.DEFAULT_PROVIDER,
                 )
                 // One user-facing automatic model. The runtime selects the trusted vision model
                 // internally whenever an image or PDF is attached.
@@ -309,12 +312,12 @@ class AgentConversationViewModel @Inject constructor(
     // internally when an image is attached; provider model names are not a
     // user decision.
     private val _selectedModel =
-        MutableStateFlow(com.zhiban.rebuild.runtime.provider.ProviderConfigurationManager.DEFAULT_MODEL)
+        MutableStateFlow(com.zhiban.rebuild.provider.ProviderConfigurationManager.DEFAULT_MODEL)
     val selectedModel: StateFlow<String> = _selectedModel.asStateFlow()
     private val _selectedMode = MutableStateFlow(AGENT_RUNTIME_MODE)
     val selectedMode: StateFlow<String> = _selectedMode.asStateFlow()
     private val _availableModels = MutableStateFlow(
-        listOf(com.zhiban.rebuild.runtime.provider.ProviderConfigurationManager.DEFAULT_MODEL),
+        listOf(com.zhiban.rebuild.provider.ProviderConfigurationManager.DEFAULT_MODEL),
     )
     val availableModels: StateFlow<List<String>> = _availableModels.asStateFlow()
     fun selectModel(model: String) {
@@ -333,9 +336,9 @@ class AgentConversationViewModel @Inject constructor(
         if (level !in levels) return
         _selectedLevel.value = level
         val preference = when (level) {
-            "深入" -> com.zhiban.rebuild.runtime.config.ExecutionPreference.DEEP
-            "快速" -> com.zhiban.rebuild.runtime.config.ExecutionPreference.FAST
-            else -> com.zhiban.rebuild.runtime.config.ExecutionPreference.BALANCED
+            "深入" -> com.zhiban.rebuild.data.config.ExecutionPreference.DEEP
+            "快速" -> com.zhiban.rebuild.data.config.ExecutionPreference.FAST
+            else -> com.zhiban.rebuild.data.config.ExecutionPreference.BALANCED
         }
         agentControls.saveExecution(preference)
     }

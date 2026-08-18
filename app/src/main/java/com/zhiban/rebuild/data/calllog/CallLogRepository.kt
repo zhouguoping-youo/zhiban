@@ -2,8 +2,8 @@ package com.zhiban.rebuild.data.calllog
 
 import androidx.room.withTransaction
 import com.zhiban.rebuild.data.agent.AgentDatabase
-import com.zhiban.rebuild.runtime.context.FactEntity
-import com.zhiban.rebuild.runtime.context.FactIndex
+import com.zhiban.rebuild.data.facts.FactEntity
+import com.zhiban.rebuild.data.facts.FactIndex
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow

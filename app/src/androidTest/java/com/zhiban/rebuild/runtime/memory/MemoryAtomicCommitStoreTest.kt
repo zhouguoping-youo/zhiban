@@ -1,14 +1,19 @@
 package com.zhiban.rebuild.runtime.memory
 
+import com.zhiban.rebuild.data.facts.FactIndex
+import com.zhiban.rebuild.data.memory.RoomStagedMemoryCandidateStore
+
+import com.zhiban.rebuild.data.memory.ApprovalWriteResult
+
+import com.zhiban.rebuild.data.memory.MemoryNamespaceEntity
+
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
-import com.zhiban.rebuild.runtime.context.ApprovalWriteResult
-import com.zhiban.rebuild.runtime.context.MemoryScope
-import com.zhiban.rebuild.runtime.context.RoomStagedMemoryCandidateStore
-import com.zhiban.rebuild.runtime.context.Sensitivity
+import com.zhiban.rebuild.foundation.MemoryScope
+import com.zhiban.rebuild.foundation.Sensitivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -275,7 +280,7 @@ class MemoryAtomicCommitStoreTest {
 
         assertEquals(
             listOf("memory:memory-$candidateId"),
-            com.zhiban.rebuild.runtime.context.FactIndex(database)
+            com.zhiban.rebuild.data.facts.FactIndex(database)
                 .search("value", now, 10).map { it.factId },
         )
 
@@ -287,7 +292,7 @@ class MemoryAtomicCommitStoreTest {
         assertEquals(0, scalar("SELECT COUNT(*) FROM memory_fts WHERE namespaceId='namespace-1'"))
         assertEquals(0, scalar("SELECT COUNT(*) FROM memory_commit_receipts WHERE namespaceId='namespace-1'"))
         assertEquals(0, scalar("SELECT COUNT(*) FROM memory_events WHERE namespaceId='namespace-1'"))
-        assertTrue(com.zhiban.rebuild.runtime.context.FactIndex(database).search("value", now, 10).isEmpty())
+        assertTrue(com.zhiban.rebuild.data.facts.FactIndex(database).search("value", now, 10).isEmpty())
         assertTrue(store.recall("namespace-1").records.isEmpty())
         assertFalse(store.ackDeletion("namespace-1", "logical-1", deletion.generation - 1, "FTS"))
         assertTrue(store.recall("namespace-1").records.isEmpty())

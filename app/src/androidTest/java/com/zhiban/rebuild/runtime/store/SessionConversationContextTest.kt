@@ -1,5 +1,9 @@
 package com.zhiban.rebuild.runtime.store
 
+import com.zhiban.rebuild.data.store.RuntimeConversationTurnEntity
+import com.zhiban.rebuild.data.store.RuntimeRunEntity
+import com.zhiban.rebuild.data.store.RuntimeSessionEntity
+
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider

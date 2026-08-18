@@ -1,7 +1,7 @@
 package com.zhiban.rebuild.ui.agent.projection
 
+import com.zhiban.rebuild.foundation.runSuspendCatching
 import com.zhiban.rebuild.runtime.input.AttachmentRef
-import com.zhiban.rebuild.runtime.runSuspendCatching
 import com.zhiban.rebuild.runtime.spi.CommandReceiptStatus
 import com.zhiban.rebuild.runtime.spi.RuntimeUiClient
 import com.zhiban.rebuild.runtime.spi.TextInputGateway

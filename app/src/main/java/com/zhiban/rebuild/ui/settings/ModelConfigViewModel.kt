@@ -3,11 +3,11 @@ package com.zhiban.rebuild.ui.settings
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.zhiban.rebuild.provider.ProviderConfigurationManager
+import com.zhiban.rebuild.provider.ProviderEnvironmentManager
+import com.zhiban.rebuild.provider.TrustedProviderRegistry
 import com.zhiban.rebuild.runtime.embedding.EmbeddingConfiguration
 import com.zhiban.rebuild.runtime.governance.OutboundDataPreferences
-import com.zhiban.rebuild.runtime.provider.ProviderConfigurationManager
-import com.zhiban.rebuild.runtime.provider.ProviderEnvironmentManager
-import com.zhiban.rebuild.runtime.provider.TrustedProviderRegistry
 import com.zhiban.rebuild.ui.chat.PreferencesManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject

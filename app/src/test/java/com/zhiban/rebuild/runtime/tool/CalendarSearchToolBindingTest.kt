@@ -5,7 +5,7 @@ import com.zhiban.rebuild.data.agent.ScheduleEntity
 import com.zhiban.rebuild.data.agent.ScheduleProjection
 import com.zhiban.rebuild.data.calendar.ExternalCalendarConflict
 import com.zhiban.rebuild.data.calendar.ExternalCalendarConflictSource
-import com.zhiban.rebuild.runtime.provider.ProviderFailure
+import com.zhiban.rebuild.provider.ProviderFailure
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest

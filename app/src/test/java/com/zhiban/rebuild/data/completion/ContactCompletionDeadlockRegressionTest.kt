@@ -1,9 +1,9 @@
 package com.zhiban.rebuild.data.completion
 
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.config.AgentControlStore
 import com.zhiban.rebuild.data.contact.ContactEnrichmentCandidateEntity
 import com.zhiban.rebuild.data.contact.ContactKnowledgeDao
-import com.zhiban.rebuild.runtime.config.AgentControlStore
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk

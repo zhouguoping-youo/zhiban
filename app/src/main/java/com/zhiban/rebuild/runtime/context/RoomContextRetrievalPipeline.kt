@@ -6,7 +6,9 @@ import com.zhiban.rebuild.data.agent.ScheduleProjection
 import com.zhiban.rebuild.data.contact.ContactSearchProjection
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.data.contact.searchNatural
+import com.zhiban.rebuild.data.facts.FactIndex
 import com.zhiban.rebuild.data.notification.MessageCollectionPreferences
+import com.zhiban.rebuild.foundation.Sensitivity
 import com.zhiban.rebuild.runtime.memory.RoomMemoryGate
 import kotlin.math.ceil
 import kotlinx.coroutines.CoroutineDispatcher

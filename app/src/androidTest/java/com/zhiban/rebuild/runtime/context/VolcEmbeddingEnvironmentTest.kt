@@ -6,9 +6,9 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.di.ProviderModule
 import com.zhiban.rebuild.runtime.embedding.EmbeddingTransport
 import com.zhiban.rebuild.runtime.embedding.VolcEmbeddingEnvironment
-import com.zhiban.rebuild.runtime.provider.KeystoreCredentialVault
-import com.zhiban.rebuild.runtime.provider.OutboundExportGate
-import com.zhiban.rebuild.runtime.provider.OutboundPolicySettings
+import com.zhiban.rebuild.provider.KeystoreCredentialVault
+import com.zhiban.rebuild.provider.OutboundExportGate
+import com.zhiban.rebuild.provider.OutboundPolicySettings
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals

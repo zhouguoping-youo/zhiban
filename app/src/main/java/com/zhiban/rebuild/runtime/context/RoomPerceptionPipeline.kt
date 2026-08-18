@@ -2,7 +2,7 @@ package com.zhiban.rebuild.runtime.context
 
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.contact.findMentionedCandidates
-import com.zhiban.rebuild.runtime.runSuspendCatching
+import com.zhiban.rebuild.foundation.runSuspendCatching
 import kotlinx.serialization.json.Json
 
 internal interface PerceptionGateway {

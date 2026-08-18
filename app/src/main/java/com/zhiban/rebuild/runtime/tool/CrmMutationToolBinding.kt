@@ -1,11 +1,13 @@
 package com.zhiban.rebuild.runtime.tool
 
+import com.zhiban.rebuild.data.autowrite.ReversibleWriteReadiness
 import com.zhiban.rebuild.data.contact.ContactDao
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.crm.CrmDao
 import com.zhiban.rebuild.data.crm.CrmLeadStatus
-import com.zhiban.rebuild.runtime.governance.ReversibleWriteReadiness
-import com.zhiban.rebuild.runtime.provider.ProviderFailure
+import com.zhiban.rebuild.foundation.RuntimeToolRisk
+import com.zhiban.rebuild.foundation.RuntimeToolSpec
+import com.zhiban.rebuild.provider.ProviderFailure
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject

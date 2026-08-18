@@ -1,8 +1,8 @@
 package com.zhiban.rebuild.data.contact.enrichment
 
-import com.zhiban.rebuild.runtime.provider.WebSearchGateway
-import com.zhiban.rebuild.runtime.provider.WebSearchHit
-import com.zhiban.rebuild.runtime.runSuspendCatching
+import com.zhiban.rebuild.foundation.runSuspendCatching
+import com.zhiban.rebuild.provider.WebSearchGateway
+import com.zhiban.rebuild.provider.WebSearchHit
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 

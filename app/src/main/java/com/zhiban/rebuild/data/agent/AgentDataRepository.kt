@@ -1,6 +1,13 @@
 package com.zhiban.rebuild.data.agent
 
 import androidx.room.withTransaction
+import com.zhiban.rebuild.data.autowrite.ActionDecision
+import com.zhiban.rebuild.data.autowrite.ActionPolicy
+import com.zhiban.rebuild.data.autowrite.AutoWriteAuditDraft
+import com.zhiban.rebuild.data.autowrite.AutoWriteToolNames
+import com.zhiban.rebuild.data.autowrite.ReversibleWriteReadiness
+import com.zhiban.rebuild.data.autowrite.canonicalChangeDigest
+import com.zhiban.rebuild.data.autowrite.insertVisibleAutoWrite
 import com.zhiban.rebuild.data.calendar.ExternalCalendarConflictSource
 import com.zhiban.rebuild.data.calendar.SystemCalendarEvent
 import com.zhiban.rebuild.data.contact.ContactAddressEntity
@@ -41,24 +48,17 @@ import com.zhiban.rebuild.data.crm.CrmOpportunityStakeholderEntity
 import com.zhiban.rebuild.data.crm.CrmRecordStatus
 import com.zhiban.rebuild.data.crm.CrmStageHistoryEntity
 import com.zhiban.rebuild.data.crm.CrmSuggestionStatus
+import com.zhiban.rebuild.data.facts.FactEntity
+import com.zhiban.rebuild.data.facts.FactIndex
 import com.zhiban.rebuild.data.notification.MessageCollectionPreferences
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.NotificationInsightAnalyzer
 import com.zhiban.rebuild.data.notification.ScheduleInsight
 import com.zhiban.rebuild.data.notification.SocialNotificationParser
-import com.zhiban.rebuild.runtime.context.FactEntity
-import com.zhiban.rebuild.runtime.context.FactIndex
-import com.zhiban.rebuild.runtime.governance.ActionDecision
-import com.zhiban.rebuild.runtime.governance.ActionPolicy
-import com.zhiban.rebuild.runtime.governance.AutoWriteAuditDraft
-import com.zhiban.rebuild.runtime.governance.AutoWriteToolNames
-import com.zhiban.rebuild.runtime.governance.ReversibleWriteReadiness
-import com.zhiban.rebuild.runtime.governance.canonicalChangeDigest
-import com.zhiban.rebuild.runtime.governance.insertVisibleAutoWrite
-import com.zhiban.rebuild.runtime.tool.RuntimeToolRisk
-import com.zhiban.rebuild.runtime.tool.RuntimeToolSpec
-import com.zhiban.rebuild.runtime.tool.changeIdFor
-import com.zhiban.rebuild.runtime.tool.sha256
+import com.zhiban.rebuild.foundation.RuntimeToolRisk
+import com.zhiban.rebuild.foundation.RuntimeToolSpec
+import com.zhiban.rebuild.foundation.changeIdFor
+import com.zhiban.rebuild.foundation.sha256
 import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.time.ZoneId
@@ -386,15 +386,8 @@ class AgentDataRepository internal constructor(
     private suspend fun recordAutomaticSchedule(candidate: NotificationCandidateEntity, nowEpochMs: Long): ScheduleEntity? {
         val insight = ScheduleInsight.from(candidate) ?: return null
         if (candidate.linkedContactId == null || !candidate.isEligibleForAutomaticSchedule(insight)) return null
-        val policySpec = RuntimeToolSpec(
-            AutoWriteToolNames.SCHEDULE_CREATE,
-            1,
-            RuntimeToolRisk.REVERSIBLE_AUTO_WRITE,
-            "{}",
-            1,
-        )
         if (ActionPolicy().evaluate(
-                policySpec,
+                RuntimeToolRisk.REVERSIBLE_AUTO_WRITE,
                 reversibleWriteReadiness = ReversibleWriteReadiness(true, true, true),
             ) != ActionDecision.AutoExecuteReversibleWrite
         ) {
@@ -456,15 +449,8 @@ class AgentDataRepository internal constructor(
         val serviceSender = candidate.platform == "SMS" &&
             (sender.startsWith("106") || sender.startsWith("95") || sender.startsWith("96"))
         if (serviceSender || candidate.isGroupChat) return false
-        val policySpec = RuntimeToolSpec(
-            AutoWriteToolNames.INTERACTION_SUMMARY,
-            1,
-            RuntimeToolRisk.REVERSIBLE_AUTO_WRITE,
-            "{}",
-            1,
-        )
         if (ActionPolicy().evaluate(
-                policySpec,
+                RuntimeToolRisk.REVERSIBLE_AUTO_WRITE,
                 reversibleWriteReadiness = ReversibleWriteReadiness(true, true, true),
             ) != ActionDecision.AutoExecuteReversibleWrite
         ) {
@@ -565,15 +551,8 @@ class AgentDataRepository internal constructor(
             ?: candidate.senderName
             ?: candidate.conversationTitle
             ?: "对方"
-        val policySpec = RuntimeToolSpec(
-            AutoWriteToolNames.INTERACTION_SUMMARY,
-            1,
-            RuntimeToolRisk.REVERSIBLE_AUTO_WRITE,
-            "{}",
-            1,
-        )
         if (ActionPolicy().evaluate(
-                policySpec,
+                RuntimeToolRisk.REVERSIBLE_AUTO_WRITE,
                 reversibleWriteReadiness = ReversibleWriteReadiness(true, true, true),
             ) != ActionDecision.AutoExecuteReversibleWrite
         ) {

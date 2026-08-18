@@ -1,6 +1,6 @@
 package com.zhiban.rebuild.runtime.tool
 
-import com.zhiban.rebuild.runtime.provider.ProviderFailure
+import com.zhiban.rebuild.provider.ProviderFailure
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put

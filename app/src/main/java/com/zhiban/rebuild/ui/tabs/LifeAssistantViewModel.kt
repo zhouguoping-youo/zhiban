@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.zhiban.rebuild.data.agent.AgentDataRepository
 import com.zhiban.rebuild.data.calendar.ScheduleReminderScheduler
 import com.zhiban.rebuild.data.calendar.SystemCalendarReader
-import com.zhiban.rebuild.runtime.runSuspendCatching
+import com.zhiban.rebuild.foundation.runSuspendCatching
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.ZoneId
 import javax.inject.Inject

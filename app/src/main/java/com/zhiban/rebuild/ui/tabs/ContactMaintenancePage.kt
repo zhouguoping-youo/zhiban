@@ -99,24 +99,23 @@ fun ContactMaintenancePage(onBack: () -> Unit, onAsk: (String) -> Unit, viewMode
                     )
                 }
             } else {
-            maintenanceActionSection(
-                overview = overview,
-                suggestionsAvailable = suggestions.isNotEmpty(),
-                unresolvedIdentityCount = unresolvedIdentities.size,
-                onReviewDuplicates = { selectedMerge = suggestions.firstOrNull() },
-                onReviewEnrichment = { reviewingEnrichment = true },
-                onResolveIdentities = { onAsk(unresolvedIdentityPrompt(unresolvedIdentities.first())) },
-            )
+                maintenanceActionSection(
+                    overview = overview,
+                    suggestionsAvailable = suggestions.isNotEmpty(),
+                    unresolvedIdentityCount = unresolvedIdentities.size,
+                    onReviewDuplicates = { selectedMerge = suggestions.firstOrNull() },
+                    onReviewEnrichment = { reviewingEnrichment = true },
+                    onResolveIdentities = { onAsk(unresolvedIdentityPrompt(unresolvedIdentities.first())) },
+                )
                 items(
                     overview.items.filter { it.issues.isNotEmpty() }.take(MAX_VISIBLE_ITEMS),
                     key = { it.contact.contactId },
                 ) { item ->
                     ContactMaintenanceRow(item, onAsk)
                 }
-            if (completableContacts.isNotEmpty()) {
-                completionSection(completableContacts = completableContacts, onPrepare = { prepareCompletion(it) })
-            }
-
+                if (completableContacts.isNotEmpty()) {
+                    completionSection(completableContacts = completableContacts, onPrepare = { prepareCompletion(it) })
+                }
             }
         }
     }
@@ -140,8 +139,6 @@ fun ContactMaintenancePage(onBack: () -> Unit, onAsk: (String) -> Unit, viewMode
         ),
     )
 }
-
-
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -280,37 +277,37 @@ private fun LazyListScope.maintenanceActionSection(
     onReviewEnrichment: () -> Unit,
     onResolveIdentities: () -> Unit,
 ) {
-            item {
-                Column(
-                    Modifier.fillMaxWidth().padding(horizontal = ZhiBanSpacing.PageHorizontal),
-                    verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm),
-                ) {
-                    if (overview.duplicateReviewCount > 0) {
-                        MaintenanceActionRow(
-                            icon = Icons.Outlined.PersonSearch,
-                            title = "重复资料",
-                            detail = "${overview.duplicateReviewCount} 组待确认",
-                            onClick = onReviewDuplicates,
-                        )
-                    }
-                    if (overview.enrichmentReviewCount > 0) {
-                        MaintenanceActionRow(
-                            icon = Icons.Outlined.AutoAwesome,
-                            title = "资料待核实",
-                            detail = localizedQuantity(R.plurals.suggestion_count, overview.enrichmentReviewCount),
-                            onClick = onReviewEnrichment,
-                        )
-                    }
-                    if (unresolvedIdentityCount > 0) {
-                        MaintenanceActionRow(
-                            icon = Icons.Outlined.AlternateEmail,
-                            title = "社交身份待关联",
-                            detail = localizedQuantity(R.plurals.account_or_group_count, unresolvedIdentityCount),
-                            onClick = onResolveIdentities,
-                        )
-                    }
-                }
+    item {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = ZhiBanSpacing.PageHorizontal),
+            verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm),
+        ) {
+            if (overview.duplicateReviewCount > 0) {
+                MaintenanceActionRow(
+                    icon = Icons.Outlined.PersonSearch,
+                    title = "重复资料",
+                    detail = "${overview.duplicateReviewCount} 组待确认",
+                    onClick = onReviewDuplicates,
+                )
             }
+            if (overview.enrichmentReviewCount > 0) {
+                MaintenanceActionRow(
+                    icon = Icons.Outlined.AutoAwesome,
+                    title = "资料待核实",
+                    detail = localizedQuantity(R.plurals.suggestion_count, overview.enrichmentReviewCount),
+                    onClick = onReviewEnrichment,
+                )
+            }
+            if (unresolvedIdentityCount > 0) {
+                MaintenanceActionRow(
+                    icon = Icons.Outlined.AlternateEmail,
+                    title = "社交身份待关联",
+                    detail = localizedQuantity(R.plurals.account_or_group_count, unresolvedIdentityCount),
+                    onClick = onResolveIdentities,
+                )
+            }
+        }
+    }
 }
 
 private data class MaintenanceDialogSlots(
@@ -394,27 +391,24 @@ private fun MaintenanceDialogs(slots: MaintenanceDialogSlots) {
 }
 
 private fun LazyListScope.completionSection(completableContacts: List<com.zhiban.rebuild.data.contact.ContactCompleteness>, onPrepare: (String) -> Unit) {
-
-        item(key = "completion-header") {
-            Text(
-                "资料待补全",
-                modifier = Modifier.fillMaxWidth()
-                    .padding(horizontal = ZhiBanSpacing.PageHorizontal)
-                    .padding(top = ZhiBanSpacing.Md),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-        items(
-            completableContacts.take(MAX_VISIBLE_ITEMS),
-            key = { "completion-${it.contact.contactId}" },
-        ) { completeness ->
-            ContactCompletionRow(
-                item = completeness,
-                onClick = { onPrepare(completeness.contact.contactId) },
-                modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
-            )
-        }
+    item(key = "completion-header") {
+        Text(
+            "资料待补全",
+            modifier = Modifier.fillMaxWidth()
+                .padding(horizontal = ZhiBanSpacing.PageHorizontal)
+                .padding(top = ZhiBanSpacing.Md),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+    items(
+        completableContacts.take(MAX_VISIBLE_ITEMS),
+        key = { "completion-${it.contact.contactId}" },
+    ) { completeness ->
+        ContactCompletionRow(
+            item = completeness,
+            onClick = { onPrepare(completeness.contact.contactId) },
+            modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+        )
+    }
 }
-
-

@@ -3,8 +3,8 @@ package com.zhiban.rebuild.data.contact.enrichment
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.contact.ContactEnrichmentCandidateEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
-import com.zhiban.rebuild.runtime.runSuspendCatching
-import com.zhiban.rebuild.runtime.tool.sha256
+import com.zhiban.rebuild.foundation.runSuspendCatching
+import com.zhiban.rebuild.foundation.sha256
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zhiban.rebuild.data.agent.AgentDataRepository
 import com.zhiban.rebuild.data.agent.CrmLeadConversionInput
+import com.zhiban.rebuild.data.autowrite.AutoWriteRepository
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.crm.CrmActivityEntity
 import com.zhiban.rebuild.data.crm.CrmAgentSuggestionEntity
@@ -17,7 +18,6 @@ import com.zhiban.rebuild.data.crm.CrmOpportunityStage
 import com.zhiban.rebuild.data.crm.CrmOpportunityStakeholderEntity
 import com.zhiban.rebuild.data.crm.CrmRecordStatus
 import com.zhiban.rebuild.data.crm.CrmStageHistoryEntity
-import com.zhiban.rebuild.runtime.governance.AutoWriteRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalDate
 import java.time.ZoneId

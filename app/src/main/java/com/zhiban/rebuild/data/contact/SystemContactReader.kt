@@ -9,7 +9,7 @@ import android.database.Cursor
 import android.os.Build
 import android.provider.ContactsContract
 import androidx.core.content.ContextCompat
-import com.zhiban.rebuild.runtime.runSuspendCatching
+import com.zhiban.rebuild.foundation.runSuspendCatching
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton

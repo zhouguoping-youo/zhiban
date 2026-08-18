@@ -6,7 +6,7 @@ import com.zhiban.rebuild.data.agent.AgentDataRepository
 import com.zhiban.rebuild.data.calendar.ScheduleReminderScheduler
 import com.zhiban.rebuild.data.calendar.SystemCalendarReader
 import com.zhiban.rebuild.data.event.EventPlanningRepository
-import com.zhiban.rebuild.runtime.runSuspendCatching
+import com.zhiban.rebuild.foundation.runSuspendCatching
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow

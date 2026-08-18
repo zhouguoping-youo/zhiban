@@ -414,7 +414,7 @@ class AgentConversationScreenE2ETest {
                 AgentConversationScreen(
                     state = AgentConversationUiState(),
                     conversationHistory = listOf(
-                        com.zhiban.rebuild.runtime.store.ConversationSummary("s1", "帮我安排明天下午的会议", 10),
+                        com.zhiban.rebuild.data.store.ConversationSummary("s1", "帮我安排明天下午的会议", 10),
                     ),
                     onOpenConversation = opened::set,
                     onDeleteConversation = deleted::set,
@@ -456,7 +456,7 @@ class AgentConversationScreenE2ETest {
                     availableLevels = listOf("深入", "标准", "快速"),
                     onLevelSelect = level::set,
                     conversationHistory = listOf(
-                        com.zhiban.rebuild.runtime.store.ConversationSummary("s-delete", "需要删除的对话", 10),
+                        com.zhiban.rebuild.data.store.ConversationSummary("s-delete", "需要删除的对话", 10),
                     ),
                     onDeleteConversation = deleted::set,
                     multimodalState = multimodal.value,

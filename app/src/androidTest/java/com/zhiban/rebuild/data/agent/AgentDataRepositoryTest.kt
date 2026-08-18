@@ -21,11 +21,11 @@ import com.zhiban.rebuild.data.crm.CrmRecordStatus
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.NotificationInsights
 import com.zhiban.rebuild.data.notification.ScheduleInsight
-import com.zhiban.rebuild.runtime.context.FactEntity
-import com.zhiban.rebuild.runtime.context.FactIndex
-import com.zhiban.rebuild.runtime.governance.AutoWriteRepository
-import com.zhiban.rebuild.runtime.governance.canonicalChangeDigest
-import com.zhiban.rebuild.runtime.governance.insertVisibleAutoWrite
+import com.zhiban.rebuild.data.facts.FactEntity
+import com.zhiban.rebuild.data.facts.FactIndex
+import com.zhiban.rebuild.data.autowrite.AutoWriteRepository
+import com.zhiban.rebuild.data.autowrite.canonicalChangeDigest
+import com.zhiban.rebuild.data.autowrite.insertVisibleAutoWrite
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -1108,7 +1108,7 @@ class AgentDataRepositoryTest {
 
         assertTrue(repository.observeNotificationCandidates().first().isEmpty())
         val schedule =
-            requireNotNull(database.scheduleDao().findById("notification-schedule-${com.zhiban.rebuild.runtime.tool.sha256("auto-schedule-source").take(32)}"))
+            requireNotNull(database.scheduleDao().findById("notification-schedule-${com.zhiban.rebuild.foundation.sha256("auto-schedule-source").take(32)}"))
         val receipt = database.changeLogDao().observeAutoWriteReceipts().first()
             .single { it.presentationType == "SCHEDULE_CREATE" }
         assertEquals(schedule.id, receipt.targetId)

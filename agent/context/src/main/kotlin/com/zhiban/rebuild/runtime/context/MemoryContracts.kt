@@ -1,7 +1,8 @@
 package com.zhiban.rebuild.runtime.context
 
-enum class MemoryScope { WORKING, SESSION, PERSON, GLOBAL }
-enum class MemoryCandidateState { PENDING, APPROVED, REJECTED, CONSUMED, DELETED }
+import com.zhiban.rebuild.foundation.MemoryCandidateState
+import com.zhiban.rebuild.foundation.MemoryScope
+import com.zhiban.rebuild.foundation.Sensitivity
 
 data class StagedMemoryInput(
     val id: String,

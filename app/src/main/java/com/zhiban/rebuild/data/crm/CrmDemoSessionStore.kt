@@ -162,10 +162,7 @@ internal fun createCrmDemoDataset(nowEpochMs: Long): CrmDemoDataset {
     return CrmDemoDataset(contacts, core.leads, core.opportunities, core.stakeholders, core.activities, tail.actions, tail.suggestions, tail.history)
 }
 
-private data class DemoCoreSecondHalf(
-    val stakeholders: List<CrmOpportunityStakeholderEntity>,
-    val activities: List<CrmActivityEntity>,
-)
+private data class DemoCoreSecondHalf(val stakeholders: List<CrmOpportunityStakeholderEntity>, val activities: List<CrmActivityEntity>)
 
 private data class DemoCore(
     val leads: List<CrmLeadEntity>,
@@ -180,13 +177,7 @@ private data class DemoCoreTail(
     val history: List<CrmStageHistoryEntity>,
 )
 
-private fun buildDemoCore(
-    wang: ContactEntity,
-    liu: ContactEntity,
-    li: ContactEntity,
-    at: (Long, Int) -> Long,
-    nowEpochMs: Long,
-): DemoCore {
+private fun buildDemoCore(wang: ContactEntity, liu: ContactEntity, li: ContactEntity, at: (Long, Int) -> Long, nowEpochMs: Long): DemoCore {
     val leads = listOf(
         CrmLeadEntity(
             "crm-demo-lead-wang", wang.contactId, wang.displayName, wang.company, CrmLeadStatus.CONVERTED,
@@ -292,7 +283,6 @@ private fun buildDemoCoreSecondHalf(
     )
     return DemoCoreSecondHalf(stakeholders, activities)
 }
-
 
 private fun buildDemoTail(
     wang: ContactEntity,

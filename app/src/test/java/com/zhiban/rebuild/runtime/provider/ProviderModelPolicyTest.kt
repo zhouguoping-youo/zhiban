@@ -1,4 +1,4 @@
-package com.zhiban.rebuild.runtime.provider
+package com.zhiban.rebuild.provider
 
 import org.junit.Assert.assertEquals
 import org.junit.Test

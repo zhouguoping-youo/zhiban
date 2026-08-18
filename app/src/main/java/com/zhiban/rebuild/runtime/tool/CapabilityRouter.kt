@@ -1,8 +1,10 @@
 package com.zhiban.rebuild.runtime.tool
 
-import com.zhiban.rebuild.runtime.governance.ActionDecision
-import com.zhiban.rebuild.runtime.governance.ActionPolicy
-import com.zhiban.rebuild.runtime.governance.ReversibleWriteReadiness
+import com.zhiban.rebuild.data.autowrite.ActionDecision
+import com.zhiban.rebuild.data.autowrite.ActionPolicy
+import com.zhiban.rebuild.data.autowrite.ReversibleWriteReadiness
+import com.zhiban.rebuild.foundation.RuntimeToolRisk
+import com.zhiban.rebuild.foundation.RuntimeToolSpec
 import kotlinx.coroutines.withTimeout
 
 /** Provider-neutral request. The runtime never dispatches on provider-specific event classes. */
@@ -149,7 +151,7 @@ internal class CapabilityRouter(
         requireEnabled(spec.name)
         val canonicalRequest = request.copy(name = spec.name)
         val readiness = reversibleReadiness(binding, canonicalRequest, context)
-        return when (val decision = policy.actionPolicy.evaluate(spec, reversibleWriteReadiness = readiness)) {
+        return when (val decision = policy.actionPolicy.evaluate(spec.risk, reversibleWriteReadiness = readiness)) {
             ActionDecision.AutoExecute -> ToolDisposition.ReadOnly
 
             ActionDecision.AutoExecuteReversibleWrite -> ToolDisposition.ReversibleAutoWrite
@@ -169,7 +171,7 @@ internal class CapabilityRouter(
         val binding = binding(request.name)
         val spec = binding.spec
         requireEnabled(spec.name)
-        if (policy.actionPolicy.evaluate(spec) !is ActionDecision.RequireConfirmation) {
+        if (policy.actionPolicy.evaluate(spec.risk) !is ActionDecision.RequireConfirmation) {
             throw ToolPolicyRejectedException("read-only tools must use the automatic execution path")
         }
         requireGlobalBudget(context.runId)
@@ -183,7 +185,7 @@ internal class CapabilityRouter(
         val binding = binding(request.name)
         val spec = binding.spec
         requireEnabled(spec.name)
-        if (policy.actionPolicy.evaluate(spec) != ActionDecision.AutoExecute) {
+        if (policy.actionPolicy.evaluate(spec.risk) != ActionDecision.AutoExecute) {
             throw ToolPolicyRejectedException("write tools must use the approval path")
         }
         requireGlobalBudget(context.runId)
@@ -200,7 +202,7 @@ internal class CapabilityRouter(
         requireEnabled(spec.name)
         val canonicalRequest = request.copy(name = spec.name)
         val readiness = reversibleReadiness(binding, canonicalRequest, context)
-        if (policy.actionPolicy.evaluate(spec, reversibleWriteReadiness = readiness) !=
+        if (policy.actionPolicy.evaluate(spec.risk, reversibleWriteReadiness = readiness) !=
             ActionDecision.AutoExecuteReversibleWrite
         ) {
             throw ToolPolicyRejectedException("reversible write must use the confirmation path")
@@ -219,7 +221,7 @@ internal class CapabilityRouter(
         val binding = registry().canonical[canonicalName] ?: throw ToolPolicyRejectedException("tool is not registered")
         requireEnabled(binding.spec.name)
         check(
-            policy.actionPolicy.evaluate(binding.spec, confirmationGranted = true) is ActionDecision.AllowedAfterConfirmation,
+            policy.actionPolicy.evaluate(binding.spec.risk, confirmationGranted = true) is ActionDecision.AllowedAfterConfirmation,
         ) {
             "tool is not authorized for confirmed execution"
         }

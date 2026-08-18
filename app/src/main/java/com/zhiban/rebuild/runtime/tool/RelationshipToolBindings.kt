@@ -4,10 +4,11 @@ import com.zhiban.rebuild.data.contact.ContactIntelligenceDao
 import com.zhiban.rebuild.data.contact.RelationshipEdgeDao
 import com.zhiban.rebuild.data.contact.RelationshipEventDao
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
+import com.zhiban.rebuild.foundation.RuntimeToolSpec
+import com.zhiban.rebuild.foundation.runSuspendCatching
 import com.zhiban.rebuild.relationship.RelationshipTaxonomy
 import com.zhiban.rebuild.runtime.governance.RelationshipCandidateCall
 import com.zhiban.rebuild.runtime.governance.RelationshipDomainWriter
-import com.zhiban.rebuild.runtime.runSuspendCatching
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive

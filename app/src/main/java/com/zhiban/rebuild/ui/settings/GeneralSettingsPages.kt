@@ -76,12 +76,12 @@ import com.zhiban.rebuild.data.agent.AGENT_DATABASE_FILE_NAME
 import com.zhiban.rebuild.data.agent.AgentDataRepository
 import com.zhiban.rebuild.data.calllog.CallLogAccessProbe
 import com.zhiban.rebuild.data.calllog.CallLogAccessStatus
+import com.zhiban.rebuild.data.config.AgentControlStore
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.export.AgentDataExportService
 import com.zhiban.rebuild.data.notification.NotificationCategory
 import com.zhiban.rebuild.data.notification.NotificationCategoryPreferences
 import com.zhiban.rebuild.data.notification.OutgoingMessageAccessibilityService
-import com.zhiban.rebuild.runtime.config.AgentControlStore
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
 import com.zhiban.rebuild.ui.components.ZhiBanPage
@@ -522,7 +522,7 @@ class DataExportViewModel @Inject constructor(private val exportService: AgentDa
         if (mutableState.value.exporting) return
         mutableState.update { it.copy(exporting = true, exportFailed = false) }
         viewModelScope.launch {
-            com.zhiban.rebuild.runtime.runSuspendCatching { exportService.create() }
+            com.zhiban.rebuild.foundation.runSuspendCatching { exportService.create() }
                 .onSuccess { file -> mutableState.update { it.copy(exporting = false, exportedFile = file) } }
                 .onFailure { mutableState.update { it.copy(exporting = false, exportFailed = true) } }
         }

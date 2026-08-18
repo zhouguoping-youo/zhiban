@@ -9,7 +9,7 @@ import com.zhiban.rebuild.data.crm.CrmNextActionEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityStakeholderEntity
 import com.zhiban.rebuild.data.crm.CrmStageHistoryEntity
-import com.zhiban.rebuild.runtime.provider.ProviderFailure
+import com.zhiban.rebuild.provider.ProviderFailure
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk

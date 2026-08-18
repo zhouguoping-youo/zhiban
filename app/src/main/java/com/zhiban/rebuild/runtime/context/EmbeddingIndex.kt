@@ -1,8 +1,12 @@
 package com.zhiban.rebuild.runtime.context
+
 import android.util.Log
 import androidx.room.withTransaction
 import com.zhiban.rebuild.data.agent.AgentDatabase
-import com.zhiban.rebuild.runtime.runSuspendCatching
+import com.zhiban.rebuild.data.facts.EmbeddingVectorEntity
+import com.zhiban.rebuild.data.facts.FactEntity
+import com.zhiban.rebuild.foundation.Sensitivity
+import com.zhiban.rebuild.foundation.runSuspendCatching
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.MessageDigest

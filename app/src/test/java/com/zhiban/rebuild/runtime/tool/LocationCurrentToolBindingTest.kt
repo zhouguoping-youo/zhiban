@@ -1,9 +1,9 @@
 package com.zhiban.rebuild.runtime.tool
 
-import com.zhiban.rebuild.runtime.provider.LocationGateway
-import com.zhiban.rebuild.runtime.provider.LocationSnapshot
-import com.zhiban.rebuild.runtime.provider.LocationUnavailable
-import com.zhiban.rebuild.runtime.provider.ProviderFailure
+import com.zhiban.rebuild.provider.LocationGateway
+import com.zhiban.rebuild.provider.LocationSnapshot
+import com.zhiban.rebuild.provider.LocationUnavailable
+import com.zhiban.rebuild.provider.ProviderFailure
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

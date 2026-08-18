@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.provider.ContactsContract
 import androidx.core.content.ContextCompat
 import androidx.room.withTransaction
+import com.zhiban.rebuild.data.autowrite.ChangeLogEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.ContactSyncOperationEntity
 import com.zhiban.rebuild.data.contact.ContactSyncProjection
@@ -20,8 +21,7 @@ import com.zhiban.rebuild.data.contact.SystemRawContactSnapshot
 import com.zhiban.rebuild.data.contact.findExistingSystemContact
 import com.zhiban.rebuild.data.contact.normalizeContactPhone
 import com.zhiban.rebuild.data.contact.toSyncProjection
-import com.zhiban.rebuild.runtime.governance.ChangeLogEntity
-import com.zhiban.rebuild.runtime.tool.sha256
+import com.zhiban.rebuild.foundation.sha256
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.UUID
 import javax.inject.Inject

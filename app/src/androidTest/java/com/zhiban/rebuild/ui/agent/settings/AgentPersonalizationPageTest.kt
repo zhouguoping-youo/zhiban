@@ -10,8 +10,8 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.zhiban.rebuild.runtime.config.AgentControlStore
-import com.zhiban.rebuild.runtime.config.ExecutionPreference
+import com.zhiban.rebuild.data.config.AgentControlStore
+import com.zhiban.rebuild.data.config.ExecutionPreference
 import com.zhiban.rebuild.runtime.personalization.AgentPersonalizationStore
 import com.zhiban.rebuild.runtime.personalization.ResponseStyle
 import com.zhiban.rebuild.runtime.personalization.UserProfileStore

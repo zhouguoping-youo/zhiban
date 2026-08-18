@@ -2,8 +2,19 @@ package com.zhiban.rebuild.runtime.memory
 
 import androidx.room.withTransaction
 import com.zhiban.rebuild.data.agent.AgentDatabase
-import com.zhiban.rebuild.runtime.context.FactEntity
-import com.zhiban.rebuild.runtime.context.FactIndex
+import com.zhiban.rebuild.data.facts.FactEntity
+import com.zhiban.rebuild.data.facts.FactIndex
+import com.zhiban.rebuild.data.memory.MemoryCommitReceiptEntity
+import com.zhiban.rebuild.data.memory.MemoryCurrentVersionEntity
+import com.zhiban.rebuild.data.memory.MemoryDeletionOutboxEntity
+import com.zhiban.rebuild.data.memory.MemoryEventEntity
+import com.zhiban.rebuild.data.memory.MemoryEvidenceEntity
+import com.zhiban.rebuild.data.memory.MemoryFtsEntity
+import com.zhiban.rebuild.data.memory.MemoryIndexOutboxEntity
+import com.zhiban.rebuild.data.memory.MemoryNamespaceEntity
+import com.zhiban.rebuild.data.memory.MemoryRecordEntity
+import com.zhiban.rebuild.data.memory.MemoryTombstoneEntity
+import com.zhiban.rebuild.data.memory.StagedMemoryCandidateEntity
 import java.security.MessageDigest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -64,7 +75,7 @@ internal class MemoryAtomicStore(private val database: AgentDatabase, private va
     }
 
     private class CommitPreparation(
-        val candidate: com.zhiban.rebuild.runtime.context.StagedMemoryCandidateEntity,
+        val candidate: com.zhiban.rebuild.data.memory.StagedMemoryCandidateEntity,
         val sources: List<String>,
         val canonicalText: String,
         val idempotentResult: MemoryCommitResult?,

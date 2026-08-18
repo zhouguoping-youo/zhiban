@@ -5,7 +5,24 @@ import com.zhiban.agent.skills.SkillActivator
 import com.zhiban.agent.skills.SkillOrigin
 import com.zhiban.agent.skills.SkillSpec
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.autowrite.AutoWritePresentationRegistry
 import com.zhiban.rebuild.data.notification.NotificationInsightAnalyzer
+import com.zhiban.rebuild.data.store.RuntimeConversationTurnEntity
+import com.zhiban.rebuild.foundation.Sensitivity
+import com.zhiban.rebuild.foundation.sha256
+import com.zhiban.rebuild.provider.CapabilitySnapshot
+import com.zhiban.rebuild.provider.ModelEvent
+import com.zhiban.rebuild.provider.ModelMessage
+import com.zhiban.rebuild.provider.ModelRequest
+import com.zhiban.rebuild.provider.OutboundChannel
+import com.zhiban.rebuild.provider.OutboundProvenance
+import com.zhiban.rebuild.provider.OutboundPurpose
+import com.zhiban.rebuild.provider.OutboundSensitivity
+import com.zhiban.rebuild.provider.ProviderAdapter
+import com.zhiban.rebuild.provider.ProviderFailure
+import com.zhiban.rebuild.provider.ProviderModelPolicy
+import com.zhiban.rebuild.provider.ProviderProfile
+import com.zhiban.rebuild.provider.ProviderProfileStore
 import com.zhiban.rebuild.runtime.context.ContextBlock
 import com.zhiban.rebuild.runtime.context.ContextKind
 import com.zhiban.rebuild.runtime.context.ContextLayer
@@ -17,29 +34,14 @@ import com.zhiban.rebuild.runtime.context.PromptBudget
 import com.zhiban.rebuild.runtime.context.QueryContext
 import com.zhiban.rebuild.runtime.context.RoomContextRetrievalPipeline
 import com.zhiban.rebuild.runtime.context.RoomPerceptionPipeline
-import com.zhiban.rebuild.runtime.context.Sensitivity
 import com.zhiban.rebuild.runtime.context.TrustLevel
 import com.zhiban.rebuild.runtime.context.reranked
 import com.zhiban.rebuild.runtime.context.resolveCalendarStartEpochMs
 import com.zhiban.rebuild.runtime.context.withDegradations
-import com.zhiban.rebuild.runtime.governance.AutoWritePresentationRegistry
 import com.zhiban.rebuild.runtime.governance.ChangeUndoCoordinator
 import com.zhiban.rebuild.runtime.governance.ContactDomainWriter
 import com.zhiban.rebuild.runtime.governance.RelationshipDomainWriter
 import com.zhiban.rebuild.runtime.memory.RoomMemoryGate
-import com.zhiban.rebuild.runtime.provider.CapabilitySnapshot
-import com.zhiban.rebuild.runtime.provider.ModelEvent
-import com.zhiban.rebuild.runtime.provider.ModelMessage
-import com.zhiban.rebuild.runtime.provider.ModelRequest
-import com.zhiban.rebuild.runtime.provider.OutboundChannel
-import com.zhiban.rebuild.runtime.provider.OutboundProvenance
-import com.zhiban.rebuild.runtime.provider.OutboundPurpose
-import com.zhiban.rebuild.runtime.provider.OutboundSensitivity
-import com.zhiban.rebuild.runtime.provider.ProviderAdapter
-import com.zhiban.rebuild.runtime.provider.ProviderFailure
-import com.zhiban.rebuild.runtime.provider.ProviderModelPolicy
-import com.zhiban.rebuild.runtime.provider.ProviderProfile
-import com.zhiban.rebuild.runtime.provider.ProviderProfileStore
 import com.zhiban.rebuild.runtime.spi.RuntimeRunStatus
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
 import com.zhiban.rebuild.runtime.store.RuntimeEventDraft
@@ -84,7 +86,6 @@ import com.zhiban.rebuild.runtime.tool.canonicalMemoryDigest
 import com.zhiban.rebuild.runtime.tool.canonicalMemoryIdempotencyKey
 import com.zhiban.rebuild.runtime.tool.canonicalScheduleDigest
 import com.zhiban.rebuild.runtime.tool.canonicalToolIdempotencyKey
-import com.zhiban.rebuild.runtime.tool.sha256
 import java.io.IOException
 import java.time.Instant
 import java.time.ZoneId
@@ -125,7 +126,7 @@ internal data class QueryAssemblyContext(val query: QueryContext, val retrieval:
 internal data class SessionAssemblyContext(
     val memories: List<String>,
     val summary: String?,
-    val recentTurns: List<com.zhiban.rebuild.runtime.store.RuntimeConversationTurnEntity>,
+    val recentTurns: List<com.zhiban.rebuild.data.store.RuntimeConversationTurnEntity>,
     val feedback: List<String>,
 )
 
@@ -272,7 +273,7 @@ internal class ProviderContextAssembler(private val clock: () -> Long, private v
 
     private fun sessionContextBlocks(
         sessionSummary: String?,
-        recentConversation: List<com.zhiban.rebuild.runtime.store.RuntimeConversationTurnEntity>,
+        recentConversation: List<com.zhiban.rebuild.data.store.RuntimeConversationTurnEntity>,
         memories: List<String>,
         feedback: List<String>,
     ): List<ContextBlock> = buildList {

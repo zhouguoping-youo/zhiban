@@ -2,6 +2,7 @@ package com.zhiban.rebuild.runtime.context
 
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.CrmAgentDataRepository
+import com.zhiban.rebuild.data.facts.FactIndex
 import com.zhiban.rebuild.runtime.memory.RoomMemoryGate
 import javax.inject.Inject
 import javax.inject.Singleton

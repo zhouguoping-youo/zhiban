@@ -8,7 +8,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
-import com.zhiban.rebuild.runtime.config.AgentControlStore
+import com.zhiban.rebuild.data.config.AgentControlStore
 import com.zhiban.rebuild.runtime.memory.AgentMemorySettingsService
 import com.zhiban.rebuild.ui.theme.ZhiBanTheme
 import org.junit.After

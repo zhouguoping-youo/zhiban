@@ -107,5 +107,5 @@ class ContactThreeWayMergeTest {
     private fun projection(name: String, phones: List<String>, emails: List<String>, company: String?) =
         ContactSyncProjection(name, phones, emails, company, null, null)
 
-    private fun digest(value: ContactSyncProjection) = com.zhiban.rebuild.runtime.tool.sha256(value.encode())
+    private fun digest(value: ContactSyncProjection) = com.zhiban.rebuild.foundation.sha256(value.encode())
 }

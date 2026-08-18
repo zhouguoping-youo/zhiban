@@ -1,8 +1,8 @@
 package com.zhiban.rebuild.data.contact.enrichment
 
-import com.zhiban.rebuild.runtime.provider.ProviderFailure
-import com.zhiban.rebuild.runtime.provider.WebSearchGateway
-import com.zhiban.rebuild.runtime.provider.WebSearchHit
+import com.zhiban.rebuild.provider.ProviderFailure
+import com.zhiban.rebuild.provider.WebSearchGateway
+import com.zhiban.rebuild.provider.WebSearchHit
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

@@ -1,4 +1,8 @@
 package com.zhiban.rebuild.runtime.context
+
+import com.zhiban.rebuild.data.memory.RoomStagedMemoryCandidateStore
+
+import com.zhiban.rebuild.data.memory.ApprovalWriteResult
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider

@@ -1,11 +1,11 @@
 package com.zhiban.rebuild.data.reply
 
-import com.zhiban.rebuild.runtime.provider.CapabilitySnapshot
-import com.zhiban.rebuild.runtime.provider.ModelEvent
-import com.zhiban.rebuild.runtime.provider.ModelRequest
-import com.zhiban.rebuild.runtime.provider.ProviderAdapter
-import com.zhiban.rebuild.runtime.provider.ProviderProfile
-import com.zhiban.rebuild.runtime.provider.ProviderProfileStore
+import com.zhiban.rebuild.provider.CapabilitySnapshot
+import com.zhiban.rebuild.provider.ModelEvent
+import com.zhiban.rebuild.provider.ModelRequest
+import com.zhiban.rebuild.provider.ProviderAdapter
+import com.zhiban.rebuild.provider.ProviderProfile
+import com.zhiban.rebuild.provider.ProviderProfileStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking

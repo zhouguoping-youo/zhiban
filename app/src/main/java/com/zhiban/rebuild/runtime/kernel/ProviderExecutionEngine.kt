@@ -5,8 +5,28 @@ import com.zhiban.agent.skills.SkillActivator
 import com.zhiban.agent.skills.SkillOrigin
 import com.zhiban.agent.skills.SkillSpec
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.autowrite.AutoWritePresentationRegistry
+import com.zhiban.rebuild.data.config.ExecutionPreference
+import com.zhiban.rebuild.data.config.FeedbackPolicy
+import com.zhiban.rebuild.data.config.MemoryPolicy
 import com.zhiban.rebuild.data.notification.MessageCollectionPreferences
 import com.zhiban.rebuild.data.notification.NotificationInsightAnalyzer
+import com.zhiban.rebuild.foundation.Sensitivity
+import com.zhiban.rebuild.foundation.runSuspendCatching
+import com.zhiban.rebuild.foundation.sha256
+import com.zhiban.rebuild.provider.CapabilitySnapshot
+import com.zhiban.rebuild.provider.ModelEvent
+import com.zhiban.rebuild.provider.ModelMessage
+import com.zhiban.rebuild.provider.ModelRequest
+import com.zhiban.rebuild.provider.OutboundChannel
+import com.zhiban.rebuild.provider.OutboundProvenance
+import com.zhiban.rebuild.provider.OutboundPurpose
+import com.zhiban.rebuild.provider.OutboundSensitivity
+import com.zhiban.rebuild.provider.ProviderAdapter
+import com.zhiban.rebuild.provider.ProviderFailure
+import com.zhiban.rebuild.provider.ProviderModelPolicy
+import com.zhiban.rebuild.provider.ProviderProfile
+import com.zhiban.rebuild.provider.ProviderProfileStore
 import com.zhiban.rebuild.runtime.context.ContextBlock
 import com.zhiban.rebuild.runtime.context.ContextKind
 import com.zhiban.rebuild.runtime.context.ContextLayer
@@ -18,32 +38,16 @@ import com.zhiban.rebuild.runtime.context.PromptBudget
 import com.zhiban.rebuild.runtime.context.QueryContext
 import com.zhiban.rebuild.runtime.context.RoomContextRetrievalPipeline
 import com.zhiban.rebuild.runtime.context.RoomPerceptionPipeline
-import com.zhiban.rebuild.runtime.context.Sensitivity
 import com.zhiban.rebuild.runtime.context.TrustLevel
 import com.zhiban.rebuild.runtime.context.reranked
 import com.zhiban.rebuild.runtime.context.resolveCalendarStartEpochMs
 import com.zhiban.rebuild.runtime.context.withDegradations
-import com.zhiban.rebuild.runtime.governance.AutoWritePresentationRegistry
 import com.zhiban.rebuild.runtime.governance.ChangeUndoCoordinator
 import com.zhiban.rebuild.runtime.governance.ContactDomainWriter
 import com.zhiban.rebuild.runtime.governance.ContactIdentityResolutionDomainWriter
 import com.zhiban.rebuild.runtime.governance.RelationshipDomainWriter
 import com.zhiban.rebuild.runtime.memory.RoomMemoryGate
 import com.zhiban.rebuild.runtime.network.NetworkQuality
-import com.zhiban.rebuild.runtime.provider.CapabilitySnapshot
-import com.zhiban.rebuild.runtime.provider.ModelEvent
-import com.zhiban.rebuild.runtime.provider.ModelMessage
-import com.zhiban.rebuild.runtime.provider.ModelRequest
-import com.zhiban.rebuild.runtime.provider.OutboundChannel
-import com.zhiban.rebuild.runtime.provider.OutboundProvenance
-import com.zhiban.rebuild.runtime.provider.OutboundPurpose
-import com.zhiban.rebuild.runtime.provider.OutboundSensitivity
-import com.zhiban.rebuild.runtime.provider.ProviderAdapter
-import com.zhiban.rebuild.runtime.provider.ProviderFailure
-import com.zhiban.rebuild.runtime.provider.ProviderModelPolicy
-import com.zhiban.rebuild.runtime.provider.ProviderProfile
-import com.zhiban.rebuild.runtime.provider.ProviderProfileStore
-import com.zhiban.rebuild.runtime.runSuspendCatching
 import com.zhiban.rebuild.runtime.spi.RuntimeRunStatus
 import com.zhiban.rebuild.runtime.store.AttemptStartRequest
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
@@ -100,7 +104,6 @@ import com.zhiban.rebuild.runtime.tool.canonicalMemoryIdempotencyKey
 import com.zhiban.rebuild.runtime.tool.canonicalScheduleDigest
 import com.zhiban.rebuild.runtime.tool.canonicalToolIdempotencyKey
 import com.zhiban.rebuild.runtime.tool.locationToolBindings
-import com.zhiban.rebuild.runtime.tool.sha256
 import java.io.IOException
 import java.time.Instant
 import java.time.ZoneId
@@ -154,11 +157,11 @@ internal data class ProviderEngineConfig(
     val toolExecutionTimeoutMs: Long = DEFAULT_TOOL_EXECUTION_TIMEOUT_MS,
     val personalization: () -> String? = { null },
     val ownerProfile: () -> ContactOwnerProfileSnapshot = { ContactOwnerProfileSnapshot() },
-    val memoryPolicy: () -> com.zhiban.rebuild.runtime.config.MemoryPolicy = {
-        com.zhiban.rebuild.runtime.config.MemoryPolicy()
+    val memoryPolicy: () -> com.zhiban.rebuild.data.config.MemoryPolicy = {
+        com.zhiban.rebuild.data.config.MemoryPolicy()
     },
-    val feedbackPolicy: () -> com.zhiban.rebuild.runtime.config.FeedbackPolicy = {
-        com.zhiban.rebuild.runtime.config.FeedbackPolicy()
+    val feedbackPolicy: () -> com.zhiban.rebuild.data.config.FeedbackPolicy = {
+        com.zhiban.rebuild.data.config.FeedbackPolicy()
     },
     val toolEnabled: (String) -> Boolean = { true },
     val webSearchOptIn: () -> Boolean = { false },
@@ -168,8 +171,8 @@ internal data class ProviderEngineConfig(
     val dynamicConfig: () -> com.zhiban.rebuild.runtime.config.AgentDynamicConfig = {
         com.zhiban.rebuild.runtime.config.AgentDynamicConfig()
     },
-    val executionPreference: () -> com.zhiban.rebuild.runtime.config.ExecutionPreference = {
-        com.zhiban.rebuild.runtime.config.ExecutionPreference.BALANCED
+    val executionPreference: () -> com.zhiban.rebuild.data.config.ExecutionPreference = {
+        com.zhiban.rebuild.data.config.ExecutionPreference.BALANCED
     },
     val skillSpecs: () -> List<SkillSpec> = { com.zhiban.agent.skills.BuiltInSkills.all },
     val onScheduleSaved: (com.zhiban.rebuild.data.agent.ScheduleEntity) -> Unit = {},
@@ -184,8 +187,8 @@ internal data class ProviderEngineInfrastructure(
     val communicationHandoffLauncher: com.zhiban.rebuild.data.communication.CommunicationHandoffLauncher? = null,
     val externalCalendarConflicts: com.zhiban.rebuild.data.calendar.ExternalCalendarConflictSource? = null,
     val perception: PerceptionGateway? = null,
-    val webSearchGateway: com.zhiban.rebuild.runtime.provider.WebSearchGateway? = null,
-    val locationGateway: com.zhiban.rebuild.runtime.provider.LocationGateway? = null,
+    val webSearchGateway: com.zhiban.rebuild.provider.WebSearchGateway? = null,
+    val locationGateway: com.zhiban.rebuild.provider.LocationGateway? = null,
     /**
      * 定位读取的用户同意开关(设置 → 隐私与安全 → 定位,默认关)。null/未接线一律视为未同意——
      * 位置数据默认不出云,宁可不读也不静默外发。
@@ -209,8 +212,8 @@ internal class ProviderExecutionEngine(
     internal val leaseDurationMs: Long = config.leaseDurationMs
     internal val rerankTimeoutMs: Long = config.rerankTimeoutMs
     private val personalization: () -> String? = config.personalization
-    internal val memoryPolicy: () -> com.zhiban.rebuild.runtime.config.MemoryPolicy = config.memoryPolicy
-    private val feedbackPolicy: () -> com.zhiban.rebuild.runtime.config.FeedbackPolicy = config.feedbackPolicy
+    internal val memoryPolicy: () -> com.zhiban.rebuild.data.config.MemoryPolicy = config.memoryPolicy
+    private val feedbackPolicy: () -> com.zhiban.rebuild.data.config.FeedbackPolicy = config.feedbackPolicy
     internal val toolEnabled: (String) -> Boolean = config.toolEnabled
     private val webSearchOptIn: () -> Boolean = config.webSearchOptIn
     private val networkQuality: () -> com.zhiban.rebuild.runtime.network.NetworkQuality = config.networkQuality
@@ -560,7 +563,7 @@ internal class ProviderExecutionEngine(
         queryContext: QueryContext,
         currentNetwork: com.zhiban.rebuild.runtime.network.NetworkQuality,
         config: com.zhiban.rebuild.runtime.config.AgentDynamicConfig,
-        policy: com.zhiban.rebuild.runtime.config.MemoryPolicy,
+        policy: com.zhiban.rebuild.data.config.MemoryPolicy,
     ): ContextRetrievalResult = runSuspendCatching {
         retrievalPipeline.retrieve(
             text,
@@ -607,7 +610,7 @@ internal class ProviderExecutionEngine(
 
     internal suspend fun loadMemoryContext(
         initialRetrieval: ContextRetrievalResult,
-        policy: com.zhiban.rebuild.runtime.config.MemoryPolicy,
+        policy: com.zhiban.rebuild.data.config.MemoryPolicy,
         sessionId: String,
         runId: String,
     ): MemoryContext {
@@ -773,7 +776,7 @@ internal class ProviderExecutionEngine(
             },
             allowWebSearch = forcedToolName == null && "web_search" in capability.features && webSearchOptIn(),
             attachments = input.attachments.map { attachment ->
-                com.zhiban.rebuild.runtime.provider.ModelAttachment(
+                com.zhiban.rebuild.provider.ModelAttachment(
                     attachment.attachmentId, attachment.kind, attachment.mimeType, attachment.byteLength,
                     attachment.digest, attachment.contentRef, attachment.expiresAtEpochMs,
                     OutboundSensitivity.SENSITIVE,

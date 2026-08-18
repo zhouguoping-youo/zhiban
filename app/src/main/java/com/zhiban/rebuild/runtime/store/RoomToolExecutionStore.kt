@@ -11,11 +11,14 @@ import com.zhiban.rebuild.data.agent.PlanRunEntity
 import com.zhiban.rebuild.data.agent.PlanVersionEntity
 import com.zhiban.rebuild.data.agent.ScheduleEntity
 import com.zhiban.rebuild.data.agent.ToolAuditEntity
+import com.zhiban.rebuild.data.autowrite.ChangeLogEntity
 import com.zhiban.rebuild.data.contact.StagedContactCandidateEntity
-import com.zhiban.rebuild.runtime.context.FactEntity
-import com.zhiban.rebuild.runtime.context.FactIndex
-import com.zhiban.rebuild.runtime.context.StagedMemoryCandidateEntity
-import com.zhiban.rebuild.runtime.governance.ChangeLogEntity
+import com.zhiban.rebuild.data.facts.FactEntity
+import com.zhiban.rebuild.data.facts.FactIndex
+import com.zhiban.rebuild.data.memory.StagedMemoryCandidateEntity
+import com.zhiban.rebuild.data.store.RuntimeEventEntity
+import com.zhiban.rebuild.data.store.RuntimeToolExecutionEntity
+import com.zhiban.rebuild.foundation.sha256
 import com.zhiban.rebuild.runtime.governance.ChangeUndoCoordinator
 import com.zhiban.rebuild.runtime.governance.ContactCreateCandidateCall
 import com.zhiban.rebuild.runtime.governance.RelationshipCandidateCall
@@ -34,7 +37,6 @@ import com.zhiban.rebuild.runtime.spi.RuntimeUiCommand
 import com.zhiban.rebuild.runtime.tool.CalendarMutationToolBinding
 import com.zhiban.rebuild.runtime.tool.MemoryRememberToolCall
 import com.zhiban.rebuild.runtime.tool.ScheduleCreateToolCall
-import com.zhiban.rebuild.runtime.tool.sha256
 import java.security.MessageDigest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json

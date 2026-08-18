@@ -69,6 +69,7 @@ import androidx.compose.ui.unit.sp
 import com.zhiban.rebuild.R
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.ScheduleInsight
+import com.zhiban.rebuild.data.store.ConversationSummary
 import com.zhiban.rebuild.ui.components.localizedQuantity
 import com.zhiban.rebuild.ui.theme.*
 import kotlin.math.abs
@@ -126,7 +127,7 @@ fun AgentConversationScreen(
     availableLevels: List<String> = listOf("深入", "标准", "快速"),
     onModelSelect: (String) -> Unit = {},
     onLevelSelect: (String) -> Unit = {},
-    conversationHistory: List<com.zhiban.rebuild.runtime.store.ConversationSummary> = emptyList(),
+    conversationHistory: List<com.zhiban.rebuild.data.store.ConversationSummary> = emptyList(),
     onLoadHistory: () -> Unit = {},
     onOpenConversation: (String) -> Unit = {},
     onDeleteConversation: (String) -> Unit = {},

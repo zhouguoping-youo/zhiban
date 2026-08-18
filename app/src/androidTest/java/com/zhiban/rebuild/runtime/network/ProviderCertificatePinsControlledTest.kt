@@ -1,8 +1,8 @@
 package com.zhiban.rebuild.runtime.network
 
 import androidx.test.platform.app.InstrumentationRegistry
-import com.zhiban.rebuild.runtime.provider.ProviderProfile
-import com.zhiban.rebuild.runtime.provider.TrustedProviderRegistry
+import com.zhiban.rebuild.provider.ProviderProfile
+import com.zhiban.rebuild.provider.TrustedProviderRegistry
 import java.net.URI
 import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient

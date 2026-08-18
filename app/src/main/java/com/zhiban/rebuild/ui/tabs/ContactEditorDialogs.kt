@@ -118,11 +118,11 @@ import com.zhiban.rebuild.data.contact.RelationshipEventWithParticipants
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.data.contact.SystemContactCandidate
 import com.zhiban.rebuild.data.contact.SystemContactWriteIntent
+import com.zhiban.rebuild.data.facts.FactEntity
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.OutgoingMessageAccessibilityService
 import com.zhiban.rebuild.data.notification.ScheduleInsight
 import com.zhiban.rebuild.relationship.RelationshipGroup
-import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.personalization.UserProfile
 import com.zhiban.rebuild.ui.components.ZhiBanChip
@@ -227,14 +227,11 @@ internal fun ContactImportDialog(state: ContactImportUiState, onDismiss: () -> U
                             onImport = onImport,
                         )
                     }
-
                 }
             }
         }
     }
 }
-
-
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
@@ -388,127 +385,119 @@ internal fun String.firstKnownTag(): String? = ContactCategoryTags.firstOrNull {
     }
 
 @Composable
-private fun ImportSelectionSection(
-    state: ContactImportUiState,
-    selected: Set<String>,
-    setSelected: (Set<String>) -> Unit,
-    onImport: (Set<String>) -> Unit,
-) {
-
-        Row(
-            Modifier.fillMaxWidth().toggleable(
-                value = selected.size == state.contacts.size,
-                role = Role.Checkbox,
-                onValueChange = {
-                    setSelected(
-                        if (selected.size == state.contacts.size) {
-                            emptySet()
-                        } else {
-                            state.contacts.map(SystemContactCandidate::sourceId).toSet()
-                        },
+private fun ImportSelectionSection(state: ContactImportUiState, selected: Set<String>, setSelected: (Set<String>) -> Unit, onImport: (Set<String>) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().toggleable(
+            value = selected.size == state.contacts.size,
+            role = Role.Checkbox,
+            onValueChange = {
+                setSelected(
+                    if (selected.size == state.contacts.size) {
+                        emptySet()
+                    } else {
+                        state.contacts.map(SystemContactCandidate::sourceId).toSet()
+                    },
+                )
+            },
+        ).padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(
+            checked = selected.size == state.contacts.size,
+            onCheckedChange = null,
+        )
+        Text("全选", modifier = Modifier.weight(1f), color = RelationInk)
+        Text(
+            localizedQuantity(R.plurals.selected_contact_count, selected.size),
+            color = RelationMuted,
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+    Box(Modifier.fillMaxWidth().height(1.dp).background(RelationLine))
+    LazyColumn(Modifier.fillMaxWidth().heightIn(max = 380.dp)) {
+        items(state.contacts.size, key = { state.contacts[it].sourceId }) { index ->
+            val contact = state.contacts[index]
+            val checked = contact.sourceId in selected
+            Row(
+                Modifier.fillMaxWidth().toggleable(
+                    value = checked,
+                    role = Role.Checkbox,
+                    onValueChange = {
+                        setSelected(if (checked) selected - contact.sourceId else selected + contact.sourceId)
+                    },
+                ).padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(checked = checked, onCheckedChange = null)
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        contact.displayName,
+                        color = RelationInk,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                },
-            ).padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Checkbox(
-                checked = selected.size == state.contacts.size,
-                onCheckedChange = null,
-            )
-            Text("全选", modifier = Modifier.weight(1f), color = RelationInk)
-            Text(
-                localizedQuantity(R.plurals.selected_contact_count, selected.size),
-                color = RelationMuted,
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
-        Box(Modifier.fillMaxWidth().height(1.dp).background(RelationLine))
-        LazyColumn(Modifier.fillMaxWidth().heightIn(max = 380.dp)) {
-            items(state.contacts.size, key = { state.contacts[it].sourceId }) { index ->
-                val contact = state.contacts[index]
-                val checked = contact.sourceId in selected
-                Row(
-                    Modifier.fillMaxWidth().toggleable(
-                        value = checked,
-                        role = Role.Checkbox,
-                        onValueChange = {
-                            setSelected(if (checked) selected - contact.sourceId else selected + contact.sourceId)
-                        },
-                    ).padding(vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Checkbox(checked = checked, onCheckedChange = null)
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            contact.displayName,
-                            color = RelationInk,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        val detail = listOfNotNull(contact.phones.firstOrNull(), contact.company)
-                            .joinToString(" · ").ifBlank { "没有电话或公司信息" }
-                        Text(
-                            detail,
-                            color = RelationMuted,
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                    val detail = listOfNotNull(contact.phones.firstOrNull(), contact.company)
+                        .joinToString(" · ").ifBlank { "没有电话或公司信息" }
+                    Text(
+                        detail,
+                        color = RelationMuted,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }
-        Text(
-            "只会保存你勾选的联系人；不会修改手机通讯录。",
-            color = RelationMuted,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(vertical = 10.dp),
-        )
-        Button(
-            onClick = { onImport(selected) },
-            enabled = selected.isNotEmpty() && !state.isImporting,
-            modifier = Modifier.fillMaxWidth().height(ZhiBanSize.Control),
-            colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
-            shape = RoundedCornerShape(ZhiBanRadius.Card),
-        ) {
-            if (state.isImporting) {
-                CircularProgressIndicator(
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    strokeWidth = 2.dp,
-                    modifier = Modifier.size(20.dp),
-                )
-            } else {
-                Text(localizedQuantity(R.plurals.import_contact_count, selected.size))
-            }
+    }
+    Text(
+        "只会保存你勾选的联系人；不会修改手机通讯录。",
+        color = RelationMuted,
+        style = MaterialTheme.typography.bodySmall,
+        modifier = Modifier.padding(vertical = 10.dp),
+    )
+    Button(
+        onClick = { onImport(selected) },
+        enabled = selected.isNotEmpty() && !state.isImporting,
+        modifier = Modifier.fillMaxWidth().height(ZhiBanSize.Control),
+        colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
+        shape = RoundedCornerShape(ZhiBanRadius.Card),
+    ) {
+        if (state.isImporting) {
+            CircularProgressIndicator(
+                color = MaterialTheme.colorScheme.onPrimary,
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(20.dp),
+            )
+        } else {
+            Text(localizedQuantity(R.plurals.import_contact_count, selected.size))
         }
+    }
 }
 
 @Composable
 private fun ImportDialogHeader(state: ContactImportUiState, onDismiss: () -> Unit) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(
-                onClick = onDismiss,
-                enabled = !state.isImporting,
-                modifier = Modifier.size(ZhiBanIconContainer.TouchTarget),
-            ) {
-                Icon(Icons.Rounded.Close, "关闭")
-            }
-            Column(Modifier.weight(1f)) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        IconButton(
+            onClick = onDismiss,
+            enabled = !state.isImporting,
+            modifier = Modifier.size(ZhiBanIconContainer.TouchTarget),
+        ) {
+            Icon(Icons.Rounded.Close, "关闭")
+        }
+        Column(Modifier.weight(1f)) {
+            Text(
+                "从手机通讯录导入",
+                color = RelationInk,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            if (state.rowsRead > 0) {
                 Text(
-                    "从手机通讯录导入",
-                    color = RelationInk,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
+                    "手机返回 ${localizedQuantity(R.plurals.contact_count, state.contacts.size)}",
+                    color = RelationMuted,
+                    style = MaterialTheme.typography.bodySmall,
                 )
-                if (state.rowsRead > 0) {
-                    Text(
-                        "手机返回 ${localizedQuantity(R.plurals.contact_count, state.contacts.size)}",
-                        color = RelationMuted,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
             }
         }
+    }
 }
-
-

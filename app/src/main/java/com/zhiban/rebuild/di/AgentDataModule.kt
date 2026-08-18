@@ -8,7 +8,9 @@ import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.AgentDatabaseEncryption
 import com.zhiban.rebuild.data.agent.AgentDatabaseKeyManager
 import com.zhiban.rebuild.data.agent.MigratingSqlCipherOpenHelperFactory
-import com.zhiban.rebuild.runtime.governance.insertVisibleAutoWrite
+import com.zhiban.rebuild.data.autowrite.insertVisibleAutoWrite
+import com.zhiban.rebuild.data.config.AgentControlStore
+import com.zhiban.rebuild.data.facts.FactIndex
 import com.zhiban.rebuild.runtime.input.AndroidAttachmentContentSource
 import com.zhiban.rebuild.runtime.input.AppPrivateAttachmentStager
 import com.zhiban.rebuild.runtime.input.AttachmentContentSource
@@ -141,8 +143,13 @@ object AgentDataModule {
         com.zhiban.rebuild.data.agent.RoomAgentTransactionRunner(database)
 
     @Provides
-    internal fun provideFactIndex(database: AgentDatabase): com.zhiban.rebuild.runtime.context.FactIndex =
-        com.zhiban.rebuild.runtime.context.FactIndex(database)
+    internal fun provideFactIndex(database: AgentDatabase): com.zhiban.rebuild.data.facts.FactIndex = com.zhiban.rebuild.data.facts.FactIndex(database)
+
+    @Provides
+    @Singleton
+    internal fun provideChangeUndoApplier(
+        impl: com.zhiban.rebuild.runtime.governance.ChangeUndoApplierImpl,
+    ): com.zhiban.rebuild.data.autowrite.ChangeUndoApplier = impl
 
     @Provides
     internal fun provideAutoWriteSink(database: AgentDatabase): com.zhiban.rebuild.data.agent.AutoWriteSink =
@@ -154,7 +161,7 @@ object AgentDataModule {
     internal fun provideAgentRepositoryInfrastructure(
         daos: com.zhiban.rebuild.data.agent.AgentDataDaos,
         transactions: com.zhiban.rebuild.data.agent.AgentTransactionRunner,
-        factIndex: com.zhiban.rebuild.runtime.context.FactIndex,
+        factIndex: com.zhiban.rebuild.data.facts.FactIndex,
         autoWriteSink: com.zhiban.rebuild.data.agent.AutoWriteSink,
     ): com.zhiban.rebuild.data.agent.AgentRepositoryInfrastructure =
         com.zhiban.rebuild.data.agent.AgentRepositoryInfrastructure(daos, transactions, factIndex, autoWriteSink)
@@ -226,11 +233,11 @@ object AgentDataModule {
     internal fun provideKernelCommandProcessor(
         database: AgentDatabase,
         flag: RuntimeV2FeatureFlag,
-        provider: com.zhiban.rebuild.runtime.provider.ProviderAdapter,
-        profiles: com.zhiban.rebuild.runtime.provider.ProviderProfileStore,
+        provider: com.zhiban.rebuild.provider.ProviderAdapter,
+        profiles: com.zhiban.rebuild.provider.ProviderProfileStore,
         personalization: AgentPersonalizationStore,
         userProfile: com.zhiban.rebuild.runtime.personalization.UserProfileStore,
-        controls: com.zhiban.rebuild.runtime.config.AgentControlStore,
+        controls: com.zhiban.rebuild.data.config.AgentControlStore,
         mcpEnvironment: com.zhiban.rebuild.runtime.mcp.McpRemoteEnvironment,
         collectionPreferences: com.zhiban.rebuild.data.notification.MessageCollectionPreferences,
         embeddingGateway: com.zhiban.rebuild.runtime.context.EmbeddingGateway,
@@ -240,8 +247,8 @@ object AgentDataModule {
         skillPackages: com.zhiban.rebuild.runtime.skills.SkillPackageManager,
         communicationHandoffLauncher: com.zhiban.rebuild.data.communication.CommunicationHandoffLauncher,
         systemCalendarReader: com.zhiban.rebuild.data.calendar.SystemCalendarReader,
-        webSearchGateway: com.zhiban.rebuild.runtime.provider.WebSearchGateway,
-        locationGateway: com.zhiban.rebuild.runtime.provider.LocationGateway,
+        webSearchGateway: com.zhiban.rebuild.provider.WebSearchGateway,
+        locationGateway: com.zhiban.rebuild.provider.LocationGateway,
     ): KernelCommandProcessor = KernelCommandProcessor(
         database,
         ownerId = "app-process",
@@ -306,7 +313,7 @@ object AgentDataModule {
 
     @Provides
     @Singleton
-    internal fun provideLocationGateway(@ApplicationContext context: Context): com.zhiban.rebuild.runtime.provider.LocationGateway =
+    internal fun provideLocationGateway(@ApplicationContext context: Context): com.zhiban.rebuild.provider.LocationGateway =
         com.zhiban.rebuild.data.location.SystemLocationGateway(context)
 
     @Provides
@@ -320,7 +327,7 @@ object AgentDataModule {
     internal fun provideReplySuggestionRepository(
         database: AgentDatabase,
         deliveryExecutor: com.zhiban.rebuild.data.reply.ReplyDeliveryExecutor,
-        controls: com.zhiban.rebuild.runtime.config.AgentControlStore,
+        controls: com.zhiban.rebuild.data.config.AgentControlStore,
     ): com.zhiban.rebuild.data.reply.ReplySuggestionRepository = com.zhiban.rebuild.data.reply.ReplySuggestionRepository(database, deliveryExecutor, controls)
 
     @Provides
@@ -342,7 +349,7 @@ object AgentDataModule {
         database: AgentDatabase,
         handoff: com.zhiban.rebuild.data.completion.CompletionHandoff,
         outreachGenerator: com.zhiban.rebuild.data.completion.ContactCompletionOutreachGenerator,
-        controls: com.zhiban.rebuild.runtime.config.AgentControlStore,
+        controls: com.zhiban.rebuild.data.config.AgentControlStore,
     ): com.zhiban.rebuild.data.completion.ContactCompletionRepository =
         com.zhiban.rebuild.data.completion.ContactCompletionRepository(database, handoff, outreachGenerator, controls)
 

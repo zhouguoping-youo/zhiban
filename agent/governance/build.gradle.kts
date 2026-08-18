@@ -8,6 +8,7 @@ kotlin {
     compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) }
 }
 dependencies {
+    implementation(project(":agent:contracts"))
     implementation(project(":agent:tools"))
     testImplementation(libs.junit)
 }

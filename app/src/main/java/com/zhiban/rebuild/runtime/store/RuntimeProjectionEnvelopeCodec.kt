@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.runtime.store
 
+import com.zhiban.rebuild.data.store.RuntimeProjectionEntity
 import com.zhiban.rebuild.runtime.spi.RUNTIME_SCHEMA_VERSION
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject

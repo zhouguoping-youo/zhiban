@@ -1,6 +1,6 @@
 package com.zhiban.rebuild.data.contact
 
-import com.zhiban.rebuild.runtime.tool.sha256
+import com.zhiban.rebuild.foundation.sha256
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json

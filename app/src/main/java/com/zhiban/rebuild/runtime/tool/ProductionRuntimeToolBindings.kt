@@ -1,7 +1,8 @@
 package com.zhiban.rebuild.runtime.tool
 
 import com.zhiban.rebuild.data.notification.NotificationInsightAnalyzer
-import com.zhiban.rebuild.runtime.provider.ProviderFailure
+import com.zhiban.rebuild.foundation.RuntimeToolSpec
+import com.zhiban.rebuild.provider.ProviderFailure
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject

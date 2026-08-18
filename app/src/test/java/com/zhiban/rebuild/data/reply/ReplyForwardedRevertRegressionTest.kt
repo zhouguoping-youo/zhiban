@@ -1,9 +1,9 @@
 package com.zhiban.rebuild.data.reply
 
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.config.AgentControlStore
 import com.zhiban.rebuild.data.notification.NotificationCandidateDao
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
-import com.zhiban.rebuild.runtime.config.AgentControlStore
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk

@@ -12,5 +12,6 @@ kotlin {
 }
 
 dependencies {
+    implementation(project(":agent:contracts"))
     testImplementation(libs.junit)
 }

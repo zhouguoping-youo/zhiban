@@ -1,5 +1,7 @@
 package com.zhiban.rebuild.runtime.tool
 
+import com.zhiban.rebuild.foundation.RuntimeToolRisk
+
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

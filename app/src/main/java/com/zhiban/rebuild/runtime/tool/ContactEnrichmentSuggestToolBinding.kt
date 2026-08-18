@@ -4,6 +4,7 @@ import com.zhiban.rebuild.data.contact.ContactDao
 import com.zhiban.rebuild.data.contact.ContactEnrichmentCandidateEntity
 import com.zhiban.rebuild.data.contact.ContactKnowledgeDao
 import com.zhiban.rebuild.data.contact.enrichment.ContactEnrichmentField
+import com.zhiban.rebuild.foundation.RuntimeToolSpec
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 

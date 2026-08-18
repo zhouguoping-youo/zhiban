@@ -5,11 +5,11 @@ import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.zhiban.rebuild.runtime.provider.AppPrivateProviderAttachmentResolver
-import com.zhiban.rebuild.runtime.provider.ModelAttachment
-import com.zhiban.rebuild.runtime.provider.OutboundProvenance
-import com.zhiban.rebuild.runtime.provider.OutboundPurpose
-import com.zhiban.rebuild.runtime.provider.OutboundSensitivity
+import com.zhiban.rebuild.provider.AppPrivateProviderAttachmentResolver
+import com.zhiban.rebuild.provider.ModelAttachment
+import com.zhiban.rebuild.provider.OutboundProvenance
+import com.zhiban.rebuild.provider.OutboundPurpose
+import com.zhiban.rebuild.provider.OutboundSensitivity
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream

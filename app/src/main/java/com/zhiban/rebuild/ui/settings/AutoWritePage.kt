@@ -33,9 +33,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.zhiban.rebuild.data.agent.AgentDataRepository
+import com.zhiban.rebuild.data.autowrite.AutoWriteReceiptRow
+import com.zhiban.rebuild.data.autowrite.AutoWriteRepository
 import com.zhiban.rebuild.data.contact.ContactEntity
-import com.zhiban.rebuild.runtime.governance.AutoWriteReceiptRow
-import com.zhiban.rebuild.runtime.governance.AutoWriteRepository
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar

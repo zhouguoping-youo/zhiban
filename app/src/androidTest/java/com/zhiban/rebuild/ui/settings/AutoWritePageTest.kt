@@ -5,7 +5,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.zhiban.rebuild.runtime.governance.AutoWriteReceiptRow
+import com.zhiban.rebuild.data.autowrite.AutoWriteReceiptRow
 import com.zhiban.rebuild.ui.theme.ZhiBanTheme
 import org.junit.Rule
 import org.junit.Test

@@ -67,6 +67,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.zhiban.rebuild.data.store.ConversationSummary
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanBottomSheet
 import com.zhiban.rebuild.ui.theme.*
@@ -78,7 +79,7 @@ private val AgentAccent = ZhiBanTerracotta
 
 @Composable
 internal fun ConversationHistoryDialog(
-    items: List<com.zhiban.rebuild.runtime.store.ConversationSummary>,
+    items: List<com.zhiban.rebuild.data.store.ConversationSummary>,
     onOpen: (String) -> Unit,
     onDelete: (String) -> Unit,
     onDismiss: () -> Unit,

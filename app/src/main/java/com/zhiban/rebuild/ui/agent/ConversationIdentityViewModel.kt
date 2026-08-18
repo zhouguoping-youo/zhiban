@@ -2,9 +2,9 @@ package com.zhiban.rebuild.ui.agent
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.zhiban.rebuild.foundation.runSuspendCatching
 import com.zhiban.rebuild.runtime.personalization.UserProfile
 import com.zhiban.rebuild.runtime.personalization.UserProfileStore
-import com.zhiban.rebuild.runtime.runSuspendCatching
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted

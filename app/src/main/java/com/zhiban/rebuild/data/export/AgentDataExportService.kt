@@ -12,8 +12,8 @@ import com.zhiban.rebuild.data.crm.CrmActivityEntity
 import com.zhiban.rebuild.data.crm.CrmLeadEntity
 import com.zhiban.rebuild.data.crm.CrmNextActionEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
-import com.zhiban.rebuild.runtime.provider.SecretRedactor
-import com.zhiban.rebuild.runtime.store.RuntimeConversationTurnEntity
+import com.zhiban.rebuild.data.store.RuntimeConversationTurnEntity
+import com.zhiban.rebuild.provider.SecretRedactor
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import javax.inject.Inject

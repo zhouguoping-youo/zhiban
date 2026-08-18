@@ -1,9 +1,9 @@
 package com.zhiban.rebuild.runtime.governance
 
-import com.zhiban.rebuild.runtime.provider.OutboundAuditEvent
-import com.zhiban.rebuild.runtime.provider.OutboundChannel
-import com.zhiban.rebuild.runtime.provider.OutboundPurpose
-import com.zhiban.rebuild.runtime.provider.OutboundSensitivity
+import com.zhiban.rebuild.provider.OutboundAuditEvent
+import com.zhiban.rebuild.provider.OutboundChannel
+import com.zhiban.rebuild.provider.OutboundPurpose
+import com.zhiban.rebuild.provider.OutboundSensitivity
 import java.time.Instant
 import java.time.ZoneId
 import org.junit.Assert.assertEquals

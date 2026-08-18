@@ -1,4 +1,4 @@
-package com.zhiban.rebuild.runtime.provider
+package com.zhiban.rebuild.provider
 
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit

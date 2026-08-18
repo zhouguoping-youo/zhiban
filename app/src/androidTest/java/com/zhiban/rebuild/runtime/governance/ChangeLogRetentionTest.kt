@@ -1,5 +1,7 @@
 package com.zhiban.rebuild.runtime.governance
 
+import com.zhiban.rebuild.data.autowrite.ChangeLogEntity
+
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider

@@ -1,14 +1,16 @@
 package com.zhiban.rebuild.runtime.context
 
+import com.zhiban.rebuild.foundation.Sensitivity
+
+import com.zhiban.rebuild.provider.CapabilitySnapshot
+import com.zhiban.rebuild.provider.DefaultOutboundDataPolicy
+import com.zhiban.rebuild.provider.ModelEvent
+import com.zhiban.rebuild.provider.ModelRequest
+import com.zhiban.rebuild.provider.OutboundChannel
+import com.zhiban.rebuild.provider.PolicyEnforcingProviderAdapter
+import com.zhiban.rebuild.provider.ProviderAdapter
+import com.zhiban.rebuild.provider.ProviderProfile
 import com.zhiban.rebuild.runtime.kernel.ProviderRetrievalReranker
-import com.zhiban.rebuild.runtime.provider.CapabilitySnapshot
-import com.zhiban.rebuild.runtime.provider.DefaultOutboundDataPolicy
-import com.zhiban.rebuild.runtime.provider.ModelEvent
-import com.zhiban.rebuild.runtime.provider.ModelRequest
-import com.zhiban.rebuild.runtime.provider.OutboundChannel
-import com.zhiban.rebuild.runtime.provider.PolicyEnforcingProviderAdapter
-import com.zhiban.rebuild.runtime.provider.ProviderAdapter
-import com.zhiban.rebuild.runtime.provider.ProviderProfile
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals

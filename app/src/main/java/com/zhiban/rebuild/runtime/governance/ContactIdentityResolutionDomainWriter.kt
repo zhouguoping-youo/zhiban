@@ -4,19 +4,20 @@ import androidx.room.withTransaction
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.ToolAuditEntity
 import com.zhiban.rebuild.data.agent.stableContactKnowledgeId
+import com.zhiban.rebuild.data.autowrite.ChangeLogEntity
 import com.zhiban.rebuild.data.contact.ContactPlatformIdentityEntity
 import com.zhiban.rebuild.data.contact.PersonEntity
 import com.zhiban.rebuild.data.contact.SourceIdentityEntity
+import com.zhiban.rebuild.data.store.RuntimeEventEntity
+import com.zhiban.rebuild.data.store.RuntimeToolExecutionEntity
+import com.zhiban.rebuild.foundation.changeIdFor
+import com.zhiban.rebuild.foundation.sha256
 import com.zhiban.rebuild.runtime.spi.RUNTIME_SCHEMA_VERSION
 import com.zhiban.rebuild.runtime.spi.RuntimeRunStatus
-import com.zhiban.rebuild.runtime.store.RuntimeEventEntity
-import com.zhiban.rebuild.runtime.store.RuntimeToolExecutionEntity
 import com.zhiban.rebuild.runtime.tool.ConfirmedToolExecutionContext
 import com.zhiban.rebuild.runtime.tool.SafeToolResult
 import com.zhiban.rebuild.runtime.tool.ToolConfirmation
 import com.zhiban.rebuild.runtime.tool.auditIdFor
-import com.zhiban.rebuild.runtime.tool.changeIdFor
-import com.zhiban.rebuild.runtime.tool.sha256
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 

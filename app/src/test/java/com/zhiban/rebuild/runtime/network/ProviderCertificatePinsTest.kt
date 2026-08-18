@@ -1,7 +1,7 @@
 package com.zhiban.rebuild.runtime.network
 
-import com.zhiban.rebuild.runtime.provider.ProviderProfile
-import com.zhiban.rebuild.runtime.provider.TrustedProviderRegistry
+import com.zhiban.rebuild.provider.ProviderProfile
+import com.zhiban.rebuild.provider.TrustedProviderRegistry
 import java.net.URI
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

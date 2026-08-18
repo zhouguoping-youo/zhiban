@@ -39,10 +39,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import com.zhiban.rebuild.runtime.config.AgentControlStore
-import com.zhiban.rebuild.runtime.config.ExecutionPreference
-import com.zhiban.rebuild.runtime.config.FeedbackPolicy
-import com.zhiban.rebuild.runtime.config.MemoryPolicy
+import com.zhiban.rebuild.data.config.AgentControlStore
+import com.zhiban.rebuild.data.config.ExecutionPreference
+import com.zhiban.rebuild.data.config.FeedbackPolicy
+import com.zhiban.rebuild.data.config.MemoryPolicy
+import com.zhiban.rebuild.data.config.PreferenceImprovementSuggestion
+import com.zhiban.rebuild.foundation.runSuspendCatching
+import com.zhiban.rebuild.provider.ProviderEnvironmentManager
 import com.zhiban.rebuild.runtime.mcp.McpRemoteEnvironment
 import com.zhiban.rebuild.runtime.mcp.McpRemoteServer
 import com.zhiban.rebuild.runtime.mcp.McpRemoteTool
@@ -53,8 +56,6 @@ import com.zhiban.rebuild.runtime.personalization.Personalization
 import com.zhiban.rebuild.runtime.personalization.ResponseStyle
 import com.zhiban.rebuild.runtime.personalization.UserProfile
 import com.zhiban.rebuild.runtime.personalization.UserProfileStore
-import com.zhiban.rebuild.runtime.provider.ProviderEnvironmentManager
-import com.zhiban.rebuild.runtime.runSuspendCatching
 import com.zhiban.rebuild.runtime.tool.RuntimeToolCatalog
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanChip
@@ -517,10 +518,7 @@ internal fun executionHint(preference: ExecutionPreference): String = when (pref
     ExecutionPreference.DEEP -> "复杂问题 · 检索更多上下文，耗时更长"
 }
 
-data class FeedbackState(
-    val policy: FeedbackPolicy = FeedbackPolicy(),
-    val suggestion: com.zhiban.rebuild.runtime.config.PreferenceImprovementSuggestion? = null,
-)
+data class FeedbackState(val policy: FeedbackPolicy = FeedbackPolicy(), val suggestion: com.zhiban.rebuild.data.config.PreferenceImprovementSuggestion? = null)
 
 @HiltViewModel
 class AgentFeedbackViewModel @Inject constructor(private val controls: AgentControlStore, private val personalization: AgentPersonalizationStore) :

@@ -1,13 +1,14 @@
 package com.zhiban.rebuild.runtime.observability
 
+import com.zhiban.rebuild.data.store.RuntimeEventEntity
+import com.zhiban.rebuild.data.store.RuntimeRunEntity
+import com.zhiban.rebuild.data.store.RuntimeSessionEntity
+
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
-import com.zhiban.rebuild.runtime.store.RuntimeEventEntity
-import com.zhiban.rebuild.runtime.store.RuntimeRunEntity
-import com.zhiban.rebuild.runtime.store.RuntimeSessionEntity
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertFalse

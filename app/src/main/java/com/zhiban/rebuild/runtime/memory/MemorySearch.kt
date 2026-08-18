@@ -2,6 +2,7 @@ package com.zhiban.rebuild.runtime.memory
 
 import androidx.room.withTransaction
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.memory.MemoryRecordEntity
 import com.zhiban.rebuild.runtime.context.attemptRetrieval
 import kotlin.math.ceil
 

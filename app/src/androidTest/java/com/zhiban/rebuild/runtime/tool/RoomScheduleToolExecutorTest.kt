@@ -1,5 +1,7 @@
 package com.zhiban.rebuild.runtime.tool
 
+import com.zhiban.rebuild.data.store.RuntimeAttemptEntity
+
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -11,7 +13,7 @@ import com.zhiban.rebuild.data.crm.CrmNextActionEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityStage
 import com.zhiban.rebuild.data.crm.CrmRecordStatus
-import com.zhiban.rebuild.runtime.context.FactIndex
+import com.zhiban.rebuild.data.facts.FactIndex
 import com.zhiban.rebuild.runtime.kernel.PersistentRuntimeKernel
 import com.zhiban.rebuild.runtime.kernel.RuntimeSignal
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
@@ -297,7 +299,7 @@ class RoomScheduleToolExecutorTest {
         kernel.transition("run", RuntimeSignal.ModelReady, "owner", lease.leaseEpoch, 5)
         kernel.transition("run", RuntimeSignal.PlanValidated, "owner", lease.leaseEpoch, 6)
         database.runtimeAttemptDao().insert(
-            com.zhiban.rebuild.runtime.store.RuntimeAttemptEntity("attempt", "run", 1, "ACTIVE", 6, 6),
+            com.zhiban.rebuild.data.store.RuntimeAttemptEntity("attempt", "run", 1, "ACTIVE", 6, 6),
         )
         database.openHelper.writableDatabase.execSQL(
             "UPDATE runtime_runs SET activeAttemptId = 'attempt' WHERE runId = 'run'",
@@ -321,7 +323,7 @@ class RoomScheduleToolExecutorTest {
         kernel.transition(runId, RuntimeSignal.ModelReady, "owner", lease.leaseEpoch, 5)
         kernel.transition(runId, RuntimeSignal.PlanValidated, "owner", lease.leaseEpoch, 6)
         database.runtimeAttemptDao().insert(
-            com.zhiban.rebuild.runtime.store.RuntimeAttemptEntity(attemptId, runId, 1, "ACTIVE", 6, 6),
+            com.zhiban.rebuild.data.store.RuntimeAttemptEntity(attemptId, runId, 1, "ACTIVE", 6, 6),
         )
         database.openHelper.writableDatabase.execSQL(
             "UPDATE runtime_runs SET activeAttemptId = '$attemptId' WHERE runId = '$runId'",

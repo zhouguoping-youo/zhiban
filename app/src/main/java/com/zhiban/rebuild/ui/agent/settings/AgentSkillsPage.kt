@@ -21,7 +21,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zhiban.agent.skills.BuiltInSkills
 import com.zhiban.agent.skills.SkillSpec
-import com.zhiban.rebuild.runtime.config.AgentControlStore
+import com.zhiban.rebuild.data.config.AgentControlStore
 import com.zhiban.rebuild.ui.components.ZhiBanGlassCard
 import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
 import com.zhiban.rebuild.ui.components.ZhiBanPage

@@ -1,7 +1,8 @@
 package com.zhiban.rebuild.runtime.kernel
 
 import android.util.Log
-import com.zhiban.rebuild.runtime.runSuspendCatching
+import com.zhiban.rebuild.foundation.runSuspendCatching
+import com.zhiban.rebuild.foundation.sha256
 import com.zhiban.rebuild.runtime.store.AttemptStartRequest
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
 import com.zhiban.rebuild.runtime.store.RuntimeEventDraft
@@ -9,7 +10,6 @@ import com.zhiban.rebuild.runtime.store.startObservationAttempt
 import com.zhiban.rebuild.runtime.tool.CapabilityRouter
 import com.zhiban.rebuild.runtime.tool.RoutedToolResult
 import com.zhiban.rebuild.runtime.tool.RuntimeToolRouteContext
-import com.zhiban.rebuild.runtime.tool.sha256
 
 /** Enforces explicitly requested read-only domains when a model ends observation too early. */
 internal class RequiredReadContinuation(

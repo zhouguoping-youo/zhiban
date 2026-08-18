@@ -1,7 +1,8 @@
 package com.zhiban.rebuild.runtime.tool
 
-import com.zhiban.rebuild.runtime.provider.ProviderFailure
-import com.zhiban.rebuild.runtime.runSuspendCatching
+import com.zhiban.rebuild.foundation.RuntimeToolSpec
+import com.zhiban.rebuild.foundation.runSuspendCatching
+import com.zhiban.rebuild.provider.ProviderFailure
 import com.zhiban.rebuild.runtime.store.ApprovedExternalToolReservationRequest
 import com.zhiban.rebuild.runtime.store.ApprovedToolExecutionRequest
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore

@@ -1,5 +1,8 @@
 package com.zhiban.rebuild.runtime.store
 
+import com.zhiban.rebuild.data.store.RuntimeAttemptEntity
+import com.zhiban.rebuild.data.store.RuntimeProjectionEntity
+
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider

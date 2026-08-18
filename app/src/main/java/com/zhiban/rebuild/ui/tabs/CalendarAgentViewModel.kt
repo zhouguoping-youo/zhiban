@@ -9,10 +9,10 @@ import com.zhiban.rebuild.data.calendar.SystemCalendarEvent
 import com.zhiban.rebuild.data.calendar.SystemCalendarReader
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.ScheduleInsight
+import com.zhiban.rebuild.foundation.runSuspendCatching
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrGateway
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrResult
-import com.zhiban.rebuild.runtime.runSuspendCatching
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.io.File
 import java.time.LocalDate

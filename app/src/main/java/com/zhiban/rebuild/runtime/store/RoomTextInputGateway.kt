@@ -1,6 +1,7 @@
 package com.zhiban.rebuild.runtime.store
 
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.store.RuntimeInputStagingEntity
 import com.zhiban.rebuild.runtime.spi.RuntimeV2DisabledException
 import com.zhiban.rebuild.runtime.spi.StagedTextInput
 import com.zhiban.rebuild.runtime.spi.TextInputGateway

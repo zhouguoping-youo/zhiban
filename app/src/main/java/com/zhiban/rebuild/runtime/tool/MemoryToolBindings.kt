@@ -2,6 +2,7 @@ package com.zhiban.rebuild.runtime.tool
 
 import com.zhiban.agent.memory.MemoryGate
 import com.zhiban.agent.memory.MemoryQuery
+import com.zhiban.rebuild.foundation.RuntimeToolSpec
 import com.zhiban.rebuild.runtime.tool.RoomMemoryToolExecutor.Companion.GLOBAL_NAMESPACE
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.add

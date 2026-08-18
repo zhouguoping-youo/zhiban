@@ -1,4 +1,4 @@
-package com.zhiban.rebuild.runtime.provider
+package com.zhiban.rebuild.provider
 
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException

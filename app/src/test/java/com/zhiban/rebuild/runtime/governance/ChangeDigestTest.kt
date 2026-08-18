@@ -1,7 +1,9 @@
 package com.zhiban.rebuild.runtime.governance
 
-import com.zhiban.rebuild.runtime.context.FactEntity
-import com.zhiban.rebuild.runtime.tool.sha256
+import com.zhiban.rebuild.data.autowrite.canonicalChangeDigest
+import com.zhiban.rebuild.data.autowrite.changeDigestMatches
+import com.zhiban.rebuild.data.facts.FactEntity
+import com.zhiban.rebuild.foundation.sha256
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

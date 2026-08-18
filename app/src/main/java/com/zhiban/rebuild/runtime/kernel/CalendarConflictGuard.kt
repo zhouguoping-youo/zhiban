@@ -1,7 +1,7 @@
 package com.zhiban.rebuild.runtime.kernel
 
-import com.zhiban.rebuild.runtime.provider.ModelEvent
-import com.zhiban.rebuild.runtime.provider.ProviderFailure
+import com.zhiban.rebuild.provider.ModelEvent
+import com.zhiban.rebuild.provider.ProviderFailure
 import com.zhiban.rebuild.runtime.tool.CapabilityRouter
 import com.zhiban.rebuild.runtime.tool.RoutedToolResult
 import com.zhiban.rebuild.runtime.tool.RuntimeToolCallRequest

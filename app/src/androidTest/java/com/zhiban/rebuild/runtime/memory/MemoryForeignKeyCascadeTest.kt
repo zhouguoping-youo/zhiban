@@ -1,12 +1,18 @@
 package com.zhiban.rebuild.runtime.memory
 
+import com.zhiban.rebuild.data.memory.MemoryCurrentVersionEntity
+
+import com.zhiban.rebuild.data.memory.MemoryEvidenceEntity
+import com.zhiban.rebuild.data.memory.MemoryNamespaceEntity
+import com.zhiban.rebuild.data.memory.MemoryRecordEntity
+
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
-import com.zhiban.rebuild.runtime.context.FactEntity
-import com.zhiban.rebuild.runtime.context.EmbeddingVectorEntity
+import com.zhiban.rebuild.data.facts.FactEntity
+import com.zhiban.rebuild.data.facts.EmbeddingVectorEntity
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals

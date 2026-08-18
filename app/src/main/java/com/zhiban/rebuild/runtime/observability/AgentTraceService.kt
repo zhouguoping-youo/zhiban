@@ -1,6 +1,8 @@
 package com.zhiban.rebuild.runtime.observability
+
 import com.zhiban.rebuild.data.agent.AgentDatabase
-import com.zhiban.rebuild.runtime.runSuspendCatching
+import com.zhiban.rebuild.data.store.RuntimeEventEntity
+import com.zhiban.rebuild.foundation.runSuspendCatching
 import javax.inject.Inject
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -108,7 +110,7 @@ class AgentTraceService @Inject internal constructor(private val database: Agent
         Json.parseToJsonElement(this).jsonObject[name]?.jsonPrimitive?.content?.toLongOrNull()
     }.getOrNull()
 
-    private fun com.zhiban.rebuild.runtime.store.RuntimeEventEntity.toAuditStep(): AgentAuditStep? = when (eventType) {
+    private fun com.zhiban.rebuild.data.store.RuntimeEventEntity.toAuditStep(): AgentAuditStep? = when (eventType) {
         "RunReceived" -> AgentAuditStep("PERCEPTION", "接收输入", "COMPLETED")
         "PerceptionCompleted" -> AgentAuditStep("PERCEPTION", "意图与实体识别", "COMPLETED")
         "ContextAssemblyStarted" -> AgentAuditStep("MEMORY", "组装上下文", "STARTED")

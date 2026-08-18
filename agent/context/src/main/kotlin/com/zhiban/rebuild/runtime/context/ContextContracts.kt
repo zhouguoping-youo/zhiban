@@ -1,8 +1,9 @@
 package com.zhiban.rebuild.runtime.context
 
+import com.zhiban.rebuild.foundation.Sensitivity
+
 enum class ContextLayer { STABLE, CONTEXT, VOLATILE }
 enum class TrustLevel { SYSTEM, TRUSTED_APP, UNTRUSTED_MODEL, UNTRUSTED_TOOL, UNTRUSTED_MEMORY }
-enum class Sensitivity { PUBLIC, PERSONAL, SENSITIVE }
 enum class ContextKind { TEXT, TOOL_CALL, TOOL_RESULT, SUMMARY }
 
 data class ContextProvenance(

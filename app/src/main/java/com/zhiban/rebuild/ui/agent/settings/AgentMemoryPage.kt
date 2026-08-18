@@ -36,10 +36,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.zhiban.rebuild.R
-import com.zhiban.rebuild.runtime.config.AgentControlStore
-import com.zhiban.rebuild.runtime.config.ExecutionPreference
-import com.zhiban.rebuild.runtime.config.FeedbackPolicy
-import com.zhiban.rebuild.runtime.config.MemoryPolicy
+import com.zhiban.rebuild.data.config.AgentControlStore
+import com.zhiban.rebuild.data.config.ExecutionPreference
+import com.zhiban.rebuild.data.config.FeedbackPolicy
+import com.zhiban.rebuild.data.config.MemoryPolicy
+import com.zhiban.rebuild.foundation.runSuspendCatching
+import com.zhiban.rebuild.provider.ProviderEnvironmentManager
 import com.zhiban.rebuild.runtime.mcp.McpRemoteEnvironment
 import com.zhiban.rebuild.runtime.mcp.McpRemoteServer
 import com.zhiban.rebuild.runtime.mcp.McpRemoteTool
@@ -50,8 +52,6 @@ import com.zhiban.rebuild.runtime.personalization.Personalization
 import com.zhiban.rebuild.runtime.personalization.ResponseStyle
 import com.zhiban.rebuild.runtime.personalization.UserProfile
 import com.zhiban.rebuild.runtime.personalization.UserProfileStore
-import com.zhiban.rebuild.runtime.provider.ProviderEnvironmentManager
-import com.zhiban.rebuild.runtime.runSuspendCatching
 import com.zhiban.rebuild.runtime.tool.RuntimeToolCatalog
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanChip
@@ -144,7 +144,7 @@ fun AgentMemoryPage(onBack: () -> Unit, viewModel: AgentMemoryViewModel = hiltVi
         Column(Modifier.fillMaxSize()) {
             AgentHeader("记忆", onBack)
             LazyColumn(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            memoryPolicySection(s = s, viewModel = viewModel)
+                memoryPolicySection(s = s, viewModel = viewModel)
                 item {
                     var advanced by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
                     ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
@@ -181,12 +181,12 @@ fun AgentMemoryPage(onBack: () -> Unit, viewModel: AgentMemoryViewModel = hiltVi
                         }
                     }
                 }
-            memoryListSection(
-                s = s,
-                onAdd = { adding = true },
-                onEdit = { editing = it },
-                onClear = { clearing = true },
-            )
+                memoryListSection(
+                    s = s,
+                    onAdd = { adding = true },
+                    onEdit = { editing = it },
+                    onClear = { clearing = true },
+                )
                 item { Spacer(Modifier.height(24.dp)) }
             }
         }
@@ -204,8 +204,6 @@ fun AgentMemoryPage(onBack: () -> Unit, viewModel: AgentMemoryViewModel = hiltVi
         ),
     )
 }
-
-
 
 @Composable private fun AddMemoryDialog(busy: Boolean, onDismiss: () -> Unit, onSave: (String, String) -> Unit) {
     var text by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
@@ -477,86 +475,86 @@ data class AgentToolsState(
 )
 
 private fun LazyListScope.memoryListSection(s: MemoryUiState, onAdd: () -> Unit, onEdit: (AgentMemoryItem) -> Unit, onClear: () -> Unit) {
-            item {
-                Row(
-                    Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+    item {
+        Row(
+            Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "已保存的记忆",
+                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                if (s.items.isNotEmpty()) {
+                    Text(
+                        localizedQuantity(R.plurals.item_count, s.items.size),
+                        color = ZhiBanTextSecondary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+            FilledTonalButton(
+                onClick = {
+                    onAdd()
+                },
+                enabled = !s.busy,
+                contentPadding = PaddingValues(
+                    horizontal = 14.dp,
+                    vertical = 8.dp,
+                ),
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = ZhiBanTerracotta.copy(alpha = .13f),
+                    contentColor = ZhiBanTerracotta,
+                ),
+            ) {
+                Icon(Icons.Outlined.Add, null, Modifier.size(ZhiBanIconSize.Inline))
+                Spacer(Modifier.width(3.dp))
+                Text("添加")
+            }
+        }
+    }
+    s.message?.let {
+        item { Text(it, color = ZhiBanTerracotta, style = MaterialTheme.typography.bodySmall) }
+    }
+    s.error?.let {
+        item {
+            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+    when {
+        s.isLoading -> item { CircularProgressIndicator() }
+
+        s.items.isEmpty() -> item {
+            ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            "已保存的记忆",
-                            fontWeight = FontWeight.SemiBold,
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        if (s.items.isNotEmpty()) {
-                            Text(
-                                localizedQuantity(R.plurals.item_count, s.items.size),
-                                color = ZhiBanTextSecondary,
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                    }
-                    FilledTonalButton(
-                        onClick = {
-                            onAdd()
-                        },
-                        enabled = !s.busy,
-                        contentPadding = PaddingValues(
-                            horizontal = 14.dp,
-                            vertical = 8.dp,
-                        ),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = ZhiBanTerracotta.copy(alpha = .13f),
-                            contentColor = ZhiBanTerracotta,
-                        ),
-                    ) {
-                        Icon(Icons.Outlined.Add, null, Modifier.size(ZhiBanIconSize.Inline))
-                        Spacer(Modifier.width(3.dp))
-                        Text("添加")
-                    }
+                    Icon(
+                        Icons.Outlined.Psychology,
+                        null,
+                        tint = ZhiBanTerracotta.copy(alpha = .72f),
+                        modifier = Modifier.size(ZhiBanIconSize.Action),
+                    )
+                    Text("还没有记住任何事", fontWeight = FontWeight.SemiBold)
+                    Text("可以手动添加", color = ZhiBanTextSecondary, style = MaterialTheme.typography.bodySmall)
                 }
             }
-            s.message?.let {
-                item { Text(it, color = ZhiBanTerracotta, style = MaterialTheme.typography.bodySmall) }
-            }
-            s.error?.let {
-                item {
-                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                }
-            }
-            when {
-                s.isLoading -> item { CircularProgressIndicator() }
+        }
 
-                s.items.isEmpty() -> item {
-                    ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
-                        Column(
-                            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            Icon(
-                                Icons.Outlined.Psychology,
-                                null,
-                                tint = ZhiBanTerracotta.copy(alpha = .72f),
-                                modifier = Modifier.size(ZhiBanIconSize.Action),
-                            )
-                            Text("还没有记住任何事", fontWeight = FontWeight.SemiBold)
-                            Text("可以手动添加", color = ZhiBanTextSecondary, style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-
-                else -> items(s.items, key = { it.id }) { m ->
-                    SettingRow(memoryIcon(m.type), m.text, m.categoryLabel) { onEdit(m) }
-                }
+        else -> items(s.items, key = { it.id }) { m ->
+            SettingRow(memoryIcon(m.type), m.text, m.categoryLabel) { onEdit(m) }
+        }
+    }
+    if (s.items.isNotEmpty()) {
+        item {
+            TextButton(onClick = onClear, enabled = !s.busy, modifier = Modifier.fillMaxWidth()) {
+                Text("让知伴忘掉全部", color = MaterialTheme.colorScheme.error)
             }
-            if (s.items.isNotEmpty()) {
-                item {
-                    TextButton(onClick = onClear, enabled = !s.busy, modifier = Modifier.fillMaxWidth()) {
-                        Text("让知伴忘掉全部", color = MaterialTheme.colorScheme.error)
-                    }
-                }
-            }
+        }
+    }
 }
 
 private data class MemoryDialogSlots(
@@ -622,28 +620,26 @@ private fun MemoryPageDialogs(slots: MemoryDialogSlots) {
 }
 
 private fun LazyListScope.memoryPolicySection(s: MemoryUiState, viewModel: AgentMemoryViewModel) {
-            item {
-                ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
-                    Column {
-                        ZhiBanToggleRow(
-                            "记住对话内容",
-                            "跨对话使用",
-                            s.policy.longTermMemoryEnabled,
-                            viewModel::longTerm,
-                        )
-                        HorizontalDivider(
-                            Modifier.padding(horizontal = 16.dp),
-                            color = ZhiBanTextSecondary.copy(alpha = .12f),
-                        )
-                        ZhiBanToggleRow(
-                            "自动发现新记忆",
-                            "自动提炼",
-                            s.policy.learnFromConversations,
-                            viewModel::learn,
-                        )
-                    }
-                }
+    item {
+        ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
+            Column {
+                ZhiBanToggleRow(
+                    "记住对话内容",
+                    "跨对话使用",
+                    s.policy.longTermMemoryEnabled,
+                    viewModel::longTerm,
+                )
+                HorizontalDivider(
+                    Modifier.padding(horizontal = 16.dp),
+                    color = ZhiBanTextSecondary.copy(alpha = .12f),
+                )
+                ZhiBanToggleRow(
+                    "自动发现新记忆",
+                    "自动提炼",
+                    s.policy.learnFromConversations,
+                    viewModel::learn,
+                )
             }
+        }
+    }
 }
-
-

@@ -2,6 +2,7 @@ package com.zhiban.rebuild.runtime.memory
 
 import com.zhiban.agent.memory.*
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.memory.MemoryNamespaceEntity
 
 /** Room adapter. Runtime depends on the :agent:memory contract, while persistence stays replaceable. */
 internal class RoomMemoryGate(database: AgentDatabase, private val clock: () -> Long = System::currentTimeMillis) : MemoryGate {

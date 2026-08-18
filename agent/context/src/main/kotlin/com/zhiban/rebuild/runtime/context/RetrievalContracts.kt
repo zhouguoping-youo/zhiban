@@ -1,5 +1,7 @@
 package com.zhiban.rebuild.runtime.context
 
+import com.zhiban.rebuild.foundation.Sensitivity
+
 enum class RetrievalPath { STRUCTURED, FTS, VECTOR, GRAPH }
 
 data class EmbeddingSpace(val providerId: String, val modelId: String, val dimensions: Int, val modelVersion: String? = null) {

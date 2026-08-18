@@ -1,7 +1,7 @@
 package com.zhiban.rebuild.runtime.governance
 
 import android.content.Context
-import com.zhiban.rebuild.runtime.provider.OutboundPolicySettings
+import com.zhiban.rebuild.provider.OutboundPolicySettings
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton

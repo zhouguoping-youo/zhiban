@@ -1,5 +1,8 @@
 package com.zhiban.rebuild.runtime.context
 
+import com.zhiban.rebuild.data.facts.FactEntity
+import com.zhiban.rebuild.data.facts.FactIndex
+
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider

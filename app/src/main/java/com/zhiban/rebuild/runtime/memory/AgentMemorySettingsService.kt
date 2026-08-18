@@ -3,9 +3,9 @@ package com.zhiban.rebuild.runtime.memory
 import com.zhiban.agent.memory.MemoryCommit
 import com.zhiban.agent.memory.MemoryNamespace
 import com.zhiban.rebuild.data.agent.AgentDatabase
-import com.zhiban.rebuild.runtime.context.MemoryScope
-import com.zhiban.rebuild.runtime.context.RoomStagedMemoryCandidateStore
-import com.zhiban.rebuild.runtime.context.Sensitivity
+import com.zhiban.rebuild.data.memory.RoomStagedMemoryCandidateStore
+import com.zhiban.rebuild.foundation.MemoryScope
+import com.zhiban.rebuild.foundation.Sensitivity
 import com.zhiban.rebuild.runtime.tool.RoomMemoryToolExecutor
 import java.security.MessageDigest
 import java.util.UUID

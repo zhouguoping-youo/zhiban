@@ -114,10 +114,10 @@ import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.data.contact.SystemContactCandidate
 import com.zhiban.rebuild.data.contact.SystemContactWriteIntent
 import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
+import com.zhiban.rebuild.data.facts.FactEntity
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.OutgoingMessageAccessibilityService
 import com.zhiban.rebuild.data.notification.ScheduleInsight
-import com.zhiban.rebuild.runtime.context.FactEntity
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.personalization.UserProfile
 import com.zhiban.rebuild.ui.components.ZhiBanChip
@@ -486,44 +486,37 @@ private fun MergeContactChoiceRow(contact: ContactEntity, selected: Boolean, onS
 }
 
 @Composable
-private fun MergeConfirmFooter(
-    saving: Boolean,
-    error: String?,
-    onConfirmClick: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Card)).background(RelationSoft).padding(14.dp)) {
-            Text(
-                "合并后只显示一个联系人，原始资料、记忆和关系不会删除。你可以随时在联系人详情中恢复。",
-                color = RelationMuted,
-                style = MaterialTheme.typography.bodySmall,
-            )
+private fun MergeConfirmFooter(saving: Boolean, error: String?, onConfirmClick: () -> Unit, onDismiss: () -> Unit) {
+    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Card)).background(RelationSoft).padding(14.dp)) {
+        Text(
+            "合并后只显示一个联系人，原始资料、记忆和关系不会删除。你可以随时在联系人详情中恢复。",
+            color = RelationMuted,
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+    error?.let {
+        Text(
+            it,
+            color = RelationDanger,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
+    Spacer(Modifier.height(18.dp))
+    Button(
+        onClick = onConfirmClick,
+        Modifier.fillMaxWidth().height(ZhiBanSize.Control),
+        enabled = !saving,
+        colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
+        shape = RoundedCornerShape(ZhiBanRadius.Card),
+    ) {
+        if (saving) {
+            CircularProgressIndicator(Modifier.size(18.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+        } else {
+            Text("确认合并")
         }
-        error?.let {
-            Text(
-                it,
-                color = RelationDanger,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-        }
-        Spacer(Modifier.height(18.dp))
-        Button(
-            onClick = onConfirmClick,
-            Modifier.fillMaxWidth().height(ZhiBanSize.Control),
-            enabled = !saving,
-            colors = ButtonDefaults.buttonColors(containerColor = RelationInk),
-            shape = RoundedCornerShape(ZhiBanRadius.Card),
-        ) {
-            if (saving) {
-                CircularProgressIndicator(Modifier.size(18.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
-            } else {
-                Text("确认合并")
-            }
-        }
-        TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth(), enabled = !saving) {
-            Text("不是同一个人", color = RelationMuted)
-        }
+    }
+    TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth(), enabled = !saving) {
+        Text("不是同一个人", color = RelationMuted)
+    }
 }
-
-

@@ -1,5 +1,7 @@
 package com.zhiban.rebuild.runtime.tool
 
+import com.zhiban.rebuild.data.store.RuntimeAttemptEntity
+
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -13,11 +15,10 @@ import com.zhiban.rebuild.data.crm.CrmNextActionEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityStage
 import com.zhiban.rebuild.data.crm.CrmRecordStatus
-import com.zhiban.rebuild.runtime.governance.AutoWriteRepository
+import com.zhiban.rebuild.data.autowrite.AutoWriteRepository
 import com.zhiban.rebuild.runtime.kernel.PersistentRuntimeKernel
 import com.zhiban.rebuild.runtime.kernel.RuntimeSignal
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
-import com.zhiban.rebuild.runtime.store.RuntimeAttemptEntity
 import com.zhiban.rebuild.runtime.store.RuntimeEventDraft
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking

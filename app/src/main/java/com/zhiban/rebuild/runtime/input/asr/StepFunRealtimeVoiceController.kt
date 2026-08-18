@@ -10,14 +10,14 @@ import android.media.audiofx.AcousticEchoCanceler
 import android.media.audiofx.NoiseSuppressor
 import android.util.Base64
 import android.util.Log
-import com.zhiban.rebuild.runtime.provider.CredentialResolver
-import com.zhiban.rebuild.runtime.provider.OutboundChannel
-import com.zhiban.rebuild.runtime.provider.OutboundExportDecision
-import com.zhiban.rebuild.runtime.provider.OutboundExportDescriptor
-import com.zhiban.rebuild.runtime.provider.OutboundExportGate
-import com.zhiban.rebuild.runtime.provider.OutboundPurpose
-import com.zhiban.rebuild.runtime.provider.OutboundSensitivity
-import com.zhiban.rebuild.runtime.provider.ProviderProfileStore
+import com.zhiban.rebuild.provider.CredentialResolver
+import com.zhiban.rebuild.provider.OutboundChannel
+import com.zhiban.rebuild.provider.OutboundExportDecision
+import com.zhiban.rebuild.provider.OutboundExportDescriptor
+import com.zhiban.rebuild.provider.OutboundExportGate
+import com.zhiban.rebuild.provider.OutboundPurpose
+import com.zhiban.rebuild.provider.OutboundSensitivity
+import com.zhiban.rebuild.provider.ProviderProfileStore
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -201,7 +201,7 @@ class StepFunRealtimeVoiceController @Inject constructor(
                 if (generation != connectionGeneration.get()) return@withCredential
                 val request = Request.Builder()
                     .url(
-                        "wss://api.stepfun.com/v1/realtime?model=${com.zhiban.rebuild.runtime.provider.TrustedProviderRegistry.STEPFUN_REALTIME_MODEL}",
+                        "wss://api.stepfun.com/v1/realtime?model=${com.zhiban.rebuild.provider.TrustedProviderRegistry.STEPFUN_REALTIME_MODEL}",
                     )
                     .header("Authorization", "Bearer ${secret.decodeToString()}")
                     .build()
