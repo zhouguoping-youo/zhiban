@@ -1,5 +1,7 @@
 package com.zhiban.rebuild.data.completion
 
+import android.util.Log
+import androidx.room.withTransaction
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.contact.ContactEnrichmentCandidateEntity
 import com.zhiban.rebuild.data.contact.ContactProfileCompletenessEvaluator
@@ -17,8 +19,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import android.util.Log
-import androidx.room.withTransaction
 
 /**
  * 补全闭环的回复检测。触发驱动（新微信消息 T1 / 前台兜底 T2),CONFLATED + 3s 防抖 + Mutex 串行，
@@ -148,11 +148,7 @@ internal class ContactCompletionCoordinator @Inject constructor(
      * 二次回复丢失(P1-1)。重扫同一回复 REPLACE 同值,依然幂等。事务边界由调用方
      * [processCandidate] 包好(R10)。
      */
-    internal suspend fun stageCandidatesAndMark(
-        request: ContactCompletionRequestEntity,
-        candidates: List<ContactEnrichmentCandidateEntity>,
-        now: Long,
-    ) {
+    internal suspend fun stageCandidatesAndMark(request: ContactCompletionRequestEntity, candidates: List<ContactEnrichmentCandidateEntity>, now: Long) {
         candidates.forEach { staged -> database.contactKnowledgeDao().upsertEnrichmentCandidate(staged) }
         candidates.firstOrNull()?.let {
             database.contactCompletionRequestDao().markResponseReceived(request.requestId, it.candidateId, now)

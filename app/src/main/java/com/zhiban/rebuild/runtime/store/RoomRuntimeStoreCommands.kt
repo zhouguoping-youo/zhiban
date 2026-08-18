@@ -45,23 +45,24 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
-internal suspend fun RoomRuntimeStore.processClaimedCommand(commandId: String, ownerId: String, fencingEpoch: Long, nowEpochMs: Long): Boolean = database.withTransaction {
-    val command = requireNotNull(database.runtimeCommandInboxDao().find(commandId))
-    requireActiveLease(command.sessionId, ownerId, fencingEpoch, nowEpochMs)
-    if (command.commandType != "Start") return@withTransaction processRunAction(command, fencingEpoch, nowEpochMs)
-    val inputRef = Json.parseToJsonElement(
-        command.payloadJson,
-    ).jsonObject.getValue("inputRef").jsonPrimitive.content
-    val staged = database.runtimeInputStagingDao().find(inputRef)
-    if (staged == null || staged.expiresAtEpochMs <= nowEpochMs) {
-        return@withTransaction failExpiredOrMissingInput(
-            ClaimedStartFailureCtx(command, commandId, staged, inputRef, fencingEpoch, nowEpochMs),
+internal suspend fun RoomRuntimeStore.processClaimedCommand(commandId: String, ownerId: String, fencingEpoch: Long, nowEpochMs: Long): Boolean =
+    database.withTransaction {
+        val command = requireNotNull(database.runtimeCommandInboxDao().find(commandId))
+        requireActiveLease(command.sessionId, ownerId, fencingEpoch, nowEpochMs)
+        if (command.commandType != "Start") return@withTransaction processRunAction(command, fencingEpoch, nowEpochMs)
+        val inputRef = Json.parseToJsonElement(
+            command.payloadJson,
+        ).jsonObject.getValue("inputRef").jsonPrimitive.content
+        val staged = database.runtimeInputStagingDao().find(inputRef)
+        if (staged == null || staged.expiresAtEpochMs <= nowEpochMs) {
+            return@withTransaction failExpiredOrMissingInput(
+                ClaimedStartFailureCtx(command, commandId, staged, inputRef, fencingEpoch, nowEpochMs),
+            )
+        }
+        commitStagedInputAndComplete(
+            ClaimedStartCommitCtx(command, commandId, staged, inputRef, fencingEpoch, nowEpochMs),
         )
     }
-    commitStagedInputAndComplete(
-        ClaimedStartCommitCtx(command, commandId, staged, inputRef, fencingEpoch, nowEpochMs),
-    )
-}
 
 internal data class ClaimedStartFailureCtx(
     val command: RuntimeCommandInboxEntity,
@@ -530,5 +531,3 @@ internal suspend fun RoomRuntimeStore.startObservationAttempt(request: AttemptSt
     )
     check(database.runtimeRunDao().startObservationAttempt(request.runId, request.attemptId, event.sequence, request.nowEpochMs) == 1)
 }
-
-

@@ -124,6 +124,7 @@ internal class WebSearchCompanyRegistryGateway(private val webSearch: WebSearchG
         const val SOURCE_LABEL = "网络公开信息"
         const val SEARCH_RESULT_LIMIT = 5
         const val MAX_QUERY_CHARS = 120
+
         /** 从网页文本抽出的"全称候选"的合理性上限;与 HttpCompanyRegistryGateway 的 200(线路传输上限)职责不同。 */
         const val MAX_FULL_NAME_CHARS = 30
         const val MAX_MATCHES = 3

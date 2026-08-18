@@ -340,7 +340,12 @@ internal suspend fun ContactAgentDataRepository.upsertSystemContactMethods(
     if (methods.isNotEmpty()) knowledge.upsertMethods(methods)
 }
 
-internal suspend fun ContactAgentDataRepository.upsertSystemContactPlatformIdentities(candidate: SystemContactCandidate, value: ContactEntity, sourceRef: String, nowEpochMs: Long) {
+internal suspend fun ContactAgentDataRepository.upsertSystemContactPlatformIdentities(
+    candidate: SystemContactCandidate,
+    value: ContactEntity,
+    sourceRef: String,
+    nowEpochMs: Long,
+) {
     val identities = candidate.platformIdentities
         .plus(candidate.wechatIds.map { com.zhiban.rebuild.data.contact.SystemContactPlatformIdentity("WECHAT", it) })
         .distinctBy { it.platform to normalizeContactMethodHandle(it.handle) }
@@ -574,4 +579,3 @@ internal suspend fun ContactAgentDataRepository.upsertSystemContactAddressesDate
         ),
     )
 }
-

@@ -47,10 +47,10 @@ import com.zhiban.rebuild.runtime.runSuspendCatching
 import com.zhiban.rebuild.runtime.spi.RuntimeRunStatus
 import com.zhiban.rebuild.runtime.store.AttemptStartRequest
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
-import com.zhiban.rebuild.runtime.store.startAttempt
-import com.zhiban.rebuild.runtime.store.startObservationAttempt
 import com.zhiban.rebuild.runtime.store.RuntimeEventDraft
 import com.zhiban.rebuild.runtime.store.RuntimeRecoveryHandle
+import com.zhiban.rebuild.runtime.store.startAttempt
+import com.zhiban.rebuild.runtime.store.startObservationAttempt
 import com.zhiban.rebuild.runtime.tool.CalendarConflictToolBinding
 import com.zhiban.rebuild.runtime.tool.CalendarMutationToolBinding
 import com.zhiban.rebuild.runtime.tool.CalendarSearchToolBinding
@@ -151,7 +151,12 @@ internal sealed interface ReActStreamOutcome {
 
 internal const val MIN_MULTIMODAL_IDLE_TIMEOUT_MS = 60_000L
 
-internal suspend fun ProviderExecutionEngine.assembleReActContext(ready: PreparedRun.Ready, runId: String, sessionId: String, fencingEpoch: Long): AssembledReActContext {
+internal suspend fun ProviderExecutionEngine.assembleReActContext(
+    ready: PreparedRun.Ready,
+    runId: String,
+    sessionId: String,
+    fencingEpoch: Long,
+): AssembledReActContext {
     val input = ready.input
     val queryContext = ready.queryContext
     var retrieval = ready.retrieval
@@ -220,8 +225,6 @@ internal suspend fun ProviderExecutionEngine.assembleReActContext(ready: Prepare
     }
     return AssembledReActContext(capability, retrieval, assembledMessages)
 }
-
-
 
 internal suspend fun ProviderExecutionEngine.handleReActToolCall(
     context: ToolCallContext,
@@ -355,8 +358,6 @@ internal suspend fun ProviderExecutionEngine.calendarConflictBeforeApproval(
     return conflict.result
 }
 
-
-
 internal suspend fun ProviderExecutionEngine.consumeReActStream(
     ready: PreparedRun.Ready,
     prepared: PreparedReActRequest,
@@ -452,7 +453,12 @@ internal suspend fun ProviderExecutionEngine.handleReactCancellation(cancelled: 
     return false
 }
 
-internal suspend fun ProviderExecutionEngine.completeReactOutcome(outcome: ReActStreamOutcome, ids: RunIdentifiers, inputText: String, attemptId: String): Boolean = when (outcome) {
+internal suspend fun ProviderExecutionEngine.completeReactOutcome(
+    outcome: ReActStreamOutcome,
+    ids: RunIdentifiers,
+    inputText: String,
+    attemptId: String,
+): Boolean = when (outcome) {
     is ReActStreamOutcome.ToolCompleted -> observeToolResult(
         ids.runId,
         ids.sessionId,
@@ -503,8 +509,6 @@ internal suspend fun ProviderExecutionEngine.completeReactOutcome(outcome: ReAct
         }
     }
 }
-
-
 
 internal suspend fun ProviderExecutionEngine.prepareObservationContext(ids: RunIdentifiers): ObservationSetup {
     val runId = ids.runId
@@ -651,7 +655,11 @@ internal suspend fun ProviderExecutionEngine.handleObservationToolCall(
     }
 }
 
-internal suspend fun ProviderExecutionEngine.routeObservationToolCall(setup: ObservationSetup, ids: RunIdentifiers, event: ModelEvent.ToolCall): ReActStreamOutcome {
+internal suspend fun ProviderExecutionEngine.routeObservationToolCall(
+    setup: ObservationSetup,
+    ids: RunIdentifiers,
+    event: ModelEvent.ToolCall,
+): ReActStreamOutcome {
     val activatedSkills = setup.activatedSkills
     val attemptId = setup.attemptId
     val runId = ids.runId
@@ -706,7 +714,12 @@ internal suspend fun ProviderExecutionEngine.routeObservationToolCall(setup: Obs
     return ReActStreamOutcome.PendingApproval
 }
 
-internal suspend fun ProviderExecutionEngine.appendDegradedObservation(attemptId: String, ids: RunIdentifiers, toolName: String, safeResultJson: String): Boolean {
+internal suspend fun ProviderExecutionEngine.appendDegradedObservation(
+    attemptId: String,
+    ids: RunIdentifiers,
+    toolName: String,
+    safeResultJson: String,
+): Boolean {
     val runId = ids.runId
     val sessionId = ids.sessionId
     val fencingEpoch = ids.fencingEpoch
@@ -1009,5 +1022,3 @@ internal suspend fun ProviderExecutionEngine.rerankRetrieval(
     }
     return result
 }
-
-

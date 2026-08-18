@@ -31,8 +31,8 @@ import com.zhiban.rebuild.data.contact.RelationshipEventWithParticipants
 import com.zhiban.rebuild.data.contact.SourceIdentityEntity
 import com.zhiban.rebuild.data.contact.SystemContactCandidate
 import com.zhiban.rebuild.data.contact.SystemContactReader
-import com.zhiban.rebuild.data.contact.enrichment.CompanyEnrichmentRefresher
 import com.zhiban.rebuild.data.contact.enrichment.CompanyEnrichmentRefreshResult
+import com.zhiban.rebuild.data.contact.enrichment.CompanyEnrichmentRefresher
 import com.zhiban.rebuild.data.contact.normalizeContactPhone
 import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
 import com.zhiban.rebuild.data.notification.MessageCollectionPreferences

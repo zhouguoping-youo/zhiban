@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.data.reply
 
+import android.util.Log
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.SensitiveMessageFilter
@@ -16,7 +17,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import android.util.Log
 
 /**
  * Orchestrates reply-suggestion generation. Trigger-driven (a new WeChat message, or app foreground as a
@@ -102,9 +102,7 @@ internal class ReplySuggestionCoordinator @Inject constructor(
                     .any { it.direction == "OUTGOING" }
                 when {
                     sentAfter -> replyDao.markThreadSentConfirmed(threadKey, ReplySuggestionStatus.SENT_CONFIRMED, now)
-
                     now - latestForward >= FORWARD_REVERT_AFTER_MS -> replyDao.revertThreadToPending(threadKey)
-
                     else -> Unit // 刚转发不久:等用户去微信里发(或取消)
                 }
             }

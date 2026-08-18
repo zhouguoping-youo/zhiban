@@ -54,11 +54,7 @@ internal class LocationCurrentToolBinding(
  * [consent] is the user's 定位读取 switch — default deny, so an unwired path silently disables the
  * tool rather than leaking coordinates.
  */
-internal fun locationToolBindings(
-    catalog: RuntimeToolCatalog,
-    gateway: LocationGateway?,
-    consent: () -> Boolean = { false },
-): List<RuntimeToolBinding> {
+internal fun locationToolBindings(catalog: RuntimeToolCatalog, gateway: LocationGateway?, consent: () -> Boolean = { false }): List<RuntimeToolBinding> {
     val spec = catalog.specs[LocationCurrentToolBinding.TOOL_NAME] ?: return emptyList()
     return gateway?.let { listOf(LocationCurrentToolBinding(spec, it, consent)) } ?: emptyList()
 }
