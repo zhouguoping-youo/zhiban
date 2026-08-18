@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
@@ -137,34 +138,18 @@ fun EventPlanningDetailPage(planId: String, onBack: () -> Unit, onAskAgent: (Str
             contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = ZhiBanSpacing.Xxl),
             verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Lg),
         ) {
-            item { ZhiBanTopBar("安排详情", onBack) }
-            if (item == null) {
-                if (!state.isLoading) item { EventPlanningEmpty(Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal), null) }
-            } else {
-                item { EventPlanSummary(item, Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal)) }
-                eventPlanParticipantsSection(
-                    item = item,
-                    onAddClick = { contactPickerOpen = true },
-                    onParticipantClick = { contact -> responseContact = contact },
-                    onRemove = { contactId -> viewModel.removeParticipant(planId, contactId) },
-                )
-                eventPlanActionSection(
-                    item = item,
-                    onPrepareInvite = { onAskAgent(eventInvitePrompt(item)) },
-                    onConfirm = { viewModel.confirmToCalendar(item) },
-                    onDelete = { deleteConfirmOpen = true },
-                )
-
-            state.actionMessage?.let { message ->
-                item {
-                    EventPlanningMessage(
-                        message,
-                        viewModel::clearMessage,
-                        Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
-                    )
-                }
-            }
-        }
+            eventPlanDetailContent(
+                item = item,
+                state = state,
+                onAddClick = { contactPickerOpen = true },
+                onParticipantClick = { contact -> responseContact = contact },
+                onRemoveParticipant = { contactId -> viewModel.removeParticipant(planId, contactId) },
+                onPrepareInvite = { item?.let { onAskAgent(eventInvitePrompt(it)) } },
+                onConfirm = { item?.let { viewModel.confirmToCalendar(it) } },
+                onDelete = { deleteConfirmOpen = true },
+                onClearMessage = viewModel::clearMessage,
+            )
+}
     }
     EventPlanningDetailDialogs(
         EventPlanningDetailDialogSlots(
@@ -471,24 +456,33 @@ private fun EventPlanningDetailDialogs(slots: EventPlanningDetailDialogSlots) {
     }
 }
 
-private fun LazyListScope.eventPlanParticipantsSection(
-    item: EventPlanUi,
+private fun LazyListScope.eventPlanDetailContent(
+    item: EventPlanUi?,
+    state: EventPlanningState,
     onAddClick: () -> Unit,
     onParticipantClick: (ContactEntity) -> Unit,
-    onRemove: (String) -> Unit,
+    onRemoveParticipant: (String) -> Unit,
+    onPrepareInvite: () -> Unit,
+    onConfirm: () -> Unit,
+    onDelete: () -> Unit,
+    onClearMessage: () -> Unit,
 ) {
+    if (item == null) {
+            if (!state.isLoading) item { EventPlanningEmpty(Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal), null) }
+        } else {
+            item { EventPlanSummary(item, Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal)) }
             item {
                 ZhiBanSectionTitle(
                     title = "参与人",
                     action = "添加",
-                    onActionClick = { contactPickerOpen = true },
+                    onActionClick = { onAddClick() },
                     modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
                 )
             }
             if (item.participants.isEmpty()) {
                 item {
                     OutlinedButton(
-                        onClick = { contactPickerOpen = true },
+                        onClick = { onAddClick() },
                         modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal).fillMaxWidth().height(48.dp),
                     ) {
                         Icon(Icons.Outlined.PersonAddAlt, null, Modifier.size(ZhiBanIconSize.Inline))
@@ -500,44 +494,45 @@ private fun LazyListScope.eventPlanParticipantsSection(
                 items(item.participants, key = { it.contact.contactId }) { participant ->
                     ParticipantRow(
                         participant = participant,
-                        onClick = { responseContact = participant.contact },
-                        onRemove = { viewModel.removeParticipant(planId, participant.contact.contactId) },
+                        onClick = { onParticipantClick(participant.contact) },
+                        onRemove = { onRemoveParticipant(participant.contact.contactId) },
                         modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
                     )
                 }
             }
-}
-
-private fun LazyListScope.eventPlanActionSection(
-    item: EventPlanUi,
-    onPrepareInvite: () -> Unit,
-    onConfirm: () -> Unit,
-    onDelete: () -> Unit,
-) {
             item {
                 Column(
                     modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
                     verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm),
                 ) {
                     OutlinedButton(
-                        onClick = { onAskAgent(eventInvitePrompt(item)) },
+                        onClick = { onPrepareInvite() },
                         enabled = item.participants.isNotEmpty(),
                         modifier = Modifier.fillMaxWidth().height(48.dp),
                     ) { Text("准备邀请") }
                     Button(
-                        onClick = { viewModel.confirmToCalendar(item) },
+                        onClick = { onConfirm() },
                         enabled = item.participants.isNotEmpty() && item.plan.status != EventPlanStatus.CONFIRMED,
                         modifier = Modifier.fillMaxWidth().height(48.dp),
                     ) {
                         Text(if (item.plan.status == EventPlanStatus.CONFIRMED) "已加入日历" else "确定并加入日历")
                     }
                     TextButton(
-                        onClick = { deleteConfirmOpen = true },
+                        onClick = { onDelete() },
                         modifier = Modifier.fillMaxWidth().height(48.dp),
                     ) {
                         Text("删除这项安排", color = MaterialTheme.colorScheme.error)
                     }
                 }
+            }
+        }
+        state.actionMessage?.let { message ->
+            item {
+                EventPlanningMessage(
+                    message,
+                    onClearMessage,
+                    Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                )
             }
         }
 }
