@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.ui.tabs
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zhiban.rebuild.data.agent.AgentDataRepository
@@ -31,6 +32,7 @@ import com.zhiban.rebuild.data.contact.SourceIdentityEntity
 import com.zhiban.rebuild.data.contact.SystemContactCandidate
 import com.zhiban.rebuild.data.contact.SystemContactReader
 import com.zhiban.rebuild.data.contact.enrichment.CompanyEnrichmentRefresher
+import com.zhiban.rebuild.data.contact.enrichment.CompanyEnrichmentRefreshResult
 import com.zhiban.rebuild.data.contact.normalizeContactPhone
 import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
 import com.zhiban.rebuild.data.notification.MessageCollectionPreferences
@@ -298,9 +300,16 @@ class RelationViewModel @Inject constructor(
         viewModelScope.launch { repository.purgeNonPersonalSmsCandidates() }
         viewModelScope.launch {
             repository.refreshLocalContactIntelligence()
-            companyEnrichment.refresh()
+            recordCompanyRefresh(companyEnrichment.refresh())
         }
         refreshCloudAsrAvailability()
+    }
+
+    /** 企业全称联网补全的降级码不得丢弃(R20):至少落日志,供诊断"为什么没查到"。 */
+    private fun recordCompanyRefresh(result: CompanyEnrichmentRefreshResult) {
+        if (result.degradationCodes.isNotEmpty()) {
+            Log.w(RELATION_TAG, "company_refresh:${result.degradationCodes.sorted().joinToString(",")}")
+        }
     }
 
     fun dismissCallNote(callRecordId: String) {
@@ -489,7 +498,7 @@ class RelationViewModel @Inject constructor(
                     ownerName = userProfileStore.profile.value.name,
                     nowEpochMs = System.currentTimeMillis(),
                 )
-                companyEnrichment.refresh()
+                recordCompanyRefresh(companyEnrichment.refresh())
                 summary
             }.onSuccess { summary ->
                 if (summary.selfIdentityMissing) {
@@ -706,3 +715,5 @@ internal fun sameNormalizedPhone(first: String?, second: String?): Boolean {
     val normalizedSecond = normalizeContactPhone(second) ?: return false
     return normalizedFirst == normalizedSecond
 }
+
+private const val RELATION_TAG = "RelationViewModel"
