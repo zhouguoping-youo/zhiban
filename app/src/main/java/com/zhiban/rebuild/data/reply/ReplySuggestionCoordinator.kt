@@ -4,6 +4,7 @@ import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.SensitiveMessageFilter
 import com.zhiban.rebuild.runtime.config.AgentControlStore
+import com.zhiban.rebuild.runtime.runSuspendCatching
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
@@ -15,6 +16,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import android.util.Log
 
 /**
  * Orchestrates reply-suggestion generation. Trigger-driven (a new WeChat message, or app foreground as a
@@ -50,8 +52,11 @@ internal class ReplySuggestionCoordinator @Inject constructor(
         scope.launch {
             for (trigger in triggers) {
                 delay(TRIGGER_DEBOUNCE_MS)
-                runCatching { processOnce() }
-                    .onFailure { if (it is CancellationException) throw it }
+                runSuspendCatching { processOnce() }
+                    .onFailure { failure ->
+                        if (failure is CancellationException) throw failure
+                        Log.w(TAG, "reply:scan_failure", failure)
+                    }
             }
         }
     }
@@ -66,8 +71,11 @@ internal class ReplySuggestionCoordinator @Inject constructor(
             database.notificationCandidateDao()
                 .recentIncomingAttributed(WECHAT_PLATFORM, now - CANDIDATE_WINDOW_MS, CANDIDATE_LIMIT)
                 .forEach { candidate ->
-                    runCatching { processCandidate(candidate) }
-                        .onFailure { if (it is CancellationException) throw it }
+                    runSuspendCatching { processCandidate(candidate) }
+                        .onFailure { failure ->
+                            if (failure is CancellationException) throw failure
+                            Log.w(TAG, "reply:candidate_failure", failure)
+                        }
                 }
             database.replySuggestionDao().expirePendingBefore(now - SUGGESTION_TTL_MS)
         }
@@ -159,6 +167,7 @@ internal class ReplySuggestionCoordinator @Inject constructor(
             .ifBlank { null }
 
     private companion object {
+        const val TAG = "ReplySuggestion"
         const val WECHAT_PLATFORM = "WECHAT"
         const val CANDIDATE_LIMIT = 20
         const val CONTEXT_MESSAGES = 10
