@@ -975,6 +975,26 @@ fun RelationTab(
             setSelectedEvent = { selectedEvent = it },
         ),
     )
+    RelationEventDialogs(
+        RelationDialogSlots(
+            contacts = contacts,
+            ownerLabel = ownerProfile.relationshipLabel(),
+            viewModel = viewModel,
+            showFeedback = showFeedback,
+            deletingEdge = deletingEdge,
+            setDeletingEdge = { deletingEdge = it },
+            selectedEdge = selectedEdge,
+            setSelectedEdge = { selectedEdge = it },
+            addFactFor = addFactFor,
+            clearAddFactFor = { addFactForId = null },
+            addEventFor = addEventFor,
+            setAddEventFor = { addEventFor = it },
+            editingEvent = editingEvent,
+            setEditingEvent = { editingEvent = it },
+            selectedEvent = selectedEvent,
+            setSelectedEvent = { selectedEvent = it },
+        ),
+    )
 }
 
 internal const val CONTACT_IMPORT_PERMISSION_INTRO =

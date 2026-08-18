@@ -837,42 +837,48 @@ private fun RunTraceCard(trace: com.zhiban.rebuild.runtime.observability.AgentRu
                 )
             }
             if (expanded) {
-                trace.auditSteps.forEach { step ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            auditPhaseLabel(step.phase),
-                            color = ZhiBanTerracotta,
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.width(54.dp),
-                        )
-                        Text(
-                            step.label,
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        step.toolName?.let {
-                            Text(
-                                toolDisplayName(it),
-                                color = ZhiBanTextSecondary,
-                                style = MaterialTheme.typography.labelSmall,
-                            )
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            auditStatusLabel(step.status),
-                            color = ZhiBanTextSecondary,
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                    }
-                }
-                trace.degradationPaths.takeIf { it.isNotEmpty() }?.let {
-                    Text(
-                        "已安全降级：${it.joinToString()}",
-                        color = ZhiBanTextSecondary,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
+                RunTraceExpandedContent(trace)
             }
+
         }
+    }
+}
+
+@Composable
+private fun RunTraceExpandedContent(trace: com.zhiban.rebuild.runtime.observability.AgentRunTrace) {
+    trace.auditSteps.forEach { step ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                auditPhaseLabel(step.phase),
+                color = ZhiBanTerracotta,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.width(54.dp),
+            )
+            Text(
+                step.label,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            step.toolName?.let {
+                Text(
+                    toolDisplayName(it),
+                    color = ZhiBanTextSecondary,
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(
+                auditStatusLabel(step.status),
+                color = ZhiBanTextSecondary,
+                style = MaterialTheme.typography.labelSmall,
+            )
+        }
+    }
+    trace.degradationPaths.takeIf { it.isNotEmpty() }?.let {
+        Text(
+            "已安全降级：${it.joinToString()}",
+            color = ZhiBanTextSecondary,
+            style = MaterialTheme.typography.bodySmall,
+        )
     }
 }

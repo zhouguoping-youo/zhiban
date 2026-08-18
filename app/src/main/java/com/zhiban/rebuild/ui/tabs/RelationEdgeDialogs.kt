@@ -94,6 +94,10 @@ internal fun RelationEdgeDialogs(slots: RelationDialogSlots) {
         },
     )
     }
+}
+
+@Composable
+internal fun RelationEventDialogs(slots: RelationDialogSlots) {
     val eventEditorSubject = slots.addEventFor ?: slots.editingEvent?.participants
     ?.firstOrNull { it.participantRole == "SUBJECT" && it.contactId != null }
     ?.contactId?.let { id -> slots.contacts.firstOrNull { it.contactId == id } }
