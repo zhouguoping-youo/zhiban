@@ -4,9 +4,7 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 /** Shared SQL helpers used by migrations and defensive database-open repair. */
-private fun createContactIntelligencePart1(db: SupportSQLiteDatabase) {
-    db.execSQL(
-        """CREATE TABLE IF NOT EXISTS `persons` (
+private const val CREATE_CONTACT_INTELLIGENCE_TABLE_1 = """CREATE TABLE IF NOT EXISTS `persons` (
             `personId` TEXT NOT NULL,
             `canonicalContactId` TEXT,
             `displayName` TEXT NOT NULL,
@@ -18,17 +16,8 @@ private fun createContactIntelligencePart1(db: SupportSQLiteDatabase) {
             PRIMARY KEY(`personId`),
             FOREIGN KEY(`canonicalContactId`) REFERENCES `contacts`(`contactId`)
                 ON UPDATE NO ACTION ON DELETE SET NULL
-        )""",
-    )
-    createIndices(
-        db,
-        "persons",
-        "canonicalContactId" to true,
-        "kind" to false,
-        "status" to false,
-    )
-    db.execSQL(
-        """CREATE TABLE IF NOT EXISTS `source_identities` (
+        )"""
+private const val CREATE_CONTACT_INTELLIGENCE_TABLE_2 = """CREATE TABLE IF NOT EXISTS `source_identities` (
             `sourceIdentityId` TEXT NOT NULL,
             `personId` TEXT,
             `sourceType` TEXT NOT NULL,
@@ -46,19 +35,8 @@ private fun createContactIntelligencePart1(db: SupportSQLiteDatabase) {
             PRIMARY KEY(`sourceIdentityId`),
             FOREIGN KEY(`personId`) REFERENCES `persons`(`personId`)
                 ON UPDATE NO ACTION ON DELETE SET NULL
-        )""",
-    )
-    createIndices(
-        db,
-        "source_identities",
-        "personId" to false,
-        "sourceType,accountScope,stableExternalId" to false,
-        "sourceType,conversationScopeId,normalizedHandle" to false,
-        "resolutionStatus" to false,
-        "lastObservedAtEpochMs" to false,
-    )
-    db.execSQL(
-        """CREATE TABLE IF NOT EXISTS `identity_claims` (
+        )"""
+private const val CREATE_CONTACT_INTELLIGENCE_TABLE_3 = """CREATE TABLE IF NOT EXISTS `identity_claims` (
             `claimId` TEXT NOT NULL,
             `personId` TEXT NOT NULL,
             `fieldType` TEXT NOT NULL,
@@ -79,23 +57,16 @@ private fun createContactIntelligencePart1(db: SupportSQLiteDatabase) {
                 ON UPDATE NO ACTION ON DELETE CASCADE,
             FOREIGN KEY(`sourceIdentityId`) REFERENCES `source_identities`(`sourceIdentityId`)
                 ON UPDATE NO ACTION ON DELETE SET NULL
-        )""",
-    )
-    createIndices(
-        db,
-        "identity_claims",
-        "personId" to false,
-        "sourceIdentityId" to false,
-        "personId,fieldType,status" to false,
-        "fieldType,normalizedValue" to false,
-        "verificationState" to false,
-        "validToEpochMs" to false,
-    )
-    createEmploymentEpisodeTable(db)
-    createRelationshipEpisodeTable(db)
-    createGroupTables(db)
-    createAndroidSyncTables(db)
+        )"""
 
+private fun createContactIntelligencePart1Sub1(db: SupportSQLiteDatabase) {
+    db.execSQL(CREATE_CONTACT_INTELLIGENCE_TABLE_1)
+    db.execSQL(CREATE_CONTACT_INTELLIGENCE_TABLE_2)
+    db.execSQL(CREATE_CONTACT_INTELLIGENCE_TABLE_3)
+}
+
+private fun createContactIntelligencePart1(db: SupportSQLiteDatabase) {
+    createContactIntelligencePart1Sub1(db)
 }
 
 internal fun createContactIntelligenceTables(db: SupportSQLiteDatabase) {

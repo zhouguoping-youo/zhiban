@@ -110,135 +110,14 @@ fun ModelConfigPage(onBack: () -> Unit = {}, viewModel: ModelConfigViewModel = h
                     item { ErrorBanner(state.errorMessage!!) }
                 }
 
+                item { ProviderStatusCard(configured = state.isApiKeyConfigured) }
                 item {
-                    ZhiBanGlassCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        cornerRadius = ZhiBanRadius.Card,
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        borderColor = Color.Transparent,
-                        elevation = 0.dp,
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(ZhiBanSpacing.Lg),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Box(
-                                modifier = Modifier.size(
-                                    ZhiBanIconContainer.Compact,
-                                ).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    Icons.Outlined.CloudQueue,
-                                    contentDescription = null,
-                                    tint = ZhiBanTerracotta,
-                                    modifier = Modifier.size(ZhiBanIconSize.Leading),
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(ZhiBanSpacing.Md))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "阶跃星辰",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = ModelSettingsPrimary,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                            }
-                            StatusBadge(configured = state.isApiKeyConfigured)
-                        }
-                    }
+                    ApiKeyCard(
+                        state = state,
+                        viewModel = viewModel,
+                        onClearClick = { confirmClear = true },
+                    )
                 }
-
-                // ===== API Key 卡片 =====
-                item {
-                    ZhiBanGlassCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        cornerRadius = ZhiBanRadius.Card,
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        borderColor = Color.Transparent,
-                        elevation = 0.dp,
-                    ) {
-                        Column(modifier = Modifier.padding(ZhiBanSpacing.Lg)) {
-                            Text(
-                                "API Key",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = ModelSettingsPrimary,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            OutlinedTextField(
-                                value = state.apiKey,
-                                onValueChange = viewModel::onApiKeyChange,
-                                placeholder = { Text("请输入阶跃星辰 API Key", color = ModelSettingsSecondary) },
-                                visualTransformation = if (state.apiKeyVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                    keyboardType = KeyboardType.Password,
-                                ),
-                                trailingIcon = {
-                                    Box(
-                                        modifier = Modifier.size(ZhiBanSize.TouchTarget).clip(CircleShape).clickable {
-                                            viewModel.toggleApiKeyVisibility()
-                                        },
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        Icon(
-                                            imageVector = if (state.apiKeyVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                                            contentDescription = if (state.apiKeyVisible) "隐藏" else "显示",
-                                            tint = Gray500,
-                                            modifier = Modifier.size(ZhiBanIconSize.Field),
-                                        )
-                                    }
-                                },
-                                singleLine = true,
-                                shape = RoundedCornerShape(ZhiBanRadius.Card),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                                    cursorColor = MaterialTheme.colorScheme.primary,
-                                ),
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (state.isApiKeyConfigured) {
-                                    TextButton(
-                                        onClick = viewModel::checkConnection,
-                                        enabled = !state.isChecking,
-                                        contentPadding = PaddingValues(horizontal = 0.dp),
-                                    ) {
-                                        Text(if (state.isChecking) "检测中…" else "检测连接", color = CloudBlue)
-                                    }
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    TextButton(
-                                        onClick = { confirmClear = true },
-                                        contentPadding = PaddingValues(horizontal = 0.dp),
-                                    ) {
-                                        Text("清除", color = ErrorRed)
-                                    }
-                                }
-                                Spacer(modifier = Modifier.weight(1f))
-                                Text("本机加密保存", color = Gray500, style = MaterialTheme.typography.labelSmall)
-                            }
-                            state.healthMessage?.let {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    it,
-                                    color = if (it ==
-                                        "连接正常"
-                                    ) {
-                                        SuccessGreen
-                                    } else {
-                                        ErrorRed
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                            }
-                        }
-                    }
-                }
-
                 item {
                     ZhiBanSaveButton(
                         state = when {
@@ -272,62 +151,22 @@ fun ModelConfigPage(onBack: () -> Unit = {}, viewModel: ModelConfigViewModel = h
             }
         }
     }
-    if (confirmClear) {
-        ZhiBanAlertDialog(
-            onDismissRequest = { confirmClear = false },
-            title = { Text("清除 API Key？") },
-            text = { Text("清除后，文字、图片和实时语音将停止使用，直到重新连接。") },
-            dismissButton = {
-                TextButton(onClick = { confirmClear = false }) { Text("取消") }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        confirmClear = false
-                        viewModel.clearApiKey()
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                ) {
-                    Text("清除")
-                }
-            },
-            shape = RoundedCornerShape(ZhiBanRadius.Dialog),
-            containerColor = MaterialTheme.colorScheme.surface,
-            tonalElevation = 0.dp,
-        )
-    }
-    if (showEmbeddingConfig) {
-        EmbeddingConfigDialog(
+    ModelConfigDialogs(
+        ModelConfigDialogSlots(
             state = state,
-            onApiKeyChange = viewModel::onEmbeddingApiKeyChange,
-            onToggleVisibility = viewModel::toggleEmbeddingApiKeyVisibility,
-            onModelChange = viewModel::onEmbeddingModelChange,
-            onDismiss = { if (!state.embeddingSaving) showEmbeddingConfig = false },
-            onConnect = viewModel::configureEmbedding,
-        )
-    }
-    if (confirmClearEmbedding) {
-        ZhiBanAlertDialog(
-            onDismissRequest = { confirmClearEmbedding = false },
-            title = { Text("关闭语义检索？") },
-            text = { Text("联系人和记忆仍可使用本地文字检索。") },
-            dismissButton = {
-                TextButton(onClick = { confirmClearEmbedding = false }) { Text("取消") }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        confirmClearEmbedding = false
-                        viewModel.clearEmbedding()
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                ) {
-                    Text("关闭")
-                }
-            },
-        )
-    }
+            viewModel = viewModel,
+            confirmClear = confirmClear,
+            setConfirmClear = { confirmClear = it },
+            showEmbeddingConfig = showEmbeddingConfig,
+            setShowEmbeddingConfig = { showEmbeddingConfig = it },
+            openedEmbeddingVersion = openedEmbeddingVersion,
+            setOpenedEmbeddingVersion = { openedEmbeddingVersion = it },
+            confirmClearEmbedding = confirmClearEmbedding,
+            setConfirmClearEmbedding = { confirmClearEmbedding = it },
+        ),
+    )
 }
+
 
 @Composable
 private fun EmbeddingConnectionCard(
@@ -584,3 +423,212 @@ private fun ModelRow(option: ModelOption, selected: Boolean, onClick: () -> Unit
         }
     }
 }
+
+@Composable
+private fun ProviderStatusCard(configured: Boolean) {
+            ZhiBanGlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = ZhiBanRadius.Card,
+                containerColor = MaterialTheme.colorScheme.surface,
+                borderColor = Color.Transparent,
+                elevation = 0.dp,
+            ) {
+                Row(
+                    modifier = Modifier.padding(ZhiBanSpacing.Lg),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier.size(
+                            ZhiBanIconContainer.Compact,
+                        ).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Outlined.CloudQueue,
+                            contentDescription = null,
+                            tint = ZhiBanTerracotta,
+                            modifier = Modifier.size(ZhiBanIconSize.Leading),
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(ZhiBanSpacing.Md))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "阶跃星辰",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = ModelSettingsPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    StatusBadge(configured = configured)
+                }
+            }
+}
+
+@Composable
+private fun ApiKeyField(state: ModelConfigUiState, viewModel: ModelConfigViewModel) {
+                        OutlinedTextField(
+                            value = state.apiKey,
+                            onValueChange = viewModel::onApiKeyChange,
+                            placeholder = { Text("请输入阶跃星辰 API Key", color = ModelSettingsSecondary) },
+                            visualTransformation = if (state.apiKeyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = KeyboardType.Password,
+                            ),
+                            trailingIcon = {
+                                Box(
+                                    modifier = Modifier.size(ZhiBanSize.TouchTarget).clip(CircleShape).clickable {
+                                        viewModel.toggleApiKeyVisibility()
+                                    },
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        imageVector = if (state.apiKeyVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                        contentDescription = if (state.apiKeyVisible) "隐藏" else "显示",
+                                        tint = Gray500,
+                                        modifier = Modifier.size(ZhiBanIconSize.Field),
+                                    )
+                                }
+                            },
+                            singleLine = true,
+                            shape = RoundedCornerShape(ZhiBanRadius.Card),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                                cursorColor = MaterialTheme.colorScheme.primary,
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+}
+
+@Composable
+private fun ApiKeyCard(state: ModelConfigUiState, viewModel: ModelConfigViewModel, onClearClick: () -> Unit) {
+                ZhiBanGlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    cornerRadius = ZhiBanRadius.Card,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    borderColor = Color.Transparent,
+                    elevation = 0.dp,
+                ) {
+                    Column(modifier = Modifier.padding(ZhiBanSpacing.Lg)) {
+                        Text(
+                            "API Key",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = ModelSettingsPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+ApiKeyField(state, viewModel)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (state.isApiKeyConfigured) {
+                                TextButton(
+                                    onClick = viewModel::checkConnection,
+                                    enabled = !state.isChecking,
+                                    contentPadding = PaddingValues(horizontal = 0.dp),
+                                ) {
+                                    Text(if (state.isChecking) "检测中…" else "检测连接", color = CloudBlue)
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                TextButton(
+                                    onClick = onClearClick,
+                                    contentPadding = PaddingValues(horizontal = 0.dp),
+                                ) {
+                                    Text("清除", color = ErrorRed)
+                                }
+                            }
+                            Spacer(modifier = Modifier.weight(1f))
+                            Text("本机加密保存", color = Gray500, style = MaterialTheme.typography.labelSmall)
+                        }
+                        state.healthMessage?.let {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                it,
+                                color = if (it ==
+                                    "连接正常"
+                                ) {
+                                    SuccessGreen
+                                } else {
+                                    ErrorRed
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    }
+                }
+}
+
+private data class ModelConfigDialogSlots(
+    val state: ModelConfigUiState,
+    val viewModel: ModelConfigViewModel,
+    val confirmClear: Boolean,
+    val setConfirmClear: (Boolean) -> Unit,
+    val showEmbeddingConfig: Boolean,
+    val setShowEmbeddingConfig: (Boolean) -> Unit,
+    val openedEmbeddingVersion: Int,
+    val setOpenedEmbeddingVersion: (Int) -> Unit,
+    val confirmClearEmbedding: Boolean,
+    val setConfirmClearEmbedding: (Boolean) -> Unit,
+)
+
+@Composable
+private fun ModelConfigDialogs(slots: ModelConfigDialogSlots) {
+
+    if (slots.confirmClear) {
+        ZhiBanAlertDialog(
+            onDismissRequest = { slots.setConfirmClear(false) },
+            title = { Text("清除 API Key？") },
+            text = { Text("清除后，文字、图片和实时语音将停止使用，直到重新连接。") },
+            dismissButton = {
+                TextButton(onClick = { slots.setConfirmClear(false) }) { Text("取消") }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        slots.setConfirmClear(false)
+                        slots.viewModel.clearApiKey()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) {
+                    Text("清除")
+                }
+            },
+            shape = RoundedCornerShape(ZhiBanRadius.Dialog),
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 0.dp,
+        )
+    }
+    if (slots.showEmbeddingConfig) {
+        EmbeddingConfigDialog(
+            state = slots.state,
+            onApiKeyChange = slots.viewModel::onApiKeyChange,
+            onToggleVisibility = slots.viewModel::toggleEmbeddingApiKeyVisibility,
+            onModelChange = slots.viewModel::onEmbeddingModelChange,
+            onDismiss = { if (!slots.state.embeddingSaving) slots.setShowEmbeddingConfig(false) },
+            onConnect = slots.viewModel::configureEmbedding,
+        )
+    }
+    if (slots.confirmClearEmbedding) {
+        ZhiBanAlertDialog(
+            onDismissRequest = { slots.setConfirmClearEmbedding(false) },
+            title = { Text("关闭语义检索？") },
+            text = { Text("联系人和记忆仍可使用本地文字检索。") },
+            dismissButton = {
+                TextButton(onClick = { slots.setConfirmClearEmbedding(false) }) { Text("取消") }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        slots.setConfirmClearEmbedding(false)
+                        slots.viewModel.clearEmbedding()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) {
+                    Text("关闭")
+                }
+            },
+        )
+    }
+}
+
