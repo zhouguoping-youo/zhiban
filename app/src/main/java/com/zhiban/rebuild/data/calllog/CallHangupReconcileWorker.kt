@@ -44,7 +44,8 @@ class CallHangupReconcileWorker(appContext: Context, params: WorkerParameters) :
             throw cancelled
         } catch (_: SecurityException) {
             Result.success()
-        } catch (_: Throwable) {
+        } catch (failure: Throwable) {
+            android.util.Log.w(TAG, "hangup_reconcile:retry", failure)
             Result.retry()
         }
     }
@@ -93,6 +94,7 @@ class CallHangupReconcileWorker(appContext: Context, params: WorkerParameters) :
     }
 
     companion object {
+        private const val TAG = "CallHangupReconcileWorker"
         const val EXTRA_OPEN_CALL_NOTE = "openCallNote"
         private const val CHANNEL_ID = "call-note-reminders"
     }

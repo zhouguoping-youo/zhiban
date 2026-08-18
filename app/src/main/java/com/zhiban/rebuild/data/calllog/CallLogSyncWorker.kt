@@ -21,15 +21,22 @@ class CallLogSyncWorker(appContext: Context, params: WorkerParameters) : Corouti
         )
         return try {
             val result = dependencies.callLogCoordinator().syncNow()
-            if (result.degradationReason == "call_log:failure") Result.retry() else Result.success()
+            if (result.degradationReason == "call_log:failure") {
+                android.util.Log.w(TAG, "call_log:sync_failure_retry")
+                Result.retry()
+            } else {
+                Result.success()
+            }
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Throwable) {
+        } catch (failure: Throwable) {
+            android.util.Log.w(TAG, "call_log:retry", failure)
             Result.retry()
         }
     }
 
     companion object {
+        private const val TAG = "CallLogSyncWorker"
         private const val UNIQUE_NAME = "call-log-reconcile-v1"
 
         fun schedule(context: Context) {

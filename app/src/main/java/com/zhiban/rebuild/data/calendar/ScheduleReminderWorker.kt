@@ -51,7 +51,8 @@ class ScheduleReminderWorker(appContext: Context, params: WorkerParameters) : Co
             )
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Throwable) {
+        } catch (failure: Throwable) {
+            android.util.Log.w(TAG, "reminder:retry", failure)
             return Result.retry()
         }
         if (!current) return Result.success()
@@ -90,6 +91,7 @@ class ScheduleReminderWorker(appContext: Context, params: WorkerParameters) : Co
     }
 
     companion object {
+        private const val TAG = "ScheduleReminderWorker"
         const val KEY_SCHEDULE_ID = "scheduleId"
         const val KEY_START_AT = "startAtEpochMs"
         const val KEY_REMINDER_MINUTES = "reminderMinutesBefore"

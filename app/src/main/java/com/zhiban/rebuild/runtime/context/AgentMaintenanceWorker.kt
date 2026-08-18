@@ -30,12 +30,15 @@ internal class AgentMaintenanceWorker(appContext: Context, parameters: WorkerPar
             Result.success()
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Throwable) {
+        } catch (failure: Throwable) {
+            // Worker 层静默 Result.retry() 补原因码日志(审计 M 类问题)。
+            android.util.Log.w(TAG, "maintenance:retry", failure)
             Result.retry()
         }
     }
 
     companion object {
+        private const val TAG = "AgentMaintenanceWorker"
         private const val UNIQUE_NAME = "agent-context-maintenance-v1"
         fun schedule(context: Context) {
             val request = PeriodicWorkRequestBuilder<AgentMaintenanceWorker>(12, TimeUnit.HOURS).build()
