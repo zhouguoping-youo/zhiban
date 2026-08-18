@@ -377,39 +377,6 @@ fun PrivacySecurityPage(
     }
 }
 
-/** Stable outbound privacy contract used by policy regression tests; not rendered as a technical settings table. */
-internal enum class DataSendScope(val dataType: String, val isSent: Boolean, val note: String) {
-    CONTACT_IDENTITY("联系人资料（脱敏）", true, "脱敏后发送，用于识别和称呼"),
-    DIRECT_IDENTIFIER("手机号与邮箱", false, "始终脱敏，不会原样发送"),
-    MESSAGE_CONTENT("消息原文", false, "只提炼摘要，原文不发送"),
-    CALL_LOG("通话记录", false, "只保存时间与方向等元数据"),
-    VOICE("语音（授权后）", true, "仅在你授权后发给语音识别"),
-    ;
-
-    val statusLabel: String get() = if (isSent) "发送" else "不发送"
-}
-
-@HiltViewModel
-class NotificationCategoryViewModel @Inject constructor(private val preferences: NotificationCategoryPreferences) : ViewModel() {
-    private val mutableStates = MutableStateFlow(NotificationCategory.entries.associateWith { true })
-    val states = mutableStates.asStateFlow()
-
-    init {
-        NotificationCategory.entries.forEach { category ->
-            viewModelScope.launch {
-                preferences.isEnabled(category).collect { enabled ->
-                    mutableStates.update { it + (category to enabled) }
-                }
-            }
-        }
-    }
-
-    fun setEnabled(category: NotificationCategory, enabled: Boolean) {
-        mutableStates.update { it + (category to enabled) }
-        viewModelScope.launch { preferences.setEnabled(category, enabled) }
-    }
-}
-
 /**
  * Backs the "回复建议" settings block: the global toggle plus the review list of contacts the user has
  * opted out (via a card's "不再建议"), so that per-contact choice stays reversible from settings.
@@ -457,66 +424,6 @@ class LocationConsentSettingsViewModel @Inject constructor(private val controls:
     fun setEnabled(enabled: Boolean) {
         controls.saveLocationAccessEnabled(enabled)
         mutableEnabled.value = enabled
-    }
-}
-
-@Composable
-fun NotificationSettingsPage(onBack: () -> Unit, categoryViewModel: NotificationCategoryViewModel = hiltViewModel()) {
-    val context = LocalContext.current
-    var refreshVersion by remember { mutableIntStateOf(0) }
-    RefreshPermissionsOnResume { refreshVersion += 1 }
-    val notificationsGranted = remember(refreshVersion) {
-        NotificationManagerCompat.from(context).areNotificationsEnabled()
-    }
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        refreshVersion += 1
-    }
-    val categoryStates by categoryViewModel.states.collectAsStateWithLifecycle()
-
-    SettingsPageFrame("通知", onBack) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = ZhiBanSpacing.PageHorizontal)
-                .padding(bottom = ZhiBanSpacing.PageBottom),
-            verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
-        ) {
-            SettingsCard {
-                SettingsPermissionRow(
-                    Icons.Outlined.NotificationsNone,
-                    "系统通知",
-                    if (notificationsGranted) "已开启 · 点击管理" else "未开启 · 点击允许",
-                ) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !notificationsGranted) {
-                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    } else {
-                        context.startActivity(
-                            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                            },
-                        )
-                    }
-                }
-            }
-            Text(
-                "通知分类",
-                style = MaterialTheme.typography.labelMedium,
-                color = ZhiBanTextSecondary,
-                modifier = Modifier.padding(horizontal = ZhiBanSpacing.Xs),
-            )
-            SettingsCard {
-                NotificationCategory.entries.forEachIndexed { index, category ->
-                    if (index > 0) Divider()
-                    SettingsToggleRow(
-                        title = category.title,
-                        subtitle = category.subtitle,
-                        checked = categoryStates[category] ?: true,
-                        onCheckedChange = { enabled -> categoryViewModel.setEnabled(category, enabled) },
-                    )
-                }
-            }
-        }
     }
 }
 
@@ -942,7 +849,7 @@ private fun SettingsRow(title: String, subtitle: String, trailing: (@Composable 
 }
 
 @Composable
-private fun SettingsToggleRow(title: String, subtitle: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+internal fun SettingsToggleRow(title: String, subtitle: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     ZhiBanToggleRow(
         title = title,
         subtitle = subtitle,
@@ -993,7 +900,7 @@ private fun SettingsInfoRow(icon: androidx.compose.ui.graphics.vector.ImageVecto
 }
 
 @Composable
-private fun SettingsPermissionRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, text: String, onClick: () -> Unit) {
+internal fun SettingsPermissionRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, text: String, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().defaultMinSize(
             minHeight = ZhiBanSize.ListRowWithSubtitle,
@@ -1016,7 +923,7 @@ private fun SettingsPermissionRow(icon: androidx.compose.ui.graphics.vector.Imag
 }
 
 @Composable
-private fun Divider() {
+internal fun Divider() {
     Box(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant))
 }
 
@@ -1080,7 +987,7 @@ private fun android.content.Context.openAppDetails() {
 }
 
 @Composable
-private fun RefreshPermissionsOnResume(onResume: () -> Unit) {
+internal fun RefreshPermissionsOnResume(onResume: () -> Unit) {
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
