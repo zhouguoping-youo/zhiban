@@ -1,7 +1,9 @@
 package com.zhiban.rebuild.runtime.provider
 
+import android.os.Build
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.StrongBoxUnavailableException
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import com.zhiban.rebuild.runtime.runSuspendCatching
@@ -80,15 +82,28 @@ class KeystoreCredentialVault(context: Context) :
     }
 
     private fun getOrCreateKey(alias: String): SecretKey = runCatching { key(alias) }.getOrElse {
-        KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore").apply {
-            init(
-                KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
-                    .setBlockModes(
-                        KeyProperties.BLOCK_MODE_GCM,
-                    ).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build(),
-            )
-        }.generateKey()
+        try {
+            generateKey(alias, strongBox = true)
+        } catch (unavailable: StrongBoxUnavailableException) {
+            // 无 StrongBox 芯片的设备回退普通 AndroidKeyStore 密钥(加固建议项,降级只发生在
+            // 硬件不支持时,凭据安全级别不低于改动前)。
+            generateKey(alias, strongBox = false)
+        }
     }
+
+    private fun generateKey(alias: String, strongBox: Boolean): SecretKey = KeyGenerator.getInstance(
+        KeyProperties.KEY_ALGORITHM_AES,
+        "AndroidKeyStore",
+    ).apply {
+        init(
+            KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+                .setBlockModes(
+                    KeyProperties.BLOCK_MODE_GCM,
+                ).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setIsStrongBoxBacked(strongBox && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
+                .build(),
+        )
+    }.generateKey()
 
     private fun key(alias: String): SecretKey = KeyStore.getInstance("AndroidKeyStore").run {
         load(null)

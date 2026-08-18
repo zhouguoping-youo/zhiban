@@ -1,7 +1,9 @@
 package com.zhiban.rebuild.data.agent
 
+import android.os.Build
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.StrongBoxUnavailableException
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import androidx.sqlite.db.SupportSQLiteDatabase
@@ -60,14 +62,26 @@ internal class AgentDatabaseKeyManager(context: Context) {
     }
 
     private fun getOrCreateKey(): SecretKey = runCatching { key() }.getOrElse {
-        KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore").apply {
-            init(
-                KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
-                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build(),
-            )
-        }.generateKey()
+        try {
+            generateKey(strongBox = true)
+        } catch (unavailable: StrongBoxUnavailableException) {
+            // 无 StrongBox 芯片的设备回退普通 AndroidKeyStore 密钥(加固建议项)。
+            generateKey(strongBox = false)
+        }
     }
+
+    private fun generateKey(strongBox: Boolean): SecretKey = KeyGenerator.getInstance(
+        KeyProperties.KEY_ALGORITHM_AES,
+        "AndroidKeyStore",
+    ).apply {
+        init(
+            KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setIsStrongBoxBacked(strongBox && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
+                .build(),
+        )
+    }.generateKey()
 
     private fun key(): SecretKey = KeyStore.getInstance("AndroidKeyStore").run {
         load(null)
