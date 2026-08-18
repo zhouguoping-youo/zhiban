@@ -1,6 +1,7 @@
 package com.zhiban.rebuild.data.completion
 
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.contact.ContactProfileCompletenessEvaluator
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.runtime.config.AgentControlStore
 import javax.inject.Inject
@@ -61,6 +62,7 @@ internal class ContactCompletionCoordinator @Inject constructor(
             val now = System.currentTimeMillis()
             val dao = database.contactCompletionRequestDao()
             dao.expireAwaitingBefore(now) // 超时收尾与开关无关,总要跑
+            reconcileCompleted(now) // 已收到回复的请求:候选都处理完(或用户已手改补齐)就收敛 COMPLETED
             if (!controls.contactCompletionEnabled()) return
             database.notificationCandidateDao()
                 .recentIncomingAttributed(WECHAT_PLATFORM, now - CANDIDATE_WINDOW_MS, CANDIDATE_LIMIT)
@@ -69,6 +71,30 @@ internal class ContactCompletionCoordinator @Inject constructor(
                         .onFailure { if (it is CancellationException) throw it }
                 }
         }
+    }
+
+    /**
+     * RESPONSE_RECEIVED → COMPLETED 的懒对账。两种收敛:候选全部不再 actionable(已采纳/已驳回/已过期),
+     * 或联系人资料已被填满(用户绕过候选直接手改)。刚 markResponseReceived 的请求其候选仍 PENDING,不会被
+     * 误判完成;用户逐项确认/驳回后,下一次扫描即收敛。
+     */
+    private suspend fun reconcileCompleted(now: Long) {
+        database.contactCompletionRequestDao().responseReceivedRequests().forEach { request ->
+            runCatching {
+                val actionablePending = database.contactKnowledgeDao()
+                    .countPendingBySourceRefPrefix("completion:${request.requestId}", now)
+                if (actionablePending == 0 || contactProfileComplete(request.contactId)) {
+                    database.contactCompletionRequestDao()
+                        .markStatus(request.requestId, ContactCompletionStatus.COMPLETED, now)
+                }
+            }.onFailure { if (it is CancellationException) throw it }
+        }
+    }
+
+    private suspend fun contactProfileComplete(contactId: String): Boolean {
+        val contact = database.contactDao().findById(contactId) ?: return false
+        val identities = database.contactIdentityDao().platformIdentities(contactId)
+        return ContactProfileCompletenessEvaluator.missingFields(contact, identities).isEmpty()
     }
 
     private suspend fun processCandidate(candidate: NotificationCandidateEntity, now: Long) {

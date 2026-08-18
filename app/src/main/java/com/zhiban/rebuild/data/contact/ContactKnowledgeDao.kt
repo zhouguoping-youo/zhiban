@@ -169,6 +169,14 @@ interface ContactKnowledgeDao {
     )
     suspend fun countActiveEnrichmentCandidates(contactId: String, providerId: String, fieldKind: String, nowEpochMs: Long): Int
 
+    /** 某补全请求(sourceRef 前缀 completion:{requestId})下仍可操作(PENDING 且未过期)的候选数。 */
+    @Query(
+        """SELECT COUNT(*) FROM contact_enrichment_candidates
+        WHERE sourceRef LIKE :prefix || '%' AND status = 'PENDING'
+        AND (expiresAtEpochMs IS NULL OR expiresAtEpochMs > :nowEpochMs)""",
+    )
+    suspend fun countPendingBySourceRefPrefix(prefix: String, nowEpochMs: Long): Int
+
     @Query(
         "UPDATE contact_enrichment_candidates SET status = :status, updatedAtEpochMs = :nowEpochMs WHERE candidateId = :candidateId AND status = 'PENDING'",
     )

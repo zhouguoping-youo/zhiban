@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.contact.ContactEnrichmentCandidateEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.runtime.config.AgentControlStore
@@ -157,17 +158,56 @@ class ContactCompletionCoordinatorTest {
         assertEquals(ContactCompletionStatus.AWAITING_REPLY, database.contactCompletionRequestDao().findById("ccr-1")!!.status)
     }
 
-    private suspend fun insertContact(contactId: String) {
+    @Test fun reconcileCompletesWhenCandidatesResolved() = runBlocking {
+        insertContact("c1")
+        seedResponseReceived("c1")
+        insertEnrichment("ccr-1", status = "APPROVED") // 候选已处理
+
+        coordinator.processOnce()
+
+        assertEquals(ContactCompletionStatus.COMPLETED, database.contactCompletionRequestDao().findById("ccr-1")!!.status)
+    }
+
+    @Test fun reconcileStaysWhenCandidatesStillPending() = runBlocking {
+        insertContact("c1")
+        seedResponseReceived("c1")
+        insertEnrichment("ccr-1", status = "PENDING") // 候选仍待用户确认
+
+        coordinator.processOnce()
+
+        assertEquals(ContactCompletionStatus.RESPONSE_RECEIVED, database.contactCompletionRequestDao().findById("ccr-1")!!.status)
+    }
+
+    @Test fun reconcileCompletesWhenContactManuallyFilled() = runBlocking {
+        // 用户绕过候选直接手改补齐:即便候选仍 PENDING,也按"资料已完整"收敛 COMPLETED。
+        insertContact("c1", phone = "13800138000", email = "a@b.c", company = "司", title = "职", responsibilities = "责")
+        seedResponseReceived("c1")
+        insertEnrichment("ccr-1", status = "PENDING")
+
+        coordinator.processOnce()
+
+        assertEquals(ContactCompletionStatus.COMPLETED, database.contactCompletionRequestDao().findById("ccr-1")!!.status)
+    }
+
+    private suspend fun insertContact(
+        contactId: String,
+        phone: String? = null,
+        email: String? = null,
+        wechatId: String? = "wx-1",
+        company: String? = null,
+        title: String? = null,
+        responsibilities: String? = null,
+    ) {
         database.contactDao().insert(
             ContactEntity(
                 contactId = contactId,
                 displayName = "张三",
                 normalizedName = "张三",
-                phone = null,
-                email = null,
-                wechatId = "wx-1",
-                company = null,
-                title = null,
+                phone = phone,
+                email = email,
+                wechatId = wechatId,
+                company = company,
+                title = title,
                 aliasesJson = "[]",
                 tagsJson = "[]",
                 note = null,
@@ -176,6 +216,7 @@ class ContactCompletionCoordinatorTest {
                 deletedAtEpochMs = null,
                 createdAtEpochMs = 1,
                 updatedAtEpochMs = 1,
+                responsibilities = responsibilities,
             ),
         )
     }
@@ -228,6 +269,45 @@ class ContactCompletionCoordinatorTest {
                 suggestedContactId = suggestedContactId,
                 suggestedContactConfidence = confidence,
                 linkedContactId = linkedContactId,
+            ),
+        )
+    }
+
+    private suspend fun seedResponseReceived(contactId: String, requestId: String = "ccr-1") {
+        val now = System.currentTimeMillis()
+        database.contactCompletionRequestDao().upsert(
+            ContactCompletionRequestEntity(
+                requestId = requestId,
+                contactId = contactId,
+                requestedFieldsJson = """["PHONE"]""",
+                draftText = "方便发我下手机号吗",
+                status = ContactCompletionStatus.RESPONSE_RECEIVED,
+                sentAtEpochMs = now - 5_000,
+                respondedAtEpochMs = now - 1_000,
+                responseCandidateId = "cc-$requestId-COMMUNICATION_METHOD",
+                createdAtEpochMs = now - 5_000,
+                expiresAtEpochMs = now + 7L * 24 * 3600_000L,
+                updatedAtEpochMs = now - 1_000,
+            ),
+        )
+    }
+
+    private suspend fun insertEnrichment(requestId: String, status: String) {
+        val now = System.currentTimeMillis()
+        database.contactKnowledgeDao().insertEnrichmentCandidateIfAbsent(
+            ContactEnrichmentCandidateEntity(
+                candidateId = "cc-$requestId-COMMUNICATION_METHOD",
+                contactId = "c1",
+                providerId = "contact-completion-outreach",
+                fieldKind = "COMMUNICATION_METHOD",
+                proposedValueJson = """{"phone":"13800138000"}""",
+                sourceRef = "completion:$requestId:COMMUNICATION_METHOD",
+                confidence = 0.9,
+                status = status,
+                observedAtEpochMs = now,
+                expiresAtEpochMs = now + 30L * 24 * 3600_000L,
+                createdAtEpochMs = now,
+                updatedAtEpochMs = now,
             ),
         )
     }
