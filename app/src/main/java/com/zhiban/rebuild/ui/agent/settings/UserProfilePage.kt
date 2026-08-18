@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -255,74 +256,9 @@ fun UserProfilePage(onBack: () -> Unit, viewModel: UserProfileViewModel = hiltVi
                     }
                 }
 
-                item { ProfileSectionLabel("联系方式") }
-                item {
-                    ProfileCard {
-                        ProfileCardField(
-                            value = s.phone,
-                            onValueChange = viewModel::phone,
-                            label = "手机号",
-                            required = true,
-                            placeholder = "11位手机号",
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
-                        )
-                        ProfileCardDivider()
-                        ProfileCardField(
-                            value = s.wechatId,
-                            onValueChange = viewModel::wechat,
-                            label = "微信号",
-                            required = true,
-                            placeholder = "你的微信号",
-                            showDivider = false,
-                        )
-                        if (s.extraAccounts.isNotEmpty()) {
-                            ProfileCardDivider()
-                            s.extraAccounts.forEachIndexed { index, row ->
-                                ExtraAccountRow(
-                                    row = row,
-                                    onHandleChange = { viewModel.changeAccountHandle(index, it) },
-                                    onRemove = { viewModel.removeAccountRow(index) },
-                                )
-                            }
-                        }
-                        AddAccountRow(onClick = { showPlatformPicker = true })
-                    }
-                }
-
-                item { ProfileSectionLabel("以下哪项最能描述你的工作和生活") }
-                item {
-                    ProfileCard {
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm),
-                            verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm),
-                        ) {
-                            OCCUPATION_OPTIONS.forEach { option ->
-                                OccupationChip(
-                                    label = option,
-                                    selected = option in s.occupations,
-                                    onClick = { viewModel.toggleOccupation(option) },
-                                )
-                            }
-                        }
-                    }
-                }
-
-                item { ProfileSectionLabel("给知伴的指令") }
-                item {
-                    ProfileCard {
-                        TextField(
-                            value = s.customInstructions,
-                            onValueChange = viewModel::customInstructions,
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp),
-                            placeholder = { Text("告诉知伴你希望它如何跟你协作") },
-                            minLines = 3,
-                            shape = RoundedCornerShape(ZhiBanRadius.Card),
-                            colors = profileFieldColors(),
-                        )
-                        InstructionHintCarousel()
-                    }
-                }
-
+                contactMethodsSection(s = s, viewModel = viewModel, onAddAccount = { showPlatformPicker = true })
+                occupationSection(occupations = s.occupations, onToggle = viewModel::toggleOccupation)
+                instructionsSection(value = s.customInstructions, onChange = viewModel::customInstructions)
                 s.validationError?.let { error ->
                     item {
                         Text(
@@ -352,15 +288,11 @@ fun UserProfilePage(onBack: () -> Unit, viewModel: UserProfileViewModel = hiltVi
         }
     }
 
-    if (showPlatformPicker) {
-        PlatformPickerDialog(
-            onSelect = { platform ->
-                showPlatformPicker = false
-                viewModel.addAccountRow(platform)
-            },
-            onDismiss = { showPlatformPicker = false },
-        )
-    }
+    PlatformPickerDialogWrapper(
+        show = showPlatformPicker,
+        setShow = { showPlatformPicker = it },
+        viewModel = viewModel,
+    )
 }
 
 @Composable
@@ -612,3 +544,91 @@ private fun profileFieldColors() = TextFieldDefaults.colors(
     unfocusedIndicatorColor = Color.Transparent,
     disabledIndicatorColor = Color.Transparent,
 )
+
+private fun LazyListScope.contactMethodsSection(s: UserProfileUiState, viewModel: UserProfileViewModel, onAddAccount: () -> Unit) {
+    item { ProfileSectionLabel("联系方式") }
+    item {
+        ProfileCard {
+            ProfileCardField(
+                value = s.phone,
+                onValueChange = viewModel::phone,
+                label = "手机号",
+                required = true,
+                placeholder = "11位手机号",
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
+            )
+            ProfileCardDivider()
+            ProfileCardField(
+                value = s.wechatId,
+                onValueChange = viewModel::wechat,
+                label = "微信号",
+                required = true,
+                placeholder = "你的微信号",
+                showDivider = false,
+            )
+            if (s.extraAccounts.isNotEmpty()) {
+                ProfileCardDivider()
+                s.extraAccounts.forEachIndexed { index, row ->
+                    ExtraAccountRow(
+                        row = row,
+                        onHandleChange = { viewModel.changeAccountHandle(index, it) },
+                        onRemove = { viewModel.removeAccountRow(index) },
+                    )
+                }
+            }
+            AddAccountRow(onClick = onAddAccount)
+        }
+    }
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+private fun LazyListScope.occupationSection(occupations: Set<String>, onToggle: (String) -> Unit) {
+    item { ProfileSectionLabel("以下哪项最能描述你的工作和生活") }
+    item {
+        ProfileCard {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm),
+                verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm),
+            ) {
+                OCCUPATION_OPTIONS.forEach { option ->
+                    OccupationChip(
+                        label = option,
+                        selected = option in occupations,
+                        onClick = { onToggle(option) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun LazyListScope.instructionsSection(value: String, onChange: (String) -> Unit) {
+    item { ProfileSectionLabel("给知伴的指令") }
+    item {
+        ProfileCard {
+            TextField(
+                value = value,
+                onValueChange = onChange,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp),
+                placeholder = { Text("告诉知伴你希望它如何跟你协作") },
+                minLines = 3,
+                shape = RoundedCornerShape(ZhiBanRadius.Card),
+                colors = profileFieldColors(),
+            )
+            InstructionHintCarousel()
+        }
+    }
+}
+
+@Composable
+private fun PlatformPickerDialogWrapper(show: Boolean, setShow: (Boolean) -> Unit, viewModel: UserProfileViewModel) {
+    if (show) {
+        PlatformPickerDialog(
+            onSelect = { platform ->
+                setShow(false)
+                viewModel.addAccountRow(platform)
+            },
+            onDismiss = { setShow(false) },
+        )
+    }
+}

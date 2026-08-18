@@ -149,7 +149,7 @@ fun EventPlanningDetailPage(planId: String, onBack: () -> Unit, onAskAgent: (Str
                 onDelete = { deleteConfirmOpen = true },
                 onClearMessage = viewModel::clearMessage,
             )
-}
+        }
     }
     EventPlanningDetailDialogs(
         EventPlanningDetailDialogSlots(
@@ -468,73 +468,71 @@ private fun LazyListScope.eventPlanDetailContent(
     onClearMessage: () -> Unit,
 ) {
     if (item == null) {
-            if (!state.isLoading) item { EventPlanningEmpty(Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal), null) }
-        } else {
-            item { EventPlanSummary(item, Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal)) }
+        if (!state.isLoading) item { EventPlanningEmpty(Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal), null) }
+    } else {
+        item { EventPlanSummary(item, Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal)) }
+        item {
+            ZhiBanSectionTitle(
+                title = "参与人",
+                action = "添加",
+                onActionClick = { onAddClick() },
+                modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+            )
+        }
+        if (item.participants.isEmpty()) {
             item {
-                ZhiBanSectionTitle(
-                    title = "参与人",
-                    action = "添加",
-                    onActionClick = { onAddClick() },
-                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
-                )
-            }
-            if (item.participants.isEmpty()) {
-                item {
-                    OutlinedButton(
-                        onClick = { onAddClick() },
-                        modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal).fillMaxWidth().height(48.dp),
-                    ) {
-                        Icon(Icons.Outlined.PersonAddAlt, null, Modifier.size(ZhiBanIconSize.Inline))
-                        Spacer(Modifier.size(ZhiBanSpacing.Sm))
-                        Text("选择联系人")
-                    }
-                }
-            } else {
-                items(item.participants, key = { it.contact.contactId }) { participant ->
-                    ParticipantRow(
-                        participant = participant,
-                        onClick = { onParticipantClick(participant.contact) },
-                        onRemove = { onRemoveParticipant(participant.contact.contactId) },
-                        modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
-                    )
-                }
-            }
-            item {
-                Column(
-                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
-                    verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm),
+                OutlinedButton(
+                    onClick = { onAddClick() },
+                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal).fillMaxWidth().height(48.dp),
                 ) {
-                    OutlinedButton(
-                        onClick = { onPrepareInvite() },
-                        enabled = item.participants.isNotEmpty(),
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                    ) { Text("准备邀请") }
-                    Button(
-                        onClick = { onConfirm() },
-                        enabled = item.participants.isNotEmpty() && item.plan.status != EventPlanStatus.CONFIRMED,
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                    ) {
-                        Text(if (item.plan.status == EventPlanStatus.CONFIRMED) "已加入日历" else "确定并加入日历")
-                    }
-                    TextButton(
-                        onClick = { onDelete() },
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                    ) {
-                        Text("删除这项安排", color = MaterialTheme.colorScheme.error)
-                    }
+                    Icon(Icons.Outlined.PersonAddAlt, null, Modifier.size(ZhiBanIconSize.Inline))
+                    Spacer(Modifier.size(ZhiBanSpacing.Sm))
+                    Text("选择联系人")
                 }
             }
-        }
-        state.actionMessage?.let { message ->
-            item {
-                EventPlanningMessage(
-                    message,
-                    onClearMessage,
-                    Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+        } else {
+            items(item.participants, key = { it.contact.contactId }) { participant ->
+                ParticipantRow(
+                    participant = participant,
+                    onClick = { onParticipantClick(participant.contact) },
+                    onRemove = { onRemoveParticipant(participant.contact.contactId) },
+                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
                 )
             }
         }
+        item {
+            Column(
+                modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm),
+            ) {
+                OutlinedButton(
+                    onClick = { onPrepareInvite() },
+                    enabled = item.participants.isNotEmpty(),
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                ) { Text("准备邀请") }
+                Button(
+                    onClick = { onConfirm() },
+                    enabled = item.participants.isNotEmpty() && item.plan.status != EventPlanStatus.CONFIRMED,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                ) {
+                    Text(if (item.plan.status == EventPlanStatus.CONFIRMED) "已加入日历" else "确定并加入日历")
+                }
+                TextButton(
+                    onClick = { onDelete() },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                ) {
+                    Text("删除这项安排", color = MaterialTheme.colorScheme.error)
+                }
+            }
+        }
+    }
+    state.actionMessage?.let { message ->
+        item {
+            EventPlanningMessage(
+                message,
+                onClearMessage,
+                Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+            )
+        }
+    }
 }
-
-

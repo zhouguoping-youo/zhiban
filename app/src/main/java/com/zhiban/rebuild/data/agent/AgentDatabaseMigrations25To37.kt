@@ -19,121 +19,120 @@ internal object AgentDatabaseMigrations25To37 {
     }
 
     private fun migrate26To27Part1(db: SupportSQLiteDatabase) {
-            // CALLBACK recreates this unmanaged partial index after Room opens the database.
-            // Remove it before migration validation so Room compares only its managed schema;
-            // onOpen restores the runtime invariant immediately after validation.
-            db.execSQL("DROP INDEX IF EXISTS `index_plan_runs_single_active_per_definition`")
+        // CALLBACK recreates this unmanaged partial index after Room opens the database.
+        // Remove it before migration validation so Room compares only its managed schema;
+        // onOpen restores the runtime invariant immediately after validation.
+        db.execSQL("DROP INDEX IF EXISTS `index_plan_runs_single_active_per_definition`")
 
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `crm_leads` (`leadId` TEXT NOT NULL, `contactId` TEXT, `displayNameSnapshot` TEXT NOT NULL, `companyNameSnapshot` TEXT, `status` TEXT NOT NULL, `sourceType` TEXT NOT NULL, `sourceRef` TEXT, `fitSummary` TEXT, `confidence` REAL NOT NULL, `userConfirmed` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`leadId`), FOREIGN KEY(`contactId`) REFERENCES `contacts`(`contactId`) ON UPDATE NO ACTION ON DELETE SET NULL)",
-            )
-            db.execSQL("CREATE INDEX IF NOT EXISTS `index_crm_leads_contactId` ON `crm_leads` (`contactId`)")
-            db.execSQL("CREATE INDEX IF NOT EXISTS `index_crm_leads_status` ON `crm_leads` (`status`)")
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_crm_leads_updatedAtEpochMs` ON `crm_leads` (`updatedAtEpochMs`)",
-            )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `crm_leads` (`leadId` TEXT NOT NULL, `contactId` TEXT, `displayNameSnapshot` TEXT NOT NULL, `companyNameSnapshot` TEXT, `status` TEXT NOT NULL, `sourceType` TEXT NOT NULL, `sourceRef` TEXT, `fitSummary` TEXT, `confidence` REAL NOT NULL, `userConfirmed` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`leadId`), FOREIGN KEY(`contactId`) REFERENCES `contacts`(`contactId`) ON UPDATE NO ACTION ON DELETE SET NULL)",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_crm_leads_contactId` ON `crm_leads` (`contactId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_crm_leads_status` ON `crm_leads` (`status`)")
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_crm_leads_updatedAtEpochMs` ON `crm_leads` (`updatedAtEpochMs`)",
+        )
 
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `crm_opportunities` (`opportunityId` TEXT NOT NULL, `title` TEXT NOT NULL, `accountNameSnapshot` TEXT NOT NULL, `primaryContactId` TEXT, `sourceLeadId` TEXT, `stage` TEXT NOT NULL, `status` TEXT NOT NULL, `valueMinor` INTEGER, `currencyCode` TEXT NOT NULL, `probabilityPercent` INTEGER NOT NULL, `expectedCloseAtEpochMs` INTEGER, `productSummary` TEXT, `needSummary` TEXT, `lossReason` TEXT, `sourceType` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`opportunityId`), FOREIGN KEY(`primaryContactId`) REFERENCES `contacts`(`contactId`) ON UPDATE NO ACTION ON DELETE SET NULL, FOREIGN KEY(`sourceLeadId`) REFERENCES `crm_leads`(`leadId`) ON UPDATE NO ACTION ON DELETE SET NULL)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_crm_opportunities_primaryContactId` ON `crm_opportunities` (`primaryContactId`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_crm_opportunities_sourceLeadId` ON `crm_opportunities` (`sourceLeadId`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_crm_opportunities_stage` ON `crm_opportunities` (`stage`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_crm_opportunities_status` ON `crm_opportunities` (`status`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_crm_opportunities_expectedCloseAtEpochMs` ON `crm_opportunities` (`expectedCloseAtEpochMs`)",
-            )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `crm_opportunities` (`opportunityId` TEXT NOT NULL, `title` TEXT NOT NULL, `accountNameSnapshot` TEXT NOT NULL, `primaryContactId` TEXT, `sourceLeadId` TEXT, `stage` TEXT NOT NULL, `status` TEXT NOT NULL, `valueMinor` INTEGER, `currencyCode` TEXT NOT NULL, `probabilityPercent` INTEGER NOT NULL, `expectedCloseAtEpochMs` INTEGER, `productSummary` TEXT, `needSummary` TEXT, `lossReason` TEXT, `sourceType` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`opportunityId`), FOREIGN KEY(`primaryContactId`) REFERENCES `contacts`(`contactId`) ON UPDATE NO ACTION ON DELETE SET NULL, FOREIGN KEY(`sourceLeadId`) REFERENCES `crm_leads`(`leadId`) ON UPDATE NO ACTION ON DELETE SET NULL)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_crm_opportunities_primaryContactId` ON `crm_opportunities` (`primaryContactId`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_crm_opportunities_sourceLeadId` ON `crm_opportunities` (`sourceLeadId`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_crm_opportunities_stage` ON `crm_opportunities` (`stage`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_crm_opportunities_status` ON `crm_opportunities` (`status`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_crm_opportunities_expectedCloseAtEpochMs` ON `crm_opportunities` (`expectedCloseAtEpochMs`)",
+        )
 
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `crm_opportunity_stakeholders` (`opportunityId` TEXT NOT NULL, `contactId` TEXT NOT NULL, `roleType` TEXT NOT NULL, `influenceLevel` TEXT NOT NULL, `userConfirmed` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`opportunityId`, `contactId`, `roleType`), FOREIGN KEY(`opportunityId`) REFERENCES `crm_opportunities`(`opportunityId`) ON UPDATE NO ACTION ON DELETE CASCADE, FOREIGN KEY(`contactId`) REFERENCES `contacts`(`contactId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_crm_opportunity_stakeholders_opportunityId` ON `crm_opportunity_stakeholders` (`opportunityId`)",
-            )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `crm_opportunity_stakeholders` (`opportunityId` TEXT NOT NULL, `contactId` TEXT NOT NULL, `roleType` TEXT NOT NULL, `influenceLevel` TEXT NOT NULL, `userConfirmed` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`opportunityId`, `contactId`, `roleType`), FOREIGN KEY(`opportunityId`) REFERENCES `crm_opportunities`(`opportunityId`) ON UPDATE NO ACTION ON DELETE CASCADE, FOREIGN KEY(`contactId`) REFERENCES `contacts`(`contactId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_crm_opportunity_stakeholders_opportunityId` ON `crm_opportunity_stakeholders` (`opportunityId`)",
+        )
     }
 
     private fun migrate26To27Part2(db: SupportSQLiteDatabase) {
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_crm_opportunity_stakeholders_contactId` ON `crm_opportunity_stakeholders` (`contactId`)",
-            )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_crm_opportunity_stakeholders_contactId` ON `crm_opportunity_stakeholders` (`contactId`)",
+        )
 
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `crm_activities` (`activityId` TEXT NOT NULL, `opportunityId` TEXT NOT NULL, `contactId` TEXT, `activityType` TEXT NOT NULL, `title` TEXT NOT NULL, `summary` TEXT NOT NULL, `occurredAtEpochMs` INTEGER NOT NULL, `sourceType` TEXT NOT NULL, `sourceRef` TEXT, `evidenceSummary` TEXT, `userConfirmed` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`activityId`), FOREIGN KEY(`opportunityId`) REFERENCES `crm_opportunities`(`opportunityId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_crm_activities_opportunityId` ON `crm_activities` (`opportunityId`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_crm_activities_contactId` ON `crm_activities` (`contactId`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_crm_activities_occurredAtEpochMs` ON `crm_activities` (`occurredAtEpochMs`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_crm_activities_sourceType` ON `crm_activities` (`sourceType`)",
-            )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `crm_activities` (`activityId` TEXT NOT NULL, `opportunityId` TEXT NOT NULL, `contactId` TEXT, `activityType` TEXT NOT NULL, `title` TEXT NOT NULL, `summary` TEXT NOT NULL, `occurredAtEpochMs` INTEGER NOT NULL, `sourceType` TEXT NOT NULL, `sourceRef` TEXT, `evidenceSummary` TEXT, `userConfirmed` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`activityId`), FOREIGN KEY(`opportunityId`) REFERENCES `crm_opportunities`(`opportunityId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_crm_activities_opportunityId` ON `crm_activities` (`opportunityId`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_crm_activities_contactId` ON `crm_activities` (`contactId`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_crm_activities_occurredAtEpochMs` ON `crm_activities` (`occurredAtEpochMs`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_crm_activities_sourceType` ON `crm_activities` (`sourceType`)",
+        )
 
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `crm_next_actions` (`actionId` TEXT NOT NULL, `opportunityId` TEXT NOT NULL, `contactId` TEXT, `actionType` TEXT NOT NULL, `title` TEXT NOT NULL, `dueAtEpochMs` INTEGER, `status` TEXT NOT NULL, `priority` INTEGER NOT NULL, `rationale` TEXT, `sourceType` TEXT NOT NULL, `scheduleId` TEXT, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`actionId`), FOREIGN KEY(`opportunityId`) REFERENCES `crm_opportunities`(`opportunityId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_crm_next_actions_opportunityId` ON `crm_next_actions` (`opportunityId`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_crm_next_actions_contactId` ON `crm_next_actions` (`contactId`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_crm_next_actions_scheduleId` ON `crm_next_actions` (`scheduleId`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_crm_next_actions_status` ON `crm_next_actions` (`status`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_crm_next_actions_dueAtEpochMs` ON `crm_next_actions` (`dueAtEpochMs`)",
-            )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `crm_next_actions` (`actionId` TEXT NOT NULL, `opportunityId` TEXT NOT NULL, `contactId` TEXT, `actionType` TEXT NOT NULL, `title` TEXT NOT NULL, `dueAtEpochMs` INTEGER, `status` TEXT NOT NULL, `priority` INTEGER NOT NULL, `rationale` TEXT, `sourceType` TEXT NOT NULL, `scheduleId` TEXT, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`actionId`), FOREIGN KEY(`opportunityId`) REFERENCES `crm_opportunities`(`opportunityId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_crm_next_actions_opportunityId` ON `crm_next_actions` (`opportunityId`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_crm_next_actions_contactId` ON `crm_next_actions` (`contactId`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_crm_next_actions_scheduleId` ON `crm_next_actions` (`scheduleId`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_crm_next_actions_status` ON `crm_next_actions` (`status`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_crm_next_actions_dueAtEpochMs` ON `crm_next_actions` (`dueAtEpochMs`)",
+        )
 
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `crm_agent_suggestions` (`suggestionId` TEXT NOT NULL, `opportunityId` TEXT NOT NULL, `suggestionType` TEXT NOT NULL, `title` TEXT NOT NULL, `summary` TEXT NOT NULL, `rationale` TEXT NOT NULL, `evidenceRefsJson` TEXT NOT NULL, `confidence` REAL NOT NULL, `proposedActionJson` TEXT, `status` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`suggestionId`), FOREIGN KEY(`opportunityId`) REFERENCES `crm_opportunities`(`opportunityId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_crm_agent_suggestions_opportunityId` ON `crm_agent_suggestions` (`opportunityId`)",
-            )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `crm_agent_suggestions` (`suggestionId` TEXT NOT NULL, `opportunityId` TEXT NOT NULL, `suggestionType` TEXT NOT NULL, `title` TEXT NOT NULL, `summary` TEXT NOT NULL, `rationale` TEXT NOT NULL, `evidenceRefsJson` TEXT NOT NULL, `confidence` REAL NOT NULL, `proposedActionJson` TEXT, `status` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`suggestionId`), FOREIGN KEY(`opportunityId`) REFERENCES `crm_opportunities`(`opportunityId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_crm_agent_suggestions_opportunityId` ON `crm_agent_suggestions` (`opportunityId`)",
+        )
     }
 
     private fun migrate26To27Part3(db: SupportSQLiteDatabase) {
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_crm_agent_suggestions_status` ON `crm_agent_suggestions` (`status`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_crm_agent_suggestions_createdAtEpochMs` ON `crm_agent_suggestions` (`createdAtEpochMs`)",
-            )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_crm_agent_suggestions_status` ON `crm_agent_suggestions` (`status`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_crm_agent_suggestions_createdAtEpochMs` ON `crm_agent_suggestions` (`createdAtEpochMs`)",
+        )
 
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `crm_stage_history` (`historyId` TEXT NOT NULL, `opportunityId` TEXT NOT NULL, `fromStage` TEXT, `toStage` TEXT NOT NULL, `reason` TEXT, `sourceType` TEXT NOT NULL, `userConfirmed` INTEGER NOT NULL, `changedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`historyId`), FOREIGN KEY(`opportunityId`) REFERENCES `crm_opportunities`(`opportunityId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_crm_stage_history_opportunityId` ON `crm_stage_history` (`opportunityId`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_crm_stage_history_changedAtEpochMs` ON `crm_stage_history` (`changedAtEpochMs`)",
-            )
-        
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `crm_stage_history` (`historyId` TEXT NOT NULL, `opportunityId` TEXT NOT NULL, `fromStage` TEXT, `toStage` TEXT NOT NULL, `reason` TEXT, `sourceType` TEXT NOT NULL, `userConfirmed` INTEGER NOT NULL, `changedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`historyId`), FOREIGN KEY(`opportunityId`) REFERENCES `crm_opportunities`(`opportunityId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_crm_stage_history_opportunityId` ON `crm_stage_history` (`opportunityId`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_crm_stage_history_changedAtEpochMs` ON `crm_stage_history` (`changedAtEpochMs`)",
+        )
     }
 
     val MIGRATION_26_27 = object : Migration(26, 27) {
         override fun migrate(db: SupportSQLiteDatabase) {
-        migrate26To27Part1(db)
-        migrate26To27Part2(db)
-        migrate26To27Part3(db)
-}
+            migrate26To27Part1(db)
+            migrate26To27Part2(db)
+            migrate26To27Part3(db)
+        }
     }
 
     /**

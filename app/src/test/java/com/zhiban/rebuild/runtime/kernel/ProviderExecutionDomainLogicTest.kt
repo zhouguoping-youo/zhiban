@@ -63,7 +63,9 @@ class ProviderExecutionDomainLogicTest {
 
     @Test fun `deterministic observation completion covers calendar and communication`() {
         assertTrue(shouldCompleteObservationDeterministically("calendar.conflicts", com.zhiban.rebuild.runtime.context.IntentLabel.GENERAL_CHAT))
-        assertTrue(shouldCompleteObservationDeterministically(CommunicationMessageToolBinding.TOOL_NAME, com.zhiban.rebuild.runtime.context.IntentLabel.GENERAL_CHAT))
+        assertTrue(
+            shouldCompleteObservationDeterministically(CommunicationMessageToolBinding.TOOL_NAME, com.zhiban.rebuild.runtime.context.IntentLabel.GENERAL_CHAT),
+        )
         assertFalse(shouldCompleteObservationDeterministically("contact.search", com.zhiban.rebuild.runtime.context.IntentLabel.GENERAL_CHAT))
         assertFalse(shouldCompleteObservationDeterministically(SchedulePlanValidator.TOOL_NAME, com.zhiban.rebuild.runtime.context.IntentLabel.GENERAL_CHAT))
     }

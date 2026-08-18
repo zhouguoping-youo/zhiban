@@ -904,45 +904,45 @@ internal class RoomApprovalStore(
     ): CalendarMutationOutcome {
         fun text(name: String) = plan[name]?.jsonPrimitive?.content ?: error("CALENDAR_PLAN_INVALID")
         val oldJson = scheduleJson(existing)
-val safeResult: String
-val operation: String
-val undoPayload: String
-if (text("toolName") == CalendarMutationToolBinding.UPDATE) {
-    val start = text("startAtEpochMs").toLong()
-    val duration = text("durationMinutes").toInt()
-    val end = Math.addExact(start, duration * 60_000L)
-    check(database.scheduleDao().findConflicts(start, end, scheduleId).isEmpty()) {
-        "CALENDAR_SCHEDULE_CONFLICT"
-    }
-    val updated = existing.copy(
-        title = text("title"),
-        startAtEpochMs = start,
-        durationMinutes = duration,
-        note = plan["note"]?.jsonPrimitive?.content,
-        updatedAtEpochMs = nowEpochMs,
-    )
-    check(database.scheduleDao().update(updated) == 1)
-    putScheduleFact(updated, runId, nowEpochMs)
-    operation = "UPDATE"
-    undoPayload = oldJson
-    safeResult =
-        buildJsonObject {
-            put("scheduleId", scheduleId)
-            put("status", "updated")
-            put("undoAvailable", true)
-        }.toString()
-} else {
-    check(database.scheduleDao().deleteById(scheduleId) == 1)
-    FactIndex(database).delete("schedule:$scheduleId")
-    operation = "DELETE"
-    undoPayload = oldJson
-    safeResult =
-        buildJsonObject {
-            put("scheduleId", scheduleId)
-            put("status", "deleted")
-            put("undoAvailable", true)
-        }.toString()
-}
+        val safeResult: String
+        val operation: String
+        val undoPayload: String
+        if (text("toolName") == CalendarMutationToolBinding.UPDATE) {
+            val start = text("startAtEpochMs").toLong()
+            val duration = text("durationMinutes").toInt()
+            val end = Math.addExact(start, duration * 60_000L)
+            check(database.scheduleDao().findConflicts(start, end, scheduleId).isEmpty()) {
+                "CALENDAR_SCHEDULE_CONFLICT"
+            }
+            val updated = existing.copy(
+                title = text("title"),
+                startAtEpochMs = start,
+                durationMinutes = duration,
+                note = plan["note"]?.jsonPrimitive?.content,
+                updatedAtEpochMs = nowEpochMs,
+            )
+            check(database.scheduleDao().update(updated) == 1)
+            putScheduleFact(updated, runId, nowEpochMs)
+            operation = "UPDATE"
+            undoPayload = oldJson
+            safeResult =
+                buildJsonObject {
+                    put("scheduleId", scheduleId)
+                    put("status", "updated")
+                    put("undoAvailable", true)
+                }.toString()
+        } else {
+            check(database.scheduleDao().deleteById(scheduleId) == 1)
+            FactIndex(database).delete("schedule:$scheduleId")
+            operation = "DELETE"
+            undoPayload = oldJson
+            safeResult =
+                buildJsonObject {
+                    put("scheduleId", scheduleId)
+                    put("status", "deleted")
+                    put("undoAvailable", true)
+                }.toString()
+        }
         return CalendarMutationOutcome(operation, safeResult, undoPayload)
     }
 }

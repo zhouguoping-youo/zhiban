@@ -32,113 +32,113 @@ internal data class RelationDialogSlots(
 @Composable
 internal fun RelationEdgeDialogs(slots: RelationDialogSlots) {
     slots.deletingEdge?.let { edge ->
-    val names = slots.contacts.associate { it.contactId to it.displayName } +
-        (RelationshipPersonIds.SELF to slots.ownerLabel)
-    ZhiBanAlertDialog(
-        onDismissRequest = { slots.setDeletingEdge(null) },
-        title = { Text("删除这条关系？") },
-        text = {
-            Text(
-                "${names[edge.fromContactId].orEmpty()} 与 ${names[edge.toContactId].orEmpty()} 的“${relationLabel(
-                    edge.relationType,
-                )}”关系将被移除。",
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                slots.viewModel.deleteRelationship(edge.edgeId) {
-                    slots.setDeletingEdge(null)
-                    slots.showFeedback("关系已删除")
+        val names = slots.contacts.associate { it.contactId to it.displayName } +
+            (RelationshipPersonIds.SELF to slots.ownerLabel)
+        ZhiBanAlertDialog(
+            onDismissRequest = { slots.setDeletingEdge(null) },
+            title = { Text("删除这条关系？") },
+            text = {
+                Text(
+                    "${names[edge.fromContactId].orEmpty()} 与 ${names[edge.toContactId].orEmpty()} 的“${relationLabel(
+                        edge.relationType,
+                    )}”关系将被移除。",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    slots.viewModel.deleteRelationship(edge.edgeId) {
+                        slots.setDeletingEdge(null)
+                        slots.showFeedback("关系已删除")
+                    }
+                }) {
+                    Text("删除", color = RelationDanger)
                 }
-            }) {
-                Text("删除", color = RelationDanger)
-            }
-        },
-        dismissButton = { TextButton(onClick = { slots.setDeletingEdge(null) }) { Text("取消", color = RelationInk) } },
-        containerColor = RelationSurface,
-    )
+            },
+            dismissButton = { TextButton(onClick = { slots.setDeletingEdge(null) }) { Text("取消", color = RelationInk) } },
+            containerColor = RelationSurface,
+        )
     }
     slots.selectedEdge?.let { edge ->
-    RelationshipEvidenceDialog(
-        edge = edge,
-        personNames = slots.contacts.associate { it.contactId to it.displayName } +
-            (RelationshipPersonIds.SELF to slots.ownerLabel),
-        onDismiss = { slots.setSelectedEdge(null) },
-        onUpdate = { type, result ->
-            slots.viewModel.updateRelationship(edge.edgeId, type) { error ->
-                result(error)
-                if (error == null) {
-                    slots.setSelectedEdge(null)
-                    slots.showFeedback("关系已保存")
+        RelationshipEvidenceDialog(
+            edge = edge,
+            personNames = slots.contacts.associate { it.contactId to it.displayName } +
+                (RelationshipPersonIds.SELF to slots.ownerLabel),
+            onDismiss = { slots.setSelectedEdge(null) },
+            onUpdate = { type, result ->
+                slots.viewModel.updateRelationship(edge.edgeId, type) { error ->
+                    result(error)
+                    if (error == null) {
+                        slots.setSelectedEdge(null)
+                        slots.showFeedback("关系已保存")
+                    }
                 }
-            }
-        },
-        onDelete = {
-            slots.setSelectedEdge(null)
-            slots.setDeletingEdge(edge)
-        },
-    )
+            },
+            onDelete = {
+                slots.setSelectedEdge(null)
+                slots.setDeletingEdge(edge)
+            },
+        )
     }
     slots.addFactFor?.let { contact ->
-    ContactFactEditorDialog(
-        contact = contact,
-        onDismiss = { slots.clearAddFactFor() },
-        onSave = { text, type, result ->
-            slots.viewModel.saveContactFact(contact.contactId, text, type) { error ->
-                result(error)
-                if (error == null) {
-                    slots.clearAddFactFor()
-                    slots.showFeedback("联系人信息已保存")
+        ContactFactEditorDialog(
+            contact = contact,
+            onDismiss = { slots.clearAddFactFor() },
+            onSave = { text, type, result ->
+                slots.viewModel.saveContactFact(contact.contactId, text, type) { error ->
+                    result(error)
+                    if (error == null) {
+                        slots.clearAddFactFor()
+                        slots.showFeedback("联系人信息已保存")
+                    }
                 }
-            }
-        },
-    )
+            },
+        )
     }
 }
 
 @Composable
 internal fun RelationEventDialogs(slots: RelationDialogSlots) {
     val eventEditorSubject = slots.addEventFor ?: slots.editingEvent?.participants
-    ?.firstOrNull { it.participantRole == "SUBJECT" && it.contactId != null }
-    ?.contactId?.let { id -> slots.contacts.firstOrNull { it.contactId == id } }
+        ?.firstOrNull { it.participantRole == "SUBJECT" && it.contactId != null }
+        ?.contactId?.let { id -> slots.contacts.firstOrNull { it.contactId == id } }
     eventEditorSubject?.let { contact ->
-    RelationshipEventEditorDialog(
-        contacts = slots.contacts,
-        subject = contact,
-        existing = slots.editingEvent,
-        onDismiss = {
-            slots.setAddEventFor(null)
-            slots.setEditingEvent(null)
-        },
-        onSave = { type, title, note, participants, result ->
-            slots.viewModel.saveRelationshipEvent(
-                slots.editingEvent?.event?.eventId,
-                type,
-                title,
-                note,
-                participants,
-            ) { error ->
-                result(error)
-                if (error == null) {
-                    slots.setAddEventFor(null)
-                    slots.setEditingEvent(null)
-                    slots.showFeedback("经历已保存")
+        RelationshipEventEditorDialog(
+            contacts = slots.contacts,
+            subject = contact,
+            existing = slots.editingEvent,
+            onDismiss = {
+                slots.setAddEventFor(null)
+                slots.setEditingEvent(null)
+            },
+            onSave = { type, title, note, participants, result ->
+                slots.viewModel.saveRelationshipEvent(
+                    slots.editingEvent?.event?.eventId,
+                    type,
+                    title,
+                    note,
+                    participants,
+                ) { error ->
+                    result(error)
+                    if (error == null) {
+                        slots.setAddEventFor(null)
+                        slots.setEditingEvent(null)
+                        slots.showFeedback("经历已保存")
+                    }
                 }
-            }
-        },
-    )
+            },
+        )
     }
     slots.selectedEvent?.let { event ->
-    RelationshipEventDetailDialog(
-        value = event,
-        onDismiss = { slots.setSelectedEvent(null) },
-        onEdit = {
-            slots.setSelectedEvent(null)
-            slots.setEditingEvent(event)
-        },
-        onDelete = {
-            slots.viewModel.deleteRelationshipEvent(event.event.eventId) { slots.setSelectedEvent(null) }
-        },
-    )
+        RelationshipEventDetailDialog(
+            value = event,
+            onDismiss = { slots.setSelectedEvent(null) },
+            onEdit = {
+                slots.setSelectedEvent(null)
+                slots.setEditingEvent(event)
+            },
+            onDelete = {
+                slots.viewModel.deleteRelationshipEvent(event.event.eventId) { slots.setSelectedEvent(null) }
+            },
+        )
     }
 }

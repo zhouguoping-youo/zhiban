@@ -252,9 +252,6 @@ internal fun ContactMergeReviewDialog(suggestion: ContactMergeSuggestion, onDism
     }
 }
 
-
-
-
 @Composable
 internal fun ContactIdentityEditorDialog(
     contact: ContactEntity,
@@ -392,7 +389,6 @@ internal fun ContactIdentityEditorDialog(
     }
 }
 
-
 @Composable
 internal fun ContactFactEditorDialog(contact: ContactEntity, onDismiss: () -> Unit, onSave: (String, String, (String?) -> Unit) -> Unit) {
     var text by rememberSaveable { mutableStateOf("") }
@@ -464,25 +460,25 @@ internal fun ContactFactEditorDialog(contact: ContactEntity, onDismiss: () -> Un
 
 @Composable
 private fun MergeDialogHeader(reason: String, onDismiss: () -> Unit) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.Rounded.Close, "关闭")
-            }
-            Column(Modifier.weight(1f)) {
-                Text(
-                    "确认是否为同一个人",
-                    color = RelationInk,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(reason, color = RelationMuted, style = MaterialTheme.typography.bodySmall)
-            }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
+            Icon(Icons.Rounded.Close, "关闭")
         }
+        Column(Modifier.weight(1f)) {
+            Text(
+                "确认是否为同一个人",
+                color = RelationInk,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(reason, color = RelationMuted, style = MaterialTheme.typography.bodySmall)
+        }
+    }
 }
 
 @Composable
 private fun MergeContactChoiceRow(contact: ContactEntity, selected: Boolean, onSelect: () -> Unit) {
-                    Row(
+    Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Card))
             .background(if (selected) RelationSoft else Color.Transparent)
             .clickable(onClick = onSelect)
@@ -520,5 +516,3 @@ private fun MergeContactChoiceRow(contact: ContactEntity, selected: Boolean, onS
     }
     Spacer(Modifier.height(6.dp))
 }
-
-

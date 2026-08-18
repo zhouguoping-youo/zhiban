@@ -10,9 +10,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -56,175 +56,173 @@ import com.zhiban.rebuild.ui.tabs.RelationTab
 import com.zhiban.rebuild.ui.tabs.SkillTab
 
 internal fun NavGraphBuilder.agentSettingsRoutes(navController: NavHostController) {
-
-            composable<AgentSettings> {
-                AgentSettingsPage(
-                    onBack = { navController.popBackStack() },
-                    onPersonalization = { navController.navigate(ConversationStyle) },
-                    onMemory = { navController.navigate(MemoryConfig) },
-                    onModel = { navController.navigate(ModelConfig) },
-                    onTools = { navController.navigate(AgentTools) },
-                    onSkills = { navController.navigate(AgentSkills) },
-                    onFeedback = { navController.navigate(AgentFeedbackImprovement) },
-                    onRunHistory = { navController.navigate(AgentRunHistory) },
+    composable<AgentSettings> {
+        AgentSettingsPage(
+            onBack = { navController.popBackStack() },
+            onPersonalization = { navController.navigate(ConversationStyle) },
+            onMemory = { navController.navigate(MemoryConfig) },
+            onModel = { navController.navigate(ModelConfig) },
+            onTools = { navController.navigate(AgentTools) },
+            onSkills = { navController.navigate(AgentSkills) },
+            onFeedback = { navController.navigate(AgentFeedbackImprovement) },
+            onRunHistory = { navController.navigate(AgentRunHistory) },
+        )
+    }
+    composable<ProfileEdit> { UserProfilePage(onBack = { navController.popBackStack() }) }
+    composable<ConversationStyle> { AgentPersonalizationPage(onBack = { navController.popBackStack() }) }
+    composable<MemoryConfig> { AgentMemoryPage(onBack = { navController.popBackStack() }) }
+    composable<AgentTools> { AgentToolsPage(onBack = { navController.popBackStack() }) }
+    composable<AgentSkills> { AgentSkillsPage(onBack = { navController.popBackStack() }) }
+    composable<AgentFeedbackImprovement> {
+        AgentFeedbackImprovementPage(onBack = { navController.popBackStack() })
+    }
+    composable<AgentRunHistory> { AgentRunHistoryPage(onBack = { navController.popBackStack() }) }
+    composable<AutoWrites> { AutoWritePage(onBack = { navController.popBackStack() }) }
+    composable<ContactMaintenance> {
+        ContactMaintenancePage(
+            onBack = { navController.popBackStack() },
+            onAsk = { draft ->
+                navController.navigate(
+                    AssistantChat(draft = draft, returnTarget = "RELATION", workContext = true),
                 )
-            }
-            composable<ProfileEdit> { UserProfilePage(onBack = { navController.popBackStack() }) }
-            composable<ConversationStyle> { AgentPersonalizationPage(onBack = { navController.popBackStack() }) }
-            composable<MemoryConfig> { AgentMemoryPage(onBack = { navController.popBackStack() }) }
-            composable<AgentTools> { AgentToolsPage(onBack = { navController.popBackStack() }) }
-            composable<AgentSkills> { AgentSkillsPage(onBack = { navController.popBackStack() }) }
-            composable<AgentFeedbackImprovement> {
-                AgentFeedbackImprovementPage(onBack = { navController.popBackStack() })
-            }
-            composable<AgentRunHistory> { AgentRunHistoryPage(onBack = { navController.popBackStack() }) }
-            composable<AutoWrites> { AutoWritePage(onBack = { navController.popBackStack() }) }
-            composable<ContactMaintenance> {
-                ContactMaintenancePage(
-                    onBack = { navController.popBackStack() },
-                    onAsk = { draft ->
-                        navController.navigate(
-                            AssistantChat(draft = draft, returnTarget = "RELATION", workContext = true),
-                        )
-                    },
-                )
-            }
-            composable<NotificationSettings> { NotificationSettingsPage(onBack = { navController.popBackStack() }) }
-            composable<PrivacySecurity> {
-                PrivacySecurityPage(
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable<StorageSettings> { StorageSettingsPage(onBack = { navController.popBackStack() }) }
-            composable<DataSettings> {
-                DataSettingsPage(
-                    onBack = { navController.popBackStack() },
-                    onMemory = { navController.navigate(MemoryConfig) },
-                    onRunHistory = { navController.navigate(AgentRunHistory) },
-                )
-            }
-            composable<ReportErrorSettings> {
-                ReportErrorSettingsPage(
-                    onBack = { navController.popBackStack() },
-                    onDiagnostics = { navController.navigate(AgentRunHistory) },
-                )
-            }
-            composable<AboutZhiBan> { AboutZhiBanPage(onBack = { navController.popBackStack() }) }
-            composable<Appearance> { AppearanceSettingsPage(onBack = { navController.popBackStack() }) }
+            },
+        )
+    }
+    composable<NotificationSettings> { NotificationSettingsPage(onBack = { navController.popBackStack() }) }
+    composable<PrivacySecurity> {
+        PrivacySecurityPage(
+            onBack = { navController.popBackStack() },
+        )
+    }
+    composable<StorageSettings> { StorageSettingsPage(onBack = { navController.popBackStack() }) }
+    composable<DataSettings> {
+        DataSettingsPage(
+            onBack = { navController.popBackStack() },
+            onMemory = { navController.navigate(MemoryConfig) },
+            onRunHistory = { navController.navigate(AgentRunHistory) },
+        )
+    }
+    composable<ReportErrorSettings> {
+        ReportErrorSettingsPage(
+            onBack = { navController.popBackStack() },
+            onDiagnostics = { navController.navigate(AgentRunHistory) },
+        )
+    }
+    composable<AboutZhiBan> { AboutZhiBanPage(onBack = { navController.popBackStack() }) }
+    composable<Appearance> { AppearanceSettingsPage(onBack = { navController.popBackStack() }) }
 }
 
 internal fun NavGraphBuilder.featureRoutes(navController: NavHostController) {
+    composable<CrmCapability> {
+        CrmCapabilityPage(
+            onBack = { navController.popBackStack() },
+            onOpenLeads = { navController.navigate(CrmLeads) },
+            onOpenOpportunityList = { stage -> navController.navigate(CrmOpportunityList(stage)) },
+            onOpenOpportunity = { opportunityId ->
+                navController.navigate(CrmOpportunityDetail(opportunityId))
+            },
+            onAskAgent = { draft ->
+                navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK", workContext = true))
+            },
+        )
+    }
 
-            composable<CrmCapability> {
-                CrmCapabilityPage(
-                    onBack = { navController.popBackStack() },
-                    onOpenLeads = { navController.navigate(CrmLeads) },
-                    onOpenOpportunityList = { stage -> navController.navigate(CrmOpportunityList(stage)) },
-                    onOpenOpportunity = { opportunityId ->
-                        navController.navigate(CrmOpportunityDetail(opportunityId))
-                    },
-                    onAskAgent = { draft ->
-                        navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK", workContext = true))
-                    },
-                )
-            }
+    composable<LifeAssistant> {
+        LifeAssistantPage(
+            onBack = { navController.popBackStack() },
+            onOpenAll = { navController.navigate(LifeAssistantList) },
+            onOpenItem = { itemId -> navController.navigate(LifeAssistantDetail(itemId)) },
+            onOpenRelations = { navController.navigate(Relation) { launchSingleTop = true } },
+            onAskAgent = { draft ->
+                navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK", workContext = true))
+            },
+        )
+    }
 
-            composable<LifeAssistant> {
-                LifeAssistantPage(
-                    onBack = { navController.popBackStack() },
-                    onOpenAll = { navController.navigate(LifeAssistantList) },
-                    onOpenItem = { itemId -> navController.navigate(LifeAssistantDetail(itemId)) },
-                    onOpenRelations = { navController.navigate(Relation) { launchSingleTop = true } },
-                    onAskAgent = { draft ->
-                        navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK", workContext = true))
-                    },
-                )
-            }
+    composable<LifeAssistantList> {
+        LifeAssistantListPage(
+            onBack = { navController.popBackStack() },
+            onOpenItem = { itemId -> navController.navigate(LifeAssistantDetail(itemId)) },
+        )
+    }
 
-            composable<LifeAssistantList> {
-                LifeAssistantListPage(
-                    onBack = { navController.popBackStack() },
-                    onOpenItem = { itemId -> navController.navigate(LifeAssistantDetail(itemId)) },
-                )
-            }
+    composable<LifeAssistantDetail> { entry ->
+        val route = entry.toRoute<LifeAssistantDetail>()
+        LifeAssistantDetailPage(
+            itemId = route.itemId,
+            onBack = { navController.popBackStack() },
+            onAskAgent = { draft ->
+                navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK", workContext = true))
+            },
+        )
+    }
 
-            composable<LifeAssistantDetail> { entry ->
-                val route = entry.toRoute<LifeAssistantDetail>()
-                LifeAssistantDetailPage(
-                    itemId = route.itemId,
-                    onBack = { navController.popBackStack() },
-                    onAskAgent = { draft ->
-                        navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK", workContext = true))
-                    },
-                )
-            }
+    composable<EventPlanning> {
+        EventPlanningPage(
+            onBack = { navController.popBackStack() },
+            onOpenAll = { navController.navigate(EventPlanningList) },
+            onOpenPlan = { planId -> navController.navigate(EventPlanningDetail(planId)) },
+        )
+    }
 
-            composable<EventPlanning> {
-                EventPlanningPage(
-                    onBack = { navController.popBackStack() },
-                    onOpenAll = { navController.navigate(EventPlanningList) },
-                    onOpenPlan = { planId -> navController.navigate(EventPlanningDetail(planId)) },
-                )
-            }
+    composable<EventPlanningList> {
+        EventPlanningListPage(
+            onBack = { navController.popBackStack() },
+            onOpenPlan = { planId -> navController.navigate(EventPlanningDetail(planId)) },
+        )
+    }
 
-            composable<EventPlanningList> {
-                EventPlanningListPage(
-                    onBack = { navController.popBackStack() },
-                    onOpenPlan = { planId -> navController.navigate(EventPlanningDetail(planId)) },
-                )
-            }
+    composable<EventPlanningDetail> { entry ->
+        val route = entry.toRoute<EventPlanningDetail>()
+        EventPlanningDetailPage(
+            planId = route.planId,
+            onBack = { navController.popBackStack() },
+            onAskAgent = { draft ->
+                navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK", workContext = true))
+            },
+        )
+    }
 
-            composable<EventPlanningDetail> { entry ->
-                val route = entry.toRoute<EventPlanningDetail>()
-                EventPlanningDetailPage(
-                    planId = route.planId,
-                    onBack = { navController.popBackStack() },
-                    onAskAgent = { draft ->
-                        navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK", workContext = true))
-                    },
-                )
-            }
+    composable<CrmLeads> {
+        CrmLeadListPage(
+            onBack = { navController.popBackStack() },
+            onOpenOpportunity = { opportunityId ->
+                navController.navigate(CrmOpportunityDetail(opportunityId))
+            },
+        )
+    }
 
-            composable<CrmLeads> {
-                CrmLeadListPage(
-                    onBack = { navController.popBackStack() },
-                    onOpenOpportunity = { opportunityId ->
-                        navController.navigate(CrmOpportunityDetail(opportunityId))
-                    },
-                )
-            }
+    composable<CrmOpportunityList> { entry ->
+        val route = entry.toRoute<CrmOpportunityList>()
+        CrmOpportunityListPage(
+            initialStage = route.stage,
+            onBack = { navController.popBackStack() },
+            onOpenOpportunity = { opportunityId ->
+                navController.navigate(CrmOpportunityDetail(opportunityId))
+            },
+            onOpenBoard = { navController.navigate(CrmOpportunityBoard) },
+        )
+    }
 
-            composable<CrmOpportunityList> { entry ->
-                val route = entry.toRoute<CrmOpportunityList>()
-                CrmOpportunityListPage(
-                    initialStage = route.stage,
-                    onBack = { navController.popBackStack() },
-                    onOpenOpportunity = { opportunityId ->
-                        navController.navigate(CrmOpportunityDetail(opportunityId))
-                    },
-                    onOpenBoard = { navController.navigate(CrmOpportunityBoard) },
-                )
-            }
+    composable<CrmOpportunityBoard> {
+        CrmOpportunityBoardPage(
+            onBack = { navController.popBackStack() },
+            onOpenOpportunity = { opportunityId ->
+                navController.navigate(CrmOpportunityDetail(opportunityId))
+            },
+        )
+    }
 
-            composable<CrmOpportunityBoard> {
-                CrmOpportunityBoardPage(
-                    onBack = { navController.popBackStack() },
-                    onOpenOpportunity = { opportunityId ->
-                        navController.navigate(CrmOpportunityDetail(opportunityId))
-                    },
-                )
-            }
-
-            composable<CrmOpportunityDetail> { entry ->
-                val route = entry.toRoute<CrmOpportunityDetail>()
-                CrmOpportunityDetailPage(
-                    opportunityId = route.opportunityId,
-                    onBack = { navController.popBackStack() },
-                    onOpenCalendar = { epochMs -> navController.navigate(Calendar(epochMs ?: 0L)) },
-                    onOpenRelation = { navController.navigate(Relation) { launchSingleTop = true } },
-                    onAskAgent = { draft ->
-                        navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK", workContext = true))
-                    },
-                )
-            }
+    composable<CrmOpportunityDetail> { entry ->
+        val route = entry.toRoute<CrmOpportunityDetail>()
+        CrmOpportunityDetailPage(
+            opportunityId = route.opportunityId,
+            onBack = { navController.popBackStack() },
+            onOpenCalendar = { epochMs -> navController.navigate(Calendar(epochMs ?: 0L)) },
+            onOpenRelation = { navController.navigate(Relation) { launchSingleTop = true } },
+            onAskAgent = { draft ->
+                navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK", workContext = true))
+            },
+        )
+    }
 }

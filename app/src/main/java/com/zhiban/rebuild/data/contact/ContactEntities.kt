@@ -202,18 +202,10 @@ data class ContactSearchProjectionWithMask(
 )
 
 /** 提及匹配的姓名行(见 ContactDao.mentionCandidateNames/mentionSourceNames)。 */
-data class ContactMentionNameRow(
-    val contactId: String,
-    val displayName: String,
-    val normalizedName: String,
-    val updatedAtEpochMs: Long = 0L,
-)
+data class ContactMentionNameRow(val contactId: String, val displayName: String, val normalizedName: String, val updatedAtEpochMs: Long = 0L)
 
 /** 输入 id → canonical id 的解析行(见 ContactDao.resolveCanonicalIds)。 */
-data class ContactIdResolution(
-    val inputId: String,
-    val canonicalId: String,
-)
+data class ContactIdResolution(val inputId: String, val canonicalId: String)
 
 @Entity(
     tableName = "relationship_edges",

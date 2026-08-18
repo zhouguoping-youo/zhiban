@@ -839,7 +839,6 @@ private fun RunTraceCard(trace: com.zhiban.rebuild.runtime.observability.AgentRu
             if (expanded) {
                 RunTraceExpandedContent(trace)
             }
-
         }
     }
 }

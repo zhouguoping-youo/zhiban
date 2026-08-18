@@ -1,10 +1,10 @@
 package com.zhiban.rebuild.data.agent
 
-import android.os.Build
 import android.content.Context
+import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.StrongBoxUnavailableException
 import android.security.keystore.KeyProperties
+import android.security.keystore.StrongBoxUnavailableException
 import android.util.Base64
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
@@ -64,9 +64,14 @@ internal class AgentDatabaseKeyManager(context: Context) {
     private fun getOrCreateKey(): SecretKey = runCatching { key() }.getOrElse {
         try {
             generateKey(strongBox = true)
-        } catch (unavailable: StrongBoxUnavailableException) {
+        } catch (failure: Exception) {
             // 无 StrongBox 芯片的设备回退普通 AndroidKeyStore 密钥(加固建议项)。
-            generateKey(strongBox = false)
+            // API<28 无此异常类型,守卫后再判型。
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && failure is StrongBoxUnavailableException) {
+                generateKey(strongBox = false)
+            } else {
+                throw failure
+            }
         }
     }
 
@@ -74,13 +79,13 @@ internal class AgentDatabaseKeyManager(context: Context) {
         KeyProperties.KEY_ALGORITHM_AES,
         "AndroidKeyStore",
     ).apply {
-        init(
-            KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
-                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                .setIsStrongBoxBacked(strongBox && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
-                .build(),
-        )
+        val builder = KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            builder.setIsStrongBoxBacked(strongBox)
+        }
+        init(builder.build())
     }.generateKey()
 
     private fun key(): SecretKey = KeyStore.getInstance("AndroidKeyStore").run {

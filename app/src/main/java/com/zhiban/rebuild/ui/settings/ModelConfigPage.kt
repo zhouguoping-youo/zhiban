@@ -167,7 +167,6 @@ fun ModelConfigPage(onBack: () -> Unit = {}, viewModel: ModelConfigViewModel = h
     )
 }
 
-
 @Composable
 private fun EmbeddingConnectionCard(
     configured: Boolean,
@@ -426,137 +425,137 @@ private fun ModelRow(option: ModelOption, selected: Boolean, onClick: () -> Unit
 
 @Composable
 private fun ProviderStatusCard(configured: Boolean) {
-            ZhiBanGlassCard(
-                modifier = Modifier.fillMaxWidth(),
-                cornerRadius = ZhiBanRadius.Card,
-                containerColor = MaterialTheme.colorScheme.surface,
-                borderColor = Color.Transparent,
-                elevation = 0.dp,
+    ZhiBanGlassCard(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = ZhiBanRadius.Card,
+        containerColor = MaterialTheme.colorScheme.surface,
+        borderColor = Color.Transparent,
+        elevation = 0.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(ZhiBanSpacing.Lg),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier.size(
+                    ZhiBanIconContainer.Compact,
+                ).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
             ) {
-                Row(
-                    modifier = Modifier.padding(ZhiBanSpacing.Lg),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        modifier = Modifier.size(
-                            ZhiBanIconContainer.Compact,
-                        ).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            Icons.Outlined.CloudQueue,
-                            contentDescription = null,
-                            tint = ZhiBanTerracotta,
-                            modifier = Modifier.size(ZhiBanIconSize.Leading),
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(ZhiBanSpacing.Md))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "阶跃星辰",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = ModelSettingsPrimary,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                    StatusBadge(configured = configured)
-                }
+                Icon(
+                    Icons.Outlined.CloudQueue,
+                    contentDescription = null,
+                    tint = ZhiBanTerracotta,
+                    modifier = Modifier.size(ZhiBanIconSize.Leading),
+                )
             }
+            Spacer(modifier = Modifier.width(ZhiBanSpacing.Md))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "阶跃星辰",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = ModelSettingsPrimary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            StatusBadge(configured = configured)
+        }
+    }
 }
 
 @Composable
 private fun ApiKeyField(state: ModelConfigUiState, viewModel: ModelConfigViewModel) {
-                        OutlinedTextField(
-                            value = state.apiKey,
-                            onValueChange = viewModel::onApiKeyChange,
-                            placeholder = { Text("请输入阶跃星辰 API Key", color = ModelSettingsSecondary) },
-                            visualTransformation = if (state.apiKeyVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                keyboardType = KeyboardType.Password,
-                            ),
-                            trailingIcon = {
-                                Box(
-                                    modifier = Modifier.size(ZhiBanSize.TouchTarget).clip(CircleShape).clickable {
-                                        viewModel.toggleApiKeyVisibility()
-                                    },
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Icon(
-                                        imageVector = if (state.apiKeyVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                                        contentDescription = if (state.apiKeyVisible) "隐藏" else "显示",
-                                        tint = Gray500,
-                                        modifier = Modifier.size(ZhiBanIconSize.Field),
-                                    )
-                                }
-                            },
-                            singleLine = true,
-                            shape = RoundedCornerShape(ZhiBanRadius.Card),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                                cursorColor = MaterialTheme.colorScheme.primary,
-                            ),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
+    OutlinedTextField(
+        value = state.apiKey,
+        onValueChange = viewModel::onApiKeyChange,
+        placeholder = { Text("请输入阶跃星辰 API Key", color = ModelSettingsSecondary) },
+        visualTransformation = if (state.apiKeyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+            keyboardType = KeyboardType.Password,
+        ),
+        trailingIcon = {
+            Box(
+                modifier = Modifier.size(ZhiBanSize.TouchTarget).clip(CircleShape).clickable {
+                    viewModel.toggleApiKeyVisibility()
+                },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = if (state.apiKeyVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                    contentDescription = if (state.apiKeyVisible) "隐藏" else "显示",
+                    tint = Gray500,
+                    modifier = Modifier.size(ZhiBanIconSize.Field),
+                )
+            }
+        },
+        singleLine = true,
+        shape = RoundedCornerShape(ZhiBanRadius.Card),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = MaterialTheme.colorScheme.surface,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
+            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+            cursorColor = MaterialTheme.colorScheme.primary,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Spacer(modifier = Modifier.height(12.dp))
 }
 
 @Composable
 private fun ApiKeyCard(state: ModelConfigUiState, viewModel: ModelConfigViewModel, onClearClick: () -> Unit) {
-                ZhiBanGlassCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    cornerRadius = ZhiBanRadius.Card,
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    borderColor = Color.Transparent,
-                    elevation = 0.dp,
-                ) {
-                    Column(modifier = Modifier.padding(ZhiBanSpacing.Lg)) {
-                        Text(
-                            "API Key",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = ModelSettingsPrimary,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-ApiKeyField(state, viewModel)
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (state.isApiKeyConfigured) {
-                                TextButton(
-                                    onClick = viewModel::checkConnection,
-                                    enabled = !state.isChecking,
-                                    contentPadding = PaddingValues(horizontal = 0.dp),
-                                ) {
-                                    Text(if (state.isChecking) "检测中…" else "检测连接", color = CloudBlue)
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                TextButton(
-                                    onClick = onClearClick,
-                                    contentPadding = PaddingValues(horizontal = 0.dp),
-                                ) {
-                                    Text("清除", color = ErrorRed)
-                                }
-                            }
-                            Spacer(modifier = Modifier.weight(1f))
-                            Text("本机加密保存", color = Gray500, style = MaterialTheme.typography.labelSmall)
-                        }
-                        state.healthMessage?.let {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                it,
-                                color = if (it ==
-                                    "连接正常"
-                                ) {
-                                    SuccessGreen
-                                } else {
-                                    ErrorRed
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
+    ZhiBanGlassCard(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = ZhiBanRadius.Card,
+        containerColor = MaterialTheme.colorScheme.surface,
+        borderColor = Color.Transparent,
+        elevation = 0.dp,
+    ) {
+        Column(modifier = Modifier.padding(ZhiBanSpacing.Lg)) {
+            Text(
+                "API Key",
+                style = MaterialTheme.typography.titleMedium,
+                color = ModelSettingsPrimary,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            ApiKeyField(state, viewModel)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (state.isApiKeyConfigured) {
+                    TextButton(
+                        onClick = viewModel::checkConnection,
+                        enabled = !state.isChecking,
+                        contentPadding = PaddingValues(horizontal = 0.dp),
+                    ) {
+                        Text(if (state.isChecking) "检测中…" else "检测连接", color = CloudBlue)
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    TextButton(
+                        onClick = onClearClick,
+                        contentPadding = PaddingValues(horizontal = 0.dp),
+                    ) {
+                        Text("清除", color = ErrorRed)
                     }
                 }
+                Spacer(modifier = Modifier.weight(1f))
+                Text("本机加密保存", color = Gray500, style = MaterialTheme.typography.labelSmall)
+            }
+            state.healthMessage?.let {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    it,
+                    color = if (it ==
+                        "连接正常"
+                    ) {
+                        SuccessGreen
+                    } else {
+                        ErrorRed
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+    }
 }
 
 private data class ModelConfigDialogSlots(
@@ -574,7 +573,6 @@ private data class ModelConfigDialogSlots(
 
 @Composable
 private fun ModelConfigDialogs(slots: ModelConfigDialogSlots) {
-
     if (slots.confirmClear) {
         ZhiBanAlertDialog(
             onDismissRequest = { slots.setConfirmClear(false) },
@@ -631,4 +629,3 @@ private fun ModelConfigDialogs(slots: ModelConfigDialogSlots) {
         )
     }
 }
-

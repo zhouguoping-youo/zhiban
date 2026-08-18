@@ -1,6 +1,5 @@
 package com.zhiban.rebuild.ui.tabs
 
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -55,7 +54,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -77,6 +75,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zhiban.rebuild.R
 import com.zhiban.rebuild.data.agent.ScheduleProjection
 import com.zhiban.rebuild.data.agent.ScheduleStatus
@@ -636,19 +635,17 @@ private fun SystemCalendarImportDialog(state: CalendarAgentViewModel.ImportState
             subtitle = "最近 30 天至未来 90 天",
             onDismiss = onDismiss,
         )
-    SystemCalendarImportContent(
-        onDismiss = onDismiss,
-        state = state,
-        sources = sources,
-        selectedSources = selectedSources,
-        setSelectedSources = { selectedSources = it },
-        selectedEvents = selectedEvents,
-        onImport = onImport,
-    )
+        SystemCalendarImportContent(
+            onDismiss = onDismiss,
+            state = state,
+            sources = sources,
+            selectedSources = selectedSources,
+            setSelectedSources = { selectedSources = it },
+            selectedEvents = selectedEvents,
+            onImport = onImport,
+        )
     }
 }
-
-
 
 internal data class SystemCalendarSource(val key: String, val name: String, val events: List<SystemCalendarEvent>)
 
@@ -1024,5 +1021,3 @@ private fun ColumnScope.SystemCalendarImportContent(
         }
     }
 }
-
-

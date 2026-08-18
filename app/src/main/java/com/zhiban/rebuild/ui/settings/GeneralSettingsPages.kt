@@ -578,7 +578,7 @@ fun DataSettingsPage(onBack: () -> Unit, onMemory: () -> Unit, onRunHistory: () 
                     SettingsRow("消息采集记录", "")
                 }
             }
-            DataExportSection(
+            dataExportSection(
                 exportState = exportState,
                 onExport = exportViewModel::export,
                 onDiagnostics = onRunHistory,
@@ -600,15 +600,14 @@ fun DataSettingsPage(onBack: () -> Unit, onMemory: () -> Unit, onRunHistory: () 
                     )
                 }
             }
-        }    }
+        }
+    }
     ResetDataConfirmDialog(
         confirmReset = confirmReset,
         setConfirmReset = { confirmReset = it },
         context = context,
     )
 }
-
-
 
 @Composable
 fun ReportErrorSettingsPage(onBack: () -> Unit, onDiagnostics: () -> Unit) {
@@ -984,38 +983,38 @@ private fun formatBytes(bytes: Long): String = when {
     else -> String.format(Locale.getDefault(), "%.1f MB", bytes / 1_048_576.0)
 }
 
-private fun LazyListScope.DataExportSection(exportState: DataExportUiState, onExport: () -> Unit, onDiagnostics: () -> Unit) {
+private fun LazyListScope.dataExportSection(exportState: DataExportUiState, onExport: () -> Unit, onDiagnostics: () -> Unit) {
+    item {
+        Text(
+            "备份与导出",
+            style = MaterialTheme.typography.labelMedium,
+            color = ZhiBanTextSecondary,
+            modifier = Modifier.padding(horizontal = ZhiBanSpacing.Xs, vertical = ZhiBanSpacing.Sm),
+        )
+    }
+    item {
+        PortableBackupSection()
+    }
+    item {
+        SettingsCard {
+            SettingsActionRow(
+                title = if (exportState.exporting) "正在导出…" else "导出全部数据",
+                onClick = onExport,
+            )
+            Divider()
+            SettingsActionRow("导出诊断记录", onClick = onDiagnostics)
+        }
+    }
+    if (exportState.exportFailed) {
         item {
             Text(
-                "备份与导出",
-                style = MaterialTheme.typography.labelMedium,
-                color = ZhiBanTextSecondary,
-                modifier = Modifier.padding(horizontal = ZhiBanSpacing.Xs, vertical = ZhiBanSpacing.Sm),
+                "导出失败，请稍后重试",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(horizontal = ZhiBanSpacing.Lg),
             )
         }
-        item {
-            PortableBackupSection()
-        }
-        item {
-            SettingsCard {
-                SettingsActionRow(
-                    title = if (exportState.exporting) "正在导出…" else "导出全部数据",
-                    onClick = onExport,
-                )
-                Divider()
-                SettingsActionRow("导出诊断记录", onClick = onDiagnostics)
-            }
-        }
-        if (exportState.exportFailed) {
-            item {
-                Text(
-                    "导出失败，请稍后重试",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.Lg),
-                )
-            }
-        }
+    }
 }
 
 @Composable
@@ -1047,4 +1046,3 @@ private fun ResetDataConfirmDialog(confirmReset: Boolean, setConfirmReset: (Bool
         )
     }
 }
-

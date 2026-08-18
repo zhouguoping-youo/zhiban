@@ -153,269 +153,267 @@ internal object AgentDatabaseMigrations1To24 {
     }
 
     private fun migrate7To8Part1(db: SupportSQLiteDatabase) {
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `memory_namespaces` (`namespaceId` TEXT NOT NULL, `ownerUserId` TEXT NOT NULL, `profileId` TEXT NOT NULL, `scopeType` TEXT NOT NULL, `scopeId` TEXT NOT NULL, `state` TEXT NOT NULL, `revision` INTEGER NOT NULL, `invalidationGeneration` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`namespaceId`))",
-            )
-            db.execSQL(
-                "CREATE UNIQUE INDEX IF NOT EXISTS `index_memory_namespaces_ownerUserId_profileId_scopeType_scopeId` ON `memory_namespaces` (`ownerUserId`,`profileId`,`scopeType`,`scopeId`)",
-            )
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `memory_records` (`namespaceId` TEXT NOT NULL, `memoryId` TEXT NOT NULL, `recordVersion` INTEGER NOT NULL, `logicalMemoryId` TEXT NOT NULL, `memoryType` TEXT NOT NULL, `subjectKey` TEXT NOT NULL, `predicateKey` TEXT NOT NULL, `objectText` TEXT NOT NULL, `canonicalText` TEXT NOT NULL, `canonicalDigest` TEXT NOT NULL, `sensitivity` TEXT NOT NULL, `confidence` REAL NOT NULL, `importance` REAL NOT NULL, `status` TEXT NOT NULL, `validFromEpochMs` INTEGER, `validToEpochMs` INTEGER, `observedAtEpochMs` INTEGER NOT NULL, `txFromEpochMs` INTEGER NOT NULL, `txToEpochMs` INTEGER, `createdAtEpochMs` INTEGER NOT NULL, `expiresAtEpochMs` INTEGER, `schemaVersion` INTEGER NOT NULL, `sourceSetDigest` TEXT NOT NULL, PRIMARY KEY(`namespaceId`,`memoryId`,`recordVersion`), FOREIGN KEY(`namespaceId`) REFERENCES `memory_namespaces`(`namespaceId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_memory_records_namespaceId` ON `memory_records` (`namespaceId`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_memory_records_namespaceId_logicalMemoryId` ON `memory_records` (`namespaceId`,`logicalMemoryId`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_memory_records_namespaceId_subjectKey_predicateKey` ON `memory_records` (`namespaceId`,`subjectKey`,`predicateKey`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_memory_records_namespaceId_expiresAtEpochMs` ON `memory_records` (`namespaceId`,`expiresAtEpochMs`)",
-            )
-            createSingleCurrentMemoryTrigger(db)
-            createSingleCurrentMemoryUpdateTrigger(db)
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `memory_current_versions` (`namespaceId` TEXT NOT NULL, `logicalMemoryId` TEXT NOT NULL, `recordVersion` INTEGER NOT NULL, `memoryId` TEXT NOT NULL, `revision` INTEGER NOT NULL, PRIMARY KEY(`namespaceId`,`logicalMemoryId`), FOREIGN KEY(`namespaceId`,`memoryId`,`recordVersion`) REFERENCES `memory_records`(`namespaceId`,`memoryId`,`recordVersion`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL(
-                "CREATE UNIQUE INDEX IF NOT EXISTS `index_memory_current_versions_namespaceId_memoryId_recordVersion` ON `memory_current_versions` (`namespaceId`,`memoryId`,`recordVersion`)",
-            )
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `memory_evidence` (`namespaceId` TEXT NOT NULL, `memoryId` TEXT NOT NULL, `recordVersion` INTEGER NOT NULL, `evidenceId` TEXT NOT NULL, `sourceType` TEXT NOT NULL, `sourceRef` TEXT NOT NULL, `sourceDigest` TEXT NOT NULL, `observedAtEpochMs` INTEGER NOT NULL, `excerptDigest` TEXT NOT NULL, `trust` TEXT NOT NULL, `sensitivity` TEXT NOT NULL, PRIMARY KEY(`namespaceId`,`memoryId`,`recordVersion`,`evidenceId`), FOREIGN KEY(`namespaceId`,`memoryId`,`recordVersion`) REFERENCES `memory_records`(`namespaceId`,`memoryId`,`recordVersion`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_memory_evidence_namespaceId_memoryId_recordVersion` ON `memory_evidence` (`namespaceId`,`memoryId`,`recordVersion`)",
-            )
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `memory_relations` (`namespaceId` TEXT NOT NULL, `fromMemoryId` TEXT NOT NULL, `fromRecordVersion` INTEGER NOT NULL, `toMemoryId` TEXT NOT NULL, `toRecordVersion` INTEGER NOT NULL, `relationType` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`namespaceId`,`fromMemoryId`,`fromRecordVersion`,`toMemoryId`,`toRecordVersion`,`relationType`), FOREIGN KEY(`namespaceId`,`fromMemoryId`,`fromRecordVersion`) REFERENCES `memory_records`(`namespaceId`,`memoryId`,`recordVersion`) ON UPDATE NO ACTION ON DELETE CASCADE, FOREIGN KEY(`namespaceId`,`toMemoryId`,`toRecordVersion`) REFERENCES `memory_records`(`namespaceId`,`memoryId`,`recordVersion`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_memory_relations_namespaceId_fromMemoryId_fromRecordVersion` ON `memory_relations` (`namespaceId`,`fromMemoryId`,`fromRecordVersion`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_memory_relations_namespaceId_toMemoryId_toRecordVersion` ON `memory_relations` (`namespaceId`,`toMemoryId`,`toRecordVersion`)",
-            )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `memory_namespaces` (`namespaceId` TEXT NOT NULL, `ownerUserId` TEXT NOT NULL, `profileId` TEXT NOT NULL, `scopeType` TEXT NOT NULL, `scopeId` TEXT NOT NULL, `state` TEXT NOT NULL, `revision` INTEGER NOT NULL, `invalidationGeneration` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`namespaceId`))",
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_memory_namespaces_ownerUserId_profileId_scopeType_scopeId` ON `memory_namespaces` (`ownerUserId`,`profileId`,`scopeType`,`scopeId`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `memory_records` (`namespaceId` TEXT NOT NULL, `memoryId` TEXT NOT NULL, `recordVersion` INTEGER NOT NULL, `logicalMemoryId` TEXT NOT NULL, `memoryType` TEXT NOT NULL, `subjectKey` TEXT NOT NULL, `predicateKey` TEXT NOT NULL, `objectText` TEXT NOT NULL, `canonicalText` TEXT NOT NULL, `canonicalDigest` TEXT NOT NULL, `sensitivity` TEXT NOT NULL, `confidence` REAL NOT NULL, `importance` REAL NOT NULL, `status` TEXT NOT NULL, `validFromEpochMs` INTEGER, `validToEpochMs` INTEGER, `observedAtEpochMs` INTEGER NOT NULL, `txFromEpochMs` INTEGER NOT NULL, `txToEpochMs` INTEGER, `createdAtEpochMs` INTEGER NOT NULL, `expiresAtEpochMs` INTEGER, `schemaVersion` INTEGER NOT NULL, `sourceSetDigest` TEXT NOT NULL, PRIMARY KEY(`namespaceId`,`memoryId`,`recordVersion`), FOREIGN KEY(`namespaceId`) REFERENCES `memory_namespaces`(`namespaceId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_memory_records_namespaceId` ON `memory_records` (`namespaceId`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_memory_records_namespaceId_logicalMemoryId` ON `memory_records` (`namespaceId`,`logicalMemoryId`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_memory_records_namespaceId_subjectKey_predicateKey` ON `memory_records` (`namespaceId`,`subjectKey`,`predicateKey`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_memory_records_namespaceId_expiresAtEpochMs` ON `memory_records` (`namespaceId`,`expiresAtEpochMs`)",
+        )
+        createSingleCurrentMemoryTrigger(db)
+        createSingleCurrentMemoryUpdateTrigger(db)
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `memory_current_versions` (`namespaceId` TEXT NOT NULL, `logicalMemoryId` TEXT NOT NULL, `recordVersion` INTEGER NOT NULL, `memoryId` TEXT NOT NULL, `revision` INTEGER NOT NULL, PRIMARY KEY(`namespaceId`,`logicalMemoryId`), FOREIGN KEY(`namespaceId`,`memoryId`,`recordVersion`) REFERENCES `memory_records`(`namespaceId`,`memoryId`,`recordVersion`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_memory_current_versions_namespaceId_memoryId_recordVersion` ON `memory_current_versions` (`namespaceId`,`memoryId`,`recordVersion`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `memory_evidence` (`namespaceId` TEXT NOT NULL, `memoryId` TEXT NOT NULL, `recordVersion` INTEGER NOT NULL, `evidenceId` TEXT NOT NULL, `sourceType` TEXT NOT NULL, `sourceRef` TEXT NOT NULL, `sourceDigest` TEXT NOT NULL, `observedAtEpochMs` INTEGER NOT NULL, `excerptDigest` TEXT NOT NULL, `trust` TEXT NOT NULL, `sensitivity` TEXT NOT NULL, PRIMARY KEY(`namespaceId`,`memoryId`,`recordVersion`,`evidenceId`), FOREIGN KEY(`namespaceId`,`memoryId`,`recordVersion`) REFERENCES `memory_records`(`namespaceId`,`memoryId`,`recordVersion`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_memory_evidence_namespaceId_memoryId_recordVersion` ON `memory_evidence` (`namespaceId`,`memoryId`,`recordVersion`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `memory_relations` (`namespaceId` TEXT NOT NULL, `fromMemoryId` TEXT NOT NULL, `fromRecordVersion` INTEGER NOT NULL, `toMemoryId` TEXT NOT NULL, `toRecordVersion` INTEGER NOT NULL, `relationType` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`namespaceId`,`fromMemoryId`,`fromRecordVersion`,`toMemoryId`,`toRecordVersion`,`relationType`), FOREIGN KEY(`namespaceId`,`fromMemoryId`,`fromRecordVersion`) REFERENCES `memory_records`(`namespaceId`,`memoryId`,`recordVersion`) ON UPDATE NO ACTION ON DELETE CASCADE, FOREIGN KEY(`namespaceId`,`toMemoryId`,`toRecordVersion`) REFERENCES `memory_records`(`namespaceId`,`memoryId`,`recordVersion`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_memory_relations_namespaceId_fromMemoryId_fromRecordVersion` ON `memory_relations` (`namespaceId`,`fromMemoryId`,`fromRecordVersion`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_memory_relations_namespaceId_toMemoryId_toRecordVersion` ON `memory_relations` (`namespaceId`,`toMemoryId`,`toRecordVersion`)",
+        )
     }
 
     private fun migrate7To8Part2(db: SupportSQLiteDatabase) {
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `memory_index_outbox` (`jobId` TEXT NOT NULL, `namespaceId` TEXT NOT NULL, `memoryId` TEXT NOT NULL, `recordVersion` INTEGER NOT NULL, `indexType` TEXT NOT NULL, `contentDigest` TEXT NOT NULL, `status` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`jobId`), FOREIGN KEY(`namespaceId`,`memoryId`,`recordVersion`) REFERENCES `memory_records`(`namespaceId`,`memoryId`,`recordVersion`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_memory_index_outbox_namespaceId_memoryId_recordVersion` ON `memory_index_outbox` (`namespaceId`,`memoryId`,`recordVersion`)",
-            )
-            db.execSQL(
-                "CREATE UNIQUE INDEX IF NOT EXISTS `index_memory_index_outbox_namespaceId_memoryId_recordVersion_indexType` ON `memory_index_outbox` (`namespaceId`,`memoryId`,`recordVersion`,`indexType`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_memory_index_outbox_status` ON `memory_index_outbox` (`status`)",
-            )
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `memory_commit_receipts` (`namespaceId` TEXT NOT NULL, `candidateId` TEXT NOT NULL, `approvalRef` TEXT NOT NULL, `canonicalDigest` TEXT NOT NULL, `memoryId` TEXT NOT NULL, `recordVersion` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`namespaceId`,`candidateId`), FOREIGN KEY(`namespaceId`,`memoryId`,`recordVersion`) REFERENCES `memory_records`(`namespaceId`,`memoryId`,`recordVersion`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_memory_commit_receipts_namespaceId_memoryId_recordVersion` ON `memory_commit_receipts` (`namespaceId`,`memoryId`,`recordVersion`)",
-            )
-            db.execSQL(
-                "CREATE UNIQUE INDEX IF NOT EXISTS `index_memory_commit_receipts_approvalRef` ON `memory_commit_receipts` (`approvalRef`)",
-            )
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `memory_events` (`eventId` TEXT NOT NULL, `namespaceId` TEXT NOT NULL, `candidateId` TEXT NOT NULL, `memoryId` TEXT NOT NULL, `recordVersion` INTEGER NOT NULL, `eventType` TEXT NOT NULL, `payloadDigest` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`eventId`), FOREIGN KEY(`namespaceId`,`memoryId`,`recordVersion`) REFERENCES `memory_records`(`namespaceId`,`memoryId`,`recordVersion`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_memory_events_namespaceId_memoryId_recordVersion` ON `memory_events` (`namespaceId`,`memoryId`,`recordVersion`)",
-            )
-            db.execSQL(
-                "CREATE UNIQUE INDEX IF NOT EXISTS `index_memory_events_namespaceId_candidateId_eventType` ON `memory_events` (`namespaceId`,`candidateId`,`eventType`)",
-            )
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `memory_tombstones` (`namespaceId` TEXT NOT NULL, `logicalMemoryId` TEXT NOT NULL, `memoryId` TEXT NOT NULL, `highestRecordVersion` INTEGER NOT NULL, `deleteCommandDigest` TEXT NOT NULL, `deletionRevision` INTEGER NOT NULL, `barrierState` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`namespaceId`,`logicalMemoryId`), FOREIGN KEY(`namespaceId`) REFERENCES `memory_namespaces`(`namespaceId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_memory_tombstones_namespaceId` ON `memory_tombstones` (`namespaceId`)",
-            )
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `memory_deletion_outbox` (`jobId` TEXT NOT NULL, `namespaceId` TEXT NOT NULL, `logicalMemoryId` TEXT NOT NULL, `deletionRevision` INTEGER NOT NULL, `targetIndex` TEXT NOT NULL, `status` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`jobId`), FOREIGN KEY(`namespaceId`) REFERENCES `memory_namespaces`(`namespaceId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_memory_deletion_outbox_namespaceId` ON `memory_deletion_outbox` (`namespaceId`)",
-            )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `memory_index_outbox` (`jobId` TEXT NOT NULL, `namespaceId` TEXT NOT NULL, `memoryId` TEXT NOT NULL, `recordVersion` INTEGER NOT NULL, `indexType` TEXT NOT NULL, `contentDigest` TEXT NOT NULL, `status` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`jobId`), FOREIGN KEY(`namespaceId`,`memoryId`,`recordVersion`) REFERENCES `memory_records`(`namespaceId`,`memoryId`,`recordVersion`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_memory_index_outbox_namespaceId_memoryId_recordVersion` ON `memory_index_outbox` (`namespaceId`,`memoryId`,`recordVersion`)",
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_memory_index_outbox_namespaceId_memoryId_recordVersion_indexType` ON `memory_index_outbox` (`namespaceId`,`memoryId`,`recordVersion`,`indexType`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_memory_index_outbox_status` ON `memory_index_outbox` (`status`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `memory_commit_receipts` (`namespaceId` TEXT NOT NULL, `candidateId` TEXT NOT NULL, `approvalRef` TEXT NOT NULL, `canonicalDigest` TEXT NOT NULL, `memoryId` TEXT NOT NULL, `recordVersion` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`namespaceId`,`candidateId`), FOREIGN KEY(`namespaceId`,`memoryId`,`recordVersion`) REFERENCES `memory_records`(`namespaceId`,`memoryId`,`recordVersion`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_memory_commit_receipts_namespaceId_memoryId_recordVersion` ON `memory_commit_receipts` (`namespaceId`,`memoryId`,`recordVersion`)",
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_memory_commit_receipts_approvalRef` ON `memory_commit_receipts` (`approvalRef`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `memory_events` (`eventId` TEXT NOT NULL, `namespaceId` TEXT NOT NULL, `candidateId` TEXT NOT NULL, `memoryId` TEXT NOT NULL, `recordVersion` INTEGER NOT NULL, `eventType` TEXT NOT NULL, `payloadDigest` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`eventId`), FOREIGN KEY(`namespaceId`,`memoryId`,`recordVersion`) REFERENCES `memory_records`(`namespaceId`,`memoryId`,`recordVersion`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_memory_events_namespaceId_memoryId_recordVersion` ON `memory_events` (`namespaceId`,`memoryId`,`recordVersion`)",
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_memory_events_namespaceId_candidateId_eventType` ON `memory_events` (`namespaceId`,`candidateId`,`eventType`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `memory_tombstones` (`namespaceId` TEXT NOT NULL, `logicalMemoryId` TEXT NOT NULL, `memoryId` TEXT NOT NULL, `highestRecordVersion` INTEGER NOT NULL, `deleteCommandDigest` TEXT NOT NULL, `deletionRevision` INTEGER NOT NULL, `barrierState` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`namespaceId`,`logicalMemoryId`), FOREIGN KEY(`namespaceId`) REFERENCES `memory_namespaces`(`namespaceId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_memory_tombstones_namespaceId` ON `memory_tombstones` (`namespaceId`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `memory_deletion_outbox` (`jobId` TEXT NOT NULL, `namespaceId` TEXT NOT NULL, `logicalMemoryId` TEXT NOT NULL, `deletionRevision` INTEGER NOT NULL, `targetIndex` TEXT NOT NULL, `status` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`jobId`), FOREIGN KEY(`namespaceId`) REFERENCES `memory_namespaces`(`namespaceId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_memory_deletion_outbox_namespaceId` ON `memory_deletion_outbox` (`namespaceId`)",
+        )
     }
 
     private fun migrate7To8Part3(db: SupportSQLiteDatabase) {
-            db.execSQL(
-                "CREATE UNIQUE INDEX IF NOT EXISTS `index_memory_deletion_outbox_namespaceId_logicalMemoryId_deletionRevision` ON `memory_deletion_outbox` (`namespaceId`,`logicalMemoryId`,`deletionRevision`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_memory_deletion_outbox_status` ON `memory_deletion_outbox` (`status`)",
-            )
-            db.execSQL(
-                "CREATE VIRTUAL TABLE IF NOT EXISTS `memory_fts` USING FTS4(`namespaceId` TEXT NOT NULL, `memoryId` TEXT NOT NULL, `recordVersion` INTEGER NOT NULL, `canonicalText` TEXT NOT NULL, tokenize=unicode61)",
-            )
-        
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_memory_deletion_outbox_namespaceId_logicalMemoryId_deletionRevision` ON `memory_deletion_outbox` (`namespaceId`,`logicalMemoryId`,`deletionRevision`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_memory_deletion_outbox_status` ON `memory_deletion_outbox` (`status`)",
+        )
+        db.execSQL(
+            "CREATE VIRTUAL TABLE IF NOT EXISTS `memory_fts` USING FTS4(`namespaceId` TEXT NOT NULL, `memoryId` TEXT NOT NULL, `recordVersion` INTEGER NOT NULL, `canonicalText` TEXT NOT NULL, tokenize=unicode61)",
+        )
     }
 
     val MIGRATION_7_8 = object : Migration(7, 8) {
         override fun migrate(db: SupportSQLiteDatabase) {
-        migrate7To8Part1(db)
-        migrate7To8Part2(db)
-        migrate7To8Part3(db)
-}
+            migrate7To8Part1(db)
+            migrate7To8Part2(db)
+            migrate7To8Part3(db)
+        }
     }
 
     private fun migrate8To9Part1(db: SupportSQLiteDatabase) {
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `plan_versions` (`versionId` TEXT NOT NULL, `schemaVersion` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `note` TEXT, PRIMARY KEY(`versionId`))",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_plan_versions_schemaVersion` ON `plan_versions` (`schemaVersion`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_plan_versions_createdAtEpochMs` ON `plan_versions` (`createdAtEpochMs`)",
-            )
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `plan_definitions` (`definitionId` TEXT NOT NULL, `versionId` TEXT NOT NULL, `ownerNamespace` TEXT NOT NULL, `fingerprint` TEXT NOT NULL, `payloadJson` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`definitionId`), FOREIGN KEY(`versionId`) REFERENCES `plan_versions`(`versionId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_plan_definitions_versionId` ON `plan_definitions` (`versionId`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_plan_definitions_ownerNamespace` ON `plan_definitions` (`ownerNamespace`)",
-            )
-            db.execSQL(
-                "CREATE UNIQUE INDEX IF NOT EXISTS `index_plan_definitions_fingerprint` ON `plan_definitions` (`fingerprint`)",
-            )
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `plan_nodes` (`nodeId` TEXT NOT NULL, `definitionId` TEXT NOT NULL, `nodeKey` TEXT NOT NULL, `nodeType` TEXT NOT NULL, `payloadJson` TEXT NOT NULL, `requiresApproval` INTEGER NOT NULL, `sensitivity` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`nodeId`), FOREIGN KEY(`definitionId`) REFERENCES `plan_definitions`(`definitionId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_plan_nodes_definitionId` ON `plan_nodes` (`definitionId`)",
-            )
-            db.execSQL(
-                "CREATE UNIQUE INDEX IF NOT EXISTS `index_plan_nodes_definitionId_nodeKey` ON `plan_nodes` (`definitionId`, `nodeKey`)",
-            )
-            db.execSQL("CREATE INDEX IF NOT EXISTS `index_plan_nodes_nodeType` ON `plan_nodes` (`nodeType`)")
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_plan_nodes_requiresApproval` ON `plan_nodes` (`requiresApproval`)",
-            )
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `plan_edges` (`edgeId` TEXT NOT NULL, `definitionId` TEXT NOT NULL, `fromNodeId` TEXT NOT NULL, `toNodeId` TEXT NOT NULL, `condition` TEXT, `ordinal` INTEGER NOT NULL, PRIMARY KEY(`edgeId`), FOREIGN KEY(`definitionId`) REFERENCES `plan_definitions`(`definitionId`) ON UPDATE NO ACTION ON DELETE CASCADE, FOREIGN KEY(`fromNodeId`) REFERENCES `plan_nodes`(`nodeId`) ON UPDATE NO ACTION ON DELETE CASCADE, FOREIGN KEY(`toNodeId`) REFERENCES `plan_nodes`(`nodeId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_plan_edges_definitionId` ON `plan_edges` (`definitionId`)",
-            )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `plan_versions` (`versionId` TEXT NOT NULL, `schemaVersion` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `note` TEXT, PRIMARY KEY(`versionId`))",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_plan_versions_schemaVersion` ON `plan_versions` (`schemaVersion`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_plan_versions_createdAtEpochMs` ON `plan_versions` (`createdAtEpochMs`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `plan_definitions` (`definitionId` TEXT NOT NULL, `versionId` TEXT NOT NULL, `ownerNamespace` TEXT NOT NULL, `fingerprint` TEXT NOT NULL, `payloadJson` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`definitionId`), FOREIGN KEY(`versionId`) REFERENCES `plan_versions`(`versionId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_plan_definitions_versionId` ON `plan_definitions` (`versionId`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_plan_definitions_ownerNamespace` ON `plan_definitions` (`ownerNamespace`)",
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_plan_definitions_fingerprint` ON `plan_definitions` (`fingerprint`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `plan_nodes` (`nodeId` TEXT NOT NULL, `definitionId` TEXT NOT NULL, `nodeKey` TEXT NOT NULL, `nodeType` TEXT NOT NULL, `payloadJson` TEXT NOT NULL, `requiresApproval` INTEGER NOT NULL, `sensitivity` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`nodeId`), FOREIGN KEY(`definitionId`) REFERENCES `plan_definitions`(`definitionId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_plan_nodes_definitionId` ON `plan_nodes` (`definitionId`)",
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_plan_nodes_definitionId_nodeKey` ON `plan_nodes` (`definitionId`, `nodeKey`)",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_plan_nodes_nodeType` ON `plan_nodes` (`nodeType`)")
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_plan_nodes_requiresApproval` ON `plan_nodes` (`requiresApproval`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `plan_edges` (`edgeId` TEXT NOT NULL, `definitionId` TEXT NOT NULL, `fromNodeId` TEXT NOT NULL, `toNodeId` TEXT NOT NULL, `condition` TEXT, `ordinal` INTEGER NOT NULL, PRIMARY KEY(`edgeId`), FOREIGN KEY(`definitionId`) REFERENCES `plan_definitions`(`definitionId`) ON UPDATE NO ACTION ON DELETE CASCADE, FOREIGN KEY(`fromNodeId`) REFERENCES `plan_nodes`(`nodeId`) ON UPDATE NO ACTION ON DELETE CASCADE, FOREIGN KEY(`toNodeId`) REFERENCES `plan_nodes`(`nodeId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_plan_edges_definitionId` ON `plan_edges` (`definitionId`)",
+        )
     }
 
     private fun migrate8To9Part2(db: SupportSQLiteDatabase) {
-            db.execSQL("CREATE INDEX IF NOT EXISTS `index_plan_edges_fromNodeId` ON `plan_edges` (`fromNodeId`)")
-            db.execSQL("CREATE INDEX IF NOT EXISTS `index_plan_edges_toNodeId` ON `plan_edges` (`toNodeId`)")
-            db.execSQL(
-                "CREATE UNIQUE INDEX IF NOT EXISTS `index_plan_edges_definitionId_fromNodeId_toNodeId` ON `plan_edges` (`definitionId`, `fromNodeId`, `toNodeId`)",
-            )
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `plan_runs` (`runId` TEXT NOT NULL, `definitionId` TEXT NOT NULL, `runStatus` TEXT NOT NULL, `activeAttemptId` TEXT, `startedAtEpochMs` INTEGER NOT NULL, `completedAtEpochMs` INTEGER, PRIMARY KEY(`runId`), FOREIGN KEY(`definitionId`) REFERENCES `plan_definitions`(`definitionId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL("CREATE INDEX IF NOT EXISTS `index_plan_runs_definitionId` ON `plan_runs` (`definitionId`)")
-            db.execSQL("CREATE INDEX IF NOT EXISTS `index_plan_runs_runStatus` ON `plan_runs` (`runStatus`)")
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_plan_runs_activeAttemptId` ON `plan_runs` (`activeAttemptId`)",
-            )
-            // ADR-006 §3.1: per-(definition) single ACTIVE partial UNIQUE is added
-            // by the onCreate + onOpen callback (Room cannot model partial UNIQUE
-            // in @Index; MIGRATION_8_9 only creates the table here).
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `node_attempts` (`attemptId` TEXT NOT NULL, `runId` TEXT NOT NULL, `nodeId` TEXT NOT NULL, `ordinal` INTEGER NOT NULL, `status` TEXT NOT NULL, `startedAtEpochMs` INTEGER NOT NULL, `finishedAtEpochMs` INTEGER, `idempotencyKey` TEXT NOT NULL, `errorCode` TEXT, PRIMARY KEY(`attemptId`), FOREIGN KEY(`runId`) REFERENCES `plan_runs`(`runId`) ON UPDATE NO ACTION ON DELETE CASCADE, FOREIGN KEY(`nodeId`) REFERENCES `plan_nodes`(`nodeId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL("CREATE INDEX IF NOT EXISTS `index_node_attempts_runId` ON `node_attempts` (`runId`)")
-            db.execSQL("CREATE INDEX IF NOT EXISTS `index_node_attempts_nodeId` ON `node_attempts` (`nodeId`)")
-            db.execSQL("CREATE INDEX IF NOT EXISTS `index_node_attempts_status` ON `node_attempts` (`status`)")
-            db.execSQL(
-                "CREATE UNIQUE INDEX IF NOT EXISTS `index_node_attempts_idempotencyKey` ON `node_attempts` (`idempotencyKey`)",
-            )
-            db.execSQL(
-                "CREATE UNIQUE INDEX IF NOT EXISTS `index_node_attempts_runId_nodeId_ordinal` ON `node_attempts` (`runId`, `nodeId`, `ordinal`)",
-            )
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `approval_grants` (`grantId` TEXT NOT NULL, `attemptId` TEXT NOT NULL, `decision` TEXT NOT NULL, `decidedByUser` TEXT NOT NULL, `title` TEXT NOT NULL, `impact` TEXT NOT NULL, `actions` TEXT NOT NULL, `verificationComponentKey` TEXT NOT NULL, `decidedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`grantId`), FOREIGN KEY(`attemptId`) REFERENCES `node_attempts`(`attemptId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_plan_edges_fromNodeId` ON `plan_edges` (`fromNodeId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_plan_edges_toNodeId` ON `plan_edges` (`toNodeId`)")
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_plan_edges_definitionId_fromNodeId_toNodeId` ON `plan_edges` (`definitionId`, `fromNodeId`, `toNodeId`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `plan_runs` (`runId` TEXT NOT NULL, `definitionId` TEXT NOT NULL, `runStatus` TEXT NOT NULL, `activeAttemptId` TEXT, `startedAtEpochMs` INTEGER NOT NULL, `completedAtEpochMs` INTEGER, PRIMARY KEY(`runId`), FOREIGN KEY(`definitionId`) REFERENCES `plan_definitions`(`definitionId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_plan_runs_definitionId` ON `plan_runs` (`definitionId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_plan_runs_runStatus` ON `plan_runs` (`runStatus`)")
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_plan_runs_activeAttemptId` ON `plan_runs` (`activeAttemptId`)",
+        )
+        // ADR-006 §3.1: per-(definition) single ACTIVE partial UNIQUE is added
+        // by the onCreate + onOpen callback (Room cannot model partial UNIQUE
+        // in @Index; MIGRATION_8_9 only creates the table here).
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `node_attempts` (`attemptId` TEXT NOT NULL, `runId` TEXT NOT NULL, `nodeId` TEXT NOT NULL, `ordinal` INTEGER NOT NULL, `status` TEXT NOT NULL, `startedAtEpochMs` INTEGER NOT NULL, `finishedAtEpochMs` INTEGER, `idempotencyKey` TEXT NOT NULL, `errorCode` TEXT, PRIMARY KEY(`attemptId`), FOREIGN KEY(`runId`) REFERENCES `plan_runs`(`runId`) ON UPDATE NO ACTION ON DELETE CASCADE, FOREIGN KEY(`nodeId`) REFERENCES `plan_nodes`(`nodeId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_node_attempts_runId` ON `node_attempts` (`runId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_node_attempts_nodeId` ON `node_attempts` (`nodeId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_node_attempts_status` ON `node_attempts` (`status`)")
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_node_attempts_idempotencyKey` ON `node_attempts` (`idempotencyKey`)",
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_node_attempts_runId_nodeId_ordinal` ON `node_attempts` (`runId`, `nodeId`, `ordinal`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `approval_grants` (`grantId` TEXT NOT NULL, `attemptId` TEXT NOT NULL, `decision` TEXT NOT NULL, `decidedByUser` TEXT NOT NULL, `title` TEXT NOT NULL, `impact` TEXT NOT NULL, `actions` TEXT NOT NULL, `verificationComponentKey` TEXT NOT NULL, `decidedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`grantId`), FOREIGN KEY(`attemptId`) REFERENCES `node_attempts`(`attemptId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
     }
 
     private fun migrate8To9Part3(db: SupportSQLiteDatabase) {
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_approval_grants_attemptId` ON `approval_grants` (`attemptId`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_approval_grants_decision` ON `approval_grants` (`decision`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_approval_grants_decidedByUser` ON `approval_grants` (`decidedByUser`)",
-            )
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `dispatch_outbox` (`jobId` TEXT NOT NULL, `attemptId` TEXT NOT NULL, `toolName` TEXT NOT NULL, `argumentsDigest` TEXT NOT NULL, `idempotencyKey` TEXT NOT NULL, `status` TEXT NOT NULL, `ordinal` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`jobId`), FOREIGN KEY(`attemptId`) REFERENCES `node_attempts`(`attemptId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_dispatch_outbox_attemptId` ON `dispatch_outbox` (`attemptId`)",
-            )
-            db.execSQL("CREATE INDEX IF NOT EXISTS `index_dispatch_outbox_status` ON `dispatch_outbox` (`status`)")
-            db.execSQL(
-                "CREATE UNIQUE INDEX IF NOT EXISTS `index_dispatch_outbox_idempotencyKey` ON `dispatch_outbox` (`idempotencyKey`)",
-            )
-            db.execSQL(
-                "CREATE UNIQUE INDEX IF NOT EXISTS `index_dispatch_outbox_attemptId_ordinal` ON `dispatch_outbox` (`attemptId`, `ordinal`)",
-            )
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `result_ledger` (`resultId` TEXT NOT NULL, `attemptId` TEXT NOT NULL, `resultJson` TEXT NOT NULL, `durabilityClass` TEXT NOT NULL, `ordinal` INTEGER NOT NULL, `recordedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`resultId`), FOREIGN KEY(`attemptId`) REFERENCES `node_attempts`(`attemptId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_result_ledger_attemptId` ON `result_ledger` (`attemptId`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_result_ledger_durabilityClass` ON `result_ledger` (`durabilityClass`)",
-            )
-            db.execSQL(
-                "CREATE UNIQUE INDEX IF NOT EXISTS `index_result_ledger_attemptId_ordinal` ON `result_ledger` (`attemptId`, `ordinal`)",
-            )
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `resource_leases` (`leaseId` TEXT NOT NULL, `attemptId` TEXT NOT NULL, `resourceKey` TEXT NOT NULL, `epoch` INTEGER NOT NULL, `ownerId` TEXT NOT NULL, `expiresAtEpochMs` INTEGER, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`leaseId`), FOREIGN KEY(`attemptId`) REFERENCES `node_attempts`(`attemptId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_resource_leases_attemptId` ON `resource_leases` (`attemptId`)",
-            )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_approval_grants_attemptId` ON `approval_grants` (`attemptId`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_approval_grants_decision` ON `approval_grants` (`decision`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_approval_grants_decidedByUser` ON `approval_grants` (`decidedByUser`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `dispatch_outbox` (`jobId` TEXT NOT NULL, `attemptId` TEXT NOT NULL, `toolName` TEXT NOT NULL, `argumentsDigest` TEXT NOT NULL, `idempotencyKey` TEXT NOT NULL, `status` TEXT NOT NULL, `ordinal` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`jobId`), FOREIGN KEY(`attemptId`) REFERENCES `node_attempts`(`attemptId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_dispatch_outbox_attemptId` ON `dispatch_outbox` (`attemptId`)",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_dispatch_outbox_status` ON `dispatch_outbox` (`status`)")
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_dispatch_outbox_idempotencyKey` ON `dispatch_outbox` (`idempotencyKey`)",
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_dispatch_outbox_attemptId_ordinal` ON `dispatch_outbox` (`attemptId`, `ordinal`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `result_ledger` (`resultId` TEXT NOT NULL, `attemptId` TEXT NOT NULL, `resultJson` TEXT NOT NULL, `durabilityClass` TEXT NOT NULL, `ordinal` INTEGER NOT NULL, `recordedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`resultId`), FOREIGN KEY(`attemptId`) REFERENCES `node_attempts`(`attemptId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_result_ledger_attemptId` ON `result_ledger` (`attemptId`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_result_ledger_durabilityClass` ON `result_ledger` (`durabilityClass`)",
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_result_ledger_attemptId_ordinal` ON `result_ledger` (`attemptId`, `ordinal`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `resource_leases` (`leaseId` TEXT NOT NULL, `attemptId` TEXT NOT NULL, `resourceKey` TEXT NOT NULL, `epoch` INTEGER NOT NULL, `ownerId` TEXT NOT NULL, `expiresAtEpochMs` INTEGER, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`leaseId`), FOREIGN KEY(`attemptId`) REFERENCES `node_attempts`(`attemptId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_resource_leases_attemptId` ON `resource_leases` (`attemptId`)",
+        )
     }
 
     private fun migrate8To9Part4(db: SupportSQLiteDatabase) {
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_resource_leases_resourceKey` ON `resource_leases` (`resourceKey`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_resource_leases_ownerId` ON `resource_leases` (`ownerId`)",
-            )
-            db.execSQL(
-                "CREATE UNIQUE INDEX IF NOT EXISTS `index_resource_leases_attemptId_resourceKey` ON `resource_leases` (`attemptId`, `resourceKey`)",
-            )
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `session_leases` (`leaseId` TEXT NOT NULL, `runId` TEXT NOT NULL, `sessionKey` TEXT NOT NULL, `epoch` INTEGER NOT NULL, `ownerId` TEXT NOT NULL, `expiresAtEpochMs` INTEGER, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`leaseId`), FOREIGN KEY(`runId`) REFERENCES `plan_runs`(`runId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL("CREATE INDEX IF NOT EXISTS `index_session_leases_runId` ON `session_leases` (`runId`)")
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_session_leases_sessionKey` ON `session_leases` (`sessionKey`)",
-            )
-            db.execSQL("CREATE INDEX IF NOT EXISTS `index_session_leases_ownerId` ON `session_leases` (`ownerId`)")
-            db.execSQL(
-                "CREATE UNIQUE INDEX IF NOT EXISTS `index_session_leases_runId_sessionKey` ON `session_leases` (`runId`, `sessionKey`)",
-            )
-        
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_resource_leases_resourceKey` ON `resource_leases` (`resourceKey`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_resource_leases_ownerId` ON `resource_leases` (`ownerId`)",
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_resource_leases_attemptId_resourceKey` ON `resource_leases` (`attemptId`, `resourceKey`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `session_leases` (`leaseId` TEXT NOT NULL, `runId` TEXT NOT NULL, `sessionKey` TEXT NOT NULL, `epoch` INTEGER NOT NULL, `ownerId` TEXT NOT NULL, `expiresAtEpochMs` INTEGER, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`leaseId`), FOREIGN KEY(`runId`) REFERENCES `plan_runs`(`runId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_session_leases_runId` ON `session_leases` (`runId`)")
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_session_leases_sessionKey` ON `session_leases` (`sessionKey`)",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_session_leases_ownerId` ON `session_leases` (`ownerId`)")
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_session_leases_runId_sessionKey` ON `session_leases` (`runId`, `sessionKey`)",
+        )
     }
 
     val MIGRATION_8_9 = object : Migration(8, 9) {
         override fun migrate(db: SupportSQLiteDatabase) {
-        migrate8To9Part1(db)
-        migrate8To9Part2(db)
-        migrate8To9Part3(db)
-        migrate8To9Part4(db)
-}
+            migrate8To9Part1(db)
+            migrate8To9Part2(db)
+            migrate8To9Part3(db)
+            migrate8To9Part4(db)
+        }
     }
 
     val MIGRATION_9_10 = object : Migration(9, 10) {
@@ -721,128 +719,127 @@ internal object AgentDatabaseMigrations1To24 {
     }
 
     private fun migrate24To25Part1(db: SupportSQLiteDatabase) {
-            db.execSQL("DROP INDEX IF EXISTS `index_plan_runs_single_active_per_definition`")
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `contact_methods` (`methodId` TEXT NOT NULL, `contactId` TEXT NOT NULL, `kind` TEXT NOT NULL, `value` TEXT NOT NULL, `normalizedValue` TEXT NOT NULL, `label` TEXT, `isPrimary` INTEGER NOT NULL, `source` TEXT NOT NULL, `evidenceRef` TEXT, `confidence` REAL NOT NULL, `userConfirmed` INTEGER NOT NULL, `verifiedAtEpochMs` INTEGER, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`methodId`), FOREIGN KEY(`contactId`) REFERENCES `contacts`(`contactId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_contact_methods_contactId` ON `contact_methods` (`contactId`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_contact_methods_kind_normalizedValue` ON `contact_methods` (`kind`, `normalizedValue`)",
-            )
-            db.execSQL(
-                "CREATE UNIQUE INDEX IF NOT EXISTS `index_contact_methods_contactId_kind_normalizedValue` ON `contact_methods` (`contactId`, `kind`, `normalizedValue`)",
-            )
+        db.execSQL("DROP INDEX IF EXISTS `index_plan_runs_single_active_per_definition`")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `contact_methods` (`methodId` TEXT NOT NULL, `contactId` TEXT NOT NULL, `kind` TEXT NOT NULL, `value` TEXT NOT NULL, `normalizedValue` TEXT NOT NULL, `label` TEXT, `isPrimary` INTEGER NOT NULL, `source` TEXT NOT NULL, `evidenceRef` TEXT, `confidence` REAL NOT NULL, `userConfirmed` INTEGER NOT NULL, `verifiedAtEpochMs` INTEGER, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`methodId`), FOREIGN KEY(`contactId`) REFERENCES `contacts`(`contactId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_contact_methods_contactId` ON `contact_methods` (`contactId`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_contact_methods_kind_normalizedValue` ON `contact_methods` (`kind`, `normalizedValue`)",
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_contact_methods_contactId_kind_normalizedValue` ON `contact_methods` (`contactId`, `kind`, `normalizedValue`)",
+        )
 
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `organizations` (`organizationId` TEXT NOT NULL, `canonicalName` TEXT NOT NULL, `normalizedName` TEXT NOT NULL, `creditCode` TEXT, `status` TEXT, `registeredAddress` TEXT, `longitude` REAL, `latitude` REAL, `source` TEXT NOT NULL, `sourceRef` TEXT, `userConfirmed` INTEGER NOT NULL, `verifiedAtEpochMs` INTEGER, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`organizationId`))",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_organizations_normalizedName` ON `organizations` (`normalizedName`)",
-            )
-            db.execSQL(
-                "CREATE UNIQUE INDEX IF NOT EXISTS `index_organizations_creditCode` ON `organizations` (`creditCode`)",
-            )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `organizations` (`organizationId` TEXT NOT NULL, `canonicalName` TEXT NOT NULL, `normalizedName` TEXT NOT NULL, `creditCode` TEXT, `status` TEXT, `registeredAddress` TEXT, `longitude` REAL, `latitude` REAL, `source` TEXT NOT NULL, `sourceRef` TEXT, `userConfirmed` INTEGER NOT NULL, `verifiedAtEpochMs` INTEGER, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`organizationId`))",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_organizations_normalizedName` ON `organizations` (`normalizedName`)",
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_organizations_creditCode` ON `organizations` (`creditCode`)",
+        )
 
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `contact_employments` (`employmentId` TEXT NOT NULL, `contactId` TEXT NOT NULL, `organizationId` TEXT, `companyNameSnapshot` TEXT NOT NULL, `department` TEXT, `title` TEXT, `jobDescription` TEXT, `officeLocation` TEXT, `isCurrent` INTEGER NOT NULL, `source` TEXT NOT NULL, `evidenceRef` TEXT, `confidence` REAL NOT NULL, `userConfirmed` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`employmentId`), FOREIGN KEY(`contactId`) REFERENCES `contacts`(`contactId`) ON UPDATE NO ACTION ON DELETE CASCADE, FOREIGN KEY(`organizationId`) REFERENCES `organizations`(`organizationId`) ON UPDATE NO ACTION ON DELETE SET NULL)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_contact_employments_contactId` ON `contact_employments` (`contactId`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_contact_employments_organizationId` ON `contact_employments` (`organizationId`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_contact_employments_isCurrent` ON `contact_employments` (`isCurrent`)",
-            )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `contact_employments` (`employmentId` TEXT NOT NULL, `contactId` TEXT NOT NULL, `organizationId` TEXT, `companyNameSnapshot` TEXT NOT NULL, `department` TEXT, `title` TEXT, `jobDescription` TEXT, `officeLocation` TEXT, `isCurrent` INTEGER NOT NULL, `source` TEXT NOT NULL, `evidenceRef` TEXT, `confidence` REAL NOT NULL, `userConfirmed` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`employmentId`), FOREIGN KEY(`contactId`) REFERENCES `contacts`(`contactId`) ON UPDATE NO ACTION ON DELETE CASCADE, FOREIGN KEY(`organizationId`) REFERENCES `organizations`(`organizationId`) ON UPDATE NO ACTION ON DELETE SET NULL)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_contact_employments_contactId` ON `contact_employments` (`contactId`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_contact_employments_organizationId` ON `contact_employments` (`organizationId`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_contact_employments_isCurrent` ON `contact_employments` (`isCurrent`)",
+        )
 
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `contact_addresses` (`addressId` TEXT NOT NULL, `contactId` TEXT NOT NULL, `kind` TEXT NOT NULL, `formattedAddress` TEXT NOT NULL, `longitude` REAL, `latitude` REAL, `precision` TEXT, `source` TEXT NOT NULL, `evidenceRef` TEXT, `userConfirmed` INTEGER NOT NULL, `verifiedAtEpochMs` INTEGER, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`addressId`), FOREIGN KEY(`contactId`) REFERENCES `contacts`(`contactId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_contact_addresses_contactId` ON `contact_addresses` (`contactId`)",
-            )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `contact_addresses` (`addressId` TEXT NOT NULL, `contactId` TEXT NOT NULL, `kind` TEXT NOT NULL, `formattedAddress` TEXT NOT NULL, `longitude` REAL, `latitude` REAL, `precision` TEXT, `source` TEXT NOT NULL, `evidenceRef` TEXT, `userConfirmed` INTEGER NOT NULL, `verifiedAtEpochMs` INTEGER, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`addressId`), FOREIGN KEY(`contactId`) REFERENCES `contacts`(`contactId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_contact_addresses_contactId` ON `contact_addresses` (`contactId`)",
+        )
     }
 
     private fun migrate24To25Part2(db: SupportSQLiteDatabase) {
-            db.execSQL(
-                "CREATE UNIQUE INDEX IF NOT EXISTS `index_contact_addresses_contactId_kind_formattedAddress` ON `contact_addresses` (`contactId`, `kind`, `formattedAddress`)",
-            )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_contact_addresses_contactId_kind_formattedAddress` ON `contact_addresses` (`contactId`, `kind`, `formattedAddress`)",
+        )
 
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `contact_important_dates` (`dateId` TEXT NOT NULL, `contactId` TEXT NOT NULL, `kind` TEXT NOT NULL, `year` INTEGER, `month` INTEGER NOT NULL, `day` INTEGER NOT NULL, `source` TEXT NOT NULL, `evidenceRef` TEXT, `userConfirmed` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`dateId`), FOREIGN KEY(`contactId`) REFERENCES `contacts`(`contactId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_contact_important_dates_contactId` ON `contact_important_dates` (`contactId`)",
-            )
-            db.execSQL(
-                "CREATE UNIQUE INDEX IF NOT EXISTS `index_contact_important_dates_contactId_kind` ON `contact_important_dates` (`contactId`, `kind`)",
-            )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `contact_important_dates` (`dateId` TEXT NOT NULL, `contactId` TEXT NOT NULL, `kind` TEXT NOT NULL, `year` INTEGER, `month` INTEGER NOT NULL, `day` INTEGER NOT NULL, `source` TEXT NOT NULL, `evidenceRef` TEXT, `userConfirmed` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`dateId`), FOREIGN KEY(`contactId`) REFERENCES `contacts`(`contactId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_contact_important_dates_contactId` ON `contact_important_dates` (`contactId`)",
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_contact_important_dates_contactId_kind` ON `contact_important_dates` (`contactId`, `kind`)",
+        )
 
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `contact_facets` (`facetId` TEXT NOT NULL, `contactId` TEXT NOT NULL, `dimension` TEXT NOT NULL, `value` TEXT NOT NULL, `source` TEXT NOT NULL, `evidenceRef` TEXT, `confidence` REAL NOT NULL, `userConfirmed` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`facetId`), FOREIGN KEY(`contactId`) REFERENCES `contacts`(`contactId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_contact_facets_contactId` ON `contact_facets` (`contactId`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_contact_facets_dimension` ON `contact_facets` (`dimension`)",
-            )
-            db.execSQL(
-                "CREATE UNIQUE INDEX IF NOT EXISTS `index_contact_facets_contactId_dimension_value` ON `contact_facets` (`contactId`, `dimension`, `value`)",
-            )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `contact_facets` (`facetId` TEXT NOT NULL, `contactId` TEXT NOT NULL, `dimension` TEXT NOT NULL, `value` TEXT NOT NULL, `source` TEXT NOT NULL, `evidenceRef` TEXT, `confidence` REAL NOT NULL, `userConfirmed` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`facetId`), FOREIGN KEY(`contactId`) REFERENCES `contacts`(`contactId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_contact_facets_contactId` ON `contact_facets` (`contactId`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_contact_facets_dimension` ON `contact_facets` (`dimension`)",
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_contact_facets_contactId_dimension_value` ON `contact_facets` (`contactId`, `dimension`, `value`)",
+        )
 
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `contact_enrichment_candidates` (`candidateId` TEXT NOT NULL, `contactId` TEXT, `providerId` TEXT NOT NULL, `fieldKind` TEXT NOT NULL, `proposedValueJson` TEXT NOT NULL, `sourceRef` TEXT, `confidence` REAL NOT NULL, `status` TEXT NOT NULL, `observedAtEpochMs` INTEGER NOT NULL, `expiresAtEpochMs` INTEGER, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`candidateId`))",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_contact_enrichment_candidates_contactId` ON `contact_enrichment_candidates` (`contactId`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_contact_enrichment_candidates_providerId` ON `contact_enrichment_candidates` (`providerId`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_contact_enrichment_candidates_status` ON `contact_enrichment_candidates` (`status`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_contact_enrichment_candidates_expiresAtEpochMs` ON `contact_enrichment_candidates` (`expiresAtEpochMs`)",
-            )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `contact_enrichment_candidates` (`candidateId` TEXT NOT NULL, `contactId` TEXT, `providerId` TEXT NOT NULL, `fieldKind` TEXT NOT NULL, `proposedValueJson` TEXT NOT NULL, `sourceRef` TEXT, `confidence` REAL NOT NULL, `status` TEXT NOT NULL, `observedAtEpochMs` INTEGER NOT NULL, `expiresAtEpochMs` INTEGER, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`candidateId`))",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_contact_enrichment_candidates_contactId` ON `contact_enrichment_candidates` (`contactId`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_contact_enrichment_candidates_providerId` ON `contact_enrichment_candidates` (`providerId`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_contact_enrichment_candidates_status` ON `contact_enrichment_candidates` (`status`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_contact_enrichment_candidates_expiresAtEpochMs` ON `contact_enrichment_candidates` (`expiresAtEpochMs`)",
+        )
 
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `owner_contact_links` (`contactId` TEXT NOT NULL, `reason` TEXT NOT NULL, `userConfirmed` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `undoneAtEpochMs` INTEGER, PRIMARY KEY(`contactId`), FOREIGN KEY(`contactId`) REFERENCES `contacts`(`contactId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
-            )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `owner_contact_links` (`contactId` TEXT NOT NULL, `reason` TEXT NOT NULL, `userConfirmed` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `undoneAtEpochMs` INTEGER, PRIMARY KEY(`contactId`), FOREIGN KEY(`contactId`) REFERENCES `contacts`(`contactId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
     }
 
     private fun migrate24To25Part3(db: SupportSQLiteDatabase) {
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_owner_contact_links_undoneAtEpochMs` ON `owner_contact_links` (`undoneAtEpochMs`)",
-            )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_owner_contact_links_undoneAtEpochMs` ON `owner_contact_links` (`undoneAtEpochMs`)",
+        )
 
-            db.execSQL(
-                "INSERT OR IGNORE INTO `contact_methods` SELECT 'legacy-phone-' || contactId, contactId, 'PHONE', phone, phone, NULL, 1, source, NULL, 0.7, 0, NULL, createdAtEpochMs, updatedAtEpochMs FROM contacts WHERE phone IS NOT NULL AND trim(phone) != ''",
-            )
-            db.execSQL(
-                "INSERT OR IGNORE INTO `contact_methods` SELECT 'legacy-email-' || contactId, contactId, 'EMAIL', email, lower(email), NULL, 1, source, NULL, 0.7, 0, NULL, createdAtEpochMs, updatedAtEpochMs FROM contacts WHERE email IS NOT NULL AND trim(email) != ''",
-            )
-            db.execSQL(
-                "INSERT OR IGNORE INTO `contact_methods` SELECT 'legacy-wechat-' || contactId, contactId, 'WECHAT', wechatId, lower(wechatId), NULL, 1, source, NULL, 0.7, 0, NULL, createdAtEpochMs, updatedAtEpochMs FROM contacts WHERE wechatId IS NOT NULL AND trim(wechatId) != ''",
-            )
-            db.execSQL(
-                "INSERT OR IGNORE INTO `organizations` SELECT 'legacy-org-' || lower(trim(company)), company, lower(trim(company)), NULL, NULL, NULL, NULL, NULL, source, NULL, 0, NULL, min(createdAtEpochMs), max(updatedAtEpochMs) FROM contacts WHERE company IS NOT NULL AND trim(company) != '' GROUP BY lower(trim(company))",
-            )
-            db.execSQL(
-                "INSERT OR IGNORE INTO `contact_employments` SELECT 'legacy-employment-' || contactId, contactId, 'legacy-org-' || lower(trim(company)), company, NULL, title, NULL, NULL, 1, source, NULL, 0.7, 0, createdAtEpochMs, updatedAtEpochMs FROM contacts WHERE company IS NOT NULL AND trim(company) != ''",
-            )
-        
+        db.execSQL(
+            "INSERT OR IGNORE INTO `contact_methods` SELECT 'legacy-phone-' || contactId, contactId, 'PHONE', phone, phone, NULL, 1, source, NULL, 0.7, 0, NULL, createdAtEpochMs, updatedAtEpochMs FROM contacts WHERE phone IS NOT NULL AND trim(phone) != ''",
+        )
+        db.execSQL(
+            "INSERT OR IGNORE INTO `contact_methods` SELECT 'legacy-email-' || contactId, contactId, 'EMAIL', email, lower(email), NULL, 1, source, NULL, 0.7, 0, NULL, createdAtEpochMs, updatedAtEpochMs FROM contacts WHERE email IS NOT NULL AND trim(email) != ''",
+        )
+        db.execSQL(
+            "INSERT OR IGNORE INTO `contact_methods` SELECT 'legacy-wechat-' || contactId, contactId, 'WECHAT', wechatId, lower(wechatId), NULL, 1, source, NULL, 0.7, 0, NULL, createdAtEpochMs, updatedAtEpochMs FROM contacts WHERE wechatId IS NOT NULL AND trim(wechatId) != ''",
+        )
+        db.execSQL(
+            "INSERT OR IGNORE INTO `organizations` SELECT 'legacy-org-' || lower(trim(company)), company, lower(trim(company)), NULL, NULL, NULL, NULL, NULL, source, NULL, 0, NULL, min(createdAtEpochMs), max(updatedAtEpochMs) FROM contacts WHERE company IS NOT NULL AND trim(company) != '' GROUP BY lower(trim(company))",
+        )
+        db.execSQL(
+            "INSERT OR IGNORE INTO `contact_employments` SELECT 'legacy-employment-' || contactId, contactId, 'legacy-org-' || lower(trim(company)), company, NULL, title, NULL, NULL, 1, source, NULL, 0.7, 0, createdAtEpochMs, updatedAtEpochMs FROM contacts WHERE company IS NOT NULL AND trim(company) != ''",
+        )
     }
 
     val MIGRATION_24_25 = object : Migration(24, 25) {
         override fun migrate(db: SupportSQLiteDatabase) {
-        migrate24To25Part1(db)
-        migrate24To25Part2(db)
-        migrate24To25Part3(db)
-}
+            migrate24To25Part1(db)
+            migrate24To25Part2(db)
+            migrate24To25Part3(db)
+        }
     }
 }

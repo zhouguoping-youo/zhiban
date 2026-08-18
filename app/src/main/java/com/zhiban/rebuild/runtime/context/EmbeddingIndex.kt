@@ -3,12 +3,12 @@ import android.util.Log
 import androidx.room.withTransaction
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.runtime.runSuspendCatching
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.MessageDigest
 import kotlin.math.sqrt
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 data class VectorSearchResult(val candidates: List<RetrievalCandidate>, val degradation: String? = null)
 

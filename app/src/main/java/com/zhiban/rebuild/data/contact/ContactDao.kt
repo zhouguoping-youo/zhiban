@@ -5,9 +5,9 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.RawQuery
-import androidx.sqlite.db.SupportSQLiteQuery
 import androidx.room.Transaction
 import androidx.room.Update
+import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -60,6 +60,7 @@ interface ContactDao {
         ) AND canonical.deletedAtEpochMs IS NULL""",
     )
     suspend fun findById(contactId: String): ContactEntity?
+
     /** 批量版 findById(同样 canonical 解析 + fill-only 语义),一条查询替代 N 条单查(P2-structured 路)。 */
     @Query(
         """SELECT canonical.contactId, canonical.displayName, canonical.normalizedName,
@@ -77,8 +78,6 @@ interface ContactDao {
         WHERE canonical.contactId IN (:canonicalIds) AND canonical.deletedAtEpochMs IS NULL""",
     )
     suspend fun findByIds(canonicalIds: List<String>): List<ContactEntity>
-
-
 
     @Query("SELECT * FROM contacts WHERE contactId = :contactId AND deletedAtEpochMs IS NULL")
     suspend fun findRawById(contactId: String): ContactEntity?
