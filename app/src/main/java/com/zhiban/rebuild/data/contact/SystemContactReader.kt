@@ -108,6 +108,86 @@ class SystemContactReader @Inject constructor(@ApplicationContext private val co
         )
     }
 
+    /**
+     * 只读单个 rawContact 的最新快照(写入后的聚合验证用)——替代整本通讯录重读,把验证
+     * 从"每次全量读"降到"一次定向查询"(P1-性能1)。拿不到时返回 null,调用方保留旧快照。
+     */
+    suspend fun readRawContact(rawContactId: Long): SystemRawContactSnapshot? = withContext(Dispatchers.IO) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            return@withContext null
+        }
+        runSuspendCatching {
+            var aggregateContactId = 0L
+            var lookupKey = ""
+            val dataRows = mutableListOf<SystemContactDataRowSnapshot>()
+            context.contentResolver.query(
+                ContactsContract.Data.CONTENT_URI,
+                CONTACT_DATA_PROJECTION,
+                "${ContactsContract.Data.RAW_CONTACT_ID} = ? AND ${ContactsContract.Data.MIMETYPE} IN (${SUPPORTED_MIME_TYPES.joinToString(",") { "?" }})",
+                arrayOf(rawContactId.toString()) + SUPPORTED_MIME_TYPES,
+                null,
+            )?.use { cursor ->
+                while (cursor.moveToNext()) {
+                    aggregateContactId = cursor.long(ContactsContract.Data.CONTACT_ID) ?: aggregateContactId
+                    lookupKey = cursor.string(ContactsContract.Data.LOOKUP_KEY) ?: lookupKey
+                    val rowId = cursor.long(ContactsContract.Data._ID) ?: continue
+                    dataRows += SystemContactDataRowSnapshot(
+                        rowId = rowId,
+                        mimeType = cursor.string(ContactsContract.Data.MIMETYPE).orEmpty(),
+                        value = cursor.string(ContactsContract.Data.DATA1)?.take(500),
+                        isReadOnly = false,
+                    )
+                }
+            }
+            if (aggregateContactId == 0L) return@runSuspendCatching null
+            val metadata = try {
+                querySingleRawContactMetadata(rawContactId, includeReadOnlyFlag = true)
+            } catch (_: IllegalArgumentException) {
+                // OEM 兼容回退(与全量读取一致):换无 READ_ONLY 列的投影。
+                querySingleRawContactMetadata(rawContactId, includeReadOnlyFlag = false)
+            } ?: return@runSuspendCatching null
+            metadata.copy(
+                aggregateContactId = aggregateContactId,
+                lookupKey = lookupKey.ifBlank { metadata.lookupKey },
+                dataRows = dataRows,
+            )
+        }.getOrNull()
+    }
+
+    private fun querySingleRawContactMetadata(rawContactId: Long, includeReadOnlyFlag: Boolean): SystemRawContactSnapshot? {
+        context.contentResolver.query(
+            ContactsContract.RawContacts.CONTENT_URI,
+            if (includeReadOnlyFlag) RAW_CONTACT_PROJECTION else RAW_CONTACT_COMPAT_PROJECTION,
+            "${ContactsContract.RawContacts._ID} = ?",
+            arrayOf(rawContactId.toString()),
+            null,
+        )?.use { cursor ->
+            if (!cursor.moveToNext()) return null
+            return SystemRawContactSnapshot(
+                rawContactId = rawContactId,
+                aggregateContactId = 0L,
+                lookupKey = "",
+                accountName = cursor.string(ContactsContract.RawContacts.ACCOUNT_NAME),
+                accountType = cursor.string(ContactsContract.RawContacts.ACCOUNT_TYPE),
+                sourceId = cursor.string(ContactsContract.RawContacts.SOURCE_ID),
+                version = cursor.long(ContactsContract.RawContacts.VERSION) ?: 0L,
+                isDirty = cursor.int(ContactsContract.RawContacts.DIRTY) == 1,
+                isReadOnly = if (includeReadOnlyFlag) {
+                    cursor.int(ContactsContract.RawContacts.RAW_CONTACT_IS_READ_ONLY) == 1
+                } else {
+                    !accountSupportsContactWrites(
+                        cursor.string(ContactsContract.RawContacts.ACCOUNT_NAME),
+                        cursor.string(ContactsContract.RawContacts.ACCOUNT_TYPE),
+                    )
+                },
+                dataRows = emptyList(),
+            )
+        }
+        return null
+    }
+
     private fun readContactData(accumulator: ContactReadAccumulator) {
         context.contentResolver.query(
             ContactsContract.Data.CONTENT_URI,

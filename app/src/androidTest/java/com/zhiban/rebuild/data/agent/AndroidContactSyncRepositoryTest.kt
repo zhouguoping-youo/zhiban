@@ -110,6 +110,22 @@ class AndroidContactSyncRepositoryTest {
         assertEquals("UNDONE", database.contactIntelligenceDao().findSyncOperation(result.operationId)?.state)
     }
 
+    @Test
+    fun targetedRawContactReadMatchesFullRead() = runBlocking {
+        val candidate = awaitCreatedContact()
+        val raw = candidate.rawContacts.first { it.rawContactId == rawContactId }
+
+        val targeted = reader.readRawContact(raw.rawContactId)!!
+
+        assertEquals(raw.rawContactId, targeted.rawContactId)
+        assertEquals(raw.aggregateContactId, targeted.aggregateContactId)
+        assertEquals(raw.version, targeted.version)
+        assertEquals(
+            raw.dataRows.map { it.rowId }.toSet(),
+            targeted.dataRows.map { it.rowId }.toSet(),
+        )
+    }
+
     private fun createSystemContact(): Long {
         val operations = arrayListOf<ContentProviderOperation>()
         val localAccountName = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

@@ -102,8 +102,8 @@ class AndroidContactSyncRepository @Inject internal constructor(
         markPending(fresh, nowEpochMs)
         return withContext(Dispatchers.IO) {
             val applied = applyOperations(fresh)
-            val verified = awaitVerifiedProjection(fresh.contact, fresh.desired)
-            recordSuccess(fresh, applied, verified.rawContact.version, nowEpochMs)
+            val verifiedVersion = awaitVerifiedProjection(fresh, fresh.desired)
+            recordSuccess(fresh, applied, verifiedVersion, nowEpochMs)
         }
     }
 
@@ -122,7 +122,7 @@ class AndroidContactSyncRepository @Inject internal constructor(
         withContext(Dispatchers.IO) {
             applyOperations(reverse, JSON.decodeFromString(operation.insertedDataRowIdsJson))
         }
-        awaitVerifiedProjection(contact, before)
+        awaitVerifiedProjection(fresh, before)
         database.withTransaction {
             database.contactIntelligenceDao().updateSyncOperationState(operationId, "UNDONE", nowEpochMs)
             database.changeLogDao().markUndone(operationId, nowEpochMs)
@@ -238,17 +238,26 @@ class AndroidContactSyncRepository @Inject internal constructor(
         )
     }
 
-    /** ContactsProvider aggregation can expose a stale aggregate briefly after a successful batch write. */
-    private suspend fun awaitVerifiedProjection(contact: ContactEntity, expected: ContactSyncProjection): AndroidContactSyncPreview {
-        var latest = prepare(contact)
+    /**
+     * ContactsProvider aggregation can expose a stale aggregate briefly after a successful batch write.
+     * 验证只定向重读刚写入的那条 rawContact(P1-性能1):过去每次重试都整本重读通讯录,
+     * 最坏 50 次全量读取;现在每次重试只查一个 rawContact 的元数据与数据行。
+     * 返回写入后的 rawContact 版本号(供撤销审计记录)。
+     */
+    private suspend fun awaitVerifiedProjection(preview: AndroidContactSyncPreview, expected: ContactSyncProjection): Long {
+        var raw = preview.rawContact
         repeat(CONTACT_PROVIDER_VERIFY_RETRIES) { attempt ->
-            if (latest.deviceProjection.containsExpected(expected)) return latest
+            val device = preview.deviceContact.toSyncProjection().includingRawContactValues(raw)
+            if (device.containsExpected(expected)) return raw.version
             if (attempt < CONTACT_PROVIDER_VERIFY_RETRIES - 1) {
                 delay(CONTACT_PROVIDER_VERIFY_RETRY_MS)
-                latest = prepare(contact)
+                raw = reader.readRawContact(preview.rawContact.rawContactId) ?: raw
             }
         }
-        val mismatch = contactProjectionMismatchFields(latest.deviceProjection, expected)
+        val mismatch = contactProjectionMismatchFields(
+            preview.deviceContact.toSyncProjection().includingRawContactValues(raw),
+            expected,
+        )
         error("手机通讯录写入后仍未完成聚合（${mismatch.joinToString()}），请稍后重试")
     }
 
