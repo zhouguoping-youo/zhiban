@@ -127,12 +127,16 @@ fun PrivacySecurityPage(
     outboundViewModel: OutboundPrivacyViewModel = hiltViewModel(),
     callCollectionViewModel: CallCollectionViewModel = hiltViewModel(),
     replySuggestionViewModel: ReplySuggestionSettingsViewModel = hiltViewModel(),
+    completionViewModel: CompletionSettingsViewModel = hiltViewModel(),
+    locationConsentViewModel: LocationConsentSettingsViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val outboundState by outboundViewModel.state.collectAsStateWithLifecycle()
     val callCollectionState by callCollectionViewModel.state.collectAsStateWithLifecycle()
     val replySuggestionsEnabled by replySuggestionViewModel.enabled.collectAsStateWithLifecycle()
     val replyOptedOutContacts by replySuggestionViewModel.optedOutContacts.collectAsStateWithLifecycle()
+    val completionEnabled by completionViewModel.enabled.collectAsStateWithLifecycle()
+    val locationAccessEnabled by locationConsentViewModel.enabled.collectAsStateWithLifecycle()
     var callLogAccessStatus by remember { mutableStateOf(CallLogAccessStatus.NOT_GRANTED) }
     var refreshVersion by remember { mutableIntStateOf(0) }
     RefreshPermissionsOnResume { refreshVersion += 1 }
@@ -309,6 +313,42 @@ fun PrivacySecurityPage(
             }
             item {
                 Text(
+                    "联系人资料补全",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = ZhiBanTextSecondary,
+                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.Xs, vertical = ZhiBanSpacing.Sm),
+                )
+            }
+            item {
+                SettingsCard {
+                    SettingsToggleRow(
+                        title = "向联系人询问缺失资料",
+                        subtitle = "缺手机号、邮箱等资料时起草微信询问；转发和发送都由你亲自完成",
+                        checked = completionEnabled,
+                        onCheckedChange = completionViewModel::setEnabled,
+                    )
+                }
+            }
+            item {
+                Text(
+                    "定位",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = ZhiBanTextSecondary,
+                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.Xs, vertical = ZhiBanSpacing.Sm),
+                )
+            }
+            item {
+                SettingsCard {
+                    SettingsToggleRow(
+                        title = "允许知伴读取当前位置",
+                        subtitle = "开启后，在需要位置的问题中知伴可读取一次性坐标并发给大模型；不记录轨迹，默认关闭",
+                        checked = locationAccessEnabled,
+                        onCheckedChange = locationConsentViewModel::setEnabled,
+                    )
+                }
+            }
+            item {
+                Text(
                     "AI 服务",
                     style = MaterialTheme.typography.labelMedium,
                     color = ZhiBanTextSecondary,
@@ -393,6 +433,30 @@ class ReplySuggestionSettingsViewModel @Inject constructor(private val controls:
     fun restoreContact(contactId: String) {
         controls.setReplyOptOut(contactId, false)
         mutableOptOutIds.value = controls.replyOptedOutContactIds()
+    }
+}
+
+/** Backs the "联系人资料补全" settings block: the global 补全触达 toggle (P1-2). */
+@HiltViewModel
+class CompletionSettingsViewModel @Inject constructor(private val controls: AgentControlStore) : ViewModel() {
+    private val mutableEnabled = MutableStateFlow(controls.contactCompletionEnabled())
+    val enabled: StateFlow<Boolean> = mutableEnabled.asStateFlow()
+
+    fun setEnabled(enabled: Boolean) {
+        controls.saveContactCompletionEnabled(enabled)
+        mutableEnabled.value = enabled
+    }
+}
+
+/** Backs the "定位" settings block: 定位读取 consent, default off (AGENTS.md 位置数据默认不出云). */
+@HiltViewModel
+class LocationConsentSettingsViewModel @Inject constructor(private val controls: AgentControlStore) : ViewModel() {
+    private val mutableEnabled = MutableStateFlow(controls.locationAccessEnabled())
+    val enabled: StateFlow<Boolean> = mutableEnabled.asStateFlow()
+
+    fun setEnabled(enabled: Boolean) {
+        controls.saveLocationAccessEnabled(enabled)
+        mutableEnabled.value = enabled
     }
 }
 
