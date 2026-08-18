@@ -93,6 +93,7 @@ class AgentDataRepository internal constructor(
     private val externalCalendarConflicts: ExternalCalendarConflictSource = ExternalCalendarConflictSource { _, _, _, _ -> emptyList() },
     private val scheduleReminderSink: ScheduleReminderSink = ScheduleReminderSink { },
     private val replySuggestionSink: () -> Unit = { },
+    private val contactCompletionSink: () -> Unit = { },
 ) {
     private val daos = infrastructure.daos
     private val transactions = infrastructure.transactions
@@ -177,6 +178,9 @@ class AgentDataRepository internal constructor(
         // attribution and reply-worthiness, so this is only a cheap "go look" nudge.
         if (candidate.direction == "INCOMING" && candidate.platform == "WECHAT") {
             replySuggestionSink()
+            // 同一触发也喂补全闭环:这条来消息可能是某个"请补全资料"请求的回复。协调器自行再核对
+            // 群聊/归因/时机,这里只是廉价的"去看看"。
+            contactCompletionSink()
         }
     }
 

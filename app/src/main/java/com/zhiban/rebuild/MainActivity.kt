@@ -43,6 +43,8 @@ class MainActivity : ComponentActivity() {
 
     @Inject internal lateinit var replySuggestionCoordinator: ReplySuggestionCoordinator
 
+    @Inject internal lateinit var contactCompletionCoordinator: com.zhiban.rebuild.data.completion.ContactCompletionCoordinator
+
     @Inject lateinit var themePreferenceStore: ThemePreferenceStore
 
     private val relationInboxRequest = mutableLongStateOf(0L)
@@ -95,6 +97,8 @@ class MainActivity : ComponentActivity() {
         // T2: foreground sweep — catch any WeChat message that arrived while the app was backgrounded
         // (e.g. the listener was briefly suspended). Cheap, debounced and conflated in the coordinator.
         replySuggestionCoordinator.onIncomingWechatActivity()
+        // 同一前台兜底也喂补全闭环:后台期间收到的"请补全资料"回复在此被补扫。
+        contactCompletionCoordinator.onIncomingWechatActivity()
     }
 
     private fun acceptSharedContent(intent: Intent?) {

@@ -107,6 +107,7 @@ object AgentDataModule {
         systemCalendarReader: com.zhiban.rebuild.data.calendar.SystemCalendarReader,
         reminderScheduler: com.zhiban.rebuild.data.calendar.ScheduleReminderScheduler,
         replySuggestionCoordinator: com.zhiban.rebuild.data.reply.ReplySuggestionCoordinator,
+        contactCompletionCoordinator: com.zhiban.rebuild.data.completion.ContactCompletionCoordinator,
     ): AgentDataRepository = AgentDataRepository(
         infrastructure,
         domains,
@@ -119,6 +120,7 @@ object AgentDataModule {
             )
         },
         replySuggestionSink = replySuggestionCoordinator::onIncomingWechatActivity,
+        contactCompletionSink = contactCompletionCoordinator::onIncomingWechatActivity,
     )
 
     @Provides
