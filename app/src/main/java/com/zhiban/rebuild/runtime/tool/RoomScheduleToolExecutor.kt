@@ -177,23 +177,7 @@ internal class RoomScheduleToolExecutor(
                 ) == 1,
             )
         }
-        FactIndex(database).upsert(
-            FactEntity(
-                factId = "schedule:${call.scheduleId}", factType = "CALENDAR_EVENT",
-                textContent = buildString {
-                    append(call.title).append("，开始时间=").append(call.startAtEpochMs)
-                    append("，时长=").append(call.durationMinutes).append("分钟")
-                    call.note?.takeIf(String::isNotBlank)?.let { append("，备注=").append(it) }
-                },
-                structuredDataJson = buildJsonObject {
-                    put("startAtEpochMs", call.startAtEpochMs)
-                    put("durationMinutes", call.durationMinutes)
-                }.toString(),
-                sourceType = "AGENT_DOMAIN_WRITE", sourceRef = context.runId, contactId = null, skillId = null,
-                confidence = 1.0, sensitivity = "PERSONAL", status = "ACTIVE", ttlDays = 0, expiresAtEpochMs = null,
-                createdAtEpochMs = context.nowEpochMs, updatedAtEpochMs = context.nowEpochMs,
-            ),
-        )
+        persistScheduleFact(context, call)
         database.changeLogDao().insert(
             ChangeLogEntity(
                 changeId, context.runId, SchedulePlanValidator.TOOL_NAME, call.idempotencyKey,
@@ -232,7 +216,70 @@ internal class RoomScheduleToolExecutor(
                 createdAtEpochMs = context.nowEpochMs, updatedAtEpochMs = context.nowEpochMs,
             ),
         )
+        persistScheduleAuditTrail(context, call, attemptId, safeResult)
         return safeResult
+    }
+
+    private suspend fun persistScheduleFact(context: ConfirmedToolExecutionContext, call: ScheduleCreateToolCall) {
+    FactIndex(database).upsert(
+        FactEntity(
+            factId = "schedule:${call.scheduleId}", factType = "CALENDAR_EVENT",
+            textContent = buildString {
+                append(call.title).append("，开始时间=").append(call.startAtEpochMs)
+                append("，时长=").append(call.durationMinutes).append("分钟")
+                call.note?.takeIf(String::isNotBlank)?.let { append("，备注=").append(it) }
+            },
+            structuredDataJson = buildJsonObject {
+                put("startAtEpochMs", call.startAtEpochMs)
+                put("durationMinutes", call.durationMinutes)
+            }.toString(),
+            sourceType = "AGENT_DOMAIN_WRITE", sourceRef = context.runId, contactId = null, skillId = null,
+            confidence = 1.0, sensitivity = "PERSONAL", status = "ACTIVE", ttlDays = 0, expiresAtEpochMs = null,
+            createdAtEpochMs = context.nowEpochMs, updatedAtEpochMs = context.nowEpochMs,
+        ),
+    )
+    }
+
+    private suspend fun persistScheduleAuditTrail(context: ConfirmedToolExecutionContext, call: ScheduleCreateToolCall, attemptId: String, safeResult: String) {
+    val changeId = changeIdFor(call.idempotencyKey)
+    database.changeLogDao().insert(
+        ChangeLogEntity(
+            changeId, context.runId, SchedulePlanValidator.TOOL_NAME, call.idempotencyKey,
+            "CALENDAR", call.scheduleId, "CREATE", null, call.canonicalInputDigest,
+            "{\"deleteScheduleId\":\"${call.scheduleId}\"}", "AVAILABLE", context.nowEpochMs, null,
+        ),
+    )
+    database.toolAuditDao().insert(
+        ToolAuditEntity(
+            id = auditIdFor(call.idempotencyKey), runId = null,
+            subjectRunDigest = sha256(context.runId), toolCallId = call.providerCallId,
+            toolName = SchedulePlanValidator.TOOL_NAME, idempotencyKey = call.idempotencyKey,
+            argumentsDigest = call.canonicalInputDigest, runtimeRunId = context.runId, runtimeAttemptId = attemptId,
+            proposalId = call.proposalId,
+            payloadRefDigest = sha256(
+                call.payloadRef,
+            ),
+            approvalRevision = call.revision,
+            status = "SUCCEEDED", resultJson = safeResult,
+            expiresAtEpochMs = null, createdAtEpochMs = context.nowEpochMs, updatedAtEpochMs = context.nowEpochMs,
+        ),
+    )
+    database.runtimeToolExecutionDao().insert(
+        RuntimeToolExecutionEntity(
+            executionId = "exec-${sha256(call.idempotencyKey).take(32)}", runId = context.runId,
+            logicalStepId = call.logicalStepId, toolName = SchedulePlanValidator.TOOL_NAME,
+            toolSpecVersion = 1, canonicalInputDigest = call.canonicalInputDigest,
+            idempotencyKey = call.idempotencyKey, providerCallId = call.providerCallId,
+            proposalId = call.proposalId,
+            payloadRefDigest = sha256(
+                call.payloadRef,
+            ),
+            approvalRevision = call.revision,
+            attemptId = attemptId, status = "SUCCEEDED", resultRef = call.scheduleId,
+            safeResultJson = safeResult, fencingEpoch = context.fencingEpoch,
+            createdAtEpochMs = context.nowEpochMs, updatedAtEpochMs = context.nowEpochMs,
+        ),
+    )
     }
 
     private suspend fun finalizeRun(

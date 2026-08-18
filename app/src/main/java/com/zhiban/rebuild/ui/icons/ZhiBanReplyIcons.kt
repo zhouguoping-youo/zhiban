@@ -33,58 +33,12 @@ internal fun ZhiBanReplyIcon(glyph: ReplyGlyph, label: String, color: Color, mod
             join = StrokeJoin.Round,
         )
         when (glyph) {
-            ReplyGlyph.COPY -> {
-                val radius = CornerRadius(1.8.dp.toPx())
-                drawRoundRect(
-                    color = color,
-                    topLeft = Offset(size.width * .28f, size.height * .14f),
-                    size = Size(size.width * .58f, size.height * .58f),
-                    cornerRadius = radius,
-                    style = stroke,
-                )
-                drawRoundRect(
-                    color = color,
-                    topLeft = Offset(size.width * .14f, size.height * .28f),
-                    size = Size(size.width * .58f, size.height * .58f),
-                    cornerRadius = radius,
-                    style = stroke,
-                )
-            }
-
+            ReplyGlyph.COPY -> drawCopyGlyph(color, stroke)
             ReplyGlyph.POSITIVE -> drawThumb(color, stroke, up = true)
 
             ReplyGlyph.NEGATIVE -> drawThumb(color, stroke, up = false)
 
-            ReplyGlyph.SPEAK -> {
-                val speaker = Path().apply {
-                    moveTo(size.width * .16f, size.height * .42f)
-                    lineTo(size.width * .34f, size.height * .42f)
-                    lineTo(size.width * .52f, size.height * .25f)
-                    lineTo(size.width * .52f, size.height * .75f)
-                    lineTo(size.width * .34f, size.height * .58f)
-                    lineTo(size.width * .16f, size.height * .58f)
-                    close()
-                }
-                drawPath(speaker, color, style = stroke)
-                drawArc(
-                    color = color,
-                    startAngle = -48f,
-                    sweepAngle = 96f,
-                    useCenter = false,
-                    topLeft = Offset(size.width * .42f, size.height * .30f),
-                    size = Size(size.width * .30f, size.height * .40f),
-                    style = stroke,
-                )
-                drawArc(
-                    color = color,
-                    startAngle = -45f,
-                    sweepAngle = 90f,
-                    useCenter = false,
-                    topLeft = Offset(size.width * .42f, size.height * .18f),
-                    size = Size(size.width * .48f, size.height * .64f),
-                    style = stroke,
-                )
-            }
+            ReplyGlyph.SPEAK -> drawSpeakGlyph(color, stroke)
 
             ReplyGlyph.SHARE -> {
                 drawLine(
@@ -147,3 +101,54 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawThumb(color: Co
         style = stroke,
     )
 }
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCopyGlyph(color: Color, stroke: Stroke) {
+val radius = CornerRadius(1.8.dp.toPx())
+drawRoundRect(
+    color = color,
+    topLeft = Offset(size.width * .28f, size.height * .14f),
+    size = Size(size.width * .58f, size.height * .58f),
+    cornerRadius = radius,
+    style = stroke,
+)
+drawRoundRect(
+    color = color,
+    topLeft = Offset(size.width * .14f, size.height * .28f),
+    size = Size(size.width * .58f, size.height * .58f),
+    cornerRadius = radius,
+    style = stroke,
+)
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSpeakGlyph(color: Color, stroke: Stroke) {
+val speaker = Path().apply {
+    moveTo(size.width * .16f, size.height * .42f)
+    lineTo(size.width * .34f, size.height * .42f)
+    lineTo(size.width * .52f, size.height * .25f)
+    lineTo(size.width * .52f, size.height * .75f)
+    lineTo(size.width * .34f, size.height * .58f)
+    lineTo(size.width * .16f, size.height * .58f)
+    close()
+}
+drawPath(speaker, color, style = stroke)
+drawArc(
+    color = color,
+    startAngle = -48f,
+    sweepAngle = 96f,
+    useCenter = false,
+    topLeft = Offset(size.width * .42f, size.height * .30f),
+    size = Size(size.width * .30f, size.height * .40f),
+    style = stroke,
+)
+drawArc(
+    color = color,
+    startAngle = -45f,
+    sweepAngle = 90f,
+    useCenter = false,
+    topLeft = Offset(size.width * .42f, size.height * .18f),
+    size = Size(size.width * .48f, size.height * .64f),
+    style = stroke,
+)
+}
+
+
