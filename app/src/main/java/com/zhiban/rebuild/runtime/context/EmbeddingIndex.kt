@@ -3,6 +3,8 @@ import android.util.Log
 import androidx.room.withTransaction
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.runtime.runSuspendCatching
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.MessageDigest
@@ -101,12 +103,13 @@ internal class EmbeddingIndex(
             ?: return VectorSearchResult(emptyList(), "vector_skipped:invalid_response")
         validate(queryVector, space)
         val ranked = rows.mapNotNull { row ->
-            val vector = runSuspendCatching { decode(row.vectorBlob, row.dimensions) }.getOrNull() ?: return@mapNotNull null
+            val vector = runSuspendCatching { decodeCached(row) }.getOrNull() ?: return@mapNotNull null
             row.factId to cosine(queryVector, vector)
         }.sortedWith(compareByDescending<Pair<String, Double>> { it.second }.thenBy { it.first }).take(limit)
+        val factsById = database.factDao().findByIds(ranked.map { it.first }).associateBy(FactEntity::factId)
         return VectorSearchResult(
             ranked.mapNotNull { (factId, _) ->
-                database.factDao().find(factId)?.let { fact ->
+                factsById[factId]?.let { fact ->
                     RetrievalCandidate(
                         id = fact.factId,
                         sourceKind = fact.factType.lowercase(),
@@ -164,8 +167,29 @@ internal class EmbeddingIndex(
         else -> Sensitivity.SENSITIVE
     }
 
+    /**
+     * 进程级解码缓存(P2:过去每次检索对最多 2000 个向量全量解码,1024 维约 8MB 瞬时分配;
+     * EmbeddingIndex 每次检索新建实例,缓存必须放伴生)。key=embeddingId@generatedAtEpochMs,
+     * 向量重新生成即失效;LRU 上限约 8MB。
+     */
+    private suspend fun decodeCached(row: EmbeddingVectorEntity): FloatArray {
+        val key = "${row.embeddingId}@${row.generatedAtEpochMs}"
+        decodeCacheMutex.withLock {
+            decodeCache[key]?.let { return it.vector }
+        }
+        val decoded = decode(row.vectorBlob, row.dimensions)
+        decodeCacheMutex.withLock { decodeCache[key] = CachedVector(decoded) }
+        return decoded
+    }
+
     companion object {
         private const val MAX_SCAN = 2_000
+        private const val DECODE_CACHE_MAX_ENTRIES = 2_048
+        private val decodeCache = object : LinkedHashMap<String, CachedVector>(256, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CachedVector>?): Boolean = size > DECODE_CACHE_MAX_ENTRIES
+        }
+        private val decodeCacheMutex = Mutex()
+        private data class CachedVector(val vector: FloatArray)
         private const val LOG_TAG = "EmbeddingIndex"
     }
 }

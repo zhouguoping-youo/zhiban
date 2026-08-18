@@ -78,6 +78,9 @@ internal interface FactDao {
     @Query("DELETE FROM facts WHERE factId = :factId")
     suspend fun delete(factId: String): Int
 
+    @Query("SELECT * FROM facts WHERE factId IN (:factIds)")
+    suspend fun findByIds(factIds: List<String>): List<FactEntity>
+
     @Query(
         """SELECT * FROM facts WHERE status = 'ACTIVE'
         AND (expiresAtEpochMs IS NULL OR expiresAtEpochMs > :now)
@@ -173,7 +176,14 @@ internal interface EmbeddingVectorDao {
 
 /** Transactional boundary for the canonical Fact row and its local FTS5 projection. */
 internal class FactIndex(private val database: AgentDatabase) {
-    suspend fun upsert(fact: FactEntity) = database.withTransaction {
+    suspend fun upsert(fact: FactEntity) = database.withTransaction { upsertInTransaction(fact) }
+
+    /** 批量 upsert 同事务(P2:过去逐条一事务,revoke 一批事实时事务数=事实数)。 */
+    suspend fun upsertAll(facts: List<FactEntity>) = database.withTransaction {
+        for (fact in facts) upsertInTransaction(fact)
+    }
+
+    private suspend fun upsertInTransaction(fact: FactEntity) {
         val previous = database.factDao().find(fact.factId)
         if (previous != null && (previous.textContent != fact.textContent || previous.status != fact.status)) {
             database.embeddingVectorDao().deleteByFact(fact.factId)
@@ -190,24 +200,31 @@ internal class FactIndex(private val database: AgentDatabase) {
         }
     }
 
-    suspend fun delete(factId: String): Boolean = database.withTransaction {
+    suspend fun delete(factId: String): Boolean = database.withTransaction { deleteInTransaction(factId) }
+
+    /** 批量删除同事务(P2)。 */
+    suspend fun deleteAll(factIds: List<String>): Int = database.withTransaction {
+        factIds.count { deleteInTransaction(it) }
+    }
+
+    private suspend fun deleteInTransaction(factId: String): Boolean {
         ensureFts()
         database.openHelper.writableDatabase.execSQL("DELETE FROM fact_fts WHERE factId = ?", arrayOf(factId))
-        database.factDao().delete(factId) == 1
+        return database.factDao().delete(factId) == 1
     }
 
     /** Uses the canonical boundary so expired rows cannot leave FTS/vector projections behind. */
     suspend fun deleteExpired(now: Long, limit: Int = 128): Int {
         require(limit in 1..1_000)
         val ids = database.factDao().expiredFactIds(now, limit)
-        ids.forEach { delete(it) }
+        deleteAll(ids)
         return ids.size
     }
 
     suspend fun revokeByContactIds(contactIds: List<String>, nowEpochMs: Long): Int {
         if (contactIds.isEmpty()) return 0
         val active = database.factDao().activeForContacts(contactIds)
-        active.forEach { fact -> upsert(fact.copy(status = "REVOKED", updatedAtEpochMs = nowEpochMs)) }
+        upsertAll(active.map { it.copy(status = "REVOKED", updatedAtEpochMs = nowEpochMs) })
         return active.size
     }
 
