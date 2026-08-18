@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.ui.agent
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -24,7 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.collectAsState
+
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -59,7 +60,7 @@ fun AgentConversationRoute(
     identityViewModel: ConversationIdentityViewModel = hiltViewModel(),
 ) {
     BackHandler(onBack = onBackToHome)
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var input by rememberConversationDraftState()
     var multimodal by remember { mutableStateOf(MultimodalUiState()) }
@@ -255,7 +256,7 @@ fun AgentConversationRoute(
         pendingCaptureFile = file
         photoCapture.launch(uri)
     }
-    val cloudAsrAvailability by viewModel.cloudAsrAvailability.collectAsState()
+    val cloudAsrAvailability by viewModel.cloudAsrAvailability.collectAsStateWithLifecycle()
     fun startSystemRecognition() {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -467,13 +468,13 @@ fun AgentConversationRoute(
     }
 
     LaunchedEffect(initialDraft, initialMode) { viewModel.initialize(initialDraft, initialMode) }
-    val selectedModel by viewModel.selectedModel.collectAsState()
-    val selectedMode by viewModel.selectedMode.collectAsState()
-    val availableModels by viewModel.availableModels.collectAsState()
-    val selectedLevel by viewModel.selectedLevel.collectAsState()
-    val conversationHistory by viewModel.conversationHistory.collectAsState()
-    val perceptionCandidates by viewModel.perceptionCandidates.collectAsState()
-    val conversationIdentity by identityViewModel.identity.collectAsState()
+    val selectedModel by viewModel.selectedModel.collectAsStateWithLifecycle()
+    val selectedMode by viewModel.selectedMode.collectAsStateWithLifecycle()
+    val availableModels by viewModel.availableModels.collectAsStateWithLifecycle()
+    val selectedLevel by viewModel.selectedLevel.collectAsStateWithLifecycle()
+    val conversationHistory by viewModel.conversationHistory.collectAsStateWithLifecycle()
+    val perceptionCandidates by viewModel.perceptionCandidates.collectAsStateWithLifecycle()
+    val conversationIdentity by identityViewModel.identity.collectAsStateWithLifecycle()
     AgentConversationScreen(
         state = state,
         userAvatarBytes = conversationIdentity.avatarBytes,

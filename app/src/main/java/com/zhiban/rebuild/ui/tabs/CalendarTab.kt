@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.ui.tabs
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -53,7 +54,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -142,13 +143,13 @@ fun CalendarTab(
     var showEditor by rememberSaveable { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<ScheduleProjection?>(null) }
     var completing by remember { mutableStateOf<ScheduleProjection?>(null) }
-    val schedules by viewModel.schedules.collectAsState()
+    val schedules by viewModel.schedules.collectAsStateWithLifecycle()
     // The editor's target is a saveable schedule id re-derived from the (rotation-surviving)
     // schedules StateFlow, so an in-progress create/edit survives a configuration change.
     val editing = editingId?.let { id -> schedules.firstOrNull { it.id == id } }
-    val pendingFeedback by viewModel.pendingFeedback.collectAsState()
-    val messageScheduleCandidates by viewModel.messageScheduleCandidates.collectAsState()
-    val auxiliaryUiState by viewModel.auxiliaryUiState.collectAsState()
+    val pendingFeedback by viewModel.pendingFeedback.collectAsStateWithLifecycle()
+    val messageScheduleCandidates by viewModel.messageScheduleCandidates.collectAsStateWithLifecycle()
+    val auxiliaryUiState by viewModel.auxiliaryUiState.collectAsStateWithLifecycle()
     val importState = auxiliaryUiState.importState
     val cloudAsrAvailability = auxiliaryUiState.cloudAsrAvailability
     val context = LocalContext.current
