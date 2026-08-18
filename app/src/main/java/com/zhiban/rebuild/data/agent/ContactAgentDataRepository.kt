@@ -66,6 +66,7 @@ import java.time.ZoneId
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -93,21 +94,21 @@ internal class ContactAgentDataRepository(internal val database: AgentDatabase) 
         database.contactDao().deleteRole(contactId, skillId, roleType) == 1
 
     fun observeContacts(): Flow<List<ContactEntity>> = combine(
-        database.contactDao().observeAllActive(),
+        // observeActive 已在 SQL 里排除合并源联系人,省掉内存 filterNot 一步(P1-性能4)。
+        database.contactDao().observeActive(),
         database.contactIdentityDao().observeActiveMergeLinks(),
         database.contactKnowledgeDao().observeActiveOwnerContactLinks(),
     ) { contacts, links, ownerLinks ->
-        val mergedSourceIds = links.mapTo(hashSetOf(), ContactMergeLinkEntity::sourceContactId)
         val ownerContactIds = ownerLinks.mapTo(hashSetOf(), OwnerContactLinkEntity::contactId)
         val sourcesByCanonical = links.groupBy(ContactMergeLinkEntity::canonicalContactId)
         val contactsById = contacts.associateBy(ContactEntity::contactId)
-        contacts.filterNot { it.contactId in mergedSourceIds || it.contactId in ownerContactIds }
+        contacts.filterNot { it.contactId in ownerContactIds }
             .map { canonical ->
                 sourcesByCanonical[canonical.contactId].orEmpty()
                     .mapNotNull { contactsById[it.sourceContactId] }
                     .fold(canonical, ::fillMissingContactFields)
             }
-    }
+    }.distinctUntilChanged() // 任一表写触发的整表重 fold 若结果未变,不再向下游发射
 
     fun observeOwnerContactLinks(): Flow<List<OwnerContactLinkEntity>> = database.contactKnowledgeDao().observeActiveOwnerContactLinks()
 
