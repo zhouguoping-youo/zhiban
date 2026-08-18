@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.ui.agent.projection
 
+import android.util.Log
 import com.zhiban.rebuild.runtime.spi.CommandReceipt
 import com.zhiban.rebuild.runtime.spi.CommandReceiptStatus
 import com.zhiban.rebuild.runtime.spi.PendingApprovalProjection
@@ -10,18 +11,33 @@ import com.zhiban.rebuild.runtime.spi.RuntimeUiCommand
 import com.zhiban.rebuild.runtime.spi.RuntimeUiEvent
 import com.zhiban.rebuild.runtime.spi.SessionProjection
 import com.zhiban.rebuild.runtime.spi.StagedApprovalContent
+import io.mockk.every
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AgentRuntimeProjectionControllerTest {
+    @Before fun mockPlatformLog() {
+        // 控制器失败路径会记原因码日志;JVM 单测里 android.util.Log 需静态 mock。
+        mockkStatic(Log::class)
+        every { Log.w(any(), any<String>(), any<Throwable>()) } returns 0
+    }
+
+    @After fun unmockPlatformLog() {
+        unmockkStatic(Log::class)
+    }
+
     @Test
     fun `projection snapshot failure becomes retryable and reconnects`() = runTest {
         val client = FakeRuntimeUiClient(SessionProjection(sessionId = "session-1")).apply {

@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.runtime.kernel
 
+import android.util.Log
 import com.zhiban.rebuild.runtime.runSuspendCatching
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
@@ -30,7 +31,9 @@ internal class RuntimeCommandRunner @Inject constructor(private val processor: K
                     processor.observeWorkCount().collect { signals.trySend(Unit) }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
-                } catch (_: Throwable) {
+                } catch (failure: Throwable) {
+                    // M3:基础设施错误记原因码,不再静默 delay 重试。
+                    Log.w(RUNTIME_COMMAND_RUNNER_TAG, "command_runner:recovery", failure)
                     delay(RUNNER_RECOVERY_DELAY_MS)
                 }
             }
@@ -60,7 +63,9 @@ internal class RuntimeCommandRunner @Inject constructor(private val processor: K
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
-                } catch (_: Throwable) {
+                } catch (failure: Throwable) {
+                    // M3:基础设施错误记原因码,不再静默 delay 重试。
+                    Log.w(RUNTIME_COMMAND_RUNNER_TAG, "command_runner:recovery", failure)
                     delay(RUNNER_RECOVERY_DELAY_MS)
                 }
             }
@@ -75,3 +80,5 @@ internal suspend fun processNextSafely(processNext: suspend () -> KernelCommandP
         .getOrDefault(KernelCommandProcessor.Outcome.FAILED)
 
 private const val RUNNER_RECOVERY_DELAY_MS = 1_000L
+
+private const val RUNTIME_COMMAND_RUNNER_TAG = "RuntimeCommandRunner"

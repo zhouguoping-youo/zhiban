@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.ui.settings
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zhiban.rebuild.runtime.embedding.EmbeddingConfiguration
@@ -96,7 +97,9 @@ class ModelConfigViewModel @Inject constructor(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (failure: Exception) {
+                // M1:配置加载失败记原因码,与 save() 的结构化错误码口径一致。
+                Log.w(MODEL_CONFIG_TAG, "model_config:load_failure", failure)
                 _uiState.update {
                     it.copy(isLoading = false, errorMessage = "加载配置失败，请稍后重试。")
                 }
@@ -292,3 +295,5 @@ internal fun embeddingConfigurationFailureMessage(code: String?): String = when 
     "EMBEDDING_REMOTE_EXPORT_CONSENT_REQUIRED" -> "请允许语义检索后重试。"
     else -> "语义检索连接失败，请检查 API Key 和接入点 ID。"
 }
+
+private const val MODEL_CONFIG_TAG = "ModelConfig"

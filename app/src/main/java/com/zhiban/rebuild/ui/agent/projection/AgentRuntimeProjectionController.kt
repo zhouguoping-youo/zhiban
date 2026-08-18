@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.ui.agent.projection
 
+import android.util.Log
 import com.zhiban.rebuild.runtime.spi.CommandReceipt
 import com.zhiban.rebuild.runtime.spi.PendingApprovalProjection
 import com.zhiban.rebuild.runtime.spi.RuntimeAction
@@ -53,7 +54,9 @@ class AgentRuntimeProjectionController(
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
-                } catch (_: Throwable) {
+                } catch (failure: Throwable) {
+                    // M2:投影循环失败记原因码——可区分"没事件"与"投影已死",不再静默重试。
+                    Log.w(PROJECTION_CONTROLLER_TAG, "projection:loop_failure", failure)
                     mutableProjection.value = projectionFailureFallback(mutableProjection.value)
                 }
                 delay(reconnectDelayMs)
@@ -207,3 +210,5 @@ private val TERMINAL_STATUSES = setOf(
 
 private const val PROJECTION_RECONNECT_DELAY_MS = 1_000L
 private const val PROJECTION_UNAVAILABLE = "PROJECTION_UNAVAILABLE"
+
+private const val PROJECTION_CONTROLLER_TAG = "AgentProjection"
