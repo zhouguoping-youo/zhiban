@@ -80,6 +80,15 @@ class ContactCompletionRepositoryTest {
         assertEquals(0, generator.calls) // 每联系人至多一个进行中请求：不再起草
     }
 
+    @Test fun prepareOutreachReturnsNullWhenResponseReceivedRequestExists() = runBlocking {
+        insertContact("c1", phone = null, wechatId = "wx-1")
+        seedRequest("c1", ContactCompletionStatus.RESPONSE_RECEIVED)
+
+        // 回复已收到但候选未处理完:再触达会复用确定性 requestId 覆盖掉 RESPONSE_RECEIVED 行、丢回复,必须拦下。
+        assertNull(repository.prepareOutreach("c1"))
+        assertEquals(0, generator.calls)
+    }
+
     @Test fun prepareOutreachReturnsNullWhenProfileComplete() = runBlocking {
         insertContact("c1", phone = "13800000000", email = "a@b.c", wechatId = "wx-1", company = "司", title = "职", responsibilities = "责")
 

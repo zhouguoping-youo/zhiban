@@ -53,6 +53,13 @@ interface ContactKnowledgeDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertEnrichmentCandidateIfAbsent(value: ContactEnrichmentCandidateEntity): Long
 
+    /**
+     * 补全闭环专用 REPLACE 落候选:同一请求+字段的确定性 candidateId 再次解析到新值(请求过期后重新触达、
+     * 对方二次回复)时覆盖旧 PENDING 候选,新值不因 PK 冲突丢失;重扫同一回复 REPLACE 同值,幂等。
+     */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertEnrichmentCandidate(value: ContactEnrichmentCandidateEntity)
+
     @Query(
         """SELECT canonical.* FROM contact_methods method
            INNER JOIN contacts source ON source.contactId = method.contactId

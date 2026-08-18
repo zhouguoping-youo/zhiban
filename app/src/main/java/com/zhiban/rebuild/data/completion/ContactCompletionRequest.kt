@@ -18,8 +18,8 @@ import kotlinx.coroutines.flow.Flow
  * the contact and press send themselves — 知伴 never sends on the user's behalf (PRODUCT.md 外部联系与不可逆动作
  * 必须由用户最终确认). The row then tracks the lifecycle: AWAITING_REPLY until the contact's next 1:1 incoming
  * message is parsed into enrichment candidates (RESPONSE_RECEIVED), then COMPLETED once those candidates are
- * resolved, or EXPIRED/CANCELLED. At most one active (DRAFTED/AWAITING_REPLY) request per contact is allowed so
- * overlapping asks can't confuse response attribution.
+ * resolved, or EXPIRED/CANCELLED. At most one active (DRAFTED/AWAITING_REPLY/RESPONSE_RECEIVED) request per
+ * contact is allowed so overlapping asks can't confuse response attribution.
  */
 @Entity(
     tableName = "contact_completion_requests",
@@ -88,10 +88,14 @@ interface ContactCompletionRequestDao {
     )
     suspend fun findAwaitingForContact(contactId: String, nowEpochMs: Long): ContactCompletionRequestEntity?
 
-    /** Active (DRAFTED/AWAITING_REPLY) unexpired requests — enforces the one-active-request-per-contact cap. */
+    /**
+     * Active (DRAFTED/AWAITING_REPLY/RESPONSE_RECEIVED) unexpired requests — enforces the one-active-request-
+     * per-contact cap. RESPONSE_RECEIVED counts too: its candidates are still unresolved, and re-outreach would
+     * reuse the deterministic requestId and REPLACE this row, orphaning the response attribution (P1-1).
+     */
     @Query(
         "SELECT COUNT(*) FROM contact_completion_requests WHERE contactId = :contactId " +
-            "AND status IN ('DRAFTED','AWAITING_REPLY') AND expiresAtEpochMs > :nowEpochMs",
+            "AND status IN ('DRAFTED','AWAITING_REPLY','RESPONSE_RECEIVED') AND expiresAtEpochMs > :nowEpochMs",
     )
     suspend fun countActiveForContact(contactId: String, nowEpochMs: Long): Int
 

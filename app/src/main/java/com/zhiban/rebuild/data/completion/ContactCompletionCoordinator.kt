@@ -108,15 +108,12 @@ internal class ContactCompletionCoordinator @Inject constructor(
 
         val extraction = parser.extract(request, candidate.body.orEmpty())
         val candidates = parser.buildCompletionCandidates(request, extraction, now)
-        var firstStagedId: String? = null
-        candidates.forEach { staged ->
-            // PK IGNORE 去重:重复扫描同一回复不重复落库,也不重置 firstStagedId。
-            if (database.contactKnowledgeDao().insertEnrichmentCandidateIfAbsent(staged) != -1L && firstStagedId == null) {
-                firstStagedId = staged.candidateId
-            }
-        }
-        // 只有真抽到字段才转 RESPONSE_RECEIVED 并挂上溯源候选;抽不到保持 AWAITING(7 天后 EXPIRED)。
-        firstStagedId?.let { dao.markResponseReceived(request.requestId, it, now) }
+        // 抽到字段就转 RESPONSE_RECEIVED 并挂上溯源候选;抽不到保持 AWAITING(7 天后 EXPIRED)。
+        // 用 REPLACE 落候选而非 IGNORE:请求过期后重新触达复用同一确定性 candidateId,二次回复的新值必须
+        // 覆盖旧 PENDING 候选,且状态推进不依赖插入是否成功——否则候选 PK 全冲突时请求卡 AWAITING、
+        // 二次回复丢失(P1-1)。重扫同一回复 REPLACE 同值,依然幂等。
+        candidates.forEach { staged -> database.contactKnowledgeDao().upsertEnrichmentCandidate(staged) }
+        candidates.firstOrNull()?.let { dao.markResponseReceived(request.requestId, it.candidateId, now) }
     }
 
     private companion object {

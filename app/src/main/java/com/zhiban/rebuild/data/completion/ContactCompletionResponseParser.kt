@@ -115,7 +115,7 @@ internal class ContactCompletionResponseParser @Inject constructor(private val p
         confidence: Double,
         nowEpochMs: Long,
     ): ContactEnrichmentCandidateEntity {
-        // 确定性 candidateId:同一请求同一字段类重复解析靠 PK IGNORE 去重,不重复落库。
+        // 确定性 candidateId:同一请求同一字段类重复解析靠确定性 PK 去重(协调器 REPLACE 落库,新值覆盖旧值)。
         val candidateId = "cc-${request.requestId}-$fieldKind"
         return ContactEnrichmentCandidateEntity(
             candidateId = candidateId,
