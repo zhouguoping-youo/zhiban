@@ -10,6 +10,7 @@ import com.zhiban.rebuild.data.agent.RelationshipEventParticipantInput
 import com.zhiban.rebuild.data.calllog.CallLogRepository
 import com.zhiban.rebuild.data.calllog.CallRecordEntity
 import com.zhiban.rebuild.data.contact.ContactAliasEntity
+import com.zhiban.rebuild.data.contact.ContactCompleteness
 import com.zhiban.rebuild.data.contact.ContactEnrichmentCandidateEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.ContactIdentityResolver
@@ -17,6 +18,7 @@ import com.zhiban.rebuild.data.contact.ContactMaintenanceEvaluator
 import com.zhiban.rebuild.data.contact.ContactMaintenanceOverview
 import com.zhiban.rebuild.data.contact.ContactMergeLinkEntity
 import com.zhiban.rebuild.data.contact.ContactPlatformIdentityEntity
+import com.zhiban.rebuild.data.contact.ContactProfileCompletenessEvaluator
 import com.zhiban.rebuild.data.contact.IdentityResolutionDecision
 import com.zhiban.rebuild.data.contact.OwnerContactLinkEntity
 import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
@@ -177,6 +179,13 @@ class RelationViewModel @Inject constructor(
             SharingStarted.WhileSubscribed(5_000),
             ContactMaintenanceOverview(emptyList(), 0, 0),
         )
+    val completionOverview: StateFlow<List<ContactCompleteness>> = combine(
+        contacts,
+        platformIdentities,
+    ) { contacts, identities ->
+        ContactProfileCompletenessEvaluator.incomplete(contacts, identities)
+    }.flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     private val mutableImportState = MutableStateFlow(ContactImportUiState())
     val importState = mutableImportState.asStateFlow()
     val notificationCandidates: StateFlow<List<NotificationCandidateEntity>> =
