@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
@@ -98,37 +99,14 @@ fun ContactMaintenancePage(onBack: () -> Unit, onAsk: (String) -> Unit, viewMode
                     )
                 }
             } else {
-                item {
-                    Column(
-                        Modifier.fillMaxWidth().padding(horizontal = ZhiBanSpacing.PageHorizontal),
-                        verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm),
-                    ) {
-                        if (overview.duplicateReviewCount > 0) {
-                            MaintenanceActionRow(
-                                icon = Icons.Outlined.PersonSearch,
-                                title = "重复资料",
-                                detail = "${overview.duplicateReviewCount} 组待确认",
-                                onClick = { selectedMerge = suggestions.firstOrNull() },
-                            )
-                        }
-                        if (overview.enrichmentReviewCount > 0) {
-                            MaintenanceActionRow(
-                                icon = Icons.Outlined.AutoAwesome,
-                                title = "资料待核实",
-                                detail = localizedQuantity(R.plurals.suggestion_count, overview.enrichmentReviewCount),
-                                onClick = { reviewingEnrichment = true },
-                            )
-                        }
-                        if (unresolvedIdentities.isNotEmpty()) {
-                            MaintenanceActionRow(
-                                icon = Icons.Outlined.AlternateEmail,
-                                title = "社交身份待关联",
-                                detail = localizedQuantity(R.plurals.account_or_group_count, unresolvedIdentities.size),
-                                onClick = { onAsk(unresolvedIdentityPrompt(unresolvedIdentities.first())) },
-                            )
-                        }
-                    }
-                }
+            maintenanceActionSection(
+                overview = overview,
+                suggestionsAvailable = suggestions.isNotEmpty(),
+                unresolvedIdentityCount = unresolvedIdentities.size,
+                onReviewDuplicates = { selectedMerge = suggestions.firstOrNull() },
+                onReviewEnrichment = { reviewingEnrichment = true },
+                onResolveIdentities = { onAsk(unresolvedIdentityPrompt(unresolvedIdentities.first())) },
+            )
                 items(
                     overview.items.filter { it.issues.isNotEmpty() }.take(MAX_VISIBLE_ITEMS),
                     key = { it.contact.contactId },
@@ -160,65 +138,28 @@ fun ContactMaintenancePage(onBack: () -> Unit, onAsk: (String) -> Unit, viewMode
             }
         }
     }
-    selectedMerge?.let { suggestion ->
-        ContactMergeReviewDialog(
-            suggestion = suggestion,
-            onDismiss = { selectedMerge = null },
-            onConfirm = { canonicalId, sourceId, onResult ->
-                viewModel.confirmMerge(canonicalId, sourceId, suggestion.reason) { error ->
-                    onResult(error)
-                    if (error == null) selectedMerge = null
-                }
-            },
-        )
-    }
-    if (reviewingEnrichment) {
-        ContactEnrichmentReviewSheet(
-            candidates = enrichmentCandidates,
-            contacts = rawContacts,
-            error = enrichmentError,
-            actions = ContactEnrichmentReviewActions(
-                onDismiss = {
-                    reviewingEnrichment = false
-                    enrichmentError = null
-                },
-                onConfirm = { candidate ->
-                    viewModel.confirmContactEnrichment(candidate) { error -> enrichmentError = error }
-                },
-                onReject = viewModel::rejectContactEnrichment,
-            ),
-        )
-    }
-    completionDraft?.let { draft ->
-        ContactCompletionCard(
-            draft = draft,
-            error = completionCardError,
-            onConfirm = { finalText ->
-                viewModel.confirmCompletionOutreach(draft.requestId, finalText) { error ->
-                    if (error == null) {
-                        completionDraft = null
-                        completionCardError = null
-                    } else {
-                        completionCardError = error
-                    }
-                }
-            },
-            onCancel = {
-                viewModel.cancelCompletionOutreach(draft.requestId)
-                completionDraft = null
-                completionCardError = null
-            },
-        )
-    }
-    completionNotice?.let { message ->
-        ZhiBanAlertDialog(
-            onDismissRequest = { completionNotice = null },
-            confirmButton = { TextButton(onClick = { completionNotice = null }) { Text("知道了") } },
-            title = { Text("资料待补全") },
-            text = { Text(message) },
-        )
-    }
+    MaintenanceDialogs(
+        MaintenanceDialogSlots(
+            selectedMerge = selectedMerge,
+            setSelectedMerge = { selectedMerge = it },
+            reviewingEnrichment = reviewingEnrichment,
+            setReviewingEnrichment = { reviewingEnrichment = it },
+            enrichmentError = enrichmentError,
+            setEnrichmentError = { enrichmentError = it },
+            enrichmentCandidates = enrichmentCandidates,
+            rawContacts = rawContacts,
+            completionDraft = completionDraft,
+            setCompletionDraft = { completionDraft = it },
+            completionCardError = completionCardError,
+            setCompletionCardError = { completionCardError = it },
+            completionNotice = completionNotice,
+            setCompletionNotice = { completionNotice = it },
+            viewModel = viewModel,
+        ),
+    )
 }
+
+
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -348,3 +289,126 @@ private fun unresolvedIdentityPrompt(identity: SourceIdentityEntity): String = "
     "先检查本地联系人和已有证据；证据不足时只问我一个最关键的问题，不能仅凭同名自动合并。"
 
 private const val MAX_VISIBLE_ITEMS = 100
+
+private fun LazyListScope.maintenanceActionSection(
+    overview: com.zhiban.rebuild.data.contact.ContactMaintenanceOverview,
+    suggestionsAvailable: Boolean,
+    unresolvedIdentityCount: Int,
+    onReviewDuplicates: () -> Unit,
+    onReviewEnrichment: () -> Unit,
+    onResolveIdentities: () -> Unit,
+) {
+            item {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                    verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm),
+                ) {
+                    if (overview.duplicateReviewCount > 0) {
+                        MaintenanceActionRow(
+                            icon = Icons.Outlined.PersonSearch,
+                            title = "重复资料",
+                            detail = "${overview.duplicateReviewCount} 组待确认",
+                            onClick = onReviewDuplicates,
+                        )
+                    }
+                    if (overview.enrichmentReviewCount > 0) {
+                        MaintenanceActionRow(
+                            icon = Icons.Outlined.AutoAwesome,
+                            title = "资料待核实",
+                            detail = localizedQuantity(R.plurals.suggestion_count, overview.enrichmentReviewCount),
+                            onClick = onReviewEnrichment,
+                        )
+                    }
+                    if (unresolvedIdentities.isNotEmpty()) {
+                        MaintenanceActionRow(
+                            icon = Icons.Outlined.AlternateEmail,
+                            title = "社交身份待关联",
+                            detail = localizedQuantity(R.plurals.account_or_group_count, unresolvedIdentityCount),
+                            onClick = onResolveIdentities,
+                        )
+                    }
+                }
+            }
+}
+
+private data class MaintenanceDialogSlots(
+    val selectedMerge: ContactMergeSuggestion?,
+    val setSelectedMerge: (ContactMergeSuggestion?) -> Unit,
+    val reviewingEnrichment: Boolean,
+    val setReviewingEnrichment: (Boolean) -> Unit,
+    val enrichmentError: String?,
+    val setEnrichmentError: (String?) -> Unit,
+    val enrichmentCandidates: List<ContactEnrichmentCandidateEntity>,
+    val rawContacts: List<ContactEntity>,
+    val completionDraft: ContactCompletionDraft?,
+    val setCompletionDraft: (ContactCompletionDraft?) -> Unit,
+    val completionCardError: String?,
+    val setCompletionCardError: (String?) -> Unit,
+    val completionNotice: String?,
+    val setCompletionNotice: (String?) -> Unit,
+    val viewModel: RelationViewModel,
+)
+
+@Composable
+private fun MaintenanceDialogs(slots: MaintenanceDialogSlots) {
+    slots.selectedMerge?.let { suggestion ->
+        ContactMergeReviewDialog(
+            suggestion = suggestion,
+            onDismiss = { slots.setSelectedMerge(null) },
+            onConfirm = { canonicalId, sourceId, onResult ->
+                slots.viewModel.confirmMerge(canonicalId, sourceId, suggestion.reason) { error ->
+                    onResult(error)
+                    if (error == null) slots.setSelectedMerge(null)
+                }
+            },
+        )
+    }
+    if (slots.reviewingEnrichment) {
+        ContactEnrichmentReviewSheet(
+            candidates = slots.enrichmentCandidates,
+            contacts = slots.rawContacts,
+            error = slots.enrichmentError,
+            actions = ContactEnrichmentReviewActions(
+                onDismiss = {
+                    slots.setReviewingEnrichment(false)
+                    slots.setEnrichmentError(null)
+                },
+                onConfirm = { candidate ->
+                    slots.viewModel.confirmContactEnrichment(candidate) { error -> slots.setEnrichmentError(error) }
+                },
+                onReject = slots.viewModel::rejectContactEnrichment,
+            ),
+        )
+    }
+    slots.completionDraft?.let { draft ->
+        ContactCompletionCard(
+            draft = draft,
+            error = slots.completionCardError,
+            onConfirm = { finalText ->
+                slots.viewModel.confirmCompletionOutreach(draft.requestId, finalText) { error ->
+                    if (error == null) {
+                        slots.setCompletionDraft(null)
+                        slots.setCompletionCardError(null)
+                    } else {
+                        slots.setCompletionCardError(error)
+                    }
+                }
+            },
+            onCancel = {
+                slots.viewModel.cancelCompletionOutreach(draft.requestId)
+                slots.setCompletionDraft(null)
+                slots.setCompletionCardError(null)
+            },
+        )
+    }
+    slots.completionNotice?.let { message ->
+        ZhiBanAlertDialog(
+            onDismissRequest = { slots.setCompletionNotice(null) },
+            confirmButton = { TextButton(onClick = { slots.setCompletionNotice(null) }) { Text("知道了") } },
+            title = { Text("资料待补全") },
+            text = { Text(message) },
+        )
+    }
+}
+
+
