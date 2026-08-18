@@ -125,6 +125,13 @@ interface ContactCompletionRequestDao {
     )
     suspend fun expireAwaitingBefore(nowEpochMs: Long): Int
 
+    /** Cancel a contact's in-flight (DRAFTED/AWAITING_REPLY) requests — used by "不再打扰". */
+    @Query(
+        "UPDATE contact_completion_requests SET status = 'CANCELLED', updatedAtEpochMs = :nowEpochMs " +
+            "WHERE contactId = :contactId AND status IN ('DRAFTED','AWAITING_REPLY')",
+    )
+    suspend fun cancelActiveForContact(contactId: String, nowEpochMs: Long): Int
+
     /** Live requests for a contact, for a possible UI badge. */
     @Query(
         "SELECT * FROM contact_completion_requests WHERE contactId = :contactId " +

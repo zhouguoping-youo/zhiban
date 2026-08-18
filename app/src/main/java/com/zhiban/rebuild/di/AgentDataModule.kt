@@ -323,6 +323,29 @@ object AgentDataModule {
 
     @Provides
     @Singleton
+    internal fun provideCompletionHandoff(
+        handoffLauncher: com.zhiban.rebuild.data.communication.CommunicationHandoffLauncher,
+    ): com.zhiban.rebuild.data.completion.CompletionHandoff = com.zhiban.rebuild.data.completion.CompletionHandoff { platform, recipient, message ->
+        try {
+            handoffLauncher.open(platform, recipient, message)
+            true
+        } catch (unavailable: IllegalStateException) {
+            false // TARGET_APP_UNAVAILABLE — 目标应用未装/不可达，保持 DRAFTED 让 UI 提示而非崩溃。
+        }
+    }
+
+    @Provides
+    @Singleton
+    internal fun provideContactCompletionRepository(
+        database: AgentDatabase,
+        handoff: com.zhiban.rebuild.data.completion.CompletionHandoff,
+        outreachGenerator: com.zhiban.rebuild.data.completion.ContactCompletionOutreachGenerator,
+        controls: com.zhiban.rebuild.runtime.config.AgentControlStore,
+    ): com.zhiban.rebuild.data.completion.ContactCompletionRepository =
+        com.zhiban.rebuild.data.completion.ContactCompletionRepository(database, handoff, outreachGenerator, controls)
+
+    @Provides
+    @Singleton
     fun provideRuntimeUiClient(commandGateway: RuntimeCommandGateway, projectionGateway: RuntimeProjectionGateway): RuntimeUiClient =
         GatewayRuntimeUiClient(commandGateway, projectionGateway)
 }

@@ -88,6 +88,21 @@ class AgentControlStore internal constructor(context: Context, prefsName: String
         check(store.edit().putStringSet("reply_opt_out_contacts", current).commit())
     }
 
+    fun isCompletionOptedOut(contactId: String): Boolean = contactId in (store.getStringSet("completion_opt_out_contacts", emptySet()) ?: emptySet())
+
+    fun setCompletionOptOut(contactId: String, optedOut: Boolean) {
+        val current = (store.getStringSet("completion_opt_out_contacts", emptySet()) ?: emptySet()).toMutableSet()
+        if (optedOut) current.add(contactId) else current.remove(contactId)
+        check(store.edit().putStringSet("completion_opt_out_contacts", current).commit())
+    }
+
+    // 联系人资料补全触达：全局总开关（默认开）+ 按联系人"不再打扰"（上文 isCompletionOptedOut/setCompletionOptOut）。
+    fun contactCompletionEnabled(): Boolean = store.getBoolean("contact_completion_enabled", true)
+
+    fun saveContactCompletionEnabled(enabled: Boolean) {
+        check(store.edit().putBoolean("contact_completion_enabled", enabled).commit())
+    }
+
     fun isToolEnabled(name: String): Boolean = name !in (store.getStringSet("disabled_tools", emptySet()) ?: emptySet())
     fun saveToolEnabled(name: String, enabled: Boolean) {
         val disabled = (store.getStringSet("disabled_tools", emptySet()) ?: emptySet()).toMutableSet()
