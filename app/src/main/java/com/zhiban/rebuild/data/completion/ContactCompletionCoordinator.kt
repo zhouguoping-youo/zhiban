@@ -71,15 +71,22 @@ internal class ContactCompletionCoordinator @Inject constructor(
             dao.expireAwaitingBefore(now) // 超时收尾与开关无关,总要跑
             reconcileCompleted(now) // 已收到回复的请求:候选都处理完(或用户已手改补齐)就收敛
             if (!controls.contactCompletionEnabled()) return
-            database.notificationCandidateDao()
-                .recentIncomingAttributed(WECHAT_PLATFORM, now - CANDIDATE_WINDOW_MS, CANDIDATE_LIMIT)
-                .forEach { candidate ->
+            // 游标式分页扫描:7 天窗口内消息可能远超一页,固定取最新 20 条会让旧回复永久错过(P2-5)。
+            var cursor = controls.completionScanCursor()
+            var page: List<NotificationCandidateEntity>
+            do {
+                page = database.notificationCandidateDao()
+                    .incomingAttributedAfter(WECHAT_PLATFORM, now - CANDIDATE_WINDOW_MS, cursor, SCAN_PAGE_SIZE)
+                page.forEach { candidate ->
                     runSuspendCatching { processCandidate(candidate, now) }
                         .onFailure { failure ->
                             if (failure is CancellationException) throw failure
                             Log.w(TAG, "completion:candidate_failure", failure)
                         }
                 }
+                cursor = page.lastOrNull()?.postedAtEpochMs ?: cursor
+                controls.saveCompletionScanCursor(cursor)
+            } while (page.size == SCAN_PAGE_SIZE)
         }
     }
 
@@ -155,7 +162,7 @@ internal class ContactCompletionCoordinator @Inject constructor(
     private companion object {
         const val TAG = "ContactCompletion"
         const val WECHAT_PLATFORM = "WECHAT"
-        const val CANDIDATE_LIMIT = 20
+        const val SCAN_PAGE_SIZE = 20
         const val ATTRIBUTION_THRESHOLD = 0.6
         const val TRIGGER_DEBOUNCE_MS = 3_000L
         const val CANDIDATE_WINDOW_MS = 7L * 24 * 60 * 60 * 1_000

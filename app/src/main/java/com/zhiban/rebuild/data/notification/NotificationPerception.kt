@@ -144,6 +144,19 @@ interface NotificationCandidateDao {
     )
     suspend fun recentIncomingAttributed(platform: String, sinceEpochMs: Long, limit: Int): List<NotificationCandidateEntity>
 
+    /**
+     * 游标式扫描:按 postedAt 升序取 :afterEpochMs 之后的一页,协调器逐页拉取直到取完。
+     * 固定 LIMIT 20 在 7 天窗口内消息超过 20 条时会把旧回复永久漏掉(P2-5)。
+     */
+    @Query(
+        """SELECT * FROM notification_candidates
+           WHERE direction = 'INCOMING' AND platform = :platform AND postedAtEpochMs > :sinceEpochMs
+             AND postedAtEpochMs > :afterEpochMs
+             AND (linkedContactId IS NOT NULL OR suggestedContactId IS NOT NULL)
+           ORDER BY postedAtEpochMs ASC LIMIT :limit""",
+    )
+    suspend fun incomingAttributedAfter(platform: String, sinceEpochMs: Long, afterEpochMs: Long, limit: Int): List<NotificationCandidateEntity>
+
     @Query(
         "UPDATE notification_candidates SET status = 'DISMISSED' WHERE candidateId = :candidateId AND status = 'PENDING'",
     )

@@ -111,6 +111,13 @@ class AgentControlStore internal constructor(context: Context, prefsName: String
         check(store.edit().putBoolean("location_access_enabled", enabled).commit())
     }
 
+    // 补全回复扫描游标:上次扫到的最后一条微信来消息时间。游标式分页扫描,防旧回复永久错过(P2-5)。
+    fun completionScanCursor(): Long = store.getLong("completion_scan_cursor", 0L)
+
+    fun saveCompletionScanCursor(cursorEpochMs: Long) {
+        check(store.edit().putLong("completion_scan_cursor", cursorEpochMs).commit())
+    }
+
     fun isToolEnabled(name: String): Boolean = name !in (store.getStringSet("disabled_tools", emptySet()) ?: emptySet())
     fun saveToolEnabled(name: String, enabled: Boolean) {
         val disabled = (store.getStringSet("disabled_tools", emptySet()) ?: emptySet()).toMutableSet()
