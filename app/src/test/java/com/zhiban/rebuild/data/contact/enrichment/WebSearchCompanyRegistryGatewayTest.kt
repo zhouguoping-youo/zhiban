@@ -78,6 +78,38 @@ class WebSearchCompanyRegistryGatewayTest {
     }
 
     @Test
+    fun `a transient failure is not cached and the next lookup retries`() = runBlocking {
+        var calls = 0
+        val webSearch = WebSearchGateway { _, _ ->
+            calls += 1
+            if (calls == 1) throw ProviderFailure("TIMEOUT", retryable = true)
+            listOf(WebSearchHit("星河科技有限公司", "https://site-a.example/1", "星河科技有限公司"))
+        }
+        val subject = gateway(webSearch)
+
+        assertTrue(subject.search("星河科技").isEmpty()) // 失败:降级为空,但绝不入缓存
+        val match = subject.search("星河科技").single() // 第二次真实重试,拿到结果
+
+        assertEquals("星河科技有限公司", match.canonicalName)
+        assertEquals(2, calls)
+    }
+
+    @Test
+    fun `a genuine empty result is cached and not re-searched`() = runBlocking {
+        var calls = 0
+        val webSearch = WebSearchGateway { _, _ ->
+            calls += 1
+            emptyList()
+        }
+        val subject = gateway(webSearch)
+
+        assertTrue(subject.search("星河科技").isEmpty())
+        assertTrue(subject.search("星河科技").isEmpty())
+
+        assertEquals(1, calls) // 成功的空结果(真没搜到)照常入缓存,不重复搜
+    }
+
+    @Test
     fun `repeat lookups for the same hint hit the cache`() = runBlocking {
         var calls = 0
         val webSearch = WebSearchGateway { _, _ ->

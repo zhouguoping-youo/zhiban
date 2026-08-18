@@ -33,7 +33,8 @@ internal class WebSearchCompanyRegistryGateway(private val webSearch: WebSearchG
         cached(cacheKey)?.let { return it }
         val hits = runSuspendCatching { webSearch.search(buildQuery(hint), SEARCH_RESULT_LIMIT) }
             .getOrElse {
-                store(cacheKey, emptyList())
+                // 瞬态失败(超时/离线/限流)绝不写缓存:把空结果当"真没搜到"缓存会以 30 天 TTL 阻塞
+                // 该公司的后续重试(P1-6)。只有真实搜索结果(含成功的空结果)才入缓存。
                 return emptyList()
             }
         val matches = score(normalize(hint), hits)
