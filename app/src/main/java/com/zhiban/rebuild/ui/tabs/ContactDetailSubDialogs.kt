@@ -182,20 +182,8 @@ internal fun ContactMergeReviewDialog(suggestion: ContactMergeSuggestion, onDism
     var error by remember { mutableStateOf<String?>(null) }
     ZhiBanDialogHost(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Dialog)).background(RelationSurface).padding(20.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Rounded.Close, "关闭")
-                }
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "确认是否为同一个人",
-                        color = RelationInk,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(suggestion.reason, color = RelationMuted, style = MaterialTheme.typography.bodySmall)
-                }
-            }
+            MergeDialogHeader(reason = suggestion.reason, onDismiss = onDismiss)
+            Spacer(Modifier.height(14.dp))
             Spacer(Modifier.height(14.dp))
             Text(
                 "选择合并后保留显示的主资料",
@@ -205,46 +193,14 @@ internal fun ContactMergeReviewDialog(suggestion: ContactMergeSuggestion, onDism
             )
             Spacer(Modifier.height(8.dp))
             listOf(suggestion.first, suggestion.second).forEach { contact ->
-                val selected = canonicalId == contact.contactId
-                Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Card))
-                        .background(if (selected) RelationSoft else Color.Transparent)
-                        .clickable {
-                            canonicalId = contact.contactId
-                            error = null
-                        }
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        Modifier.size(42.dp).clip(CircleShape).background(if (selected) RelationInk else RelationSoft),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            contact.displayName.take(1),
-                            color = if (selected) MaterialTheme.colorScheme.onPrimary else RelationInk,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            contact.displayName,
-                            color = RelationInk,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium,
-                        )
-                        Text(
-                            listOfNotNull(contact.phone, contact.company, contact.wechatId).take(2).joinToString(" · ")
-                                .ifBlank { if (selected) "将作为主资料" else "资料较少" },
-                            color = RelationMuted,
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    if (selected) Text("主资料", color = RelationInk, style = MaterialTheme.typography.labelMedium)
-                }
+                MergeContactChoiceRow(
+                    contact = contact,
+                    selected = canonicalId == contact.contactId,
+                    onSelect = {
+                        canonicalId = contact.contactId
+                        error = null
+                    },
+                )
                 Spacer(Modifier.height(6.dp))
             }
             Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Card)).background(RelationSoft).padding(14.dp)) {
@@ -295,6 +251,8 @@ internal fun ContactMergeReviewDialog(suggestion: ContactMergeSuggestion, onDism
         }
     }
 }
+
+
 
 
 @Composable
@@ -503,4 +461,64 @@ internal fun ContactFactEditorDialog(contact: ContactEntity, onDismiss: () -> Un
         }
     }
 }
+
+@Composable
+private fun MergeDialogHeader(reason: String, onDismiss: () -> Unit) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
+                Icon(Icons.Rounded.Close, "关闭")
+            }
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "确认是否为同一个人",
+                    color = RelationInk,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(reason, color = RelationMuted, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+}
+
+@Composable
+private fun MergeContactChoiceRow(contact: ContactEntity, selected: Boolean, onSelect: () -> Unit) {
+                    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(ZhiBanRadius.Card))
+            .background(if (selected) RelationSoft else Color.Transparent)
+            .clickable(onClick = onSelect)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(42.dp).clip(CircleShape).background(if (selected) RelationInk else RelationSoft),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                contact.displayName.take(1),
+                color = if (selected) MaterialTheme.colorScheme.onPrimary else RelationInk,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                contact.displayName,
+                color = RelationInk,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                listOfNotNull(contact.phone, contact.company, contact.wechatId).take(2).joinToString(" · ")
+                    .ifBlank { if (selected) "将作为主资料" else "资料较少" },
+                color = RelationMuted,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (selected) Text("主资料", color = RelationInk, style = MaterialTheme.typography.labelMedium)
+    }
+    Spacer(Modifier.height(6.dp))
+}
+
 
