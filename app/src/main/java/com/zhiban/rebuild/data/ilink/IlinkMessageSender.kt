@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.data.ilink
 
+import com.zhiban.rebuild.data.ilink.network.ILINK_SESSION_EXPIRED_CODE
 import com.zhiban.rebuild.data.ilink.network.IlinkBotTransport
 import com.zhiban.rebuild.data.ilink.network.IlinkOutboundMessage
 import com.zhiban.rebuild.data.ilink.network.IlinkSendResult
@@ -16,8 +17,9 @@ import kotlinx.coroutines.delay
  *
  * Ordering mirrors `StepFunWebSearchGateway`: outbound-gate first, then credentials, then network.
  * Retries reuse the same `client_id` so the server's dedup makes a retry after a timeout safe (it
- * will not double-deliver). A `ret: -14` marks the binding expired and clears the short-lived
- * context tokens, then propagates so the user is told to re-bind.
+ * will not double-deliver). A `ret: -14` or an HTTP 401/403 (both "session revoked") marks the
+ * binding expired and clears the short-lived context tokens, then propagates so the user is told
+ * to re-bind.
  */
 @Singleton
 internal class IlinkMessageSender @Inject constructor(
@@ -60,6 +62,12 @@ internal class IlinkMessageSender @Inject constructor(
                 handleSessionExpired()
                 throw expired
             } catch (failure: ProviderFailure) {
+                // HTTP 401/403 与 -14 同语义(P1-5):凭证被吊销时同样清会话与短时上下文令牌再上抛,
+                // 用户才能看到重绑提示,而不是每次发送都神秘失败、绑定状态还显示"活"。
+                if (failure.code == ILINK_SESSION_EXPIRED_CODE) {
+                    handleSessionExpired()
+                    throw failure
+                }
                 if (!failure.retryable || attempt >= RETRY_BACKOFF_MS.size) throw failure
                 delay(RETRY_BACKOFF_MS[attempt])
                 attempt += 1

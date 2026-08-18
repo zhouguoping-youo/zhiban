@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.data.ilink
 
+import com.zhiban.rebuild.data.ilink.network.ILINK_SESSION_EXPIRED_CODE
 import com.zhiban.rebuild.data.ilink.network.IlinkBotTransport
 import com.zhiban.rebuild.data.ilink.network.IlinkSessionExpiredException
 import com.zhiban.rebuild.runtime.provider.ProviderFailure
@@ -74,7 +75,7 @@ internal class IlinkFetchCoordinator @Inject constructor(
     }
 
     /** One pull pass: gate → session → getupdates → persist cursor → reconcile. Serialized by [fetchMutex]. */
-    private suspend fun fetchOnce() {
+    internal suspend fun fetchOnce() {
         fetchMutex.withLock {
             gate.requireFetchAllowed("ilink-fetch-${System.currentTimeMillis()}")
             if (!credentialStore.hasUsableBinding()) return
@@ -91,8 +92,13 @@ internal class IlinkFetchCoordinator @Inject constructor(
                 // Session is dead and its cursor is tied to it; drop both so a re-bind starts clean.
                 credentialStore.markSessionExpired()
                 cursorStore.clear()
-            } catch (_: ProviderFailure) {
-                // Transient network/server failure: keep the cursor so the next trigger retries.
+            } catch (failure: ProviderFailure) {
+                // HTTP 401/403 与 -14 同语义(P1-5):凭证被吊销时必须同样清会话,否则绑定永远显示
+                // "活"、工具一直展示但每次拉取都静默失败。其余为瞬态失败,保留 cursor 下个触发重试。
+                if (failure.code == ILINK_SESSION_EXPIRED_CODE) {
+                    credentialStore.markSessionExpired()
+                    cursorStore.clear()
+                }
             }
         }
     }

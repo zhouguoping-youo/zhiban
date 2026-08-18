@@ -29,6 +29,12 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 
 /**
+ * HTTP 401/403 与协议层 `ret: -14` 同语义:会话被服务端吊销。协调层(拉取/发送)据此清理绑定
+ * 与 cursor,不能只认 [IlinkSessionExpiredException](P1-5)。
+ */
+internal const val ILINK_SESSION_EXPIRED_CODE = "ILINK_SESSION_EXPIRED"
+
+/**
  * Raw iLink Bot API operations. Single-shot, no retry and no credential/outbound-gate concerns —
  * those live in the caller (binding controller / fetch coordinator / send executor), mirroring how
  * `OkHttpStepFunWebSearchTransport` stays a dumb transport under `StepFunWebSearchGateway`.
@@ -268,7 +274,7 @@ internal class OkHttpIlinkBotTransport(
 
     private fun httpFailure(status: Int, operation: String): ProviderFailure = ProviderFailure(
         code = when (status) {
-            401, 403 -> "ILINK_SESSION_EXPIRED"
+            401, 403 -> ILINK_SESSION_EXPIRED_CODE
             408 -> "TIMEOUT"
             429 -> "RATE_LIMITED"
             in 500..599 -> "PROVIDER_UNAVAILABLE"
