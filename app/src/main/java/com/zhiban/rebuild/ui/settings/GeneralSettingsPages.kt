@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -577,37 +578,11 @@ fun DataSettingsPage(onBack: () -> Unit, onMemory: () -> Unit, onRunHistory: () 
                     SettingsRow("消息采集记录", "")
                 }
             }
-            item {
-                Text(
-                    "备份与导出",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = ZhiBanTextSecondary,
-                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.Xs, vertical = ZhiBanSpacing.Sm),
-                )
-            }
-            item {
-                PortableBackupSection()
-            }
-            item {
-                SettingsCard {
-                    SettingsActionRow(
-                        title = if (exportState.exporting) "正在导出…" else "导出全部数据",
-                        onClick = exportViewModel::export,
-                    )
-                    Divider()
-                    SettingsActionRow("导出诊断记录", onClick = onRunHistory)
-                }
-            }
-            if (exportState.exportFailed) {
-                item {
-                    Text(
-                        "导出失败，请稍后重试",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(horizontal = ZhiBanSpacing.Lg),
-                    )
-                }
-            }
+            DataExportSection(
+                exportState = exportState,
+                onExport = exportViewModel::export,
+                onDiagnostics = onRunHistory,
+            )
             item {
                 Text(
                     "重置",
@@ -625,35 +600,15 @@ fun DataSettingsPage(onBack: () -> Unit, onMemory: () -> Unit, onRunHistory: () 
                     )
                 }
             }
-        }
-    }
-    if (confirmReset) {
-        ZhiBanAlertDialog(
-            onDismissRequest = { confirmReset = false },
-            shape = RoundedCornerShape(ZhiBanRadius.Dialog),
-            containerColor = ZhiBanCard,
-            title = { Text("重置知伴？") },
-            text = {
-                Text(
-                    "系统会打开知伴的应用信息页。进入“存储”并选择“清除数据”后，对话、记忆、联系人关系、日程、API Key 和所有本机设置都会被删除，无法恢复。",
-                )
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmReset = false }) { Text("取消") }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        confirmReset = false
-                        context.openAppDetails()
-                    },
-                ) {
-                    Text("打开系统设置", color = MaterialTheme.colorScheme.error)
-                }
-            },
-        )
-    }
+        }    }
+    ResetDataConfirmDialog(
+        confirmReset = confirmReset,
+        setConfirmReset = { confirmReset = it },
+        context = context,
+    )
 }
+
+
 
 @Composable
 fun ReportErrorSettingsPage(onBack: () -> Unit, onDiagnostics: () -> Unit) {
@@ -1028,3 +983,68 @@ private fun formatBytes(bytes: Long): String = when {
     bytes < 1_048_576 -> "${bytes / 1_024} KB"
     else -> String.format(Locale.getDefault(), "%.1f MB", bytes / 1_048_576.0)
 }
+
+private fun LazyListScope.DataExportSection(exportState: DataExportUiState, onExport: () -> Unit, onDiagnostics: () -> Unit) {
+        item {
+            Text(
+                "备份与导出",
+                style = MaterialTheme.typography.labelMedium,
+                color = ZhiBanTextSecondary,
+                modifier = Modifier.padding(horizontal = ZhiBanSpacing.Xs, vertical = ZhiBanSpacing.Sm),
+            )
+        }
+        item {
+            PortableBackupSection()
+        }
+        item {
+            SettingsCard {
+                SettingsActionRow(
+                    title = if (exportState.exporting) "正在导出…" else "导出全部数据",
+                    onClick = onExport,
+                )
+                Divider()
+                SettingsActionRow("导出诊断记录", onClick = onDiagnostics)
+            }
+        }
+        if (exportState.exportFailed) {
+            item {
+                Text(
+                    "导出失败，请稍后重试",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.Lg),
+                )
+            }
+        }
+}
+
+@Composable
+private fun ResetDataConfirmDialog(confirmReset: Boolean, setConfirmReset: (Boolean) -> Unit, context: android.content.Context) {
+    if (confirmReset) {
+        ZhiBanAlertDialog(
+            onDismissRequest = { setConfirmReset(false) },
+            shape = RoundedCornerShape(ZhiBanRadius.Dialog),
+            containerColor = ZhiBanCard,
+            title = { Text("重置知伴？") },
+            text = {
+                Text(
+                    "系统会打开知伴的应用信息页。进入“存储”并选择“清除数据”后，对话、记忆、联系人关系、日程、API Key 和所有本机设置都会被删除，无法恢复。",
+                )
+            },
+            dismissButton = {
+                TextButton(onClick = { setConfirmReset(false) }) { Text("取消") }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        setConfirmReset(false)
+                        context.openAppDetails()
+                    },
+                ) {
+                    Text("打开系统设置", color = MaterialTheme.colorScheme.error)
+                }
+            },
+        )
+    }
+}
+
