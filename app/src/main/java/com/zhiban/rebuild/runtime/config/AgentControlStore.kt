@@ -20,8 +20,11 @@ enum class ExecutionPreference(val label: String, val runtimeLevel: String) {
 }
 
 @Singleton
-class AgentControlStore @Inject constructor(@ApplicationContext context: Context) {
-    private val store = context.getSharedPreferences("agent_controls", Context.MODE_PRIVATE)
+class AgentControlStore internal constructor(context: Context, prefsName: String) {
+    @Inject constructor(@ApplicationContext context: Context) : this(context, "agent_controls")
+
+    // Tests pass an isolated prefsName so they never read or clobber the device's real "agent_controls".
+    private val store = context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
     fun memory() = MemoryPolicy(
         sessionMemoryEnabled = store.getBoolean("session_memory", true),
         longTermMemoryEnabled = store.getBoolean("long_term_memory", true),

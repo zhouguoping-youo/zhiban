@@ -37,10 +37,11 @@ class ReplySuggestionCoordinatorTest {
 
     @Before fun setUp() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        context.getSharedPreferences("agent_controls", Context.MODE_PRIVATE).edit().clear().commit()
+        // Isolated prefs file — never touch the device's real "agent_controls".
+        context.getSharedPreferences("agent_controls_test", Context.MODE_PRIVATE).edit().clear().commit()
         database = Room.inMemoryDatabaseBuilder(context, AgentDatabase::class.java)
             .addCallback(AgentDatabase.CALLBACK).allowMainThreadQueries().build()
-        controls = AgentControlStore(context)
+        controls = AgentControlStore(context, "agent_controls_test")
         generator = FakeGenerator(listOf("好的张总，明早十点前发您", "收到，明天上午给您回复"))
         coordinator = ReplySuggestionCoordinator(database, generator, controls)
     }
