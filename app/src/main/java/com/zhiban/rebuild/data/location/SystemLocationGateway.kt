@@ -92,11 +92,7 @@ internal class SystemLocationGateway(private val context: Context) : LocationGat
         }
     }
 
-    private fun liveProviders(): List<String> = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        listOf(LocationManager.FUSED_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
-    } else {
-        listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
-    }
+    private fun liveProviders(): List<String> = liveLocationProviders(Build.VERSION.SDK_INT)
 
     private companion object {
         const val MAX_FRESH_FIX_AGE_MS = 15L * 60 * 1_000
@@ -105,6 +101,17 @@ internal class SystemLocationGateway(private val context: Context) : LocationGat
         const val MAX_FALLBACK_ACCURACY_METERS = 2_000f
         val FIX_TIMEOUT = 10.seconds
     }
+}
+
+/**
+ * Live-fix provider preference. `LocationManager.FUSED_PROVIDER` only exists from API 31 (S) — the
+ * guard must be S, not R (on API 30 the constant is merely absent and lookups fall back to
+ * network/GPS, so the old guard never crashed, but it stated the wrong API level).
+ */
+internal fun liveLocationProviders(sdkInt: Int): List<String> = if (sdkInt >= Build.VERSION_CODES.S) {
+    listOf(LocationManager.FUSED_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
+} else {
+    listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
 }
 
 /**
