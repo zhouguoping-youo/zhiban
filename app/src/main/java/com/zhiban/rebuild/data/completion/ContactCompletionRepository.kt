@@ -85,16 +85,19 @@ class ContactCompletionRepository internal constructor(
     }
 
     /**
-     * 用户确认 → 跳转微信预填（用户亲选联系人亲发）。handoff 成功才转 AWAITING_REPLY（重置 7 天过期）。
+     * 用户确认 → 跳转微信预填（用户亲选联系人亲发）。[finalText] 是卡片里可能改过的最终稿：非空才发送，
+     * handoff 成功才转 AWAITING_REPLY 并把它落库（行记录"实际发出"的文本,供追溯/重开显示;重置 7 天过期）。
      * 微信未装/不可达保持 DRAFTED 并返回 false。
      */
-    suspend fun confirmAndHandoff(requestId: String): Boolean {
+    suspend fun confirmAndHandoff(requestId: String, finalText: String): Boolean {
         val request = dao.findById(requestId) ?: return false
         if (request.status != ContactCompletionStatus.DRAFTED) return false
+        val text = finalText.trim()
+        if (text.isEmpty()) return false
         val contact = contactDao.findById(request.contactId) ?: return false
-        if (!handoff.openComposer(PLATFORM_WECHAT, contact.displayName, request.draftText)) return false
+        if (!handoff.openComposer(PLATFORM_WECHAT, contact.displayName, text)) return false
         val now = System.currentTimeMillis()
-        dao.markAwaiting(requestId, sentAtEpochMs = now, expiresAtEpochMs = now + REQUEST_TTL_MS, nowEpochMs = now)
+        dao.markAwaiting(requestId, text, sentAtEpochMs = now, expiresAtEpochMs = now + REQUEST_TTL_MS, nowEpochMs = now)
         return true
     }
 

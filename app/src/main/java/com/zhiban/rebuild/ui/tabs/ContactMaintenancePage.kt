@@ -15,12 +15,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.AlternateEmail
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.LinkOff
 import androidx.compose.material.icons.outlined.PersonSearch
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,11 +37,14 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zhiban.rebuild.R
+import com.zhiban.rebuild.data.completion.ContactCompletionDraft
+import com.zhiban.rebuild.data.contact.ContactCompleteness
 import com.zhiban.rebuild.data.contact.ContactEnrichmentCandidateEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.ContactMaintenanceIssue
 import com.zhiban.rebuild.data.contact.ContactMaintenanceItem
 import com.zhiban.rebuild.data.contact.SourceIdentityEntity
+import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanBottomSheet
 import com.zhiban.rebuild.ui.components.ZhiBanDialogHeader
 import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
@@ -64,9 +69,19 @@ fun ContactMaintenancePage(onBack: () -> Unit, onAsk: (String) -> Unit, viewMode
     val unresolvedIdentities by viewModel.unresolvedSourceIdentities.collectAsStateWithLifecycle()
     val enrichmentCandidates by viewModel.pendingEnrichment.collectAsStateWithLifecycle()
     val rawContacts by viewModel.rawContacts.collectAsStateWithLifecycle()
+    val completableContacts by viewModel.completableContacts.collectAsStateWithLifecycle()
     var selectedMerge by remember { mutableStateOf<ContactMergeSuggestion?>(null) }
     var reviewingEnrichment by remember { mutableStateOf(false) }
     var enrichmentError by remember { mutableStateOf<String?>(null) }
+    var completionDraft by remember { mutableStateOf<ContactCompletionDraft?>(null) }
+    var completionCardError by remember { mutableStateOf<String?>(null) }
+    var completionNotice by remember { mutableStateOf<String?>(null) }
+    val prepareCompletion: (String) -> Unit = { contactId ->
+        completionNotice = null
+        viewModel.prepareCompletionOutreach(contactId) { draft, message ->
+            if (draft != null) completionDraft = draft else completionNotice = message
+        }
+    }
     ZhiBanPage {
         LazyColumn(
             Modifier.fillMaxSize(),
@@ -74,7 +89,7 @@ fun ContactMaintenancePage(onBack: () -> Unit, onAsk: (String) -> Unit, viewMode
             verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
         ) {
             item { ZhiBanTopBar(title = "联系人维护", onBack = onBack) }
-            if (overview.needsAttentionCount == 0 && unresolvedIdentities.isEmpty()) {
+            if (overview.needsAttentionCount == 0 && unresolvedIdentities.isEmpty() && completableContacts.isEmpty()) {
                 item {
                     Text(
                         "联系人资料已整理",
@@ -120,6 +135,28 @@ fun ContactMaintenancePage(onBack: () -> Unit, onAsk: (String) -> Unit, viewMode
                 ) { item ->
                     ContactMaintenanceRow(item, onAsk)
                 }
+                if (completableContacts.isNotEmpty()) {
+                    item(key = "completion-header") {
+                        Text(
+                            "资料待补全",
+                            modifier = Modifier.fillMaxWidth()
+                                .padding(horizontal = ZhiBanSpacing.PageHorizontal)
+                                .padding(top = ZhiBanSpacing.Md),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    items(
+                        completableContacts.take(MAX_VISIBLE_ITEMS),
+                        key = { "completion-${it.contact.contactId}" },
+                    ) { completeness ->
+                        ContactCompletionRow(
+                            item = completeness,
+                            onClick = { prepareCompletion(completeness.contact.contactId) },
+                            modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                        )
+                    }
+                }
             }
         }
     }
@@ -150,6 +187,35 @@ fun ContactMaintenancePage(onBack: () -> Unit, onAsk: (String) -> Unit, viewMode
                 },
                 onReject = viewModel::rejectContactEnrichment,
             ),
+        )
+    }
+    completionDraft?.let { draft ->
+        ContactCompletionCard(
+            draft = draft,
+            error = completionCardError,
+            onConfirm = { finalText ->
+                viewModel.confirmCompletionOutreach(draft.requestId, finalText) { error ->
+                    if (error == null) {
+                        completionDraft = null
+                        completionCardError = null
+                    } else {
+                        completionCardError = error
+                    }
+                }
+            },
+            onCancel = {
+                viewModel.cancelCompletionOutreach(draft.requestId)
+                completionDraft = null
+                completionCardError = null
+            },
+        )
+    }
+    completionNotice?.let { message ->
+        ZhiBanAlertDialog(
+            onDismissRequest = { completionNotice = null },
+            confirmButton = { TextButton(onClick = { completionNotice = null }) { Text("知道了") } },
+            title = { Text("资料待补全") },
+            text = { Text(message) },
         )
     }
 }
@@ -236,6 +302,17 @@ private fun ContactMaintenanceRow(item: ContactMaintenanceItem, onAsk: (String) 
         detail = label,
         onClick = { onAsk(verificationPrompt(item, primaryIssue)) },
         modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+    )
+}
+
+@Composable
+private fun ContactCompletionRow(item: ContactCompleteness, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    MaintenanceActionRow(
+        icon = Icons.Outlined.EditNote,
+        title = item.contact.displayName,
+        detail = "待补：${item.missingFields.joinToString("、") { it.label }}",
+        onClick = onClick,
+        modifier = modifier,
     )
 }
 

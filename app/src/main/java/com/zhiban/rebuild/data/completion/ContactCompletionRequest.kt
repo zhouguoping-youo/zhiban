@@ -100,11 +100,11 @@ interface ContactCompletionRequestDao {
     suspend fun responseReceivedRequests(): List<ContactCompletionRequestEntity>
 
     @Query(
-        "UPDATE contact_completion_requests SET status = 'AWAITING_REPLY', sentAtEpochMs = :sentAtEpochMs, " +
+        "UPDATE contact_completion_requests SET status = 'AWAITING_REPLY', draftText = :draftText, sentAtEpochMs = :sentAtEpochMs, " +
             "expiresAtEpochMs = :expiresAtEpochMs, updatedAtEpochMs = :nowEpochMs " +
             "WHERE requestId = :requestId AND status = 'DRAFTED'",
     )
-    suspend fun markAwaiting(requestId: String, sentAtEpochMs: Long, expiresAtEpochMs: Long, nowEpochMs: Long): Int
+    suspend fun markAwaiting(requestId: String, draftText: String, sentAtEpochMs: Long, expiresAtEpochMs: Long, nowEpochMs: Long): Int
 
     @Query(
         "UPDATE contact_completion_requests SET status = 'RESPONSE_RECEIVED', responseCandidateId = :candidateId, " +

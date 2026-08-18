@@ -137,12 +137,15 @@ class ContactCompletionRepositoryTest {
     @Test fun confirmAndHandoffMarksAwaitingOnSuccess() = runBlocking {
         insertContact("c1", phone = null, wechatId = "wx-1")
         val draft = repository.prepareOutreach("c1")!!
+        val edited = "张三，方便发我一下手机号吗？（已改）"
 
-        assertTrue(repository.confirmAndHandoff(draft.requestId))
+        assertTrue(repository.confirmAndHandoff(draft.requestId, edited))
 
         assertEquals(1, handoff.calls)
+        assertEquals(edited, handoff.lastMessage) // 跳转的是编辑后的最终稿
         val row = database.contactCompletionRequestDao().findById(draft.requestId)!!
         assertEquals(ContactCompletionStatus.AWAITING_REPLY, row.status)
+        assertEquals(edited, row.draftText) // 行记录实际发出的文本
         assertNotNull(row.sentAtEpochMs)
     }
 
@@ -151,19 +154,31 @@ class ContactCompletionRepositoryTest {
         val draft = repository.prepareOutreach("c1")!!
         handoff.available = false
 
-        assertFalse(repository.confirmAndHandoff(draft.requestId))
+        assertFalse(repository.confirmAndHandoff(draft.requestId, "改写后的稿子"))
 
         assertEquals(1, handoff.calls)
-        // 微信未装/不可达:保持 DRAFTED,绝不谎报已发送。
-        assertEquals(ContactCompletionStatus.DRAFTED, database.contactCompletionRequestDao().findById(draft.requestId)!!.status)
+        // 微信未装/不可达:保持 DRAFTED 且原稿不被改写,绝不谎报已发送。
+        val row = database.contactCompletionRequestDao().findById(draft.requestId)!!
+        assertEquals(ContactCompletionStatus.DRAFTED, row.status)
+        assertEquals(draft.draftText, row.draftText)
     }
 
     @Test fun confirmAndHandoffRejectsNonDraftedRequest() = runBlocking {
         insertContact("c1", phone = null, wechatId = "wx-1")
         seedRequest("c1", ContactCompletionStatus.AWAITING_REPLY, requestId = "ccr-x")
 
-        assertFalse(repository.confirmAndHandoff("ccr-x"))
+        assertFalse(repository.confirmAndHandoff("ccr-x", "任何文本"))
         assertEquals(0, handoff.calls) // 非 DRAFTED 不再二次跳转
+    }
+
+    @Test fun confirmAndHandoffRejectsBlankText() = runBlocking {
+        insertContact("c1", phone = null, wechatId = "wx-1")
+        val draft = repository.prepareOutreach("c1")!!
+
+        assertFalse(repository.confirmAndHandoff(draft.requestId, "   "))
+
+        assertEquals(0, handoff.calls) // 空稿不跳转
+        assertEquals(ContactCompletionStatus.DRAFTED, database.contactCompletionRequestDao().findById(draft.requestId)!!.status)
     }
 
     @Test fun cancelMarksCancelled() = runBlocking {
@@ -279,12 +294,15 @@ class ContactCompletionRepositoryTest {
         }
     }
 
-    /** fun-interface 缝隙,模拟微信在/不在;记录调用次数以验证"不二次跳转"。 */
+    /** fun-interface 缝隙,模拟微信在/不在;记录调用次数与最后一次文本以验证"不二次跳转/发的是最终稿"。 */
     private class FakeHandoff(var available: Boolean) {
         var calls = 0
             private set
-        val impl = CompletionHandoff { _, _, _ ->
+        var lastMessage: String? = null
+            private set
+        val impl = CompletionHandoff { _, _, message ->
             calls++
+            lastMessage = message
             available
         }
     }

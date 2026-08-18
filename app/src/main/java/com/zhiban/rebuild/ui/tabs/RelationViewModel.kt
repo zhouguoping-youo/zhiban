@@ -9,6 +9,8 @@ import com.zhiban.rebuild.data.agent.AndroidContactSyncResult
 import com.zhiban.rebuild.data.agent.RelationshipEventParticipantInput
 import com.zhiban.rebuild.data.calllog.CallLogRepository
 import com.zhiban.rebuild.data.calllog.CallRecordEntity
+import com.zhiban.rebuild.data.completion.ContactCompletionDraft
+import com.zhiban.rebuild.data.completion.ContactCompletionRepository
 import com.zhiban.rebuild.data.contact.ContactAliasEntity
 import com.zhiban.rebuild.data.contact.ContactCompleteness
 import com.zhiban.rebuild.data.contact.ContactEnrichmentCandidateEntity
@@ -94,6 +96,8 @@ private data class RelationInboxSnapshot(
     val cloudAsrAvailability: CloudAsrAvailability,
 )
 
+private const val PLATFORM_WECHAT = "WECHAT"
+
 class RelationContactServices @Inject constructor(
     val systemContactReader: SystemContactReader,
     val companyEnrichment: CompanyEnrichmentRefresher,
@@ -112,6 +116,7 @@ class RelationViewModel @Inject constructor(
     private val repository: AgentDataRepository,
     private val userProfileStore: UserProfileStore,
     private val replySuggestionRepository: ReplySuggestionRepository,
+    private val contactCompletionRepository: ContactCompletionRepository,
     contactServices: RelationContactServices,
     collectionServices: RelationCollectionServices,
 ) : ViewModel() {
@@ -184,6 +189,20 @@ class RelationViewModel @Inject constructor(
         platformIdentities,
     ) { contacts, identities ->
         ContactProfileCompletenessEvaluator.incomplete(contacts, identities)
+    }.flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /**
+     * "资料待补全"可点列表：有缺失字段 **且微信可触达**（有 wechatId 或活跃 WECHAT 平台身份）。补全触达
+     * 只走微信，不可达的联系人进了列表也点不出草稿（会被仓库 reachability 闸门拦），故在此滤掉——他们由
+     * 既有"缺少联系方式"维护项兜底。
+     */
+    val completableContacts: StateFlow<List<ContactCompleteness>> = combine(
+        completionOverview,
+        platformIdentities,
+    ) { incomplete, identities ->
+        val wechatReachable = identities.filter { it.platform == PLATFORM_WECHAT }.mapTo(HashSet()) { it.contactId }
+        incomplete.filter { !it.contact.wechatId.isNullOrBlank() || it.contact.contactId in wechatReachable }
     }.flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     private val mutableImportState = MutableStateFlow(ContactImportUiState())
@@ -393,6 +412,29 @@ class RelationViewModel @Inject constructor(
 
     fun optOutReplySuggestion(contactId: String) {
         viewModelScope.launch { replySuggestionRepository.optOutContact(contactId) }
+    }
+
+    /** 点"资料待补全"行 → 起草并落 DRAFTED。null = 被闸门拦下（已在进行/资料已完整/微信不可达/免打扰）。 */
+    fun prepareCompletionOutreach(contactId: String, onResult: (ContactCompletionDraft?, String?) -> Unit) {
+        viewModelScope.launch {
+            runSuspendCatching { contactCompletionRepository.prepareOutreach(contactId) }
+                .onSuccess { draft -> onResult(draft, if (draft == null) "暂时无法发起补全（可能已在进行或资料已完整）" else null) }
+                .onFailure { onResult(null, it.message ?: "起草失败，请重试") }
+        }
+    }
+
+    /** 确认 → 跳转微信预填（用户亲选亲发）。null=已拉起微信；否则为错误文案（如未装微信保持 DRAFTED）。 */
+    fun confirmCompletionOutreach(requestId: String, finalText: String, onResult: (String?) -> Unit) {
+        viewModelScope.launch {
+            runSuspendCatching { contactCompletionRepository.confirmAndHandoff(requestId, finalText) }
+                .onSuccess { opened -> onResult(if (opened) null else "未检测到微信，请先安装或稍后再试") }
+                .onFailure { onResult(it.message ?: "跳转失败，请重试") }
+        }
+    }
+
+    /** 取消/关闭补全卡 → 撤掉这条 DRAFTED 请求（不留活跃请求挡下次起草）。 */
+    fun cancelCompletionOutreach(requestId: String) {
+        viewModelScope.launch { contactCompletionRepository.cancel(requestId) }
     }
 
     fun loadSystemContacts() {
