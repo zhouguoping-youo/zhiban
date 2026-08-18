@@ -88,7 +88,30 @@ interface NotificationCandidateDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(value: NotificationCandidateEntity)
 
-    @Query("SELECT * FROM notification_candidates WHERE status = 'PENDING' ORDER BY postedAtEpochMs DESC LIMIT :limit")
+    // The inbox shows one card per logical message. The same message can be captured several times when WeChat
+    // re-posts or updates its notification (a fresh postTime, or a "[N条]" unread-count tag on the sender), which
+    // yields a distinct sourceKey/candidateId per capture and would otherwise stack duplicate cards. Collapse
+    // pending rows that share the same conversation + body to the most recent one. Sender is deliberately NOT part
+    // of the key: the "[N条]" tag makes it differ across captures of the same 1:1 message, so keying on it would
+    // fail to dedup exactly the duplicates this targets. Direction stays in the key so my own outgoing text and an
+    // identical incoming text never merge.
+    @Query(
+        """SELECT nc.* FROM notification_candidates nc
+           WHERE nc.status = 'PENDING'
+             AND NOT EXISTS (
+               SELECT 1 FROM notification_candidates newer
+               WHERE newer.status = 'PENDING'
+                 AND newer.platform = nc.platform
+                 AND newer.direction = nc.direction
+                 AND COALESCE(newer.conversationTitle, '') = COALESCE(nc.conversationTitle, '')
+                 AND COALESCE(newer.body, '') = COALESCE(nc.body, '')
+                 AND (
+                   newer.postedAtEpochMs > nc.postedAtEpochMs
+                   OR (newer.postedAtEpochMs = nc.postedAtEpochMs AND newer.rowid > nc.rowid)
+                 )
+             )
+           ORDER BY nc.postedAtEpochMs DESC LIMIT :limit""",
+    )
     fun observePending(limit: Int = 100): Flow<List<NotificationCandidateEntity>>
 
     @Query("SELECT * FROM notification_candidates WHERE candidateId = :candidateId")

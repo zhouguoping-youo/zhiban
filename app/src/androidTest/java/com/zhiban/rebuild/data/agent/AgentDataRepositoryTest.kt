@@ -1317,6 +1317,42 @@ class AgentDataRepositoryTest {
     }
 
     @Test
+    fun pendingInboxCollapsesDuplicateCapturesOfTheSameMessageToTheLatest() = runBlocking {
+        // WeChat re-posts/updates its notification as messages stack, giving each capture a fresh postTime or a
+        // "[N条]" sender tag -> a distinct candidateId/sourceKey for one logical message. The inbox must surface a
+        // single card (the most recent), not a stack of duplicates.
+        val body = "后天上午10点去九州通拜访客户"
+        fun capture(id: String, sourceKey: String, sender: String, postedAt: Long, dir: String = "INCOMING", text: String = body) =
+            NotificationCandidateEntity(
+                candidateId = id,
+                sourceKey = sourceKey,
+                packageName = "com.tencent.mm",
+                appLabel = "微信",
+                title = "周国平",
+                body = text,
+                postedAtEpochMs = postedAt,
+                platform = "WECHAT",
+                conversationTitle = "周国平",
+                senderName = sender,
+                direction = dir,
+            )
+        val dao = database.notificationCandidateDao()
+        dao.upsert(capture("cap-early", "sk-early", "[2条]周国平", 1_000L))
+        dao.upsert(capture("cap-mid", "sk-mid", "[3条]周国平", 2_000L))
+        dao.upsert(capture("cap-late", "sk-late", "周国平", 2_000L)) // ties cap-mid on postTime; later rowid wins
+
+        // A different message in the same conversation, and my own outgoing copy of the same text, must not collapse.
+        dao.upsert(capture("cap-other-body", "sk-other-body", "周国平", 3_000L, text = "好的"))
+        dao.upsert(capture("cap-outgoing", "sk-outgoing", "周国平", 4_000L, dir = "OUTGOING"))
+
+        val visible = repository.observeNotificationCandidates().first()
+        assertEquals(
+            listOf("cap-outgoing", "cap-other-body", "cap-late"),
+            visible.map { it.candidateId },
+        )
+    }
+
+    @Test
     fun confirmedContactMergeIsNonDestructiveAndReversible() = runBlocking {
         val primary = repository.saveUserContact(null, "王小明", "13800138008", null, "星河科技", null, null, null, 1_000L)
         val duplicate = repository.saveUserContact(null, "王老师", "13800138008", null, null, null, null, null, 2_000L)
