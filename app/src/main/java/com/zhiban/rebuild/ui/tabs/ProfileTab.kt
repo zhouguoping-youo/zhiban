@@ -160,7 +160,7 @@ fun ProfileTab(
         ),
     )
     val appItems = listOf(
-        ProfileSettingItem(Icons.AutoMirrored.Outlined.Chat, "微信", "绑定后收发微信消息", onClick = onNavigateToWechatChannel),
+        ProfileSettingItem(Icons.AutoMirrored.Outlined.Chat, "微信", "绑定微信机器人（iLink Bot）", onClick = onNavigateToWechatChannel),
         ProfileSettingItem(Icons.Outlined.DarkMode, "外观", "跟随手机显示设置", onClick = onNavigateToAppearance),
         ProfileSettingItem(
             Icons.Outlined.NotificationsNone,

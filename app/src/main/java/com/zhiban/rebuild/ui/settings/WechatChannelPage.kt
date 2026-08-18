@@ -152,15 +152,15 @@ internal fun WechatChannelPage(onBack: () -> Unit, viewModel: WechatChannelViewM
                 .padding(bottom = ZhiBanSpacing.PageBottom),
         ) {
             Text(
-                "通过微信官方 iLink 机器人收发消息。你确认的内容才会真正发出；收到的消息用于补全通知里被截断的原文。",
+                "绑定微信官方 iLink 机器人（Bot）后，知伴可接收和回复与该机器人的一对一对话：对方需先给机器人发消息，知伴才能收发；发送前都会经过你确认。",
                 style = MaterialTheme.typography.bodySmall,
                 color = ZhiBanTextSecondary,
                 modifier = Modifier.padding(horizontal = ZhiBanSpacing.Xs, vertical = ZhiBanSpacing.Sm),
             )
             SettingsCard {
                 ZhiBanToggleRow(
-                    title = "微信收发",
-                    subtitle = if (state.enabled) "已开启 · 可绑定和收发" else "关闭后不会连接微信",
+                    title = "微信机器人",
+                    subtitle = if (state.enabled) "已开启 · 机器人对话可接入" else "关闭后机器人对话不再接入",
                     checked = state.enabled,
                     onCheckedChange = { viewModel.setEnabled(it) },
                     horizontalPadding = 0.dp,
@@ -184,19 +184,12 @@ private fun BindStatusCard(state: WechatChannelState, viewModel: WechatChannelVi
             binding == null -> {
                 WechatInfoRow("绑定状态", "未绑定")
                 Spacer(Modifier.height(ZhiBanSpacing.Sm))
+                // 点"绑定机器人"本身就是同意动作(startBind 会先打开同意开关),按钮无需因开关未开而禁用。
                 Button(
                     onClick = viewModel::startBind,
-                    enabled = state.enabled && state.bindUi == null,
+                    enabled = state.bindUi == null,
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("绑定微信") }
-                if (!state.enabled) {
-                    Text(
-                        "先开启上方“微信收发”，再绑定。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = ZhiBanTextSecondary,
-                        modifier = Modifier.padding(top = ZhiBanSpacing.Xs),
-                    )
-                }
+                ) { Text("绑定机器人") }
             }
 
             binding.sessionExpired -> {
@@ -324,7 +317,7 @@ private fun WechatQrImage(content: String?) {
 
 private fun bindFailureMessage(reasonCode: String): String = when (reasonCode) {
     "ILINK_BIND_TIMEOUT" -> "二维码超时，请重试"
-    "WECHAT_ILINK_CONSENT_REQUIRED" -> "请先开启“微信收发”"
+    "WECHAT_ILINK_CONSENT_REQUIRED" -> "请先开启“微信机器人”"
     else -> "连接微信失败，请检查网络后重试"
 }
 

@@ -114,7 +114,7 @@ object AgentProjectionUiMapper {
 
         safeFailureCode == "ILINK_SESSION_EXPIRED" -> "微信登录已过期，请到“我的 → 微信”重新绑定后再发。"
 
-        safeFailureCode == "WECHAT_ILINK_CONSENT_REQUIRED" -> "微信收发还没开启，请先到“我的 → 微信”打开开关。"
+        safeFailureCode == "WECHAT_ILINK_CONSENT_REQUIRED" -> "微信机器人还没开启，请先到“我的 → 微信”打开开关。"
 
         safeFailureCode == "ILINK_CONTACT_NOT_FOUND" -> "没有找到这个联系人，先检查一下称呼或备注。"
 
