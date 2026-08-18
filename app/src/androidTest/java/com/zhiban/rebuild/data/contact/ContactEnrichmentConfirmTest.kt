@@ -58,6 +58,29 @@ class ContactEnrichmentConfirmTest {
         assertEquals("采购经理", updated.title) // blank field filled
     }
 
+    @Test fun confirmAppliesResponsibilitiesToBlankProfile() = runBlocking {
+        db.contactDao().insert(contact(company = null, title = null))
+        val candidate = candidate(fieldKind = "RESPONSIBILITIES", value = """{"responsibilities":"华南区采购"}""")
+        repository.stageContactEnrichmentCandidate(candidate)
+
+        val applied = repository.applyContactEnrichmentCandidate(candidate)
+
+        assertTrue(applied)
+        assertEquals("华南区采购", db.contactDao().findRawById("c1")!!.responsibilities)
+        assertTrue(db.contactKnowledgeDao().observePendingEnrichment("c1").first().isEmpty())
+    }
+
+    @Test fun confirmResponsibilitiesNeverOverwritesExisting() = runBlocking {
+        db.contactDao().insert(contact(company = null, title = null).copy(responsibilities = "既有职责"))
+        val candidate = candidate(fieldKind = "RESPONSIBILITIES", value = """{"responsibilities":"新职责"}""")
+        repository.stageContactEnrichmentCandidate(candidate)
+
+        val applied = repository.applyContactEnrichmentCandidate(candidate)
+
+        assertFalse(applied) // 已有非空职责,fill-only 不覆盖
+        assertEquals("既有职责", db.contactDao().findRawById("c1")!!.responsibilities)
+    }
+
     @Test fun confirmNonScalarFieldResolvesWithoutProfileWrite() = runBlocking {
         db.contactDao().insert(contact(company = null, title = null))
         val candidate = candidate(fieldKind = "ADDRESS", value = """{"formattedAddress":"上海市徐汇区"}""")

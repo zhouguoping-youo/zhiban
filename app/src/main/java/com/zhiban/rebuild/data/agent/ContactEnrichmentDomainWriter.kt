@@ -25,7 +25,7 @@ internal class ContactEnrichmentDomainWriter(private val database: AgentDatabase
         val applied = when (candidate.fieldKind) {
             "ORGANIZATION" -> applyOrganization(contact, candidate, value, nowEpochMs)
 
-            "EMPLOYMENT", "COMMUNICATION_METHOD" -> applyScalarPatch(
+            "EMPLOYMENT", "COMMUNICATION_METHOD", "RESPONSIBILITIES" -> applyScalarPatch(
                 contact,
                 candidate,
                 value,
@@ -211,6 +211,10 @@ internal class ContactEnrichmentDomainWriter(private val database: AgentDatabase
             value.text("wechatId")?.let { "wechatId" to it },
         ).toMap()
 
+        "RESPONSIBILITIES" -> listOfNotNull(
+            value.text("responsibilities")?.let { "responsibilities" to it },
+        ).toMap()
+
         else -> emptyMap()
     }
 
@@ -220,6 +224,7 @@ internal class ContactEnrichmentDomainWriter(private val database: AgentDatabase
         "wechatId" -> wechatId
         "company" -> company
         "title" -> title
+        "responsibilities" -> responsibilities
         else -> null
     }
 
@@ -229,6 +234,7 @@ internal class ContactEnrichmentDomainWriter(private val database: AgentDatabase
         "wechatId" -> copy(wechatId = value)
         "company" -> copy(company = value)
         "title" -> copy(title = value)
+        "responsibilities" -> copy(responsibilities = value)
         else -> this
     }
 

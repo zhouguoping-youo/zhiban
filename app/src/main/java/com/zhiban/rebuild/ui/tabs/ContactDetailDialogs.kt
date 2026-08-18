@@ -1072,6 +1072,7 @@ internal fun enrichmentFieldLabel(fieldKind: String): String = when (fieldKind) 
     "EMPLOYMENT" -> "职位"
     "ADDRESS" -> "地址"
     "COMMUNICATION_METHOD" -> "联系方式"
+    "RESPONSIBILITIES" -> "职责"
     else -> "字段"
 }
 
@@ -1082,7 +1083,7 @@ internal fun enrichmentValueSummary(proposedValueJson: String): String {
     val displayKeys = if (obj["canonicalName"] != null) {
         listOf("canonicalName", "registrationStatus", "creditCode", "registeredAddress")
     } else {
-        listOf("company", "title", "phone", "email", "wechatId", "formattedAddress")
+        listOf("company", "title", "phone", "email", "wechatId", "responsibilities", "formattedAddress")
     }
     return displayKeys
         .mapNotNull { key ->
@@ -1103,6 +1104,7 @@ private fun enrichmentValueLabel(key: String): String = when (key) {
     "phone" -> "电话"
     "email" -> "邮箱"
     "wechatId" -> "微信"
+    "responsibilities" -> "职责"
     else -> key
 }
 
