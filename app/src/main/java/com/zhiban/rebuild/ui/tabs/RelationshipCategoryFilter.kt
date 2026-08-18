@@ -84,39 +84,56 @@ internal fun RelationshipCategoryFilter(selected: String, options: List<String>,
             )
         }
 
-        DropdownMenu(
+        CategoryDropdownMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier
-                .clip(MaterialTheme.shapes.large)
-                .background(MaterialTheme.colorScheme.surface),
-        ) {
-            options.forEach { option ->
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = option,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = if (option == selected) FontWeight.SemiBold else FontWeight.Normal,
-                        )
-                    },
-                    onClick = {
-                        onSelected(option)
-                        expanded = false
-                    },
-                    trailingIcon = if (option == selected) {
-                        {
-                            Icon(
-                                imageVector = Icons.Outlined.Check,
-                                contentDescription = "已选择",
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    } else {
-                        null
-                    },
-                )
-            }
-        }
+            options = options,
+            selected = selected,
+            onSelected = onSelected,
+            onDismiss = { expanded = false },
+        )
     }
+}
+
+@Composable
+private fun CategoryDropdownMenu(
+    expanded: Boolean,
+    options: List<String>,
+    selected: String,
+    onSelected: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+DropdownMenu(
+    expanded = expanded,
+    onDismissRequest = onDismiss,
+    modifier = Modifier
+        .clip(MaterialTheme.shapes.large)
+        .background(MaterialTheme.colorScheme.surface),
+) {
+    options.forEach { option ->
+        DropdownMenuItem(
+            text = {
+                Text(
+                    text = option,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (option == selected) FontWeight.SemiBold else FontWeight.Normal,
+                )
+            },
+            onClick = {
+                onSelected(option)
+                onDismiss()
+            },
+            trailingIcon = if (option == selected) {
+                {
+                    Icon(
+                        imageVector = Icons.Outlined.Check,
+                        contentDescription = "已选择",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            } else {
+                null
+            },
+        )
+    }
+}
 }
