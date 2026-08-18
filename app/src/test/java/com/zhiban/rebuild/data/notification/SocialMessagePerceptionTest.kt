@@ -77,6 +77,25 @@ class SocialMessagePerceptionTest {
     }
 
     @Test
+    fun wechatStackedSenderUnreadCountPrefixIsStrippedForAttribution() {
+        // When WeChat messages stack, the MessagingStyle sender arrives as "[3条]周国平". The unread-count tag is
+        // not part of the name; it must be stripped or name-based attribution/auto-linking silently misses.
+        val candidate = SocialNotificationParser.parse(
+            snapshot(
+                packageName = "com.tencent.mm",
+                title = "周国平",
+                text = "合同明天能发我吗",
+            ).copy(
+                messages = listOf(NotificationMessageSnapshot("[3条]周国平", "合同明天能发我吗", now)),
+            ),
+        )
+
+        assertNotNull(candidate)
+        assertEquals("周国平", candidate!!.senderName)
+        assertEquals("周国平", candidate.conversationTitle)
+    }
+
+    @Test
     fun explicitChineseScheduleGetsDeterministicLocalTime() {
         val insights = NotificationInsightAnalyzer.analyze(
             text = "明天下午三点在公司开会",

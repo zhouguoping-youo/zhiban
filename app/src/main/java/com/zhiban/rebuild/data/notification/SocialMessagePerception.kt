@@ -579,7 +579,9 @@ object SocialNotificationParser {
             !latestSender.isNullOrBlank() && !latestSender.equals(title, ignoreCase = true) -> latestSender
             platform.code == "SMS" || isUsefulSender(title) -> title
             else -> null
-        }?.replaceIsoControls()?.take(80)
+            // WeChat prepends an unread-count tag ("[3条]张三") to the sender when messages stack; strip it so
+            // name-based attribution / auto-linking matches the contact, like cleanTitle already does for titles.
+        }?.replaceIsoControls()?.replace(UNREAD_COUNT_PREFIX, "")?.take(80)
         if (sender == null && title == null) return null
         if (!isGroup && isServiceSender(sender ?: title.orEmpty())) return null
 
@@ -654,7 +656,7 @@ object SocialNotificationParser {
 
     private fun cleanTitle(value: String?): String? = value
         ?.replaceIsoControls()
-        ?.replace(Regex("""^\[\d+条?]\s*"""), "")
+        ?.replace(UNREAD_COUNT_PREFIX, "")
         ?.replace(Regex("""\s*\(\d+\)\s*$"""), "")
         ?.replace(Regex("""\s*（\d+条?新消息）\s*$"""), "")
         ?.replace(Regex("\\s+"), " ")
@@ -707,6 +709,7 @@ object SocialNotificationParser {
     }
 
     private val GROUP_MESSAGE = Regex("""^([^:：]{1,80})\s*[:：]\s*(.+)$""")
+    private val UNREAD_COUNT_PREFIX = Regex("""^\[\d+条?]\s*""")
     internal const val REPLY_FOCUS_WINDOW_MS = 8 * 60 * 60_000L
     private val REPLY_INDICATORS = listOf(
         "收到",
