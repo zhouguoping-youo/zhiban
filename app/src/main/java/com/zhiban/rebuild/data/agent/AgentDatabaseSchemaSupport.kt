@@ -4,7 +4,7 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 /** Shared SQL helpers used by migrations and defensive database-open repair. */
-internal fun createContactIntelligenceTables(db: SupportSQLiteDatabase) {
+private fun createContactIntelligencePart1(db: SupportSQLiteDatabase) {
     db.execSQL(
         """CREATE TABLE IF NOT EXISTS `persons` (
             `personId` TEXT NOT NULL,
@@ -95,6 +95,11 @@ internal fun createContactIntelligenceTables(db: SupportSQLiteDatabase) {
     createRelationshipEpisodeTable(db)
     createGroupTables(db)
     createAndroidSyncTables(db)
+
+}
+
+internal fun createContactIntelligenceTables(db: SupportSQLiteDatabase) {
+    createContactIntelligencePart1(db)
 }
 
 internal fun createEmploymentEpisodeTable(db: SupportSQLiteDatabase) {

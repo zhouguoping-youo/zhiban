@@ -18,8 +18,7 @@ internal object AgentDatabaseMigrations25To37 {
         }
     }
 
-    val MIGRATION_26_27 = object : Migration(26, 27) {
-        override fun migrate(db: SupportSQLiteDatabase) {
+    private fun migrate26To27Part1(db: SupportSQLiteDatabase) {
             // CALLBACK recreates this unmanaged partial index after Room opens the database.
             // Remove it before migration validation so Room compares only its managed schema;
             // onOpen restores the runtime invariant immediately after validation.
@@ -59,6 +58,9 @@ internal object AgentDatabaseMigrations25To37 {
             db.execSQL(
                 "CREATE INDEX IF NOT EXISTS `index_crm_opportunity_stakeholders_opportunityId` ON `crm_opportunity_stakeholders` (`opportunityId`)",
             )
+    }
+
+    private fun migrate26To27Part2(db: SupportSQLiteDatabase) {
             db.execSQL(
                 "CREATE INDEX IF NOT EXISTS `index_crm_opportunity_stakeholders_contactId` ON `crm_opportunity_stakeholders` (`contactId`)",
             )
@@ -104,6 +106,9 @@ internal object AgentDatabaseMigrations25To37 {
             db.execSQL(
                 "CREATE INDEX IF NOT EXISTS `index_crm_agent_suggestions_opportunityId` ON `crm_agent_suggestions` (`opportunityId`)",
             )
+    }
+
+    private fun migrate26To27Part3(db: SupportSQLiteDatabase) {
             db.execSQL(
                 "CREATE INDEX IF NOT EXISTS `index_crm_agent_suggestions_status` ON `crm_agent_suggestions` (`status`)",
             )
@@ -120,7 +125,15 @@ internal object AgentDatabaseMigrations25To37 {
             db.execSQL(
                 "CREATE INDEX IF NOT EXISTS `index_crm_stage_history_changedAtEpochMs` ON `crm_stage_history` (`changedAtEpochMs`)",
             )
-        }
+        
+    }
+
+    val MIGRATION_26_27 = object : Migration(26, 27) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+        migrate26To27Part1(db)
+        migrate26To27Part2(db)
+        migrate26To27Part3(db)
+}
     }
 
     /**

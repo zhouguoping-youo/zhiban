@@ -152,8 +152,7 @@ internal object AgentDatabaseMigrations1To24 {
         }
     }
 
-    val MIGRATION_7_8 = object : Migration(7, 8) {
-        override fun migrate(db: SupportSQLiteDatabase) {
+    private fun migrate7To8Part1(db: SupportSQLiteDatabase) {
             db.execSQL(
                 "CREATE TABLE IF NOT EXISTS `memory_namespaces` (`namespaceId` TEXT NOT NULL, `ownerUserId` TEXT NOT NULL, `profileId` TEXT NOT NULL, `scopeType` TEXT NOT NULL, `scopeId` TEXT NOT NULL, `state` TEXT NOT NULL, `revision` INTEGER NOT NULL, `invalidationGeneration` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`namespaceId`))",
             )
@@ -198,6 +197,9 @@ internal object AgentDatabaseMigrations1To24 {
             db.execSQL(
                 "CREATE INDEX IF NOT EXISTS `index_memory_relations_namespaceId_toMemoryId_toRecordVersion` ON `memory_relations` (`namespaceId`,`toMemoryId`,`toRecordVersion`)",
             )
+    }
+
+    private fun migrate7To8Part2(db: SupportSQLiteDatabase) {
             db.execSQL(
                 "CREATE TABLE IF NOT EXISTS `memory_index_outbox` (`jobId` TEXT NOT NULL, `namespaceId` TEXT NOT NULL, `memoryId` TEXT NOT NULL, `recordVersion` INTEGER NOT NULL, `indexType` TEXT NOT NULL, `contentDigest` TEXT NOT NULL, `status` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`jobId`), FOREIGN KEY(`namespaceId`,`memoryId`,`recordVersion`) REFERENCES `memory_records`(`namespaceId`,`memoryId`,`recordVersion`) ON UPDATE NO ACTION ON DELETE CASCADE)",
             )
@@ -240,6 +242,9 @@ internal object AgentDatabaseMigrations1To24 {
             db.execSQL(
                 "CREATE INDEX IF NOT EXISTS `index_memory_deletion_outbox_namespaceId` ON `memory_deletion_outbox` (`namespaceId`)",
             )
+    }
+
+    private fun migrate7To8Part3(db: SupportSQLiteDatabase) {
             db.execSQL(
                 "CREATE UNIQUE INDEX IF NOT EXISTS `index_memory_deletion_outbox_namespaceId_logicalMemoryId_deletionRevision` ON `memory_deletion_outbox` (`namespaceId`,`logicalMemoryId`,`deletionRevision`)",
             )
@@ -249,11 +254,18 @@ internal object AgentDatabaseMigrations1To24 {
             db.execSQL(
                 "CREATE VIRTUAL TABLE IF NOT EXISTS `memory_fts` USING FTS4(`namespaceId` TEXT NOT NULL, `memoryId` TEXT NOT NULL, `recordVersion` INTEGER NOT NULL, `canonicalText` TEXT NOT NULL, tokenize=unicode61)",
             )
-        }
+        
     }
 
-    val MIGRATION_8_9 = object : Migration(8, 9) {
+    val MIGRATION_7_8 = object : Migration(7, 8) {
         override fun migrate(db: SupportSQLiteDatabase) {
+        migrate7To8Part1(db)
+        migrate7To8Part2(db)
+        migrate7To8Part3(db)
+}
+    }
+
+    private fun migrate8To9Part1(db: SupportSQLiteDatabase) {
             db.execSQL(
                 "CREATE TABLE IF NOT EXISTS `plan_versions` (`versionId` TEXT NOT NULL, `schemaVersion` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `note` TEXT, PRIMARY KEY(`versionId`))",
             )
@@ -294,6 +306,9 @@ internal object AgentDatabaseMigrations1To24 {
             db.execSQL(
                 "CREATE INDEX IF NOT EXISTS `index_plan_edges_definitionId` ON `plan_edges` (`definitionId`)",
             )
+    }
+
+    private fun migrate8To9Part2(db: SupportSQLiteDatabase) {
             db.execSQL("CREATE INDEX IF NOT EXISTS `index_plan_edges_fromNodeId` ON `plan_edges` (`fromNodeId`)")
             db.execSQL("CREATE INDEX IF NOT EXISTS `index_plan_edges_toNodeId` ON `plan_edges` (`toNodeId`)")
             db.execSQL(
@@ -325,6 +340,9 @@ internal object AgentDatabaseMigrations1To24 {
             db.execSQL(
                 "CREATE TABLE IF NOT EXISTS `approval_grants` (`grantId` TEXT NOT NULL, `attemptId` TEXT NOT NULL, `decision` TEXT NOT NULL, `decidedByUser` TEXT NOT NULL, `title` TEXT NOT NULL, `impact` TEXT NOT NULL, `actions` TEXT NOT NULL, `verificationComponentKey` TEXT NOT NULL, `decidedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`grantId`), FOREIGN KEY(`attemptId`) REFERENCES `node_attempts`(`attemptId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
             )
+    }
+
+    private fun migrate8To9Part3(db: SupportSQLiteDatabase) {
             db.execSQL(
                 "CREATE INDEX IF NOT EXISTS `index_approval_grants_attemptId` ON `approval_grants` (`attemptId`)",
             )
@@ -365,6 +383,9 @@ internal object AgentDatabaseMigrations1To24 {
             db.execSQL(
                 "CREATE INDEX IF NOT EXISTS `index_resource_leases_attemptId` ON `resource_leases` (`attemptId`)",
             )
+    }
+
+    private fun migrate8To9Part4(db: SupportSQLiteDatabase) {
             db.execSQL(
                 "CREATE INDEX IF NOT EXISTS `index_resource_leases_resourceKey` ON `resource_leases` (`resourceKey`)",
             )
@@ -385,7 +406,16 @@ internal object AgentDatabaseMigrations1To24 {
             db.execSQL(
                 "CREATE UNIQUE INDEX IF NOT EXISTS `index_session_leases_runId_sessionKey` ON `session_leases` (`runId`, `sessionKey`)",
             )
-        }
+        
+    }
+
+    val MIGRATION_8_9 = object : Migration(8, 9) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+        migrate8To9Part1(db)
+        migrate8To9Part2(db)
+        migrate8To9Part3(db)
+        migrate8To9Part4(db)
+}
     }
 
     val MIGRATION_9_10 = object : Migration(9, 10) {
@@ -690,8 +720,7 @@ internal object AgentDatabaseMigrations1To24 {
         }
     }
 
-    val MIGRATION_24_25 = object : Migration(24, 25) {
-        override fun migrate(db: SupportSQLiteDatabase) {
+    private fun migrate24To25Part1(db: SupportSQLiteDatabase) {
             db.execSQL("DROP INDEX IF EXISTS `index_plan_runs_single_active_per_definition`")
             db.execSQL(
                 "CREATE TABLE IF NOT EXISTS `contact_methods` (`methodId` TEXT NOT NULL, `contactId` TEXT NOT NULL, `kind` TEXT NOT NULL, `value` TEXT NOT NULL, `normalizedValue` TEXT NOT NULL, `label` TEXT, `isPrimary` INTEGER NOT NULL, `source` TEXT NOT NULL, `evidenceRef` TEXT, `confidence` REAL NOT NULL, `userConfirmed` INTEGER NOT NULL, `verifiedAtEpochMs` INTEGER, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`methodId`), FOREIGN KEY(`contactId`) REFERENCES `contacts`(`contactId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
@@ -735,6 +764,9 @@ internal object AgentDatabaseMigrations1To24 {
             db.execSQL(
                 "CREATE INDEX IF NOT EXISTS `index_contact_addresses_contactId` ON `contact_addresses` (`contactId`)",
             )
+    }
+
+    private fun migrate24To25Part2(db: SupportSQLiteDatabase) {
             db.execSQL(
                 "CREATE UNIQUE INDEX IF NOT EXISTS `index_contact_addresses_contactId_kind_formattedAddress` ON `contact_addresses` (`contactId`, `kind`, `formattedAddress`)",
             )
@@ -781,6 +813,9 @@ internal object AgentDatabaseMigrations1To24 {
             db.execSQL(
                 "CREATE TABLE IF NOT EXISTS `owner_contact_links` (`contactId` TEXT NOT NULL, `reason` TEXT NOT NULL, `userConfirmed` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `undoneAtEpochMs` INTEGER, PRIMARY KEY(`contactId`), FOREIGN KEY(`contactId`) REFERENCES `contacts`(`contactId`) ON UPDATE NO ACTION ON DELETE CASCADE)",
             )
+    }
+
+    private fun migrate24To25Part3(db: SupportSQLiteDatabase) {
             db.execSQL(
                 "CREATE INDEX IF NOT EXISTS `index_owner_contact_links_undoneAtEpochMs` ON `owner_contact_links` (`undoneAtEpochMs`)",
             )
@@ -800,6 +835,14 @@ internal object AgentDatabaseMigrations1To24 {
             db.execSQL(
                 "INSERT OR IGNORE INTO `contact_employments` SELECT 'legacy-employment-' || contactId, contactId, 'legacy-org-' || lower(trim(company)), company, NULL, title, NULL, NULL, 1, source, NULL, 0.7, 0, createdAtEpochMs, updatedAtEpochMs FROM contacts WHERE company IS NOT NULL AND trim(company) != ''",
             )
-        }
+        
+    }
+
+    val MIGRATION_24_25 = object : Migration(24, 25) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+        migrate24To25Part1(db)
+        migrate24To25Part2(db)
+        migrate24To25Part3(db)
+}
     }
 }
