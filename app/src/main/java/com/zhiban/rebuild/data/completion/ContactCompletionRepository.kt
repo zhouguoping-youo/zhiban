@@ -97,8 +97,9 @@ class ContactCompletionRepository internal constructor(
         val contact = contactDao.findById(request.contactId) ?: return false
         if (!handoff.openComposer(PLATFORM_WECHAT, contact.displayName, text)) return false
         val now = System.currentTimeMillis()
-        dao.markAwaiting(requestId, text, sentAtEpochMs = now, expiresAtEpochMs = now + REQUEST_TTL_MS, nowEpochMs = now)
-        return true
+        // markAwaiting 返回受影响行数:并发下状态可能已变(被取消/已过期),0 行=状态没转成,
+        // 不能谎报已进入等待回复(P2-3)。
+        return dao.markAwaiting(requestId, text, sentAtEpochMs = now, expiresAtEpochMs = now + REQUEST_TTL_MS, nowEpochMs = now) > 0
     }
 
     suspend fun cancel(requestId: String) {
