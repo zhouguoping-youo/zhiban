@@ -3,6 +3,8 @@ package com.zhiban.rebuild.data.contact.enrichment
 import com.zhiban.rebuild.runtime.provider.WebSearchGateway
 import com.zhiban.rebuild.runtime.provider.WebSearchHit
 import com.zhiban.rebuild.runtime.runSuspendCatching
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Resolves a company's registered full name from public web search instead of a private registry proxy.
@@ -25,6 +27,7 @@ internal class WebSearchCompanyRegistryGateway(private val webSearch: WebSearchG
     private val cache = object : LinkedHashMap<String, CacheEntry>(16, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CacheEntry>?): Boolean = size > MAX_CACHE_ENTRIES
     }
+    private val cacheMutex = Mutex()
 
     override suspend fun search(companyHint: String): List<CompanyRegistryMatch> {
         val hint = companyHint.trim()
@@ -49,7 +52,7 @@ internal class WebSearchCompanyRegistryGateway(private val webSearch: WebSearchG
         hits.forEach { hit ->
             extractFullNames("${hit.title} ${hit.snippet}")
                 .map { it.filterNot(Char::isWhitespace) }
-                .filter { it.length in hint.length..MAX_COMPANY_NAME_CHARS }
+                .filter { it.length in hint.length..MAX_FULL_NAME_CHARS }
                 .filter { it.contains(hint, ignoreCase = true) }
                 .forEach { fullName -> aggregates.getOrPut(fullName) { CandidateAggregate(fullName) }.addHit(hit) }
         }
@@ -61,8 +64,8 @@ internal class WebSearchCompanyRegistryGateway(private val webSearch: WebSearchG
 
     private fun extractFullNames(text: String): List<String> = ORG_NAME.findAll(text).mapNotNull { it.groupValues.getOrNull(1)?.trim() }.toList()
 
-    private fun cached(key: String): List<CompanyRegistryMatch>? = synchronized(cache) {
-        val entry = cache[key] ?: return@synchronized null
+    private suspend fun cached(key: String): List<CompanyRegistryMatch>? = cacheMutex.withLock {
+        val entry = cache[key] ?: return@withLock null
         if (clock() - entry.storedAtEpochMs > CACHE_TTL_MS) {
             cache.remove(key)
             null
@@ -71,7 +74,7 @@ internal class WebSearchCompanyRegistryGateway(private val webSearch: WebSearchG
         }
     }
 
-    private fun store(key: String, matches: List<CompanyRegistryMatch>) = synchronized(cache) {
+    private suspend fun store(key: String, matches: List<CompanyRegistryMatch>) = cacheMutex.withLock {
         cache[key] = CacheEntry(clock(), matches)
     }
 
@@ -121,7 +124,8 @@ internal class WebSearchCompanyRegistryGateway(private val webSearch: WebSearchG
         const val SOURCE_LABEL = "网络公开信息"
         const val SEARCH_RESULT_LIMIT = 5
         const val MAX_QUERY_CHARS = 120
-        const val MAX_COMPANY_NAME_CHARS = 30
+        /** 从网页文本抽出的"全称候选"的合理性上限;与 HttpCompanyRegistryGateway 的 200(线路传输上限)职责不同。 */
+        const val MAX_FULL_NAME_CHARS = 30
         const val MAX_MATCHES = 3
         const val MAX_CACHE_ENTRIES = 200
         const val MIN_SOURCES_FOR_CORROBORATION = 2
