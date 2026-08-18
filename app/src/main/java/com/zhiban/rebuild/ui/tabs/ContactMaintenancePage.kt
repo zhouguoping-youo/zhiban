@@ -319,7 +319,7 @@ private fun LazyListScope.maintenanceActionSection(
                             onClick = onReviewEnrichment,
                         )
                     }
-                    if (unresolvedIdentities.isNotEmpty()) {
+                    if (unresolvedIdentityCount > 0) {
                         MaintenanceActionRow(
                             icon = Icons.Outlined.AlternateEmail,
                             title = "社交身份待关联",

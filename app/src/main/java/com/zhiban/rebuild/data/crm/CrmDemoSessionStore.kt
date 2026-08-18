@@ -162,6 +162,11 @@ internal fun createCrmDemoDataset(nowEpochMs: Long): CrmDemoDataset {
     return CrmDemoDataset(contacts, core.leads, core.opportunities, core.stakeholders, core.activities, tail.actions, tail.suggestions, tail.history)
 }
 
+private data class DemoCoreSecondHalf(
+    val stakeholders: List<CrmOpportunityStakeholderEntity>,
+    val activities: List<CrmActivityEntity>,
+)
+
 private data class DemoCore(
     val leads: List<CrmLeadEntity>,
     val opportunities: List<CrmOpportunityEntity>,
@@ -175,7 +180,13 @@ private data class DemoCoreTail(
     val history: List<CrmStageHistoryEntity>,
 )
 
-private fun buildDemoCore(wang: ContactEntity, liu: ContactEntity, li: ContactEntity, at: (Long, Int) -> Long, nowEpochMs: Long): DemoCore {
+private fun buildDemoCore(
+    wang: ContactEntity,
+    liu: ContactEntity,
+    li: ContactEntity,
+    at: (Long, Int) -> Long,
+    nowEpochMs: Long,
+): DemoCore {
     val leads = listOf(
         CrmLeadEntity(
             "crm-demo-lead-wang", wang.contactId, wang.displayName, wang.company, CrmLeadStatus.CONVERTED,
@@ -223,6 +234,18 @@ private fun buildDemoCore(wang: ContactEntity, liu: ContactEntity, li: ContactEn
             nowEpochMs - 19 * 86_400_000L, nowEpochMs,
         ),
     )
+    val opportunitiesHalf = buildDemoCoreSecondHalf(wang, liu, li, opportunities, at, nowEpochMs)
+    return DemoCore(leads, opportunities, opportunitiesHalf.stakeholders, opportunitiesHalf.activities)
+}
+
+private fun buildDemoCoreSecondHalf(
+    wang: ContactEntity,
+    liu: ContactEntity,
+    li: ContactEntity,
+    opportunities: List<CrmOpportunityEntity>,
+    at: (Long, Int) -> Long,
+    nowEpochMs: Long,
+): DemoCoreSecondHalf {
     val stakeholders = listOf(
         CrmOpportunityStakeholderEntity(
             opportunities[0].opportunityId,
@@ -267,8 +290,9 @@ private fun buildDemoCore(wang: ContactEntity, liu: ContactEntity, li: ContactEn
             nowEpochMs - 86_400_000L, "DEMO", "demo:email:1", "演示邮件摘要", true, nowEpochMs,
         ),
     )
-    return DemoCore(leads, opportunities, stakeholders, activities)
+    return DemoCoreSecondHalf(stakeholders, activities)
 }
+
 
 private fun buildDemoTail(
     wang: ContactEntity,
