@@ -17,12 +17,12 @@ import kotlinx.serialization.json.put
 /**
  * Confirmation-request decorator that keeps an unsendable `communication.wechat.send` from dead-ending
  * the run. A direct iLink send is only possible once the recipient has a learned `userId` (they have
- * messaged the bound bot). When they have not, proposing the real-send card surfaces the
- * recipient-resolution failure after confirmation as run-fatal, so the user taps 确认 and the run simply
- * fails with "改用普通消息手动发" yet WeChat never opens. Instead such a call is redirected to a
+ * messaged the bound bot). When the contact exists but has no `userId`, the call is redirected to a
  * `communication.message.compose` confirmation — same recipient and message, platform WECHAT — so the
- * single card lands the user in WeChat with the draft pre-filled and they finish the send there. Every
- * other tool call (and a cleanly-resolved WeChat send) is forwarded unchanged.
+ * single card lands the user in WeChat with the draft pre-filled and they finish the send there. A
+ * recipient that matches no contact is NOT redirected (a share sheet without a recipient helps nobody);
+ * it fails with the typed `ILINK_CONTACT_NOT_FOUND` so the Agent can correct itself. Every other tool
+ * call (and a cleanly-resolved WeChat send) is forwarded unchanged.
  */
 internal class WechatSendComposeRedirect(private val router: CapabilityRouter, private val channel: IlinkWechatChannel?) {
     /** Redirect an unsendable WeChat send to compose; otherwise request confirmation for [event] as-is. */
@@ -42,7 +42,16 @@ internal class WechatSendComposeRedirect(private val router: CapabilityRouter, p
             ?: throw ProviderFailure("INVALID_TOOL_ARGUMENTS", false)
         val message = arguments["message"]?.jsonPrimitive?.content?.takeIf(String::isNotBlank)
             ?: throw ProviderFailure("INVALID_TOOL_ARGUMENTS", false)
-        if (resolver.resolveUserId(recipient) is WechatRecipientResolution.Resolved) return false
+        when (val resolution = resolver.resolveUserId(recipient)) {
+            // 已学到 userId:直发路径,原样走 send 工具的确认卡。
+            is WechatRecipientResolution.Resolved -> return false
+
+            // 联系人不存在:明确报错让 Agent 改口/放弃——重定向成 compose 只会拉起无收件人的分享面板。
+            is WechatRecipientResolution.ContactNotFound -> throw ProviderFailure("ILINK_CONTACT_NOT_FOUND", false)
+
+            // 联系人存在但没学到 userId:落 compose 手动发(既有设计)。
+            is WechatRecipientResolution.NoWechatLink -> Unit
+        }
         val composeRequest = RuntimeToolCallRequest(
             providerCallId = event.providerCallId,
             name = CommunicationMessageToolBinding.TOOL_NAME,
