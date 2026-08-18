@@ -641,6 +641,9 @@ internal object AgentDatabaseMigrations25To37 {
     /** 索引补齐(P1-性能/索引):contacts 检索排序与 notification 收件箱去重。命名与 Room 导出一致。 */
     val MIGRATION_41_42 = object : Migration(41, 42) {
         override fun migrate(db: SupportSQLiteDatabase) {
+            // CALLBACK 托管的部分索引不在 42 schema 里,旧安装(41)经 onOpen 建过它——照 40_41 先例,
+            // 迁移开头先删,CALLBACK.onOpen 在验证后再重建,否则 Room 校验因多余索引失败。
+            db.execSQL("DROP INDEX IF EXISTS `index_plan_runs_single_active_per_definition`")
             db.execSQL(
                 "CREATE INDEX IF NOT EXISTS `index_contacts_normalizedName_deletedAtEpochMs` " +
                     "ON `contacts` (`normalizedName`, `deletedAtEpochMs`)",
