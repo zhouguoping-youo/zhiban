@@ -74,9 +74,12 @@ internal class ReplySuggestionCoordinator @Inject constructor(
     }
 
     /**
-     * Upgrades FORWARDED groups to SENT_CONFIRMED once the captured thread shows an OUTGOING message
-     * after the forward. Relies on the existing outgoing-message perception (zero new tracking); when
-     * the accessibility service is off the confirmation simply never lands — the accepted degradation.
+     * Reconciles FORWARDED groups. Upgrades to SENT_CONFIRMED once the captured thread shows an OUTGOING
+     * message after the forward; reverts to PENDING when none appears within [FORWARD_REVERT_AFTER_MS]
+     * (the user cancelled the share sheet — the card must come back, FORWARDED is not a terminal state,
+     * P1-7). Relies on the existing outgoing-message perception (zero new tracking); when the
+     * accessibility service is off, confirmation never lands and the revert re-surfaces the card — the
+     * accepted degradation.
      */
     private suspend fun confirmForwardedReplies(now: Long) {
         val replyDao = database.replySuggestionDao()
@@ -89,8 +92,12 @@ internal class ReplySuggestionCoordinator @Inject constructor(
                 val sentAfter = database.notificationCandidateDao()
                     .threadMessages(platform, title, latestForward, THREAD_QUERY_LIMIT)
                     .any { it.direction == "OUTGOING" }
-                if (sentAfter) {
-                    replyDao.markThreadSentConfirmed(threadKey, ReplySuggestionStatus.SENT_CONFIRMED, now)
+                when {
+                    sentAfter -> replyDao.markThreadSentConfirmed(threadKey, ReplySuggestionStatus.SENT_CONFIRMED, now)
+
+                    now - latestForward >= FORWARD_REVERT_AFTER_MS -> replyDao.revertThreadToPending(threadKey)
+
+                    else -> Unit // 刚转发不久:等用户去微信里发(或取消)
                 }
             }
     }
@@ -162,5 +169,6 @@ internal class ReplySuggestionCoordinator @Inject constructor(
         const val TRIGGER_DEBOUNCE_MS = 3_000L
         const val CANDIDATE_WINDOW_MS = 24L * 60 * 60 * 1_000
         const val SUGGESTION_TTL_MS = 24L * 60 * 60 * 1_000
+        const val FORWARD_REVERT_AFTER_MS = 5L * 60 * 1_000
     }
 }

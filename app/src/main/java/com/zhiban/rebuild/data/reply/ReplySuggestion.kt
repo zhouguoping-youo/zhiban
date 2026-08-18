@@ -91,6 +91,13 @@ interface ReplySuggestionDao {
     @Query("UPDATE reply_suggestions SET status = :status, confirmedAtEpochMs = :atEpochMs WHERE threadKey = :threadKey AND status = 'FORWARDED'")
     suspend fun markThreadSentConfirmed(threadKey: String, status: String, atEpochMs: Long): Int
 
+    /**
+     * 转发后迟迟没有 OUTGOING(用户取消了微信分享或没发出去):整组回退 PENDING 并清 forwardedAt,
+     * 卡片重生、可再次转发,否则 FORWARDED 不可逆、卡片永久消失(P1-7)。
+     */
+    @Query("UPDATE reply_suggestions SET status = 'PENDING', forwardedAtEpochMs = NULL WHERE threadKey = :threadKey AND status = 'FORWARDED'")
+    suspend fun revertThreadToPending(threadKey: String): Int
+
     @Query("UPDATE reply_suggestions SET status = :status WHERE candidateId = :candidateId AND status = 'PENDING'")
     suspend fun markGroupDismissed(candidateId: String, status: String): Int
 
