@@ -715,36 +715,7 @@ private fun ForceNodeDetailSheet(node: ForceGraphNode, model: ForceGraphModel, o
                 .padding(horizontal = ZhiBanSpacing.PageHorizontal)
                 .padding(bottom = ZhiBanSpacing.Xl),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier
-                        .size(52.dp)
-                        .clip(CircleShape)
-                        .background(nodeColor(node.kind, graphColors)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Rounded.Person,
-                        contentDescription = null,
-                        tint = nodeContentColor(node.kind, graphColors),
-                    )
-                }
-                Spacer(Modifier.width(ZhiBanSpacing.Md))
-                Column(Modifier.weight(1f)) {
-                    Text(node.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    val subtitle = listOfNotNull(node.title, node.company).distinct().joinToString(" · ")
-                    Text(
-                        subtitle.ifBlank { nodeKindLabel(node.kind) },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                IconButton(onClick = onDismiss, modifier = Modifier.size(ZhiBanSize.TouchTarget)) {
-                    Icon(Icons.Rounded.Close, contentDescription = "关闭详情")
-                }
-            }
+            ForceNodeHeader(node = node, graphColors = graphColors, onDismiss = onDismiss)
             if (strength != null) {
                 Spacer(Modifier.height(ZhiBanSpacing.Md))
                 Surface(
@@ -767,54 +738,12 @@ private fun ForceNodeDetailSheet(node: ForceGraphNode, model: ForceGraphModel, o
             Spacer(Modifier.height(ZhiBanSpacing.Lg))
             Text("关联对象", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(ZhiBanSpacing.Xs))
-            if (relatedLinks.isEmpty()) {
-                Text(
-                    "暂无可展示的关联",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                relatedLinks.take(12).forEachIndexed { index, link ->
-                    val relatedId = if (link.fromId == node.id) link.toId else link.fromId
-                    val related = model.nodes.firstOrNull { it.id == relatedId } ?: return@forEachIndexed
-                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .defaultMinSize(minHeight = 56.dp)
-                            .clickable { onRelatedClick(relatedId) }
-                            .padding(vertical = ZhiBanSpacing.Sm),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(Modifier.size(10.dp).clip(CircleShape).background(nodeColor(related.kind, graphColors)))
-                        Spacer(Modifier.width(ZhiBanSpacing.Md))
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                related.name,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium,
-                            )
-                            Text(
-                                buildString {
-                                    append(graphRelationLabel(link.relationType, link.isHistorical))
-                                    link.evidenceLabel?.let { append(" · 依据：").append(it) }
-                                    if (link.isInferred) append(" · 智能推测")
-                                },
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Text(
-                            "查看",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
-            }
+            ForceNodeRelatedList(node = node, model = model, graphColors = graphColors, onRelatedClick = onRelatedClick)
         }
     }
 }
+
+
 
 private fun nodeColor(kind: ForceGraphNodeKind, colors: RelationshipGraphColors): Color = when (kind) {
     ForceGraphNodeKind.FOCUS -> colors.focusNode
@@ -833,3 +762,89 @@ private fun nodeKindLabel(kind: ForceGraphNodeKind): String = when (kind) {
     ForceGraphNodeKind.CONTACT -> "联系人"
     ForceGraphNodeKind.WORK -> "工作关系"
 }
+
+@Composable
+private fun ForceNodeHeader(node: ForceGraphNode, graphColors: RelationshipGraphColors, onDismiss: () -> Unit) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .background(nodeColor(node.kind, graphColors)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Rounded.Person,
+                    contentDescription = null,
+                    tint = nodeContentColor(node.kind, graphColors),
+                )
+            }
+            Spacer(Modifier.width(ZhiBanSpacing.Md))
+            Column(Modifier.weight(1f)) {
+                Text(node.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                val subtitle = listOfNotNull(node.title, node.company).distinct().joinToString(" · ")
+                Text(
+                    subtitle.ifBlank { nodeKindLabel(node.kind) },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            IconButton(onClick = onDismiss, modifier = Modifier.size(ZhiBanSize.TouchTarget)) {
+                Icon(Icons.Rounded.Close, contentDescription = "关闭详情")
+            }
+        }
+}
+
+@Composable
+private fun ForceNodeRelatedList(node: ForceGraphNode, model: ForceGraphModel, graphColors: RelationshipGraphColors, onRelatedClick: (String) -> Unit) {
+    val relatedLinks = model.links.filter { it.fromId == node.id || it.toId == node.id }
+        if (relatedLinks.isEmpty()) {
+            Text(
+                "暂无可展示的关联",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            relatedLinks.take(12).forEachIndexed { index, link ->
+                val relatedId = if (link.fromId == node.id) link.toId else link.fromId
+                val related = model.nodes.firstOrNull { it.id == relatedId } ?: return@forEachIndexed
+                if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = 56.dp)
+                        .clickable { onRelatedClick(relatedId) }
+                        .padding(vertical = ZhiBanSpacing.Sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.size(10.dp).clip(CircleShape).background(nodeColor(related.kind, graphColors)))
+                    Spacer(Modifier.width(ZhiBanSpacing.Md))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            related.name,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Text(
+                            buildString {
+                                append(graphRelationLabel(link.relationType, link.isHistorical))
+                                link.evidenceLabel?.let { append(" · 依据：").append(it) }
+                                if (link.isInferred) append(" · 智能推测")
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        "查看",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+        }
+}
+
+
