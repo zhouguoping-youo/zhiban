@@ -9,8 +9,6 @@ plugins {
 
 val runtimeV2Enabled = providers.gradleProperty("runtimeV2Enabled").orNull
     ?.toBooleanStrictOrNull() ?: true
-val companyEnrichmentBaseUrl = providers.gradleProperty("zhiban.companyEnrichmentBaseUrl").orNull.orEmpty()
-
 fun String.asBuildConfigString(): String = "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
 fun externalSigningValue(propertyName: String, environmentName: String): String? = providers.gradleProperty(propertyName).orNull
@@ -38,7 +36,6 @@ android {
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "RUNTIME_V2_ENABLED", runtimeV2Enabled.toString())
-        buildConfigField("String", "COMPANY_ENRICHMENT_BASE_URL", companyEnrichmentBaseUrl.asBuildConfigString())
     }
 
     signingConfigs {

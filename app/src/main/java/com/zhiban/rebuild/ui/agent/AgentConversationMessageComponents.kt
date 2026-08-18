@@ -620,11 +620,7 @@ private fun ConversationAvatar(label: String, background: Color, foreground: Col
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    if (plan.deliversDirectly) {
-                        "确认后将真实发送到对方微信，发出后不可撤销。"
-                    } else {
-                        "确认后会打开目标应用，仍需由你完成最后发送。"
-                    },
+                    "确认后会打开目标应用，仍需由你完成最后发送。",
                     style = MaterialTheme.typography.bodySmall,
                     color = ZhiBanTextSecondary,
                 )

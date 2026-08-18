@@ -39,8 +39,6 @@ object AgentProjectionUiMapper {
             plan = projection.pendingApproval?.let { approval ->
                 val isExternalMessage = approval.platform?.isNotBlank() == true &&
                     approval.recipient?.isNotBlank() == true
-                // 所有外发计划都是"打开目标应用"式跳转,由用户完成最后发送。
-                val deliversDirectly = false
                 AgentPlanUi(
                     title = approval.title.ifBlank { "执行知伴计划" },
                     subject = approval.title,
@@ -50,7 +48,7 @@ object AgentProjectionUiMapper {
                         approval.scheduleNote,
                     ),
                     reminder = formatReminderLine(approval.scheduleReminderMinutesBefore),
-                    platform = if (deliversDirectly) "WECHAT" else approval.platform.orEmpty(),
+                    platform = approval.platform.orEmpty(),
                     recipient = approval.recipient.orEmpty(),
                     // Several internal tools use a payload field named `message` as their
                     // confirmation summary. It is only an outbound message when the plan also
@@ -60,7 +58,6 @@ object AgentProjectionUiMapper {
                     details = approval.details.orEmpty().ifBlank {
                         approval.message.orEmpty().takeUnless { isExternalMessage }.orEmpty()
                     },
-                    deliversDirectly = deliversDirectly,
                 )
             },
             usedTokens = projection.budget?.usedTokens,

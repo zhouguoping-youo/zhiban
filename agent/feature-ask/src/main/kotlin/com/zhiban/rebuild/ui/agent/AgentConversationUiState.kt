@@ -24,9 +24,7 @@ data class AgentPlanUi(
     // Generic body for non-message confirmations (memory content, CRM summary, …). Unlike
     // [message], it carries no "将发送 / 打开目标应用" messaging semantics.
     val details: String = "",
-    // True when confirming delivers the message for real (e.g. WeChat via iLink), as opposed to
     // opening the target app for the user to finish sending. Drives which disclaimer the card shows.
-    val deliversDirectly: Boolean = false,
 )
 
 data class AgentConversationMessageUi(val turnId: String, val role: String, val text: String)

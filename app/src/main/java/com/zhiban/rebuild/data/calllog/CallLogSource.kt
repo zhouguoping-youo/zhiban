@@ -23,13 +23,9 @@ data class SystemCallLogRow(
     val phoneAccountComponentName: String?,
 )
 
-interface CallLogSource {
-    suspend fun readChangedSince(lastModifiedEpochMs: Long, limit: Int): List<SystemCallLogRow>
-}
-
 @Singleton
-class AndroidCallLogSource @Inject constructor(@ApplicationContext private val context: Context) : CallLogSource {
-    override suspend fun readChangedSince(lastModifiedEpochMs: Long, limit: Int): List<SystemCallLogRow> = withContext(Dispatchers.IO) {
+class AndroidCallLogSource @Inject constructor(@ApplicationContext private val context: Context) {
+    suspend fun readChangedSince(lastModifiedEpochMs: Long, limit: Int): List<SystemCallLogRow> = withContext(Dispatchers.IO) {
         require(limit in 1..2_000)
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALL_LOG) !=
             PackageManager.PERMISSION_GRANTED
