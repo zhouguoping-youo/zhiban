@@ -1413,6 +1413,86 @@ class AgentDataRepositoryTest {
     }
 
     @Test
+    fun pendingInboxCollapsesDistinctMessagesFromOneUnresolvedSenderToLatestCard() = runBlocking {
+        fun message(id: String, sourceKey: String, body: String, postedAt: Long, sender: String = "未名商户") =
+            NotificationCandidateEntity(
+                candidateId = id,
+                sourceKey = sourceKey,
+                packageName = "com.tencent.mm",
+                appLabel = "微信",
+                title = sender,
+                body = body,
+                postedAtEpochMs = postedAt,
+                platform = "WECHAT",
+                conversationTitle = sender,
+                senderName = sender,
+            )
+        // 同一未解析发送者的两条不同消息:收件箱只显示最新一张,另一发送者不受影响。
+        repository.stageNotificationCandidate(message("throttle-1", "throttle-source-1", "你好", 1_000L))
+        repository.stageNotificationCandidate(message("throttle-2", "throttle-source-2", "在吗", 2_000L))
+        repository.stageNotificationCandidate(message("throttle-other", "throttle-source-3", "你好", 1_500L, sender = "另一位"))
+
+        assertEquals(
+            listOf("throttle-2", "throttle-other"),
+            repository.observeNotificationCandidates().first().map { it.candidateId },
+        )
+    }
+
+    @Test
+    fun senderCollapseOnlyAppliesToUnresolvedStagedRows() = runBlocking {
+        // 已关联联系人的行与旧行(normalizedSender 为 NULL)不参与发送者折叠,保持一卡一条。
+        fun row(id: String, body: String, sender: String, postedAt: Long, normalized: String?, linked: String?) =
+            NotificationCandidateEntity(
+                candidateId = id,
+                sourceKey = "source-$id",
+                packageName = "com.tencent.mm",
+                appLabel = "微信",
+                title = sender,
+                body = body,
+                postedAtEpochMs = postedAt,
+                platform = "WECHAT",
+                conversationTitle = sender,
+                senderName = sender,
+                normalizedSender = normalized,
+                linkedContactId = linked,
+            )
+        val dao = database.notificationCandidateDao()
+        dao.upsert(row("linked-1", "第一条", "王敏", 1_000L, normalized = "wangmin", linked = "contact-1"))
+        dao.upsert(row("linked-2", "第二条", "王敏", 2_000L, normalized = "wangmin", linked = "contact-1"))
+        dao.upsert(row("legacy-1", "旧一", "老李头", 3_000L, normalized = null, linked = null))
+        dao.upsert(row("legacy-2", "旧二", "老李头", 4_000L, normalized = null, linked = null))
+
+        assertEquals(
+            listOf("legacy-2", "legacy-1", "linked-2", "linked-1"),
+            repository.observeNotificationCandidates().first().map { it.candidateId },
+        )
+    }
+
+    @Test
+    fun senderCollapseIgnoresUnreadCountTagVariation() = runBlocking {
+        fun message(id: String, sourceKey: String, sender: String, postedAt: Long) =
+            NotificationCandidateEntity(
+                candidateId = id,
+                sourceKey = sourceKey,
+                packageName = "com.tencent.mm",
+                appLabel = "微信",
+                title = sender,
+                body = "稍后回复你",
+                postedAtEpochMs = postedAt,
+                platform = "WECHAT",
+                conversationTitle = sender,
+                senderName = sender,
+            )
+        // 微信堆叠未读时发送者带 "[N条]" 前缀,归一化键剥掉它,两次捕获折叠成一张卡。
+        repository.stageNotificationCandidate(message("tag-1", "tag-source-1", "[3条]张三", 1_000L))
+        repository.stageNotificationCandidate(message("tag-2", "tag-source-2", "张三", 2_000L))
+
+        val visible = repository.observeNotificationCandidates().first()
+        assertEquals(listOf("tag-2"), visible.map { it.candidateId })
+        assertEquals("张三", visible.single().normalizedSender)
+    }
+
+    @Test
     fun confirmedContactMergeIsNonDestructiveAndReversible() = runBlocking {
         val primary = repository.saveUserContact(null, "王小明", "13800138008", null, "星河科技", null, null, null, 1_000L)
         val duplicate = repository.saveUserContact(null, "王老师", "13800138008", null, null, null, null, null, 2_000L)

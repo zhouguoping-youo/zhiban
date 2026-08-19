@@ -4,7 +4,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.zhiban.rebuild.data.contact.normalizeContactPhone
 
-/** Current schema steps 25 through 43 (filename keeps its original 25–37 range). */
+/** Current schema steps 25 through 44 (filename keeps its original 25–37 range). */
 internal object AgentDatabaseMigrations25To37 {
     val MIGRATION_25_26 = object : Migration(25, 26) {
         override fun migrate(db: SupportSQLiteDatabase) {
@@ -678,6 +678,18 @@ internal object AgentDatabaseMigrations25To37 {
             db.execSQL(
                 "CREATE INDEX IF NOT EXISTS `index_sender_mutes_createdAtEpochMs` ON `sender_mutes` (`createdAtEpochMs`)",
             )
+        }
+    }
+
+    /**
+     * 收件箱节流折叠:notification_candidates 增加 staging 计算的发送者归一化键,
+     * observePending 按它把同一未解析发送者的多张待处理卡折叠成最新一张。
+     * 旧行不回填(NULL),折叠只作用于新入库数据。
+     */
+    val MIGRATION_43_44 = object : Migration(43, 44) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("DROP INDEX IF EXISTS `index_plan_runs_single_active_per_definition`")
+            db.execSQL("ALTER TABLE `notification_candidates` ADD COLUMN `normalizedSender` TEXT")
         }
     }
 }

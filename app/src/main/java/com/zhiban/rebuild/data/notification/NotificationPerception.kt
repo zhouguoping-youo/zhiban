@@ -48,6 +48,9 @@ data class NotificationCandidateEntity(
     val suggestedContactConfidence: Double = 0.0,
     val linkedContactId: String? = null,
     val createdScheduleId: String? = null,
+    // 入库时由 staging 计算的发送者归一化键(剥未读条数前缀/小写/去空白),收件箱按它折叠
+    // 同一未解析发送者的多张卡。旧行未回填,保持 NULL,走旧的一卡一条语义。
+    val normalizedSender: String? = null,
 )
 
 fun sharedTextCandidate(
@@ -104,6 +107,10 @@ interface NotificationCandidateDao {
     // 原 NOT EXISTS 自连接去重对每行再扫全表(近 O(n²));窗口函数 ROW_NUMBER 按同键分组取最新,
     // 一次排序完成,语义等价(postedAt 降序、同刻取 rowid 大者)。Room 的 @Query 校验器不支持
     // 窗口函数,故走 @RawQuery(Room 不校验其 SQL,observedEntities 保持变更订阅)。
+    // 节流第二层:同一"未解析发送者"(linkedContactId 为空且 staging 已写 normalizedSender)
+    // 的多条不同消息在第一层后仍会各占一卡,这里再按归一化发送者折叠、只留最新一张。旧行
+    // (normalizedSender 为 NULL,迁移前入库)与已关联联系人的行按行自身分键,保持旧的一卡一条
+    // 语义——折叠只作用于新数据,旧卡随用户处理自然消退。
     @RawQuery(observedEntities = [NotificationCandidateEntity::class])
     fun observePendingRaw(query: SupportSQLiteQuery): Flow<List<NotificationCandidateEntity>>
 
@@ -235,13 +242,23 @@ interface NotificationCandidateDao {
 
 private const val OBSERVE_PENDING_DEDUP_SQL = """
     SELECT * FROM (
-      SELECT nc.*, ROW_NUMBER() OVER (
-        PARTITION BY nc.platform, nc.direction, COALESCE(nc.conversationTitle, ''), COALESCE(nc.body, '')
-        ORDER BY nc.postedAtEpochMs DESC, nc.rowid DESC
-      ) AS dedup_rank
-      FROM notification_candidates nc
-      WHERE nc.status = 'PENDING'
+      SELECT message_dedup.*, ROW_NUMBER() OVER (
+        PARTITION BY message_dedup.platform, message_dedup.direction,
+          CASE WHEN message_dedup.linkedContactId IS NULL AND message_dedup.normalizedSender IS NOT NULL
+               THEN message_dedup.normalizedSender
+               ELSE 'self:' || message_dedup.candidateId END
+        ORDER BY message_dedup.postedAtEpochMs DESC, message_dedup._rowid DESC
+      ) AS sender_rank
+      FROM (
+        SELECT nc.*, nc.rowid AS _rowid, ROW_NUMBER() OVER (
+          PARTITION BY nc.platform, nc.direction, COALESCE(nc.conversationTitle, ''), COALESCE(nc.body, '')
+          ORDER BY nc.postedAtEpochMs DESC, nc.rowid DESC
+        ) AS dedup_rank
+        FROM notification_candidates nc
+        WHERE nc.status = 'PENDING'
+      ) AS message_dedup
+      WHERE message_dedup.dedup_rank = 1
     )
-    WHERE dedup_rank = 1
+    WHERE sender_rank = 1
     ORDER BY postedAtEpochMs DESC LIMIT ?
 """

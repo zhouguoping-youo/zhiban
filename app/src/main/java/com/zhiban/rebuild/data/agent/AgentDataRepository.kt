@@ -124,11 +124,13 @@ class AgentDataRepository internal constructor(
 
     suspend fun stageNotificationCandidate(candidate: NotificationCandidateEntity) {
         val nowEpochMs = System.currentTimeMillis()
+        // 发送者归一化键在入库时算好落列(收件箱节流折叠按它分组),静默闸门复用同一把尺子。
+        val withSender = candidate.copy(normalizedSender = normalizeSenderHandle(candidate.platform, candidate.senderName))
         // 用户点过"不再提醒此人"的发送者:消息照常入库为证据(行保留、观察身份照写),
         // 但状态直接置 MUTED——不进待处理列表,也不跑三级匹配/自动关联/自动日程等
         // 任何自动整理,被忽略的人不再制造提醒。
-        if (stageMutedSenderIfNeeded(candidate, nowEpochMs)) return
-        val automaticSchedule = transactions.runInTransaction { stageUnmutedCandidate(candidate, nowEpochMs) }
+        if (stageMutedSenderIfNeeded(withSender, nowEpochMs)) return
+        val automaticSchedule = transactions.runInTransaction { stageUnmutedCandidate(withSender, nowEpochMs) }
         automaticSchedule?.let(scheduleReminderSink::replace)
         // T1: a fresh incoming WeChat message may warrant an AI reply suggestion. Fired outside the
         // transaction so the coordinator reads the committed candidate; the coordinator re-gates on

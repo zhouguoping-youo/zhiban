@@ -65,6 +65,7 @@ class FactIndexMigrationTest {
                 AgentDatabase.MIGRATION_40_41,
                 AgentDatabase.MIGRATION_41_42,
                 AgentDatabase.MIGRATION_42_43,
+                AgentDatabase.MIGRATION_43_44,
             )
             .addCallback(AgentDatabase.CALLBACK)
             .allowMainThreadQueries().build()
