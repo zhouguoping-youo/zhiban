@@ -5,6 +5,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import com.zhiban.rebuild.data.contact.ContactEntity
+import com.zhiban.rebuild.data.notification.IdentityDriftInfo
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.ui.theme.ZhiBanTheme
 import java.util.concurrent.atomic.AtomicReference
@@ -68,6 +70,119 @@ class NotificationCandidateDialogTest {
 
         compose.onNodeWithContentDescription("消息感知设置").performClick()
         compose.onNodeWithText("采集来源").assertIsDisplayed()
+    }
+
+    @Test
+    fun unresolvedSenderCardOffersLinkCreateAndMuteActions() {
+        val muted = AtomicReference<String>()
+        val candidate = NotificationCandidateEntity(
+            candidateId = "candidate-2",
+            sourceKey = "source-2",
+            packageName = "com.tencent.mm",
+            appLabel = "微信",
+            title = "老李头",
+            body = "最近怎么样",
+            postedAtEpochMs = 1_700_000_000_000L,
+            senderName = "老李头",
+        )
+        compose.setContent {
+            ZhiBanTheme {
+                NotificationCandidateDialog(
+                    enabled = true,
+                    candidates = listOf(candidate),
+                    contacts = emptyList(),
+                    replySuggestions = emptyList(),
+                    onForwardReply = { _, _ -> },
+                    onDismissReply = {},
+                    onOptOutReply = {},
+                    onEnable = {},
+                    onDismissCandidate = {},
+                    onMuteSender = { muted.set(it) },
+                    onDenyDrift = {},
+                    onConfirmCandidate = { _, _, done -> done(null) },
+                    onCreateContact = { _, _, done -> done(null) },
+                    onConfirmSchedule = { _, done -> done(null) },
+                    enabledPlatforms = emptySet(),
+                    onPlatformEnabled = { _, _ -> },
+                    outgoingCollectionEnabled = false,
+                    outgoingAccessibilityEnabled = false,
+                    onOutgoingCollectionEnabled = {},
+                    onDismiss = {},
+                )
+            }
+        }
+
+        compose.onNodeWithText("关联已有联系人").assertIsDisplayed()
+        compose.onNodeWithText("新建联系人").assertIsDisplayed()
+        compose.onNodeWithText("不再提醒此人").performClick()
+        assertEquals("candidate-2", muted.get())
+        compose.onNodeWithText("忽略").assertIsDisplayed()
+    }
+
+    @Test
+    fun driftHintRendersPromptAndDenialClearsIt() {
+        val denied = AtomicReference<String>()
+        val contact = ContactEntity(
+            contactId = "contact-1",
+            displayName = "李建国",
+            normalizedName = "李建国",
+            phone = null,
+            email = null,
+            wechatId = null,
+            company = null,
+            title = null,
+            aliasesJson = "[]",
+            tagsJson = "[]",
+            note = null,
+            avatarUri = null,
+            source = "MANUAL",
+            deletedAtEpochMs = null,
+            createdAtEpochMs = 1L,
+            updatedAtEpochMs = 1L,
+        )
+        val candidate = NotificationCandidateEntity(
+            candidateId = "drift-candidate",
+            sourceKey = "drift-source",
+            packageName = "com.tencent.mm",
+            appLabel = "微信",
+            title = "李建国",
+            body = "明天见",
+            postedAtEpochMs = 1_700_000_000_000L,
+            senderName = "李建国",
+            suggestedContactId = "contact-1",
+            suggestedContactConfidence = 0.99,
+            identityDriftJson = IdentityDriftInfo("WECHAT", "李建国", "老李头", "identity-old-1").toJson(),
+        )
+        compose.setContent {
+            ZhiBanTheme {
+                NotificationCandidateDialog(
+                    enabled = true,
+                    candidates = listOf(candidate),
+                    contacts = listOf(contact),
+                    replySuggestions = emptyList(),
+                    onForwardReply = { _, _ -> },
+                    onDismissReply = {},
+                    onOptOutReply = {},
+                    onEnable = {},
+                    onDismissCandidate = {},
+                    onMuteSender = {},
+                    onDenyDrift = { denied.set(it) },
+                    onConfirmCandidate = { _, _, done -> done(null) },
+                    onCreateContact = { _, _, done -> done(null) },
+                    onConfirmSchedule = { _, done -> done(null) },
+                    enabledPlatforms = emptySet(),
+                    onPlatformEnabled = { _, _ -> },
+                    outgoingCollectionEnabled = false,
+                    outgoingAccessibilityEnabled = false,
+                    onOutgoingCollectionEnabled = {},
+                    onDismiss = {},
+                )
+            }
+        }
+
+        compose.onNodeWithText("「李建国」可能是「老李头」修改了微信备注，是否关联？").assertIsDisplayed()
+        compose.onNodeWithText("不是同一个人").performClick()
+        assertEquals("drift-candidate", denied.get())
     }
 
     @Test

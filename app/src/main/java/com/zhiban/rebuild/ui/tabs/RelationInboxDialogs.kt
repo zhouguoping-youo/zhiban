@@ -671,12 +671,23 @@ internal fun NotificationCandidateDialog(
                                 ) { error = it }
                             }
                         }
+                        val createContact = {
+                            error = null
+                            onCreateContact(
+                                item.candidateId,
+                                requireNotNull(item.senderName),
+                            ) { contactError ->
+                                if (contactError == null && needsSchedule) {
+                                    onConfirmSchedule(item.candidateId) { error = it }
+                                } else {
+                                    error = contactError
+                                }
+                            }
+                        }
+                        // 未匹配卡的三种出路;建议/日历确认仍走主按钮快路径。
                         val primaryLabel = when {
                             canUseSuggestion && needsSchedule -> "确认关联并加入日历"
                             canUseSuggestion -> "关联为 ${suggestedContact.displayName}"
-                            canCreateContact && needsSchedule -> "新建联系人并加入日历"
-                            canCreateContact -> "新建联系人"
-                            needsContact -> "选择联系人"
                             needsSchedule -> "确认加入日历"
                             else -> null
                         }
@@ -751,22 +762,6 @@ internal fun NotificationCandidateDialog(
                                     onClick = {
                                         when {
                                             canUseSuggestion -> confirmSuggestedContact()
-
-                                            canCreateContact -> onCreateContact(
-                                                item.candidateId,
-                                                requireNotNull(item.senderName),
-                                            ) { contactError ->
-                                                if (contactError == null && needsSchedule) {
-                                                    onConfirmSchedule(item.candidateId) { error = it }
-                                                } else {
-                                                    error = contactError
-                                                }
-                                            }
-
-                                            needsContact -> {
-                                                linking = item
-                                            }
-
                                             needsSchedule -> onConfirmSchedule(item.candidateId) { error = it }
                                         }
                                     },
@@ -777,28 +772,39 @@ internal fun NotificationCandidateDialog(
                                     Text(primaryLabel)
                                 }
                             }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                TextButton(onClick = { onDismissCandidate(item.candidateId) }) {
-                                    Text("忽略", color = RelationMuted)
-                                }
-                                if (needsContact) {
-                                    TextButton(onClick = { onMuteSender(item.candidateId) }) {
-                                        Text("不再提醒此人", color = RelationInk)
-                                    }
-                                }
-                                if (needsContact && (canUseSuggestion || canCreateContact)) {
+                            if (needsContact) {
+                                // 未匹配候选卡的三种出路:关联已有联系人 / 新建联系人 / 不再提醒此人;
+                                // "忽略"降为次要操作放最后。窄屏可横滑。
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
                                     TextButton(onClick = {
                                         linking = item
                                         error = null
                                     }) {
-                                        Text(
-                                            if (canUseSuggestion) "不是这个人" else "关联已有联系人",
-                                            color = RelationInk,
-                                        )
+                                        Text("关联已有联系人", color = RelationInk)
+                                    }
+                                    if (canCreateContact) {
+                                        TextButton(onClick = { createContact() }) {
+                                            Text("新建联系人", color = RelationInk)
+                                        }
+                                    }
+                                    TextButton(onClick = { onMuteSender(item.candidateId) }) {
+                                        Text("不再提醒此人", color = RelationInk)
+                                    }
+                                    TextButton(onClick = { onDismissCandidate(item.candidateId) }) {
+                                        Text("忽略", color = RelationMuted)
+                                    }
+                                }
+                            } else {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End,
+                                ) {
+                                    TextButton(onClick = { onDismissCandidate(item.candidateId) }) {
+                                        Text("忽略", color = RelationMuted)
                                     }
                                 }
                             }
