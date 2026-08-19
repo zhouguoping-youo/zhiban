@@ -82,6 +82,9 @@ data class AutoWriteReceiptRow(
     val correctionRoute: String,
     val reviewState: String,
     val createdAtEpochMs: Long,
+    // 收据卡的内容预览:FACT 域取事实正文(如互动摘要文本),SCHEDULE 域取日程标题,
+    // 其余类型暂不投影。让用户在关系页就能判断"系统到底整理了啥"。
+    val contentPreview: String? = null,
 )
 
 @Dao
@@ -134,10 +137,15 @@ interface ChangeLogDao {
             auto_write_receipts.presentationType AS presentationType,
             auto_write_receipts.correctionRoute AS correctionRoute,
             auto_write_receipts.reviewState AS reviewState,
-            auto_write_receipts.createdAtEpochMs AS createdAtEpochMs
+            auto_write_receipts.createdAtEpochMs AS createdAtEpochMs,
+            CASE WHEN change_log.targetDomain = 'FACT' THEN facts.textContent
+                 WHEN change_log.targetDomain = 'SCHEDULE' THEN schedules.title
+                 ELSE NULL END AS contentPreview
             FROM auto_write_receipts
             INNER JOIN change_log ON change_log.changeId = auto_write_receipts.changeId
             LEFT JOIN contacts ON contacts.contactId = auto_write_receipts.subjectContactId
+            LEFT JOIN facts ON facts.factId = change_log.targetId AND change_log.targetDomain = 'FACT'
+            LEFT JOIN schedules ON schedules.id = change_log.targetId AND change_log.targetDomain = 'SCHEDULE'
             ORDER BY auto_write_receipts.createdAtEpochMs DESC
             LIMIT :limit""",
     )

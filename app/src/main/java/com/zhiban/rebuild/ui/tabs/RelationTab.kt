@@ -238,7 +238,6 @@ fun RelationTab(
     var showPermissionExplanation by remember { mutableStateOf(false) }
     var showNotificationCandidates by remember { mutableStateOf(false) }
     var selectedCallNote by remember { mutableStateOf<CallRecordEntity?>(null) }
-    var correctingAutoWrite by remember { mutableStateOf<com.zhiban.rebuild.data.autowrite.AutoWriteReceiptRow?>(null) }
     var pendingPhoneSync by remember { mutableStateOf<AndroidContactSyncPreview?>(null) }
     var phoneSyncPermissionContact by remember { mutableStateOf<ContactEntity?>(null) }
     var notificationAccessEnabled by remember {
@@ -275,7 +274,12 @@ fun RelationTab(
     }
     LaunchedEffect(autoWriteState.receipts.isNotEmpty()) {
         if (autoWriteViewModel.consumeFirstHintIfNeeded(autoWriteState.receipts.isNotEmpty())) {
-            snackbarHostState.showSnackbar("知伴帮你整理了一条，可看可撤")
+            // 自动写收据不再挂关系页顶部:这里只做一次性即时通知,收据统一在「我的-自动整理」页查看。
+            val result = snackbarHostState.showSnackbar(
+                message = "知伴帮你整理了一条，可看可撤",
+                actionLabel = "查看",
+            )
+            if (result == SnackbarResult.ActionPerformed) onOpenAutoWrites()
         }
     }
     val contactPermissionLauncher =
@@ -426,57 +430,6 @@ fun RelationTab(
                             )
                         }
                         Text("记录", color = RelationAccent, style = MaterialTheme.typography.labelLarge)
-                    }
-                    Spacer(Modifier.height(12.dp))
-                }
-            }
-            val actionableAutoWrites = autoWriteState.receipts.filter { it.undoState == "AVAILABLE" }.take(3)
-            if (actionableAutoWrites.isNotEmpty()) {
-                item {
-                    Column(
-                        Modifier.fillMaxWidth().zhiBanCardSurface(RelationSurface)
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                    ) {
-                        actionableAutoWrites.forEach { receipt ->
-                            Row(
-                                Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(Icons.Outlined.AutoAwesome, contentDescription = null, tint = RelationAccent)
-                                Spacer(Modifier.width(12.dp))
-                                Column(Modifier.weight(1f)) {
-                                    Text(
-                                        autoWriteActionTitle(receipt.presentationType),
-                                        color = RelationInk,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Medium,
-                                    )
-                                    Text(
-                                        listOfNotNull(
-                                            receipt.contactName,
-                                            receipt.confidence?.let { "判断 ${(it * 100).toInt()}%" },
-                                        ).joinToString(" · "),
-                                        color = RelationMuted,
-                                        style = MaterialTheme.typography.bodySmall,
-                                    )
-                                }
-                                TextButton(onClick = { correctingAutoWrite = receipt }) { Text("纠正", color = RelationInk) }
-                                TextButton(onClick = { autoWriteViewModel.undo(receipt.changeId) }) {
-                                    Text("撤销", color = RelationAccent)
-                                }
-                            }
-                        }
-                        Row(
-                            Modifier.fillMaxWidth().defaultMinSize(minHeight = ZhiBanSize.TouchTarget)
-                                .clickable(onClick = onOpenAutoWrites).padding(top = 4.dp),
-                            horizontalArrangement = Arrangement.End,
-                        ) {
-                            Text(
-                                "共 ${autoWriteState.receipts.count { it.undoState == "AVAILABLE" }} 条 · 全部",
-                                color = RelationAccent,
-                                style = MaterialTheme.typography.labelLarge,
-                            )
-                        }
                     }
                     Spacer(Modifier.height(12.dp))
                 }
@@ -888,28 +841,6 @@ fun RelationTab(
             containerColor = RelationSurface,
         )
     }
-    correctingAutoWrite?.let { receipt ->
-        ZhiBanAlertDialog(
-            onDismissRequest = { correctingAutoWrite = null },
-            title = { Text("这条内容属于谁？") },
-            text = {
-                LazyColumn {
-                    items(autoWriteState.contacts, key = ContactEntity::contactId) { contact ->
-                        TextButton(
-                            onClick = {
-                                correctingAutoWrite = null
-                                autoWriteViewModel.correctInteraction(receipt.changeId, contact.contactId)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text(contact.displayName, color = RelationInk, modifier = Modifier.fillMaxWidth()) }
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = { TextButton(onClick = { correctingAutoWrite = null }) { Text("取消", color = RelationInk) } },
-            containerColor = RelationSurface,
-        )
-    }
     markingAsOwner?.let { contact ->
         ZhiBanAlertDialog(
             onDismissRequest = { markingAsOwner = null },
@@ -1018,17 +949,4 @@ private fun contactSyncSummary(preview: AndroidContactSyncPreview): String {
         }
     }
     return if (lines.isEmpty()) "手机通讯录已经是最新" else lines.joinToString("\n")
-}
-
-/** Title for an auto-write receipt shown inline on the relation page. */
-private fun autoWriteActionTitle(presentationType: String): String = when (presentationType) {
-    "INTERACTION_SUMMARY" -> "整理了一条互动摘要"
-    "CONTACT_TAG" -> "补充了联系人标签"
-    "CONTACT_IDENTITY_LINK" -> "合并了重复联系人"
-    "SCHEDULE_CREATE" -> "创建了一条日程"
-    "MEMORY" -> "更新了一条长期记忆"
-    "CRM_LEAD_CANDIDATE" -> "发现了一条候选线索"
-    "CRM_ACTIVITY" -> "记录了一次客户互动"
-    "CRM_NEXT_ACTION" -> "创建了下一步动作"
-    else -> "完成了一条内部整理"
 }

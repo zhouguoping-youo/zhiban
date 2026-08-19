@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -228,6 +229,17 @@ private fun AutoWriteReceiptCard(receipt: AutoWriteReceiptRow, onUndo: () -> Uni
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        // 收据卡补上实际内容:FACT 域显示事实正文(如互动摘要文本),SCHEDULE 域显示日程标题,
+        // 让用户不用点进任何详情就能判断"系统到底整理了啥"。
+        receipt.contentPreview?.takeIf(String::isNotBlank)?.let { preview ->
+            Text(
+                preview,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             if (receipt.undoState == "AVAILABLE") {
                 TextButton(onClick = onCorrect) { Text("纠正") }
