@@ -58,6 +58,27 @@ class SocialMessagePerceptionTest {
     }
 
     @Test
+    fun wechatStackedUnreadCountPrefixInTextIsNotMistakenForGroupChat() {
+        // Real-device format (dumpsys notification): a 1:1 chat whose messages stack reports
+        // title="周国平" and text="[3条]周国平: ...". The stacked prefix must not turn this into a
+        // group chat — group candidates are excluded from auto-linking, so the unique-name match
+        // would surface a confirmation card instead of silently binding to the contact.
+        val candidate = SocialNotificationParser.parse(
+            snapshot(
+                packageName = "com.tencent.mm",
+                title = "周国平",
+                text = "[3条]周国平: 我是周国平，平凯星辰（北京）科技有限公司武汉分公司，13476110061",
+            ),
+        )
+
+        assertNotNull(candidate)
+        assertEquals("周国平", candidate!!.senderName)
+        assertEquals("周国平", candidate.conversationTitle)
+        assertFalse(candidate.isGroupChat)
+        assertEquals("我是周国平，平凯星辰（北京）科技有限公司武汉分公司，13476110061", candidate.body)
+    }
+
+    @Test
     fun wechatGroupSeparatesConversationAndActualSender() {
         val candidate = SocialNotificationParser.parse(
             snapshot(

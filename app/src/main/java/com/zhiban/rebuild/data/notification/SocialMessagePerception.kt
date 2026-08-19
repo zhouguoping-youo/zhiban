@@ -585,7 +585,14 @@ object SocialNotificationParser {
         if (sender == null && title == null) return null
         if (!isGroup && isServiceSender(sender ?: title.orEmpty())) return null
 
-        val body = if (isGroup) prefixed?.groupValues?.get(2)?.trim() else cleanText
+        val body = when {
+            isGroup -> prefixed?.groupValues?.get(2)?.trim()
+            // Non-group but the text still carries a "sender:" prefix whose sender IS the
+            // conversation title: a stacked 1:1 notification artifact, not message content.
+            prefixedSender != null && title != null &&
+                title.equals(prefixedSender, ignoreCase = true) -> prefixed!!.groupValues[2].trim()
+            else -> cleanText
+        }
         if (platform.code == "SMS" && isNonPersonalSms(sender, body)) return null
         val conversation = title ?: sender
         val sourceKey = sha256(
@@ -663,8 +670,14 @@ object SocialNotificationParser {
         ?.trim()
         ?.takeIf(String::isNotBlank)
 
+    // WeChat stacks unread messages as "[3条]周国平: 内容" in the notification TEXT (not only in the
+    // MessagingStyle sender). The unread-count tag must be stripped BEFORE group detection: with the
+    // tag present, GROUP_MESSAGE captures "[3条]周国平" as the prefixed sender, which never equals the
+    // conversation title, so a 1:1 chat is misclassified as a group — and group candidates are exempt
+    // from auto-linking, so a unique-name match silently never binds (real-device regression).
     private fun cleanText(value: String?): String? = value
         ?.replaceIsoControls()
+        ?.replace(UNREAD_COUNT_PREFIX, "")
         ?.replace(Regex("\\s+"), " ")
         ?.trim()
         ?.takeIf(String::isNotBlank)
