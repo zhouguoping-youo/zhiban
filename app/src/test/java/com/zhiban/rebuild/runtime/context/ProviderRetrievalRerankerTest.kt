@@ -6,6 +6,7 @@ import com.zhiban.rebuild.provider.DefaultOutboundDataPolicy
 import com.zhiban.rebuild.provider.ModelEvent
 import com.zhiban.rebuild.provider.ModelRequest
 import com.zhiban.rebuild.provider.OutboundChannel
+import com.zhiban.rebuild.provider.OutboundPolicySettings
 import com.zhiban.rebuild.provider.PolicyEnforcingProviderAdapter
 import com.zhiban.rebuild.provider.ProviderAdapter
 import com.zhiban.rebuild.provider.ProviderProfile
@@ -53,7 +54,10 @@ class ProviderRetrievalRerankerTest {
 
     @Test fun governedRerankRedactsPersonalIdentifiersAndKeepsSensitiveCandidatesLocal() = runTest {
         val capturing = CapturingAdapter("[\"a\",\"b\"]")
-        val governed = PolicyEnforcingProviderAdapter(capturing, DefaultOutboundDataPolicy())
+        val governed = PolicyEnforcingProviderAdapter(
+            capturing,
+            DefaultOutboundDataPolicy { OutboundPolicySettings(allowUnmaskedPhoneNumbers = false) },
+        )
         val values = candidates + RankedRetrievalCandidate(
             RetrievalCandidate(
                 "relationship-1",

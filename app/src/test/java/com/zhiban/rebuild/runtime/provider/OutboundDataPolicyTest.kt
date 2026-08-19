@@ -15,7 +15,7 @@ class OutboundDataPolicyTest {
         val audits = mutableListOf<OutboundAuditEvent>()
         val adapter = PolicyEnforcingProviderAdapter(
             delegate,
-            DefaultOutboundDataPolicy(),
+            DefaultOutboundDataPolicy { OutboundPolicySettings(allowUnmaskedPhoneNumbers = false) },
             OutboundAuditSink(audits::add),
             clock = { 42L },
         )
@@ -44,7 +44,10 @@ class OutboundDataPolicyTest {
 
     @Test fun toolObservationRemovesStructuredPrivateFieldsButKeepsUsefulProfileFields() = runTest {
         val delegate = CapturingAdapter()
-        PolicyEnforcingProviderAdapter(delegate, DefaultOutboundDataPolicy()).stream(
+        PolicyEnforcingProviderAdapter(
+            delegate,
+            DefaultOutboundDataPolicy { OutboundPolicySettings(allowUnmaskedPhoneNumbers = false) },
+        ).stream(
             request(
                 message(
                     "{\"displayName\":\"张三\",\"company\":\"示例公司\",\"phone\":\"13800000000\"," +
@@ -59,6 +62,51 @@ class OutboundDataPolicyTest {
         assertTrue(sent.contains("张三"))
         assertTrue(sent.contains("示例公司"))
         assertFalse(sent.contains("13800000000"))
+        assertFalse(sent.contains("wx_private_123"))
+        assertFalse(sent.contains("家庭住址与内部备注"))
+    }
+
+    @Test fun phoneNumbersReachTheModelByDefaultWhileOtherIdentifiersStayMasked() = runTest {
+        val delegate = CapturingAdapter()
+        PolicyEnforcingProviderAdapter(delegate, DefaultOutboundDataPolicy()).stream(
+            request(
+                message(
+                    "联系人电话=13800000000，备用电话=+86 139-1234-5678，座机=021-12345678，客服=95588，" +
+                        "邮箱=test@example.com，身份证=11010519491231002X，银行卡=6222021234567890123",
+                    OutboundSensitivity.PERSONAL,
+                    OutboundPurpose.AUTO_RETRIEVED,
+                ),
+            ),
+        ).toList()
+
+        val sent = delegate.requests.single().messages.single().content
+        assertTrue(sent.contains("13800000000"))
+        assertTrue(sent.contains("139-1234-5678"))
+        assertTrue(sent.contains("021-12345678"))
+        assertTrue(sent.contains("95588"))
+        assertFalse(sent.contains("test@example.com"))
+        assertFalse(sent.contains("11010519491231002X"))
+        assertFalse(sent.contains("6222021234567890123"))
+        assertEquals(-1, sent.indexOf("138****"))
+    }
+
+    @Test fun toolObservationKeepsPhoneFieldByDefaultButStillRedactsOtherPrivateFields() = runTest {
+        val delegate = CapturingAdapter()
+        PolicyEnforcingProviderAdapter(delegate, DefaultOutboundDataPolicy()).stream(
+            request(
+                message(
+                    "{\"displayName\":\"张三\",\"company\":\"示例公司\",\"phone\":\"13800000000\"," +
+                        "\"wechatId\":\"wx_private_123\",\"note\":\"家庭住址与内部备注\"}",
+                    OutboundSensitivity.PERSONAL,
+                    OutboundPurpose.TOOL_OBSERVATION,
+                ),
+            ),
+        ).toList()
+
+        val sent = delegate.requests.single().messages.single().content
+        assertTrue(sent.contains("张三"))
+        assertTrue(sent.contains("示例公司"))
+        assertTrue(sent.contains("13800000000"))
         assertFalse(sent.contains("wx_private_123"))
         assertFalse(sent.contains("家庭住址与内部备注"))
     }
@@ -214,7 +262,10 @@ class OutboundDataPolicyTest {
 
     @Test fun automaticContextRedactsLandlinesServiceNumbersAndBankCards() = runTest {
         val delegate = CapturingAdapter()
-        PolicyEnforcingProviderAdapter(delegate, DefaultOutboundDataPolicy()).stream(
+        PolicyEnforcingProviderAdapter(
+            delegate,
+            DefaultOutboundDataPolicy { OutboundPolicySettings(allowUnmaskedPhoneNumbers = false) },
+        ).stream(
             request(
                 message(
                     "座机 021-12345678，客服 400-123-4567 或 95588，银行卡 6222021234567890123",

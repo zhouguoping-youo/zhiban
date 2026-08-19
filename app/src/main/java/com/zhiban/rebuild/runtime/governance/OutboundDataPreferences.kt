@@ -21,6 +21,7 @@ class OutboundDataPreferences @Inject constructor(@ApplicationContext context: C
         allowCloudLlm = preferences.getBoolean(KEY_ALLOW_CLOUD_LLM, true),
         allowRemoteMcp = preferences.getBoolean(KEY_ALLOW_REMOTE_MCP, false),
         allowRemoteEmbedding = preferences.getBoolean(KEY_ALLOW_REMOTE_EMBEDDING, false),
+        allowUnmaskedPhoneNumbers = preferences.getBoolean(KEY_ALLOW_UNMASKED_PHONE_NUMBERS, true),
     )
 
     fun setAllowRedactedAutomaticPersonalContext(enabled: Boolean) {
@@ -43,6 +44,10 @@ class OutboundDataPreferences @Inject constructor(@ApplicationContext context: C
         check(preferences.edit().putBoolean(KEY_ALLOW_REMOTE_EMBEDDING, enabled).commit())
     }
 
+    fun setAllowUnmaskedPhoneNumbers(enabled: Boolean) {
+        check(preferences.edit().putBoolean(KEY_ALLOW_UNMASKED_PHONE_NUMBERS, enabled).commit())
+    }
+
     private companion object {
         const val KEY_ALLOW_REDACTED_AUTOMATIC_PERSONAL_CONTEXT =
             "allow_redacted_automatic_personal_context"
@@ -50,5 +55,6 @@ class OutboundDataPreferences @Inject constructor(@ApplicationContext context: C
         const val KEY_ALLOW_CLOUD_LLM = "allow_cloud_llm"
         const val KEY_ALLOW_REMOTE_MCP = "allow_remote_mcp"
         const val KEY_ALLOW_REMOTE_EMBEDDING = "allow_remote_embedding"
+        const val KEY_ALLOW_UNMASKED_PHONE_NUMBERS = "allow_unmasked_phone_numbers"
     }
 }

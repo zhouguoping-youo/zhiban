@@ -41,6 +41,12 @@ data class OutboundPolicySettings(
     val allowRemoteEmbedding: Boolean = false,
     /** 大模型通道总开关(复检 P1-3):关闭后 LLM 推理/重排一律不放行。默认开——对话是核心功能。 */
     val allowCloudLlm: Boolean = true,
+    /**
+     * 号码明文开关:开启时自动检索/工具观察里的手机号、座机、服务号以明文交给大模型,
+     * 知伴才能替你发短信、拨号;关闭则号码打码(打码号码无法用于任何工具)。默认开——优先可用性。
+     * 邮箱、证件号、银行卡与凭据始终照旧打码,不受此开关影响。
+     */
+    val allowUnmaskedPhoneNumbers: Boolean = true,
 )
 
 data class OutboundExportDescriptor(
@@ -154,6 +160,7 @@ class DefaultOutboundDataPolicy(private val settings: () -> OutboundPolicySettin
                         OutboundPiiRedactor.redact(
                             message.content,
                             redactStructuredPrivateFields = message.purpose == OutboundPurpose.TOOL_OBSERVATION,
+                            preservePhoneNumbers = currentSettings.allowUnmaskedPhoneNumbers,
                         )
                     } else {
                         OMITTED_PERSONAL_CONTENT
@@ -238,23 +245,33 @@ internal object OutboundPiiRedactor {
     private val email =
         Regex("(?i)(?<![A-Z0-9._%+-])([A-Z0-9._%+-])([A-Z0-9._%+-]*)@([A-Z0-9.-]+\\.[A-Z]{2,})(?![A-Z0-9._%+-])")
     private val mainlandId = Regex("(?<![0-9A-Za-z])(\\d{6})\\d{8}(\\d{3}[0-9Xx])(?![0-9A-Za-z])")
+    private val structuredPhoneField = Regex(
+        "(?i)(\\\"phone\\\"\\s*:\\s*\\\")([^\\\"]*)(\\\")",
+    )
     private val structuredPrivateField = Regex(
-        "(?i)(\\\"(?:phone|email|wechatId|dingTalkId|feishuId|address|note)\\\"\\s*:\\s*\\\")([^\\\"]*)(\\\")",
+        "(?i)(\\\"(?:email|wechatId|dingTalkId|feishuId|address|note)\\\"\\s*:\\s*\\\")([^\\\"]*)(\\\")",
     )
 
-    fun redact(value: String, redactStructuredPrivateFields: Boolean = false): String {
+    fun redact(value: String, redactStructuredPrivateFields: Boolean = false, preservePhoneNumbers: Boolean = false): String {
         var safe = bearer.replace(value, "Bearer [REDACTED]")
         safe = credentialLike.replace(safe) { match ->
             match.value.substringBefore(':').substringBefore('=') + "=[REDACTED]"
         }
         safe = OutboundCredentialGuard.redact(safe)
-        safe = mainlandPhone.replace(safe) { match -> "${match.groupValues[1]}****${match.groupValues[2]}" }
+        if (!preservePhoneNumbers) {
+            safe = mainlandPhone.replace(safe) { match -> "${match.groupValues[1]}****${match.groupValues[2]}" }
+            safe = mainlandLandline.replace(safe, OMITTED_DIRECT_IDENTIFIER)
+            safe = serviceNumber.replace(safe, OMITTED_DIRECT_IDENTIFIER)
+        }
         safe = email.replace(safe) { match -> "${match.groupValues[1]}***@${match.groupValues[3]}" }
         safe = mainlandId.replace(safe) { match -> "${match.groupValues[1]}********${match.groupValues[2]}" }
         safe = bankCard.replace(safe, OMITTED_DIRECT_IDENTIFIER)
-        safe = mainlandLandline.replace(safe, OMITTED_DIRECT_IDENTIFIER)
-        safe = serviceNumber.replace(safe, OMITTED_DIRECT_IDENTIFIER)
         if (redactStructuredPrivateFields) {
+            if (!preservePhoneNumbers) {
+                safe = structuredPhoneField.replace(safe) { match ->
+                    "${match.groupValues[1]}[REDACTED]${match.groupValues[3]}"
+                }
+            }
             safe = structuredPrivateField.replace(safe) { match ->
                 "${match.groupValues[1]}[REDACTED]${match.groupValues[3]}"
             }

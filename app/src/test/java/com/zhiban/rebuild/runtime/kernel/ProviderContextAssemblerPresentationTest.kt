@@ -5,6 +5,7 @@ import com.zhiban.rebuild.provider.CapabilitySnapshot
 import com.zhiban.rebuild.provider.DefaultOutboundDataPolicy
 import com.zhiban.rebuild.provider.ModelRequest
 import com.zhiban.rebuild.provider.OutboundChannel
+import com.zhiban.rebuild.provider.OutboundPolicySettings
 import com.zhiban.rebuild.provider.OutboundPurpose
 import com.zhiban.rebuild.provider.ProviderProfile
 import com.zhiban.rebuild.runtime.context.ContextRetrievalResult
@@ -92,38 +93,46 @@ class ProviderContextAssemblerPresentationTest {
     }
 
     @Test
-    fun userAuthoredHistoryPassesIntactWhileAssistantEchoStaysRedacted() {
+    fun userAuthoredHistoryPassesIntactWhileAssistantEchoFollowsPhoneNumberSwitch() {
         val assembled = assembleWithHistory(
             listOf(
                 turn("turn-private", "user", "我的电话是13800000000", 1),
                 turn("turn-answer", "assistant", "已存联系人号码13800000000", 2),
             ),
         )
-        val governed = DefaultOutboundDataPolicy().enforce(
-            ModelRequest(
-                requestId = "request-history",
-                channel = OutboundChannel.LLM_INFERENCE,
-                profile = ProviderProfile("stepfun", "primary", "model", "credential", 1),
-                messages = assembled.messages,
-                capability = CapabilitySnapshot("profile", emptySet(), emptySet(), 4_096, 2_048, 0, Long.MAX_VALUE),
-                maxTokens = 2_048,
-            ),
-        ).request
 
-        // The number the user typed reaches the model intact (deliberate send).
-        val recalledUser = governed.messages.first { it.provenance.sourceId == "turn-private" }
-        assertEquals("user", recalledUser.role)
-        assertEquals(OutboundPurpose.USER_AUTHORED, recalledUser.purpose)
-        assertEquals("我的电话是13800000000", recalledUser.content)
+        // 默认:号码明文交给大模型(优先可用性),助手回声里的号码不再打码。
+        val governedByDefault = DefaultOutboundDataPolicy().enforce(requestFrom(assembled)).request
+        val recalledUserByDefault = governedByDefault.messages.first { it.provenance.sourceId == "turn-private" }
+        assertEquals("user", recalledUserByDefault.role)
+        assertEquals(OutboundPurpose.USER_AUTHORED, recalledUserByDefault.purpose)
+        assertEquals("我的电话是13800000000", recalledUserByDefault.content)
 
-        // A number echoed by the assistant (sourced from stored data) is still identifier-redacted.
-        val recalledAssistant = governed.messages.first { it.provenance.sourceId == "turn-answer" }
-        assertEquals("assistant", recalledAssistant.role)
-        assertEquals(OutboundPurpose.AUTO_RETRIEVED, recalledAssistant.purpose)
-        assertEquals("已存联系人号码138****0000", recalledAssistant.content)
+        val recalledAssistantByDefault = governedByDefault.messages.first { it.provenance.sourceId == "turn-answer" }
+        assertEquals("assistant", recalledAssistantByDefault.role)
+        assertEquals(OutboundPurpose.AUTO_RETRIEVED, recalledAssistantByDefault.purpose)
+        assertEquals("已存联系人号码13800000000", recalledAssistantByDefault.content)
 
-        assertEquals("接着上面说", governed.messages.last().content)
+        // 关闭号码明文后,助手回声(源于已存数据)重新打码;用户亲手输入的内容始终原样送达。
+        val governedMasked = DefaultOutboundDataPolicy {
+            OutboundPolicySettings(allowUnmaskedPhoneNumbers = false)
+        }.enforce(requestFrom(assembled)).request
+        val recalledUserMasked = governedMasked.messages.first { it.provenance.sourceId == "turn-private" }
+        assertEquals("我的电话是13800000000", recalledUserMasked.content)
+        val recalledAssistantMasked = governedMasked.messages.first { it.provenance.sourceId == "turn-answer" }
+        assertEquals("已存联系人号码138****0000", recalledAssistantMasked.content)
+
+        assertEquals("接着上面说", governedByDefault.messages.last().content)
     }
+
+    private fun requestFrom(assembled: AssembledModelContext) = ModelRequest(
+        requestId = "request-history",
+        channel = OutboundChannel.LLM_INFERENCE,
+        profile = ProviderProfile("stepfun", "primary", "model", "credential", 1),
+        messages = assembled.messages,
+        capability = CapabilitySnapshot("profile", emptySet(), emptySet(), 4_096, 2_048, 0, Long.MAX_VALUE),
+        maxTokens = 2_048,
+    )
 
     private fun assembleWithHistory(history: List<RuntimeConversationTurnEntity>) =
         ProviderContextAssembler(clock = { 0L }, personalization = { null }).assembleMessages(

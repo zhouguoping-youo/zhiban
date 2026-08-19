@@ -18,6 +18,7 @@ data class OutboundPrivacyState(
     val allowCloudLlm: Boolean = true,
     val allowRemoteMcp: Boolean = false,
     val allowRemoteEmbedding: Boolean = false,
+    val allowUnmaskedPhoneNumbers: Boolean = true,
     val auditCount: Int = 0,
     val blockedCount: Int = 0,
     val monthlyRedactedCount: Int = 0,
@@ -35,6 +36,7 @@ class OutboundPrivacyViewModel @Inject constructor(private val preferences: Outb
             allowCloudLlm = preferences.snapshot().allowCloudLlm,
             allowRemoteMcp = preferences.snapshot().allowRemoteMcp,
             allowRemoteEmbedding = preferences.snapshot().allowRemoteEmbedding,
+            allowUnmaskedPhoneNumbers = preferences.snapshot().allowUnmaskedPhoneNumbers,
         ),
     )
     val state = _state.asStateFlow()
@@ -78,6 +80,11 @@ class OutboundPrivacyViewModel @Inject constructor(private val preferences: Outb
     fun setAllowRemoteEmbedding(enabled: Boolean) {
         preferences.setAllowRemoteEmbedding(enabled)
         _state.update { it.copy(allowRemoteEmbedding = enabled) }
+    }
+
+    fun setAllowUnmaskedPhoneNumbers(enabled: Boolean) {
+        preferences.setAllowUnmaskedPhoneNumbers(enabled)
+        _state.update { it.copy(allowUnmaskedPhoneNumbers = enabled) }
     }
 
     fun clearAudit() {

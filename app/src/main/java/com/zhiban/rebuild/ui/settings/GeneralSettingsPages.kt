@@ -365,6 +365,17 @@ fun PrivacySecurityPage(
                         onCheckedChange = outboundViewModel::setAllowCloudLlm,
                     )
                     Divider()
+                    SettingsToggleRow(
+                        title = "把真实号码交给大模型",
+                        subtitle = if (outboundState.allowUnmaskedPhoneNumbers) {
+                            "已开启 · 知伴能看到真实手机号，才能替你发短信、拨号"
+                        } else {
+                            "已关闭 · 号码打码，发短信、拨号等操作将不可用"
+                        },
+                        checked = outboundState.allowUnmaskedPhoneNumbers,
+                        onCheckedChange = outboundViewModel::setAllowUnmaskedPhoneNumbers,
+                    )
+                    Divider()
                     SettingsRow("文字、图片与联系人", "使用时按需处理 · 敏感信息自动保护")
                     Divider()
                     SettingsRow("语音输入", if (outboundState.allowCloudSpeech) "可用 · 仅主动使用时处理" else "首次使用时开启")
