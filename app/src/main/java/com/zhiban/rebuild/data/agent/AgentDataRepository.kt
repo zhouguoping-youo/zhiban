@@ -56,6 +56,7 @@ import com.zhiban.rebuild.data.notification.NotificationInsightAnalyzer
 import com.zhiban.rebuild.data.notification.ScheduleInsight
 import com.zhiban.rebuild.data.notification.SenderMuteEntity
 import com.zhiban.rebuild.data.notification.SocialNotificationParser
+import com.zhiban.rebuild.data.notification.detectIdentityDrift
 import com.zhiban.rebuild.data.notification.normalizeIdentityValue
 import com.zhiban.rebuild.data.notification.normalizeSenderHandle
 import com.zhiban.rebuild.foundation.RuntimeToolRisk
@@ -155,6 +156,28 @@ class AgentDataRepository internal constructor(
         return true
     }
 
+    /**
+     * 回复上下文推断与高置信自动关联。带漂移标记的候选不做任何自动处理:
+     * 漂移只是提示,自动关联会静默写身份,必须留给用户显式确认(分级授权红线)。
+     */
+    private suspend fun applyAutomaticProcessing(candidate: NotificationCandidateEntity, nowEpochMs: Long): Pair<NotificationCandidateEntity, Boolean> {
+        if (candidate.identityDriftJson != null) return candidate to false
+        var enriched = candidate
+        var processed = false
+        if (isLikelyReplyContext(enriched, nowEpochMs) &&
+            recordInferredInteractionEvidence(enriched, nowEpochMs)
+        ) {
+            enriched = enriched.copy(linkedContactId = enriched.linkedContactId ?: enriched.suggestedContactId)
+            processed = true
+        } else if (enriched.suggestedContactId != null && enriched.suggestedContactConfidence >= AUTO_LINK_CONFIDENCE &&
+            recordAutoInteractionEvidence(enriched, enriched.suggestedContactId, nowEpochMs)
+        ) {
+            enriched = enriched.copy(linkedContactId = enriched.suggestedContactId)
+            processed = true
+        }
+        return enriched to processed
+    }
+
     private suspend fun stageUnmutedCandidate(candidate: NotificationCandidateEntity, nowEpochMs: Long): ScheduleEntity? {
         val existing = daos.notificationCandidateDao.findBySourceKey(candidate.sourceKey)
         if (existing?.status in setOf("CONFIRMED", "DISMISSED")) return null
@@ -171,18 +194,9 @@ class AgentDataRepository internal constructor(
             )
             return null
         }
-        var automaticallyProcessed = false
-        if (isLikelyReplyContext(enriched, nowEpochMs) &&
-            recordInferredInteractionEvidence(enriched, nowEpochMs)
-        ) {
-            enriched = enriched.copy(linkedContactId = enriched.linkedContactId ?: enriched.suggestedContactId)
-            automaticallyProcessed = true
-        } else if (enriched.suggestedContactId != null && enriched.suggestedContactConfidence >= AUTO_LINK_CONFIDENCE &&
-            recordAutoInteractionEvidence(enriched, enriched.suggestedContactId, nowEpochMs)
-        ) {
-            enriched = enriched.copy(linkedContactId = enriched.suggestedContactId)
-            automaticallyProcessed = true
-        }
+        val processed = applyAutomaticProcessing(enriched, nowEpochMs)
+        enriched = processed.first
+        var automaticallyProcessed = processed.second
         val createdSchedule = if (!externalConflict) {
             recordAutomaticSchedule(enriched, nowEpochMs)
         } else {
@@ -205,6 +219,12 @@ class AgentDataRepository internal constructor(
     }
 
     suspend fun dismissNotificationCandidate(candidateId: String): Boolean = daos.notificationCandidateDao.dismiss(candidateId) == 1
+
+    /**
+     * 用户否认漂移提示("不是同一个人"):清除漂移标记,候选按正常三级匹配结果继续处理。
+     * 否认不写成任何静默写——不新增身份、不改联系人。
+     */
+    suspend fun denyNotificationIdentityDrift(candidateId: String): Boolean = daos.notificationCandidateDao.clearIdentityDrift(candidateId) == 1
 
     fun observeMutedSenders(): Flow<List<SenderMuteEntity>> = daos.senderMuteDao.observeAll()
 
@@ -398,6 +418,7 @@ class AgentDataRepository internal constructor(
         if (candidate.suggestedContactId != null) return candidate
         val sender = candidate.senderName?.trim()?.takeIf(String::isNotBlank) ?: return candidate
         val normalized = normalizeIdentityValue(sender)
+        var driftJson: String? = null
         val (contact, confidence) = if (candidate.platform == "SMS") {
             normalizeContactPhone(sender)?.let { phone ->
                 daos.contactKnowledgeDao.findContactByMethod("PHONE", phone)
@@ -411,12 +432,22 @@ class AgentDataRepository internal constructor(
                 }?.let { it to AUTO_LINK_CONFIDENCE }
                 ?: daos.contactDao.findByNormalizedName(normalized)?.takeIf {
                     daos.contactDao.countActiveByNormalizedName(normalized) == 1
-                }?.let { it to AUTO_LINK_CONFIDENCE }
+                }?.let { contact ->
+                    // 第三级命中:名字恰好等于联系人名,但该联系人已有同平台的确认 handle 且与当前
+                    // 不同——大概率是用户改了微信备注。只打提示标记,写身份仍须用户显式确认。
+                    driftJson = detectIdentityDrift(
+                        platform = candidate.platform,
+                        currentNormalizedHandle = normalized,
+                        confirmedIdentities = daos.contactIdentityDao.platformIdentities(contact.contactId),
+                    )?.toJson()
+                    contact to AUTO_LINK_CONFIDENCE
+                }
                 ?: return candidate
         }
         return candidate.copy(
             suggestedContactId = contact.contactId,
             suggestedContactConfidence = confidence,
+            identityDriftJson = driftJson,
         )
     }
 

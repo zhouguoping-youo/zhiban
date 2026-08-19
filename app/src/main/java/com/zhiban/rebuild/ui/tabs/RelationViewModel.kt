@@ -384,6 +384,11 @@ class RelationViewModel @Inject constructor(
         }
     }
 
+    /** 否认备注漂移提示:只清标记,候选按正常三级匹配结果继续处理,不写任何静默数据。 */
+    fun denyNotificationIdentityDrift(candidateId: String) {
+        viewModelScope.launch { repository.denyNotificationIdentityDrift(candidateId) }
+    }
+
     fun confirmNotificationCandidate(candidateId: String, contactId: String, onResult: (String?) -> Unit) {
         viewModelScope.launch {
             runSuspendCatching { repository.confirmNotificationCandidate(candidateId, contactId) }

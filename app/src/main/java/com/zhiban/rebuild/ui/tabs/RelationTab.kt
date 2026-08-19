@@ -829,6 +829,7 @@ fun RelationTab(
                     showFeedback(error ?: "已不再提醒该发送者，可在设置中解除")
                 }
             },
+            onDenyDrift = viewModel::denyNotificationIdentityDrift,
             onConfirmCandidate = viewModel::confirmNotificationCandidate,
             onCreateContact = viewModel::createContactFromNotification,
             onConfirmSchedule = viewModel::confirmNotificationSchedule,

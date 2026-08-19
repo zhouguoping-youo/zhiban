@@ -18,6 +18,7 @@ import com.zhiban.rebuild.data.contact.SystemRawContactSnapshot
 import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityStage
 import com.zhiban.rebuild.data.crm.CrmRecordStatus
+import com.zhiban.rebuild.data.notification.IdentityDriftInfo
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.NotificationInsights
 import com.zhiban.rebuild.data.notification.ScheduleInsight
@@ -1490,6 +1491,76 @@ class AgentDataRepositoryTest {
         val visible = repository.observeNotificationCandidates().first()
         assertEquals(listOf("tag-2"), visible.map { it.candidateId })
         assertEquals("张三", visible.single().normalizedSender)
+    }
+
+    @Test
+    fun nameMatchedCandidateCarriesDriftHintAndWaitsForUserDecision() = runBlocking {
+        // 联系人"李建国"已有用户确认的微信身份"老李头";新消息 senderName 恰好等于联系人名。
+        val contactId = repository.saveUserContact(null, "李建国", null, null, null, null, null, null, 1_000L)
+        repository.addContactPlatformIdentity(contactId, "WECHAT", "老李头", nowEpochMs = 1_100L)
+        repository.stageNotificationCandidate(
+            NotificationCandidateEntity(
+                candidateId = "drift-1",
+                sourceKey = "drift-source-1",
+                packageName = "com.tencent.mm",
+                appLabel = "微信",
+                title = "李建国",
+                body = "明天见",
+                postedAtEpochMs = 2_000L,
+                platform = "WECHAT",
+                conversationTitle = "李建国",
+                senderName = "李建国",
+            ),
+        )
+
+        // 第三级命中 + 漂移标记;有漂移时不自动关联,候选保持 PENDING 等用户决定。
+        val staged = requireNotNull(database.notificationCandidateDao().find("drift-1"))
+        assertEquals(contactId, staged.suggestedContactId)
+        assertEquals("PENDING", staged.status)
+        assertNull(staged.linkedContactId)
+        val drift = requireNotNull(IdentityDriftInfo.fromJson(requireNotNull(staged.identityDriftJson)))
+        assertEquals("老李头", drift.oldHandle)
+        assertEquals("李建国", drift.newHandle)
+        assertEquals(1, repository.observeNotificationCandidates().first().size)
+
+        // 否认:漂移标记清除,建议保留,不产生任何身份/联系人写入。
+        assertTrue(repository.denyNotificationIdentityDrift("drift-1"))
+        val denied = requireNotNull(database.notificationCandidateDao().find("drift-1"))
+        assertNull(denied.identityDriftJson)
+        assertEquals(contactId, denied.suggestedContactId)
+        assertEquals(1, database.contactIdentityDao().listPlatformIdentities().size)
+
+        // 确认:走既有确认链路,写新 handle 的 confirmed identity,旧 identity 行保留不删。
+        assertTrue(repository.confirmNotificationCandidate("drift-1", contactId, 3_000L))
+        val identities = database.contactIdentityDao().listPlatformIdentities()
+        assertEquals(2, identities.size)
+        assertTrue(identities.any { it.handle == "老李头" && it.userConfirmed })
+        assertTrue(identities.any { it.handle == "李建国" && it.userConfirmed })
+        assertEquals("CONFIRMED", database.notificationCandidateDao().find("drift-1")?.status)
+    }
+
+    @Test
+    fun driftHintIsNotSetWhenNoOlderConfirmedIdentityExists() = runBlocking {
+        // 没有旧确认身份时,第三级命中照常自动关联(自愈),不打漂移标记。
+        val contactId = repository.saveUserContact(null, "李建国", null, null, null, null, null, null, 1_000L)
+        repository.stageNotificationCandidate(
+            NotificationCandidateEntity(
+                candidateId = "no-drift-1",
+                sourceKey = "no-drift-source-1",
+                packageName = "com.tencent.mm",
+                appLabel = "微信",
+                title = "李建国",
+                body = "明天见",
+                postedAtEpochMs = 2_000L,
+                platform = "WECHAT",
+                conversationTitle = "李建国",
+                senderName = "李建国",
+            ),
+        )
+
+        val staged = requireNotNull(database.notificationCandidateDao().find("no-drift-1"))
+        assertNull(staged.identityDriftJson)
+        assertEquals(contactId, staged.linkedContactId)
     }
 
     @Test

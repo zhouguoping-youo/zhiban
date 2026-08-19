@@ -51,6 +51,9 @@ data class NotificationCandidateEntity(
     // 入库时由 staging 计算的发送者归一化键(剥未读条数前缀/小写/去空白),收件箱按它折叠
     // 同一未解析发送者的多张卡。旧行未回填,保持 NULL,走旧的一卡一条语义。
     val normalizedSender: String? = null,
+    // 备注漂移提示载荷(IdentityDriftInfo JSON):第三级归一化名命中且该联系人有同平台的
+    // 不同确认 handle 时打上;只提示,不自动写身份。用户否认后清除。
+    val identityDriftJson: String? = null,
 )
 
 fun sharedTextCandidate(
@@ -168,6 +171,12 @@ interface NotificationCandidateDao {
         "UPDATE notification_candidates SET status = 'DISMISSED' WHERE candidateId = :candidateId AND status = 'PENDING'",
     )
     suspend fun dismiss(candidateId: String): Int
+
+    /** 否认备注漂移提示:只清标记,候选保持 PENDING 按正常三级匹配结果继续处理。 */
+    @Query(
+        "UPDATE notification_candidates SET identityDriftJson = NULL WHERE candidateId = :candidateId AND status = 'PENDING'",
+    )
+    suspend fun clearIdentityDrift(candidateId: String): Int
 
     @Query(
         "UPDATE notification_candidates SET status = 'CONFIRMED' WHERE candidateId = :candidateId AND status = 'PENDING'",

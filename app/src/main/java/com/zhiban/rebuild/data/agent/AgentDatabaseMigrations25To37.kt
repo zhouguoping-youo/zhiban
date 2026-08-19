@@ -692,4 +692,15 @@ internal object AgentDatabaseMigrations25To37 {
             db.execSQL("ALTER TABLE `notification_candidates` ADD COLUMN `normalizedSender` TEXT")
         }
     }
+
+    /**
+     * 备注漂移提示:第三级归一化名命中联系人时,记录"可能是旧备注改名"的提示载荷
+     * (旧 handle + 旧身份 id)。只提示不写身份;用户确认走既有确认链路,否认则清除标记。
+     */
+    val MIGRATION_44_45 = object : Migration(44, 45) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("DROP INDEX IF EXISTS `index_plan_runs_single_active_per_definition`")
+            db.execSQL("ALTER TABLE `notification_candidates` ADD COLUMN `identityDriftJson` TEXT")
+        }
+    }
 }

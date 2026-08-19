@@ -112,6 +112,7 @@ import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.data.contact.SystemContactCandidate
 import com.zhiban.rebuild.data.contact.SystemContactWriteIntent
 import com.zhiban.rebuild.data.facts.FactEntity
+import com.zhiban.rebuild.data.notification.IdentityDriftInfo
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.OutgoingMessageAccessibilityService
 import com.zhiban.rebuild.data.notification.ScheduleInsight
@@ -401,6 +402,7 @@ internal fun NotificationCandidateDialog(
     onEnable: () -> Unit,
     onDismissCandidate: (String) -> Unit,
     onMuteSender: (String) -> Unit,
+    onDenyDrift: (String) -> Unit,
     onConfirmCandidate: (String, String, (String?) -> Unit) -> Unit,
     onCreateContact: (String, String, (String?) -> Unit) -> Unit,
     onConfirmSchedule: (String, (String?) -> Unit) -> Unit,
@@ -648,6 +650,27 @@ internal fun NotificationCandidateDialog(
                         val needsSchedule = schedule != null && item.createdScheduleId == null
                         val canUseSuggestion = needsContact && suggestedContact != null
                         val canCreateContact = needsContact && !item.isGroupChat
+                        val drift = item.identityDriftJson?.let { IdentityDriftInfo.fromJson(it) }
+                        val confirmSuggestedContact = {
+                            error = null
+                            if (canUseSuggestion && needsSchedule) {
+                                onConfirmCandidate(
+                                    item.candidateId,
+                                    requireNotNull(suggestedContact).contactId,
+                                ) { contactError ->
+                                    if (contactError == null) {
+                                        onConfirmSchedule(item.candidateId) { error = it }
+                                    } else {
+                                        error = contactError
+                                    }
+                                }
+                            } else if (canUseSuggestion) {
+                                onConfirmCandidate(
+                                    item.candidateId,
+                                    requireNotNull(suggestedContact).contactId,
+                                ) { error = it }
+                            }
+                        }
                         val primaryLabel = when {
                             canUseSuggestion && needsSchedule -> "确认关联并加入日历"
                             canUseSuggestion -> "关联为 ${suggestedContact.displayName}"
@@ -704,27 +727,30 @@ internal fun NotificationCandidateDialog(
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             }
+                            if (drift != null && canUseSuggestion) {
+                                Text(
+                                    "「${drift.newHandle}」可能是「${drift.oldHandle}」修改了${inboxPlatformLabel(drift.platform)}备注，是否关联？",
+                                    color = RelationInk,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    TextButton(onClick = { confirmSuggestedContact() }) {
+                                        Text("确认关联", color = RelationAccent)
+                                    }
+                                    TextButton(onClick = { onDenyDrift(item.candidateId) }) {
+                                        Text("不是同一个人", color = RelationMuted)
+                                    }
+                                }
+                            }
                             if (primaryLabel != null) {
                                 Spacer(Modifier.height(ZhiBanSpacing.Xs))
                                 Button(
                                     onClick = {
-                                        error = null
                                         when {
-                                            canUseSuggestion && needsSchedule -> onConfirmCandidate(
-                                                item.candidateId,
-                                                requireNotNull(suggestedContact).contactId,
-                                            ) { contactError ->
-                                                if (contactError == null) {
-                                                    onConfirmSchedule(item.candidateId) { error = it }
-                                                } else {
-                                                    error = contactError
-                                                }
-                                            }
-
-                                            canUseSuggestion -> onConfirmCandidate(
-                                                item.candidateId,
-                                                requireNotNull(suggestedContact).contactId,
-                                            ) { error = it }
+                                            canUseSuggestion -> confirmSuggestedContact()
 
                                             canCreateContact -> onCreateContact(
                                                 item.candidateId,
@@ -820,6 +846,18 @@ internal fun NotificationCandidateDialog(
 
 internal fun formatMessageSchedule(epochMs: Long): String = DateFormats.MonthDayTime
     .format(Instant.ofEpochMilli(epochMs).atZone(ZoneId.systemDefault()))
+
+private fun inboxPlatformLabel(platform: String): String = when (platform) {
+    "WECHAT" -> "微信"
+    "SMS" -> "短信"
+    "QQ" -> "QQ"
+    "TIM" -> "TIM"
+    "FEISHU" -> "飞书"
+    "LARK" -> "Lark"
+    "WEWORK" -> "企业微信"
+    "DINGTALK" -> "钉钉"
+    else -> platform
+}
 
 internal fun isOutgoingAccessibilityEnabled(context: android.content.Context): Boolean {
     val component = ComponentName(context, OutgoingMessageAccessibilityService::class.java)
