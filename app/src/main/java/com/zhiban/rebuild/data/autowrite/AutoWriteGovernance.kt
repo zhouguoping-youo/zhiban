@@ -22,6 +22,9 @@ internal object AutoWriteToolNames {
     /** User-confirmed acceptance of a NEW_LEAD suggestion (creates a lead; undoable). */
     const val CRM_SUGGESTION_ACCEPT_LEAD = "crm.suggestion.acceptLead"
 
+    /** 高置信消息抽取自动补全联系人资料(公司/职位/电话;可撤销)。 */
+    const val CONTACT_COMPLETION = "contact.completion.autoApply"
+
     val all = setOf(
         INTERACTION_SUMMARY,
         CONTACT_TAG_ADD,
@@ -33,6 +36,7 @@ internal object AutoWriteToolNames {
         CRM_NEXT_ACTION_CREATE,
         CRM_SUGGESTION_ACCEPT_ACTIVITY,
         CRM_SUGGESTION_ACCEPT_LEAD,
+        CONTACT_COMPLETION,
     )
 }
 
@@ -59,6 +63,8 @@ internal data class AutoWriteAuditDraft(
     val presentationType: String,
     val correctionRoute: String,
     val createdAtEpochMs: Long,
+    // 收据卡的内容预览(FACT/SCHEDULE 域走数据本身,CONTACT 域等无自然正文的类型存这里)。
+    val summary: String? = null,
 )
 
 internal suspend fun AgentDatabase.insertVisibleAutoWrite(draft: AutoWriteAuditDraft) {
@@ -94,6 +100,7 @@ internal suspend fun AgentDatabase.insertVisibleAutoWrite(draft: AutoWriteAuditD
                 correctionRoute = draft.correctionRoute,
                 reviewState = "UNREVIEWED",
                 createdAtEpochMs = draft.createdAtEpochMs,
+                summary = draft.summary,
             ),
         )
     }

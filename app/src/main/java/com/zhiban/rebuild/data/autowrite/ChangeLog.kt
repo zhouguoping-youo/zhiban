@@ -65,6 +65,8 @@ data class AutoWriteReceiptEntity(
     val correctionRoute: String,
     val reviewState: String,
     val createdAtEpochMs: Long,
+    // 收据卡内容预览(CONTACT 域等无自然正文的自动写存这;FACT/SCHEDULE 域仍从数据本身投影)。
+    val summary: String? = null,
 )
 
 data class AutoWriteReceiptRow(
@@ -140,6 +142,7 @@ interface ChangeLogDao {
             auto_write_receipts.createdAtEpochMs AS createdAtEpochMs,
             CASE WHEN change_log.targetDomain = 'FACT' THEN facts.textContent
                  WHEN change_log.targetDomain = 'SCHEDULE' THEN schedules.title
+                 WHEN change_log.targetDomain = 'CONTACT' THEN auto_write_receipts.summary
                  ELSE NULL END AS contentPreview
             FROM auto_write_receipts
             INNER JOIN change_log ON change_log.changeId = auto_write_receipts.changeId

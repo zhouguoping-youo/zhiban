@@ -109,7 +109,7 @@ import com.zhiban.rebuild.data.store.RuntimeToolExecutionEntity
 
 /** 知伴本机数据库文件名，供数据层以外的只读场景（如存储页显示大小）使用，避免引用 internal 的 AgentDatabase。 */
 const val AGENT_DATABASE_FILE_NAME = "zhiban-agent.db"
-const val AGENT_DATABASE_SCHEMA_VERSION = 46
+const val AGENT_DATABASE_SCHEMA_VERSION = 47
 
 @Database(
     entities = [
@@ -256,6 +256,7 @@ internal abstract class AgentDatabase : RoomDatabase() {
         val MIGRATION_43_44 = AgentDatabaseSchema.MIGRATION_43_44
         val MIGRATION_44_45 = AgentDatabaseSchema.MIGRATION_44_45
         val MIGRATION_45_46 = AgentDatabaseSchema.MIGRATION_45_46
+        val MIGRATION_46_47 = AgentDatabaseSchema.MIGRATION_46_47
         val CALLBACK = AgentDatabaseSchema.CALLBACK
     }
 }

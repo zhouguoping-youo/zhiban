@@ -213,6 +213,7 @@ private fun AutoWriteReceiptCard(receipt: AutoWriteReceiptRow, onUndo: () -> Uni
         "CRM_LEAD_CANDIDATE" -> "发现了一条候选线索"
         "CRM_ACTIVITY" -> "记录了一次客户互动"
         "CRM_NEXT_ACTION" -> "创建了下一步动作"
+        "CONTACT_COMPLETION" -> "补全了联系人资料"
         else -> "完成了一条内部整理"
     }
     Column(

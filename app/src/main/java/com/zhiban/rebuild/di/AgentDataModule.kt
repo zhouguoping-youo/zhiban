@@ -101,10 +101,16 @@ object AgentDataModule {
                     AgentDatabase.MIGRATION_43_44,
                     AgentDatabase.MIGRATION_44_45,
                     AgentDatabase.MIGRATION_45_46,
+                    AgentDatabase.MIGRATION_46_47,
                 )
                 .addCallback(AgentDatabase.CALLBACK).build()
         }
     }
+
+    @Provides
+    internal fun provideMessageContactFieldExtraction(
+        extractor: com.zhiban.rebuild.data.contact.enrichment.MessageContactInfoExtractor,
+    ): com.zhiban.rebuild.data.contact.enrichment.MessageContactFieldExtraction = extractor
 
     @Provides
     @Singleton
@@ -115,6 +121,7 @@ object AgentDataModule {
         reminderScheduler: com.zhiban.rebuild.data.calendar.ScheduleReminderScheduler,
         replySuggestionCoordinator: com.zhiban.rebuild.data.reply.ReplySuggestionCoordinator,
         contactCompletionCoordinator: com.zhiban.rebuild.data.completion.ContactCompletionCoordinator,
+        messageContactCompletionCoordinator: com.zhiban.rebuild.data.contact.enrichment.MessageContactCompletionCoordinator,
     ): AgentDataRepository = AgentDataRepository(
         infrastructure,
         domains,
@@ -128,6 +135,7 @@ object AgentDataModule {
         },
         replySuggestionSink = replySuggestionCoordinator::onIncomingWechatActivity,
         contactCompletionSink = contactCompletionCoordinator::onIncomingWechatActivity,
+        messageContactCompletionSink = messageContactCompletionCoordinator::onIncomingWechatActivity,
     )
 
     @Provides

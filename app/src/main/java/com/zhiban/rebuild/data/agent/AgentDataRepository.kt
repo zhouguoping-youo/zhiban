@@ -98,6 +98,7 @@ class AgentDataRepository internal constructor(
     private val scheduleReminderSink: ScheduleReminderSink = ScheduleReminderSink { },
     private val replySuggestionSink: () -> Unit = { },
     private val contactCompletionSink: () -> Unit = { },
+    private val messageContactCompletionSink: () -> Unit = { },
 ) {
     private val daos = infrastructure.daos
     private val transactions = infrastructure.transactions
@@ -142,6 +143,8 @@ class AgentDataRepository internal constructor(
             // 同一触发也喂补全闭环:这条来消息可能是某个"请补全资料"请求的回复。协调器自行再核对
             // 群聊/归因/时机,这里只是廉价的"去看看"。
             contactCompletionSink()
+            // 消息正文 → 联系人资料补全(高置信自动写/低置信建议卡):协调器再核对关联与字段空缺。
+            messageContactCompletionSink()
         }
     }
 

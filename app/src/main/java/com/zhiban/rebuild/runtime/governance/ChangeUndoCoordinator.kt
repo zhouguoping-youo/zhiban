@@ -6,6 +6,7 @@ import com.zhiban.rebuild.data.autowrite.AutoWriteToolNames
 import com.zhiban.rebuild.data.autowrite.ChangeLogEntity
 import com.zhiban.rebuild.data.autowrite.canonicalChangeDigest
 import com.zhiban.rebuild.data.autowrite.changeDigestMatches
+import com.zhiban.rebuild.data.contact.enrichment.canonicalContactCompletionDigest
 import com.zhiban.rebuild.data.facts.FactEntity
 import com.zhiban.rebuild.data.facts.FactIndex
 import com.zhiban.rebuild.foundation.runSuspendCatching
@@ -14,6 +15,7 @@ import com.zhiban.rebuild.runtime.memory.MemoryAtomicStore
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -68,6 +70,8 @@ internal class ChangeUndoCoordinator(private val database: AgentDatabase) {
         AutoWriteToolNames.INTERACTION_SUMMARY -> undoInteractionSummary(change)
 
         AutoWriteToolNames.CONTACT_TAG_ADD -> undoContactTag(change, nowEpochMs)
+
+        AutoWriteToolNames.CONTACT_COMPLETION -> undoContactCompletion(change, nowEpochMs)
 
         AutoWriteToolNames.CONTACT_IDENTITY_AUTO_LINK -> undoAutomaticIdentityLink(change, nowEpochMs)
 
@@ -148,6 +152,26 @@ internal class ChangeUndoCoordinator(private val database: AgentDatabase) {
             updatedAtEpochMs = nowEpochMs,
         )
         return database.contactDao().update(updated) == 1
+    }
+
+    /** 撤销消息抽取自动补全:当前值仍等于写入后的值才允许,恢复为写入前的旧值(可含 null)。 */
+    private suspend fun undoContactCompletion(change: ChangeLogEntity, nowEpochMs: Long): Boolean {
+        val current = database.contactDao().findRawById(change.targetId) ?: return false
+        if (canonicalContactCompletionDigest(current) != change.afterDigest) return false
+        val inverse =
+            runSuspendCatching { Json.parseToJsonElement(change.inversePayloadJson).jsonObject }.getOrNull() ?: return false
+        val oldFields = inverse["fields"]?.jsonObject ?: return false
+        val oldCompany = (oldFields["company"] as? JsonPrimitive)?.contentOrNull
+        val oldTitle = (oldFields["title"] as? JsonPrimitive)?.contentOrNull
+        val oldPhone = (oldFields["phone"] as? JsonPrimitive)?.contentOrNull
+        if (oldCompany == null && oldTitle == null && oldPhone == null) return false
+        val restored = current.copy(
+            company = oldCompany,
+            title = oldTitle,
+            phone = oldPhone,
+            updatedAtEpochMs = nowEpochMs,
+        )
+        return database.contactDao().update(restored) == 1
     }
 
     private suspend fun undoAutomaticIdentityLink(change: ChangeLogEntity, nowEpochMs: Long): Boolean {

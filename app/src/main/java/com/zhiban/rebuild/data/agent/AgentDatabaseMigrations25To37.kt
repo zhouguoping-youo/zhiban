@@ -717,4 +717,13 @@ internal object AgentDatabaseMigrations25To37 {
             db.execSQL("DROP INDEX IF EXISTS `index_contacts_active_deleted`")
         }
     }
+
+    /** 收据内容预览:auto_write_receipts 增加 summary 列(CONTACT 域等无自然正文的自动写存这里)。 */
+    val MIGRATION_46_47 = object : Migration(46, 47) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("DROP INDEX IF EXISTS `index_plan_runs_single_active_per_definition`")
+            db.execSQL("DROP INDEX IF EXISTS `index_contacts_active_deleted`")
+            db.execSQL("ALTER TABLE `auto_write_receipts` ADD COLUMN `summary` TEXT")
+        }
+    }
 }
