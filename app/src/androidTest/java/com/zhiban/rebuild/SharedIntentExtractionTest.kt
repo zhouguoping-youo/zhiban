@@ -28,6 +28,7 @@ class SharedIntentExtractionTest {
             ),
         )
     }
+
     @Test
     fun malformedExtraTypesAreRejectedWithoutEscapingAnException() {
         val malformed = Intent(Intent.ACTION_SEND).apply {

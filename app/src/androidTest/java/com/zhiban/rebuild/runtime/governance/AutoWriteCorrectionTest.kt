@@ -1,18 +1,15 @@
 package com.zhiban.rebuild.runtime.governance
 
-import com.zhiban.rebuild.data.autowrite.insertVisibleAutoWrite
-
-import com.zhiban.rebuild.data.autowrite.AutoWriteAuditDraft
-import com.zhiban.rebuild.data.autowrite.AutoWriteToolNames
-import com.zhiban.rebuild.data.autowrite.canonicalChangeDigest
-
-import com.zhiban.rebuild.data.autowrite.AutoWriteRepository
-
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.autowrite.AutoWriteAuditDraft
+import com.zhiban.rebuild.data.autowrite.AutoWriteRepository
+import com.zhiban.rebuild.data.autowrite.AutoWriteToolNames
+import com.zhiban.rebuild.data.autowrite.canonicalChangeDigest
+import com.zhiban.rebuild.data.autowrite.insertVisibleAutoWrite
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.facts.FactEntity
 import com.zhiban.rebuild.data.facts.FactIndex

@@ -1,18 +1,16 @@
 package com.zhiban.rebuild.runtime.memory
 
-import com.zhiban.rebuild.data.memory.MemoryCurrentVersionEntity
-
-import com.zhiban.rebuild.data.memory.MemoryEvidenceEntity
-import com.zhiban.rebuild.data.memory.MemoryNamespaceEntity
-import com.zhiban.rebuild.data.memory.MemoryRecordEntity
-
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
-import com.zhiban.rebuild.data.facts.FactEntity
 import com.zhiban.rebuild.data.facts.EmbeddingVectorEntity
+import com.zhiban.rebuild.data.facts.FactEntity
+import com.zhiban.rebuild.data.memory.MemoryCurrentVersionEntity
+import com.zhiban.rebuild.data.memory.MemoryEvidenceEntity
+import com.zhiban.rebuild.data.memory.MemoryNamespaceEntity
+import com.zhiban.rebuild.data.memory.MemoryRecordEntity
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -88,11 +86,10 @@ class MemoryForeignKeyCascadeTest {
         assertEquals(0, countRows("embedding_vectors"))
     }
 
-    private fun countRows(table: String): Int =
-        database.openHelper.writableDatabase.query("SELECT COUNT(*) FROM $table").use { cursor ->
-            cursor.moveToFirst()
-            cursor.getInt(0)
-        }
+    private fun countRows(table: String): Int = database.openHelper.writableDatabase.query("SELECT COUNT(*) FROM $table").use { cursor ->
+        cursor.moveToFirst()
+        cursor.getInt(0)
+    }
 
     private fun namespace() = MemoryNamespaceEntity(NS, "owner", "profile", "SCOPE", "scope-id", "ACTIVE", 0, 0, 0)
 
@@ -115,7 +112,14 @@ class MemoryForeignKeyCascadeTest {
     )
 
     private fun vector() = EmbeddingVectorEntity(
-        "embedding-1", FACT_ID, "ark", "embed-model", 3, byteArrayOf(1, 2, 3), 1_000L, null,
+        "embedding-1",
+        FACT_ID,
+        "ark",
+        "embed-model",
+        3,
+        byteArrayOf(1, 2, 3),
+        1_000L,
+        null,
     )
 
     private companion object {

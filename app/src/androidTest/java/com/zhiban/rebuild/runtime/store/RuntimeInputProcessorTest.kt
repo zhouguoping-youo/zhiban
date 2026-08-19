@@ -11,22 +11,14 @@ import com.zhiban.rebuild.R
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.ScheduleEntity
 import com.zhiban.rebuild.data.agent.TemporalRelationshipWriter
+import com.zhiban.rebuild.data.config.FeedbackPolicy
+import com.zhiban.rebuild.data.config.MemoryPolicy
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.ContactRoleEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.data.contact.SourceIdentityEntity
-import com.zhiban.rebuild.data.config.FeedbackPolicy
-import com.zhiban.rebuild.data.config.MemoryPolicy
 import com.zhiban.rebuild.data.facts.FactIndex
-import com.zhiban.rebuild.runtime.context.LocalEntityExtractor
-import com.zhiban.rebuild.runtime.context.PerceptionGateway
-import com.zhiban.rebuild.runtime.context.QueryContext
-import com.zhiban.rebuild.runtime.kernel.KernelCommandProcessor
-import com.zhiban.rebuild.runtime.kernel.ProviderEngineConfig
-import com.zhiban.rebuild.runtime.kernel.RuntimeCommandRunner
-import com.zhiban.rebuild.runtime.mcp.McpConnectionFactory
-import com.zhiban.rebuild.runtime.mcp.McpRemoteEnvironment
 import com.zhiban.rebuild.provider.CapabilitySnapshot
 import com.zhiban.rebuild.provider.CredentialProvisioner
 import com.zhiban.rebuild.provider.ModelEvent
@@ -37,6 +29,14 @@ import com.zhiban.rebuild.provider.ProviderAdapter
 import com.zhiban.rebuild.provider.ProviderFailure
 import com.zhiban.rebuild.provider.ProviderProfile
 import com.zhiban.rebuild.provider.ProviderProfileStore
+import com.zhiban.rebuild.runtime.context.LocalEntityExtractor
+import com.zhiban.rebuild.runtime.context.PerceptionGateway
+import com.zhiban.rebuild.runtime.context.QueryContext
+import com.zhiban.rebuild.runtime.kernel.KernelCommandProcessor
+import com.zhiban.rebuild.runtime.kernel.ProviderEngineConfig
+import com.zhiban.rebuild.runtime.kernel.RuntimeCommandRunner
+import com.zhiban.rebuild.runtime.mcp.McpConnectionFactory
+import com.zhiban.rebuild.runtime.mcp.McpRemoteEnvironment
 import com.zhiban.rebuild.runtime.spi.CommandReceiptStatus
 import com.zhiban.rebuild.runtime.spi.RuntimeAction
 import com.zhiban.rebuild.runtime.spi.RuntimeUiCommand
@@ -278,8 +278,7 @@ class RuntimeInputProcessorTest {
     @Test fun nativeWebSearchFollowsOptInPolicy() = runBlocking {
         val requests = mutableListOf<ModelRequest>()
         val provider = object : ProviderAdapter {
-            override suspend fun probe(profile: ProviderProfile) =
-                capability(profile).copy(features = setOf("stream", "tools", "web_search"))
+            override suspend fun probe(profile: ProviderProfile) = capability(profile).copy(features = setOf("stream", "tools", "web_search"))
             override fun stream(request: ModelRequest): kotlinx.coroutines.flow.Flow<ModelEvent> {
                 requests += request
                 return flowOf(ModelEvent.Delta(0, "好的"), ModelEvent.Final("stop"))
@@ -303,8 +302,12 @@ class RuntimeInputProcessorTest {
             RuntimeUiCommand.Start("s-web-on", stagedOn.inputRef, "c-web-on", "a-web-on", 0, "chat", "r-web-on"),
         )
         KernelCommandProcessor(
-            database, "processor", { true }, { now++ },
-            provider = provider, profiles = fixedProfileStore(),
+            database,
+            "processor",
+            { true },
+            { now++ },
+            provider = provider,
+            profiles = fixedProfileStore(),
             config = ProviderEngineConfig(webSearchOptIn = { true }),
         ).processNext()
         awaitRunStatus("r-web-on", "SUCCEEDED")
@@ -375,8 +378,13 @@ class RuntimeInputProcessorTest {
         val staged = RoomTextInputGateway(database, { true }, { now }).stage(input)
         RoomRuntimeGateways(database, "test") { now++ }.accept(
             RuntimeUiCommand.Start(
-                "s-tool-correction", staged.inputRef, "c-tool-correction", "a-tool-correction",
-                0, "chat", "r-tool-correction",
+                "s-tool-correction",
+                staged.inputRef,
+                "c-tool-correction",
+                "a-tool-correction",
+                0,
+                "chat",
+                "r-tool-correction",
             ),
         )
         val requests = mutableListOf<ModelRequest>()
@@ -389,16 +397,21 @@ class RuntimeInputProcessorTest {
                         ModelEvent.ToolCall(0, "call-invalid", "contact.search", "{}"),
                         ModelEvent.Final("tool_calls"),
                     )
+
                     2 -> {
                         assertTrue(request.messages.any { it.content.contains("INVALID_TOOL_ARGUMENTS") })
                         assertTrue(requireNotNull(request.toolsJson).contains("contact_search"))
                         flowOf(
                             ModelEvent.ToolCall(
-                                0, "call-corrected", "contact.search", """{"query":"张三"}""",
+                                0,
+                                "call-corrected",
+                                "contact.search",
+                                """{"query":"张三"}""",
                             ),
                             ModelEvent.Final("tool_calls"),
                         )
                     }
+
                     else -> {
                         assertTrue(request.messages.any { it.content.contains("contact-correction") })
                         flowOf(ModelEvent.Delta(0, "找到了张三。"), ModelEvent.Final("stop"))
@@ -408,7 +421,12 @@ class RuntimeInputProcessorTest {
             override fun cancel(requestId: String) = true
         }
         val processor = KernelCommandProcessor(
-            database, "processor", { true }, { now++ }, provider = provider, profiles = fixedProfileStore(),
+            database,
+            "processor",
+            { true },
+            { now++ },
+            provider = provider,
+            profiles = fixedProfileStore(),
         )
 
         processor.processNext()
@@ -429,8 +447,13 @@ class RuntimeInputProcessorTest {
         val staged = RoomTextInputGateway(database, { true }, { now }).stage(input)
         RoomRuntimeGateways(database, "test") { now++ }.accept(
             RuntimeUiCommand.Start(
-                "s-tool-correction-limit", staged.inputRef, "c-tool-correction-limit",
-                "a-tool-correction-limit", 0, "chat", "r-tool-correction-limit",
+                "s-tool-correction-limit",
+                staged.inputRef,
+                "c-tool-correction-limit",
+                "a-tool-correction-limit",
+                0,
+                "chat",
+                "r-tool-correction-limit",
             ),
         )
         var requestCount = 0
@@ -446,7 +469,12 @@ class RuntimeInputProcessorTest {
             override fun cancel(requestId: String) = true
         }
         val processor = KernelCommandProcessor(
-            database, "processor", { true }, { now++ }, provider = provider, profiles = fixedProfileStore(),
+            database,
+            "processor",
+            { true },
+            { now++ },
+            provider = provider,
+            profiles = fixedProfileStore(),
         )
 
         processor.processNext()
@@ -555,8 +583,13 @@ class RuntimeInputProcessorTest {
         val gateway = RoomRuntimeGateways(database, "test") { now++ }
         gateway.accept(
             RuntimeUiCommand.Start(
-                "s-approval-race", staged.inputRef, "c-approval-race", "a-approval-race",
-                0, "chat", "r-approval-race",
+                "s-approval-race",
+                staged.inputRef,
+                "c-approval-race",
+                "a-approval-race",
+                0,
+                "chat",
+                "r-approval-race",
             ),
         )
         val cancelEntered = CompletableDeferred<Unit>()
@@ -565,20 +598,19 @@ class RuntimeInputProcessorTest {
         val requestCount = AtomicInteger()
         val provider = object : ProviderAdapter {
             override suspend fun probe(profile: ProviderProfile) = capability(profile)
-            override fun stream(request: ModelRequest): kotlinx.coroutines.flow.Flow<ModelEvent> =
-                if (requestCount.incrementAndGet() > 1) {
-                    flowOf(ModelEvent.Delta(0, "日程已经创建。"), ModelEvent.Final("stop"))
-                } else {
-                    flowOf(
-                        ModelEvent.ToolCall(
-                            0,
-                            "call-approval-race",
-                            "memory.remember",
-                            """{"content":"用户喜欢简洁回答","memoryType":"PREFERENCE","subjectKey":"user","predicateKey":"response_style"}""",
-                        ),
-                        ModelEvent.Final("tool_calls"),
-                    )
-                }
+            override fun stream(request: ModelRequest): kotlinx.coroutines.flow.Flow<ModelEvent> = if (requestCount.incrementAndGet() > 1) {
+                flowOf(ModelEvent.Delta(0, "日程已经创建。"), ModelEvent.Final("stop"))
+            } else {
+                flowOf(
+                    ModelEvent.ToolCall(
+                        0,
+                        "call-approval-race",
+                        "memory.remember",
+                        """{"content":"用户喜欢简洁回答","memoryType":"PREFERENCE","subjectKey":"user","predicateKey":"response_style"}""",
+                    ),
+                    ModelEvent.Final("tool_calls"),
+                )
+            }
 
             override fun cancel(requestId: String): Boolean {
                 if (holdFirstCancel.compareAndSet(true, false)) {
@@ -589,7 +621,12 @@ class RuntimeInputProcessorTest {
             }
         }
         val processor = KernelCommandProcessor(
-            database, "processor", { true }, { now++ }, provider = provider, profiles = fixedProfileStore(),
+            database,
+            "processor",
+            { true },
+            { now++ },
+            provider = provider,
+            profiles = fixedProfileStore(),
             config = com.zhiban.rebuild.runtime.kernel.ProviderEngineConfig(
                 dynamicConfig = {
                     com.zhiban.rebuild.runtime.config.AgentDynamicConfig(enableLlmRerank = false)
@@ -830,8 +867,13 @@ class RuntimeInputProcessorTest {
         val gateway = RoomRuntimeGateways(database, "test") { fixedNow }
         gateway.accept(
             RuntimeUiCommand.Start(
-                "s-approved-timeout", staged.inputRef, "c-approved-timeout", "a-approved-timeout",
-                0, "chat", "r-approved-timeout",
+                "s-approved-timeout",
+                staged.inputRef,
+                "c-approved-timeout",
+                "a-approved-timeout",
+                0,
+                "chat",
+                "r-approved-timeout",
             ),
         )
         KernelCommandProcessor(database, "processor", { true }, { fixedNow }).processNext()
@@ -841,7 +883,11 @@ class RuntimeInputProcessorTest {
             override fun cancel(requestId: String) = false
         }
         val preparingEngine = com.zhiban.rebuild.runtime.kernel.ProviderExecutionEngine(
-            database, provider, fixedProfileStore(), "processor", { fixedNow },
+            database,
+            provider,
+            fixedProfileStore(),
+            "processor",
+            { fixedNow },
         )
         val initialLease = requireNotNull(database.runtimeSessionDao().find("s-approved-timeout"))
         assertTrue(preparingEngine.execute("r-approved-timeout", "s-approved-timeout", initialLease.leaseEpoch))
@@ -2926,16 +2972,14 @@ class RuntimeInputProcessorTest {
         var requestNumber = 0
         val provider = object : ProviderAdapter {
             override suspend fun probe(profile: ProviderProfile) = capability(profile)
-            override fun stream(request: ModelRequest): kotlinx.coroutines.flow.Flow<ModelEvent> {
-                return if (requestNumber++ == 0) {
-                    assertNull(request.forcedToolName)
-                    flowOf(
-                        ModelEvent.ToolCall(0, "call-required-contacts", "contact_maintenance_list", """{"limit":1}"""),
-                        ModelEvent.Final("tool_calls"),
-                    )
-                } else {
-                    flowOf(ModelEvent.Delta(0, "I cannot inspect another domain."), ModelEvent.Final("stop"))
-                }
+            override fun stream(request: ModelRequest): kotlinx.coroutines.flow.Flow<ModelEvent> = if (requestNumber++ == 0) {
+                assertNull(request.forcedToolName)
+                flowOf(
+                    ModelEvent.ToolCall(0, "call-required-contacts", "contact_maintenance_list", """{"limit":1}"""),
+                    ModelEvent.Final("tool_calls"),
+                )
+            } else {
+                flowOf(ModelEvent.Delta(0, "I cannot inspect another domain."), ModelEvent.Final("stop"))
             }
             override fun cancel(requestId: String) = true
         }
@@ -2975,12 +3019,11 @@ class RuntimeInputProcessorTest {
         var requestNumber = 0
         val provider = object : ProviderAdapter {
             override suspend fun probe(profile: ProviderProfile) = capability(profile)
-            override fun stream(request: ModelRequest): kotlinx.coroutines.flow.Flow<ModelEvent> =
-                if (requestNumber++ == 0) {
-                    flowOf(ModelEvent.Delta(0, "凭空回答：今天应该没事。"), ModelEvent.Final("stop"))
-                } else {
-                    flowOf(ModelEvent.Delta(0, "没有日程安排"), ModelEvent.Final("stop"))
-                }
+            override fun stream(request: ModelRequest): kotlinx.coroutines.flow.Flow<ModelEvent> = if (requestNumber++ == 0) {
+                flowOf(ModelEvent.Delta(0, "凭空回答：今天应该没事。"), ModelEvent.Final("stop"))
+            } else {
+                flowOf(ModelEvent.Delta(0, "没有日程安排"), ModelEvent.Final("stop"))
+            }
             override fun cancel(requestId: String) = true
         }
         KernelCommandProcessor(database, "processor", { true }, { now++ }, provider = provider, profiles = fixedProfileStore())
@@ -3007,20 +3050,19 @@ class RuntimeInputProcessorTest {
         var requestNumber = 0
         val provider = object : ProviderAdapter {
             override suspend fun probe(profile: ProviderProfile) = capability(profile)
-            override fun stream(request: ModelRequest): kotlinx.coroutines.flow.Flow<ModelEvent> =
-                if (requestNumber++ == 0) {
-                    flowOf(
-                        ModelEvent.ToolCall(
-                            0,
-                            "call-conflicts",
-                            "calendar.schedule.conflicts",
-                            """{"startAtEpochMs":1800000000000,"durationMinutes":30}""",
-                        ),
-                        ModelEvent.Final("tool_calls"),
-                    )
-                } else {
-                    flowOf(ModelEvent.Delta(0, "没有冲突"), ModelEvent.Final("stop"))
-                }
+            override fun stream(request: ModelRequest): kotlinx.coroutines.flow.Flow<ModelEvent> = if (requestNumber++ == 0) {
+                flowOf(
+                    ModelEvent.ToolCall(
+                        0,
+                        "call-conflicts",
+                        "calendar.schedule.conflicts",
+                        """{"startAtEpochMs":1800000000000,"durationMinutes":30}""",
+                    ),
+                    ModelEvent.Final("tool_calls"),
+                )
+            } else {
+                flowOf(ModelEvent.Delta(0, "没有冲突"), ModelEvent.Final("stop"))
+            }
             override fun cancel(requestId: String) = true
         }
         KernelCommandProcessor(database, "processor", { true }, { now++ }, provider = provider, profiles = fixedProfileStore())
@@ -4095,9 +4137,7 @@ class RuntimeInputProcessorTest {
         override suspend fun contains(credentialRef: String, keyVersion: Int) = false
     }
 
-    private class RuntimeMcpFactory(
-        private val beforeToolCall: suspend () -> Unit = {},
-    ) : McpConnectionFactory {
+    private class RuntimeMcpFactory(private val beforeToolCall: suspend () -> Unit = {}) : McpConnectionFactory {
         var callCount = 0
         var lastArguments: JsonObject? = null
         override fun create(endpoint: String, credentialRef: String?) = McpClient(

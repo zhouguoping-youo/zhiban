@@ -1,13 +1,12 @@
 package com.zhiban.rebuild.data.agent
 
-import com.zhiban.rebuild.data.store.RuntimeSessionEntity
-
 import android.content.Context
 import androidx.room.Room
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.zhiban.rebuild.data.store.RuntimeSessionEntity
 import kotlinx.coroutines.runBlocking
 import net.zetetic.database.sqlcipher.SQLiteDatabase
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory

@@ -7,6 +7,9 @@ import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.OrganizationEntity
 import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
 import com.zhiban.rebuild.data.contact.PersonEntity
+import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
+import com.zhiban.rebuild.data.contact.RelationshipPersonIds
+import com.zhiban.rebuild.relationship.RelationshipTaxonomy
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -31,6 +34,8 @@ internal class ContactEnrichmentDomainWriter(private val database: AgentDatabase
                 value,
                 nowEpochMs,
             )
+
+            "RELATIONSHIP" -> applyRelationship(contact, candidate, value, nowEpochMs)
 
             else -> false
         }
@@ -247,6 +252,31 @@ internal class ContactEnrichmentDomainWriter(private val database: AgentDatabase
     private fun JsonObject.text(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
         ?.trim()
         ?.takeIf { it.isNotEmpty() && it.length <= MAX_FIELD_CHARS }
+
+    /** 用户确认的互动推断关系:写 SELF↔联系人的确认边(覆盖同类型自动边)。 */
+    private suspend fun applyRelationship(contact: ContactEntity, candidate: ContactEnrichmentCandidateEntity, value: JsonObject, nowEpochMs: Long): Boolean {
+        val relationType = value.text("relationType")?.trim()?.uppercase()
+            ?.takeIf { it in RelationshipTaxonomy.selectableCodes } ?: return false
+        val evidence = value.text("evidence") ?: "互动推断"
+        val edgeId = "user-edge-user:self-${contact.contactId}-$relationType".take(220)
+        database.relationshipEdgeDao().upsert(
+            RelationshipEdgeEntity(
+                edgeId = edgeId,
+                fromContactId = RelationshipPersonIds.SELF,
+                toContactId = contact.contactId,
+                relationType = relationType,
+                evidenceDigest = evidence.take(120),
+                evidenceRefsJson = "[\"${candidate.candidateId}\"]",
+                confidence = candidate.confidence,
+                userConfirmed = true,
+                skillId = null,
+                status = "ACTIVE",
+                createdAtEpochMs = nowEpochMs,
+                updatedAtEpochMs = nowEpochMs,
+            ),
+        )
+        return true
+    }
 
     private companion object {
         const val MAX_FIELD_CHARS = 500

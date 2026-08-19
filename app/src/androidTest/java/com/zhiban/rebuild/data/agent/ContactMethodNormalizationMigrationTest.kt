@@ -56,13 +56,7 @@ class ContactMethodNormalizationMigrationTest {
         }
     }
 
-    private fun insertPhone(
-        db: androidx.sqlite.db.SupportSQLiteDatabase,
-        methodId: String,
-        value: String,
-        isPrimary: Int,
-        userConfirmed: Int,
-    ) {
+    private fun insertPhone(db: androidx.sqlite.db.SupportSQLiteDatabase, methodId: String, value: String, isPrimary: Int, userConfirmed: Int) {
         db.execSQL(
             "INSERT INTO contact_methods " +
                 "(methodId, contactId, kind, value, normalizedValue, isPrimary, source, confidence, " +
@@ -72,15 +66,13 @@ class ContactMethodNormalizationMigrationTest {
         )
     }
 
-    private fun androidx.sqlite.db.SupportSQLiteDatabase.int(query: String): Int =
-        this.query(query).use { cursor ->
-            check(cursor.moveToFirst())
-            cursor.getInt(0)
-        }
+    private fun androidx.sqlite.db.SupportSQLiteDatabase.int(query: String): Int = this.query(query).use { cursor ->
+        check(cursor.moveToFirst())
+        cursor.getInt(0)
+    }
 
-    private fun androidx.sqlite.db.SupportSQLiteDatabase.text(query: String): String =
-        this.query(query).use { cursor ->
-            check(cursor.moveToFirst())
-            cursor.getString(0)
-        }
+    private fun androidx.sqlite.db.SupportSQLiteDatabase.text(query: String): String = this.query(query).use { cursor ->
+        check(cursor.moveToFirst())
+        cursor.getString(0)
+    }
 }

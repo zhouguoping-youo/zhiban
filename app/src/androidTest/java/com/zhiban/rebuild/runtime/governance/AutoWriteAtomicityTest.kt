@@ -1,16 +1,14 @@
 package com.zhiban.rebuild.runtime.governance
 
-import com.zhiban.rebuild.data.autowrite.insertVisibleAutoWrite
-
-import com.zhiban.rebuild.data.autowrite.AutoWriteAuditDraft
-import com.zhiban.rebuild.data.autowrite.AutoWriteToolNames
-
 import android.content.Context
 import androidx.room.Room
 import androidx.room.withTransaction
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.autowrite.AutoWriteAuditDraft
+import com.zhiban.rebuild.data.autowrite.AutoWriteToolNames
+import com.zhiban.rebuild.data.autowrite.insertVisibleAutoWrite
 import com.zhiban.rebuild.data.contact.ContactEntity
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -96,25 +94,24 @@ class AutoWriteAtomicityTest {
         assertNull(database.changeLogDao().findAutoWriteReceipt("change-receipt-failure"))
     }
 
-    private fun auditDraft(changeId: String, subjectContactId: String = "contact-atomic") =
-        AutoWriteAuditDraft(
-            changeId = changeId,
-            runtimeRunId = null,
-            toolName = AutoWriteToolNames.CONTACT_TAG_ADD,
-            idempotencyKey = "idempotency-$changeId",
-            targetDomain = "CONTACT",
-            targetId = "contact-atomic",
-            operation = "UPDATE",
-            beforeDigest = "before",
-            afterDigest = "after",
-            inversePayloadJson = "{\"removeTag\":\"客户\"}",
-            originType = "SYSTEM_PERCEPTION",
-            subjectContactId = subjectContactId,
-            sourceType = "TEST",
-            sourceRef = "test-source",
-            confidence = 1.0,
-            presentationType = "CONTACT_TAG",
-            correctionRoute = "CONTACT_TAG_EDITOR",
-            createdAtEpochMs = 2,
-        )
+    private fun auditDraft(changeId: String, subjectContactId: String = "contact-atomic") = AutoWriteAuditDraft(
+        changeId = changeId,
+        runtimeRunId = null,
+        toolName = AutoWriteToolNames.CONTACT_TAG_ADD,
+        idempotencyKey = "idempotency-$changeId",
+        targetDomain = "CONTACT",
+        targetId = "contact-atomic",
+        operation = "UPDATE",
+        beforeDigest = "before",
+        afterDigest = "after",
+        inversePayloadJson = "{\"removeTag\":\"客户\"}",
+        originType = "SYSTEM_PERCEPTION",
+        subjectContactId = subjectContactId,
+        sourceType = "TEST",
+        sourceRef = "test-source",
+        confidence = 1.0,
+        presentationType = "CONTACT_TAG",
+        correctionRoute = "CONTACT_TAG_EDITOR",
+        createdAtEpochMs = 2,
+    )
 }

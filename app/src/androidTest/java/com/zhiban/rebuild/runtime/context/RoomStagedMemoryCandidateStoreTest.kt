@@ -1,16 +1,14 @@
 package com.zhiban.rebuild.runtime.context
 
-import com.zhiban.rebuild.foundation.MemoryScope
-import com.zhiban.rebuild.foundation.Sensitivity
-
-import com.zhiban.rebuild.data.memory.RoomStagedMemoryCandidateStore
-
-import com.zhiban.rebuild.data.memory.ApprovalWriteResult
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.memory.ApprovalWriteResult
+import com.zhiban.rebuild.data.memory.RoomStagedMemoryCandidateStore
+import com.zhiban.rebuild.foundation.MemoryScope
+import com.zhiban.rebuild.foundation.Sensitivity
 import kotlinx.coroutines.runBlocking
 import org.junit.*
 import org.junit.runner.RunWith

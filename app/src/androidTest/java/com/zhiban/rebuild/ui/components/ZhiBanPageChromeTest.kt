@@ -1,7 +1,7 @@
 package com.zhiban.rebuild.ui.components
 
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LocalRippleConfiguration
@@ -16,9 +16,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.zhiban.rebuild.ui.agent.AgentTopBar
 import com.zhiban.rebuild.ui.theme.ZhiBanTerracotta
 import com.zhiban.rebuild.ui.theme.ZhiBanTheme
-import com.zhiban.rebuild.ui.agent.AgentTopBar
 import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

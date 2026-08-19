@@ -1,10 +1,9 @@
 package com.zhiban.rebuild.runtime.config
 
-import com.zhiban.rebuild.data.config.AgentControlStore
-import com.zhiban.rebuild.data.config.ExecutionPreference
-
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.zhiban.rebuild.data.config.AgentControlStore
+import com.zhiban.rebuild.data.config.ExecutionPreference
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

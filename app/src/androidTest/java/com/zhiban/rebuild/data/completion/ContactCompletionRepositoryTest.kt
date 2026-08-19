@@ -5,10 +5,10 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.config.AgentControlStore
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.ContactPlatformIdentityEntity
 import com.zhiban.rebuild.data.contact.ContactProfileField
-import com.zhiban.rebuild.data.config.AgentControlStore
 import com.zhiban.rebuild.provider.CapabilitySnapshot
 import com.zhiban.rebuild.provider.ModelEvent
 import com.zhiban.rebuild.provider.ModelRequest
@@ -287,17 +287,11 @@ class ContactCompletionRepositoryTest {
     }
 
     /** 覆写 [ContactCompletionOutreachGenerator.generateDraft] 返回固定草稿,provider 绝不触网。 */
-    private class FakeGenerator(private val draft: String?) :
-        ContactCompletionOutreachGenerator(UnusedProvider, UnusedProfileStore) {
+    private class FakeGenerator(private val draft: String?) : ContactCompletionOutreachGenerator(UnusedProvider, UnusedProfileStore) {
         var calls = 0
             private set
 
-        override suspend fun generateDraft(
-            contactName: String,
-            fields: List<ContactProfileField>,
-            businessContext: String?,
-            requestKey: String,
-        ): String? {
+        override suspend fun generateDraft(contactName: String, fields: List<ContactProfileField>, businessContext: String?, requestKey: String): String? {
             calls++
             return draft
         }

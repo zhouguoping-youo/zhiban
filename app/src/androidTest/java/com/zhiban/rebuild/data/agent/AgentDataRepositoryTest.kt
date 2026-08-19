@@ -4,6 +4,9 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.zhiban.rebuild.data.autowrite.AutoWriteRepository
+import com.zhiban.rebuild.data.autowrite.canonicalChangeDigest
+import com.zhiban.rebuild.data.autowrite.insertVisibleAutoWrite
 import com.zhiban.rebuild.data.calendar.SystemCalendarEvent
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.ContactImportantDateEntity
@@ -18,15 +21,12 @@ import com.zhiban.rebuild.data.contact.SystemRawContactSnapshot
 import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityStage
 import com.zhiban.rebuild.data.crm.CrmRecordStatus
+import com.zhiban.rebuild.data.facts.FactEntity
+import com.zhiban.rebuild.data.facts.FactIndex
 import com.zhiban.rebuild.data.notification.IdentityDriftInfo
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.NotificationInsights
 import com.zhiban.rebuild.data.notification.ScheduleInsight
-import com.zhiban.rebuild.data.facts.FactEntity
-import com.zhiban.rebuild.data.facts.FactIndex
-import com.zhiban.rebuild.data.autowrite.AutoWriteRepository
-import com.zhiban.rebuild.data.autowrite.canonicalChangeDigest
-import com.zhiban.rebuild.data.autowrite.insertVisibleAutoWrite
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -1324,20 +1324,19 @@ class AgentDataRepositoryTest {
         // "[N条]" sender tag -> a distinct candidateId/sourceKey for one logical message. The inbox must surface a
         // single card (the most recent), not a stack of duplicates.
         val body = "后天上午10点去九州通拜访客户"
-        fun capture(id: String, sourceKey: String, sender: String, postedAt: Long, dir: String = "INCOMING", text: String = body) =
-            NotificationCandidateEntity(
-                candidateId = id,
-                sourceKey = sourceKey,
-                packageName = "com.tencent.mm",
-                appLabel = "微信",
-                title = "周国平",
-                body = text,
-                postedAtEpochMs = postedAt,
-                platform = "WECHAT",
-                conversationTitle = "周国平",
-                senderName = sender,
-                direction = dir,
-            )
+        fun capture(id: String, sourceKey: String, sender: String, postedAt: Long, dir: String = "INCOMING", text: String = body) = NotificationCandidateEntity(
+            candidateId = id,
+            sourceKey = sourceKey,
+            packageName = "com.tencent.mm",
+            appLabel = "微信",
+            title = "周国平",
+            body = text,
+            postedAtEpochMs = postedAt,
+            platform = "WECHAT",
+            conversationTitle = "周国平",
+            senderName = sender,
+            direction = dir,
+        )
         val dao = database.notificationCandidateDao()
         dao.upsert(capture("cap-early", "sk-early", "[2条]周国平", 1_000L))
         dao.upsert(capture("cap-mid", "sk-mid", "[3条]周国平", 2_000L))
@@ -1415,19 +1414,18 @@ class AgentDataRepositoryTest {
 
     @Test
     fun pendingInboxCollapsesDistinctMessagesFromOneUnresolvedSenderToLatestCard() = runBlocking {
-        fun message(id: String, sourceKey: String, body: String, postedAt: Long, sender: String = "未名商户") =
-            NotificationCandidateEntity(
-                candidateId = id,
-                sourceKey = sourceKey,
-                packageName = "com.tencent.mm",
-                appLabel = "微信",
-                title = sender,
-                body = body,
-                postedAtEpochMs = postedAt,
-                platform = "WECHAT",
-                conversationTitle = sender,
-                senderName = sender,
-            )
+        fun message(id: String, sourceKey: String, body: String, postedAt: Long, sender: String = "未名商户") = NotificationCandidateEntity(
+            candidateId = id,
+            sourceKey = sourceKey,
+            packageName = "com.tencent.mm",
+            appLabel = "微信",
+            title = sender,
+            body = body,
+            postedAtEpochMs = postedAt,
+            platform = "WECHAT",
+            conversationTitle = sender,
+            senderName = sender,
+        )
         // 同一未解析发送者的两条不同消息:收件箱只显示最新一张,另一发送者不受影响。
         repository.stageNotificationCandidate(message("throttle-1", "throttle-source-1", "你好", 1_000L))
         repository.stageNotificationCandidate(message("throttle-2", "throttle-source-2", "在吗", 2_000L))
@@ -1442,21 +1440,20 @@ class AgentDataRepositoryTest {
     @Test
     fun senderCollapseOnlyAppliesToUnresolvedStagedRows() = runBlocking {
         // 已关联联系人的行与旧行(normalizedSender 为 NULL)不参与发送者折叠,保持一卡一条。
-        fun row(id: String, body: String, sender: String, postedAt: Long, normalized: String?, linked: String?) =
-            NotificationCandidateEntity(
-                candidateId = id,
-                sourceKey = "source-$id",
-                packageName = "com.tencent.mm",
-                appLabel = "微信",
-                title = sender,
-                body = body,
-                postedAtEpochMs = postedAt,
-                platform = "WECHAT",
-                conversationTitle = sender,
-                senderName = sender,
-                normalizedSender = normalized,
-                linkedContactId = linked,
-            )
+        fun row(id: String, body: String, sender: String, postedAt: Long, normalized: String?, linked: String?) = NotificationCandidateEntity(
+            candidateId = id,
+            sourceKey = "source-$id",
+            packageName = "com.tencent.mm",
+            appLabel = "微信",
+            title = sender,
+            body = body,
+            postedAtEpochMs = postedAt,
+            platform = "WECHAT",
+            conversationTitle = sender,
+            senderName = sender,
+            normalizedSender = normalized,
+            linkedContactId = linked,
+        )
         val dao = database.notificationCandidateDao()
         dao.upsert(row("linked-1", "第一条", "王敏", 1_000L, normalized = "wangmin", linked = "contact-1"))
         dao.upsert(row("linked-2", "第二条", "王敏", 2_000L, normalized = "wangmin", linked = "contact-1"))
@@ -1471,19 +1468,18 @@ class AgentDataRepositoryTest {
 
     @Test
     fun senderCollapseIgnoresUnreadCountTagVariation() = runBlocking {
-        fun message(id: String, sourceKey: String, sender: String, postedAt: Long) =
-            NotificationCandidateEntity(
-                candidateId = id,
-                sourceKey = sourceKey,
-                packageName = "com.tencent.mm",
-                appLabel = "微信",
-                title = sender,
-                body = "稍后回复你",
-                postedAtEpochMs = postedAt,
-                platform = "WECHAT",
-                conversationTitle = sender,
-                senderName = sender,
-            )
+        fun message(id: String, sourceKey: String, sender: String, postedAt: Long) = NotificationCandidateEntity(
+            candidateId = id,
+            sourceKey = sourceKey,
+            packageName = "com.tencent.mm",
+            appLabel = "微信",
+            title = sender,
+            body = "稍后回复你",
+            postedAtEpochMs = postedAt,
+            platform = "WECHAT",
+            conversationTitle = sender,
+            senderName = sender,
+        )
         // 微信堆叠未读时发送者带 "[N条]" 前缀,归一化键剥掉它,两次捕获折叠成一张卡。
         repository.stageNotificationCandidate(message("tag-1", "tag-source-1", "[3条]张三", 1_000L))
         repository.stageNotificationCandidate(message("tag-2", "tag-source-2", "张三", 2_000L))

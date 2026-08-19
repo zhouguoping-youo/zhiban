@@ -1,10 +1,10 @@
 package com.zhiban.rebuild.ui.tabs
 
 import com.zhiban.rebuild.data.contact.ContactEntity
-import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
+import com.zhiban.rebuild.data.facts.FactEntity
 import com.zhiban.rebuild.relationship.HistoricalRelationshipVisibility
 import com.zhiban.rebuild.relationship.RelationshipGroup
 import com.zhiban.rebuild.relationship.RelationshipTaxonomy
@@ -13,138 +13,7 @@ internal const val INFERRED_COMPANY_RELATIONSHIP_STATUS = "INFERRED_COMPANY"
 internal const val INFERRED_HISTORICAL_COMPANY_RELATIONSHIP_STATUS = "INFERRED_HISTORICAL_COMPANY"
 internal const val INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME_STATUS = "INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME"
 internal const val INFERRED_COMPANY_UNKNOWN_TIME_STATUS = "INFERRED_COMPANY_UNKNOWN_TIME"
-
-/**
- * Adds reversible, display-only colleague links when two people have the same explicit company.
- *
- * These edges are deliberately not written to Room: a company match is useful graph evidence, but
- * it is still an inference rather than a user-confirmed fact. A saved colleague edge always wins.
- */
-internal fun withInferredCompanyRelationships(
-    contacts: List<ContactEntity>,
-    ownerContactSources: List<ContactEntity>,
-    savedEdges: List<RelationshipEdgeEntity>,
-    employmentEpisodes: List<PersonEmploymentEpisodeEntity> = emptyList(),
-): List<RelationshipEdgeEntity> {
-    val ownerIds = ownerContactSources.mapTo(hashSetOf(), ContactEntity::contactId)
-    val visiblePersonIds = contacts.mapTo(hashSetOf(), ContactEntity::contactId).apply {
-        addAll(ownerIds)
-        add(RelationshipPersonIds.SELF)
-    }
-    val employmentEvidence = employmentEvidenceByPerson(employmentEpisodes, ownerIds, visiblePersonIds)
-    if (employmentEvidence.size < 2) return savedEdges
-
-    val savedColleaguePairs = savedEdges.asSequence()
-        .filter { it.relationType == "COLLEAGUE" }
-        .map { relationshipPairKey(it.fromContactId, it.toContactId) }
-        .toMutableSet()
-    val companyEdges = inferTemporalCompanyPairs(employmentEvidence, savedColleaguePairs)
-    return savedEdges + companyEdges
-}
-
-private fun employmentEvidenceByPerson(
-    episodes: List<PersonEmploymentEpisodeEntity>,
-    ownerContactIds: Set<String>,
-    visiblePersonIds: Set<String>,
-): Map<String, List<EmploymentEvidence>> = episodes
-    .filter { it.status == "ACTIVE" && it.personId in visiblePersonIds }
-    .filter { episode ->
-        val belongsToOwner = episode.personId == RelationshipPersonIds.SELF || episode.personId in ownerContactIds
-        !belongsToOwner || episode.verificationState == "USER_CONFIRMED"
-    }
-    .mapNotNull { episode ->
-        val company = episode.companyNameSnapshot.toNormalizedCompany() ?: return@mapNotNull null
-        val personId = if (episode.personId in ownerContactIds) RelationshipPersonIds.SELF else episode.personId
-        personId to EmploymentEvidence(
-            company,
-            episode.organizationId,
-            episode.validFromEpochMs,
-            episode.validToEpochMs,
-            episode.currentState,
-        )
-    }.groupBy({ it.first }, { it.second })
-
-private fun inferTemporalCompanyPairs(evidenceByPerson: Map<String, List<EmploymentEvidence>>, blockedPairs: Set<String>): List<RelationshipEdgeEntity> =
-    buildList {
-        val emittedPairs = blockedPairs.toMutableSet()
-        val peopleByCompany = evidenceByPerson.flatMap { (personId, episodes) ->
-            episodes.map { it.groupingKey to personId }
-        }.groupBy({ it.first }, { it.second })
-        peopleByCompany.forEach { (companyKey, people) ->
-            val distinctPeople = people.distinct().sorted()
-            if (distinctPeople.size < 2 || RelationshipPersonIds.SELF !in distinctPeople) return@forEach
-            val pairs = distinctPeople.filterNot { it == RelationshipPersonIds.SELF }
-                .map { RelationshipPersonIds.SELF to it }
-            pairs.forEach { (firstId, secondId) ->
-                val pairKey = relationshipPairKey(firstId, secondId)
-                if (pairKey in emittedPairs) return@forEach
-                val firstEpisodes = evidenceByPerson.getValue(firstId).filter { it.groupingKey == companyKey }
-                val secondEpisodes = evidenceByPerson.getValue(secondId).filter { it.groupingKey == companyKey }
-                val timing = temporalMatch(firstEpisodes, secondEpisodes) ?: return@forEach
-                emittedPairs += pairKey
-                val company = (firstEpisodes + secondEpisodes).first().company.displayName
-                add(
-                    inferredColleagueEdge(
-                        firstId,
-                        secondId,
-                        pairKey,
-                        timing.status,
-                        "${timing.label}：$company",
-                        "employment.episode",
-                        timing.confidence,
-                    ),
-                )
-            }
-        }
-    }
-
-private fun temporalMatch(first: List<EmploymentEvidence>, second: List<EmploymentEvidence>): TemporalCompanyMatch? {
-    val allPairs = first.flatMap { a -> second.map { b -> a to b } }
-    val knownPairs = allPairs.filter { (a, b) -> a.hasKnownInterval && b.hasKnownInterval }
-    val overlapping = knownPairs.firstOrNull { (a, b) -> a.overlaps(b) }
-    if (overlapping != null) {
-        if (overlapping.first.currentState == "PAST" || overlapping.second.currentState == "PAST") {
-            return TemporalCompanyMatch(
-                INFERRED_HISTORICAL_COMPANY_RELATIONSHIP_STATUS,
-                "曾在同公司任职",
-                0.9,
-            )
-        }
-        return TemporalCompanyMatch(INFERRED_COMPANY_RELATIONSHIP_STATUS, "任职时间重叠", 0.9)
-    }
-    if (allPairs.isNotEmpty() && allPairs.size == knownPairs.size) return null
-    if (allPairs.any { (a, b) -> a.currentState == "PAST" || b.currentState == "PAST" }) {
-        return TemporalCompanyMatch(
-            INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME_STATUS,
-            "曾在同公司 · 时间待核实",
-            0.7,
-        )
-    }
-    return TemporalCompanyMatch(INFERRED_COMPANY_UNKNOWN_TIME_STATUS, "同公司，时间待核实", 0.65)
-}
-
-private fun inferredColleagueEdge(
-    firstId: String,
-    secondId: String,
-    pairKey: String,
-    status: String,
-    evidence: String,
-    evidenceRef: String,
-    confidence: Double,
-) = RelationshipEdgeEntity(
-    edgeId = "inferred:$status:$pairKey",
-    fromContactId = firstId,
-    toContactId = secondId,
-    relationType = "COLLEAGUE",
-    evidenceDigest = evidence.take(180),
-    evidenceRefsJson = "[\"$evidenceRef\"]",
-    confidence = confidence,
-    userConfirmed = false,
-    skillId = null,
-    status = status,
-    createdAtEpochMs = 0L,
-    updatedAtEpochMs = 0L,
-)
+internal const val INTERACTION_EVIDENCE_STATUS = "INTERACTION_EVIDENCE"
 
 internal fun contactMatchesRelationCategory(contact: ContactEntity, category: String, relationships: List<RelationshipEdgeEntity>): Boolean {
     if (category == "全部") return true
@@ -169,16 +38,12 @@ internal fun contactMatchesRelationCategory(contact: ContactEntity, category: St
     return relationTypes.any(acceptedTypes::contains)
 }
 
-internal fun RelationshipEdgeEntity.isInferredCompanyRelationship(): Boolean = status == INFERRED_COMPANY_RELATIONSHIP_STATUS ||
-    status == INFERRED_HISTORICAL_COMPANY_RELATIONSHIP_STATUS ||
-    status == INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME_STATUS ||
-    status == INFERRED_COMPANY_UNKNOWN_TIME_STATUS
-
 internal fun RelationshipEdgeEntity.isInferredEvidenceRelationship(): Boolean = status in setOf(
     INFERRED_COMPANY_RELATIONSHIP_STATUS,
     INFERRED_HISTORICAL_COMPANY_RELATIONSHIP_STATUS,
     INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME_STATUS,
     INFERRED_COMPANY_UNKNOWN_TIME_STATUS,
+    INTERACTION_EVIDENCE_STATUS,
 )
 
 internal fun RelationshipEdgeEntity.inferredEvidenceLabel(): String? = when (status) {
@@ -186,7 +51,44 @@ internal fun RelationshipEdgeEntity.inferredEvidenceLabel(): String? = when (sta
     INFERRED_HISTORICAL_COMPANY_RELATIONSHIP_STATUS -> "曾在同公司任职"
     INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME_STATUS -> "曾在同公司 · 时间待核实"
     INFERRED_COMPANY_UNKNOWN_TIME_STATUS -> "同公司 · 时间待核实"
+    INTERACTION_EVIDENCE_STATUS -> "有联系 · 来自消息互动"
     else -> null
+}
+
+/**
+ * ① 互动边:从互动摘要事实投影 SELF↔联系人 的只读边(不落库、不可点开编辑),
+ * 让图谱显示"哪些人有真实联系"。边强度信息放在 evidenceDigest 里。
+ */
+internal fun interactionEvidenceEdges(
+    interactions: List<FactEntity>,
+    contacts: List<ContactEntity>,
+    ownerContactSources: List<ContactEntity>,
+): List<RelationshipEdgeEntity> {
+    val visibleIds = contacts.mapTo(hashSetOf(), ContactEntity::contactId)
+    val ownerIds = ownerContactSources.mapTo(hashSetOf(), ContactEntity::contactId)
+    val now = System.currentTimeMillis()
+    return interactions
+        .filter { it.contactId != null && it.contactId !in ownerIds && it.contactId in visibleIds }
+        .groupBy(FactEntity::contactId)
+        .mapNotNull { (contactId, facts) ->
+            val contactId = contactId ?: return@mapNotNull null
+            val latest = facts.maxOfOrNull(FactEntity::createdAtEpochMs) ?: now
+            val recencyDays = ((now - latest) / (24 * 60 * 60 * 1_000L)).coerceAtLeast(0)
+            RelationshipEdgeEntity(
+                edgeId = "interaction-user:self-$contactId",
+                fromContactId = RelationshipPersonIds.SELF,
+                toContactId = contactId,
+                relationType = "INTERACTION",
+                evidenceDigest = "近 90 天互动 ${facts.size} 次 · 最近 $recencyDays 天前",
+                evidenceRefsJson = facts.map { it.factId }.take(5).toString(),
+                confidence = 1.0,
+                userConfirmed = false,
+                skillId = null,
+                status = INTERACTION_EVIDENCE_STATUS,
+                createdAtEpochMs = latest,
+                updatedAtEpochMs = latest,
+            )
+        }
 }
 
 /** Projects closed temporal episodes into a read-only graph layer. */
@@ -232,27 +134,6 @@ internal fun relationshipGraphEdgesForRoot(rootId: String, edges: List<Relations
     it.fromContactId == rootId || it.toContactId == rootId
 }
 
-private data class NormalizedCompany(val key: String, val displayName: String)
-
-private data class EmploymentEvidence(
-    val company: NormalizedCompany,
-    val organizationId: String?,
-    val validFromEpochMs: Long?,
-    val validToEpochMs: Long?,
-    val currentState: String,
-) {
-    // Registry-backed contacts may use a credit-code ID while an older owner record uses a
-    // name-derived ID. The confirmed legal name is the shared key until aliases are explicit.
-    val groupingKey: String = "name:${company.key}"
-    val hasKnownInterval: Boolean get() = validFromEpochMs != null || validToEpochMs != null
-
-    fun overlaps(other: EmploymentEvidence): Boolean {
-        val start = maxOf(validFromEpochMs ?: Long.MIN_VALUE, other.validFromEpochMs ?: Long.MIN_VALUE)
-        val end = minOf(validToEpochMs ?: Long.MAX_VALUE, other.validToEpochMs ?: Long.MAX_VALUE)
-        return start <= end
-    }
-}
-
 internal fun RelationshipEdgeEntity.isHistoricalRelationship(): Boolean = status == "HISTORICAL" ||
     status == INFERRED_HISTORICAL_COMPANY_RELATIONSHIP_STATUS ||
     status == INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME_STATUS
@@ -260,15 +141,8 @@ internal fun RelationshipEdgeEntity.isHistoricalRelationship(): Boolean = status
 internal fun RelationshipEdgeEntity.displayRelationLabel(): String = when (status) {
     INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME_STATUS -> "可能是前同事"
     INFERRED_COMPANY_UNKNOWN_TIME_STATUS -> "同公司"
+    INTERACTION_EVIDENCE_STATUS -> "有联系"
     else -> relationLabel(relationType, isHistorical = isHistoricalRelationship())
-}
-
-private data class TemporalCompanyMatch(val status: String, val label: String, val confidence: Double)
-
-private fun String.toNormalizedCompany(): NormalizedCompany? {
-    val display = trim().replace(Regex("\\s+"), " ")
-    val key = display.lowercase().replace(" ", "")
-    return key.takeIf { it.length >= 4 }?.let { NormalizedCompany(it, display) }
 }
 
 private fun relationshipPairKey(firstId: String, secondId: String): String = listOf(firstId, secondId).sorted().joinToString("::")

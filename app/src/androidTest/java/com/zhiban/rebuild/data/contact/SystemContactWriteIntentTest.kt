@@ -68,12 +68,7 @@ class SystemContactWriteIntentTest {
         contactUri = "content://com.android.contacts/contacts/$sourceId",
     )
 
-    private fun contact(
-        source: String = "MANUAL",
-        phone: String? = null,
-        email: String? = null,
-        company: String? = null,
-    ) = ContactEntity(
+    private fun contact(source: String = "MANUAL", phone: String? = null, email: String? = null, company: String? = null) = ContactEntity(
         contactId = "contact-1",
         displayName = "测试联系人",
         normalizedName = "测试联系人",

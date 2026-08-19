@@ -8,19 +8,18 @@ import org.junit.Test
 
 /** 备注漂移检测纯函数:第三级归一化名命中后的"可能是旧备注改名"判断。 */
 class IdentityDriftTest {
-    private fun identity(id: String, platform: String, handle: String, confirmed: Boolean, updatedAt: Long) =
-        ContactPlatformIdentityEntity(
-            identityId = id,
-            contactId = "contact-1",
-            platform = platform,
-            handle = handle,
-            normalizedHandle = handle.lowercase(),
-            platformUserId = null,
-            source = "USER_CONFIRMED_MESSAGE",
-            userConfirmed = confirmed,
-            createdAtEpochMs = updatedAt,
-            updatedAtEpochMs = updatedAt,
-        )
+    private fun identity(id: String, platform: String, handle: String, confirmed: Boolean, updatedAt: Long) = ContactPlatformIdentityEntity(
+        identityId = id,
+        contactId = "contact-1",
+        platform = platform,
+        handle = handle,
+        normalizedHandle = handle.lowercase(),
+        platformUserId = null,
+        source = "USER_CONFIRMED_MESSAGE",
+        userConfirmed = confirmed,
+        createdAtEpochMs = updatedAt,
+        updatedAtEpochMs = updatedAt,
+    )
 
     @Test
     fun detectsDriftWhenContactHasDifferentConfirmedHandleOnSamePlatform() {

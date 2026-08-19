@@ -25,6 +25,9 @@ internal object AutoWriteToolNames {
     /** 高置信消息抽取自动补全联系人资料(公司/职位/电话;可撤销)。 */
     const val CONTACT_COMPLETION = "contact.completion.autoApply"
 
+    /** 关系图谱自动推断边(同公司同事/LLM 关系类型;可撤销)。 */
+    const val RELATIONSHIP_AUTO_INFER = "contact.relationship.autoInfer"
+
     val all = setOf(
         INTERACTION_SUMMARY,
         CONTACT_TAG_ADD,
@@ -37,6 +40,7 @@ internal object AutoWriteToolNames {
         CRM_SUGGESTION_ACCEPT_ACTIVITY,
         CRM_SUGGESTION_ACCEPT_LEAD,
         CONTACT_COMPLETION,
+        RELATIONSHIP_AUTO_INFER,
     )
 }
 

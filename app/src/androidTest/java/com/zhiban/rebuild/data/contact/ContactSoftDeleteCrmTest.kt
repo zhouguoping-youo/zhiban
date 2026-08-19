@@ -74,7 +74,12 @@ class ContactSoftDeleteCrmTest {
     )
 
     private fun stakeholder() = CrmOpportunityStakeholderEntity(
-        OPPORTUNITY_ID, CONTACT_ID, "DECISION_MAKER", "HIGH", true, 1,
+        OPPORTUNITY_ID,
+        CONTACT_ID,
+        "DECISION_MAKER",
+        "HIGH",
+        true,
+        1,
     )
 
     private fun activity() = CrmActivityEntity(

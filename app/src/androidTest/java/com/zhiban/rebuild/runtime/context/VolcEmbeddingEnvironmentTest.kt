@@ -1,16 +1,15 @@
 package com.zhiban.rebuild.runtime.context
 
-import com.zhiban.rebuild.foundation.Sensitivity
-
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.di.ProviderModule
-import com.zhiban.rebuild.runtime.embedding.EmbeddingTransport
-import com.zhiban.rebuild.runtime.embedding.VolcEmbeddingEnvironment
+import com.zhiban.rebuild.foundation.Sensitivity
 import com.zhiban.rebuild.provider.KeystoreCredentialVault
 import com.zhiban.rebuild.provider.OutboundExportGate
 import com.zhiban.rebuild.provider.OutboundPolicySettings
+import com.zhiban.rebuild.runtime.embedding.EmbeddingTransport
+import com.zhiban.rebuild.runtime.embedding.VolcEmbeddingEnvironment
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals

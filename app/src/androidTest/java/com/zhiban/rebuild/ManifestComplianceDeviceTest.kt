@@ -18,7 +18,8 @@ class ManifestComplianceDeviceTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
     @Suppress("DEPRECATION")
-    @Test fun systemCameraCaptureDoesNotRequireDirectCameraPermission() {
+    @Test
+    fun systemCameraCaptureDoesNotRequireDirectCameraPermission() {
         val permissions = context.packageManager.getPackageInfo(
             context.packageName,
             PackageManager.GET_PERMISSIONS,
@@ -28,7 +29,8 @@ class ManifestComplianceDeviceTest {
     }
 
     @Suppress("DEPRECATION")
-    @Test fun sensitiveServicesExposeAccurateLabelsAndDescriptions() {
+    @Test
+    fun sensitiveServicesExposeAccurateLabelsAndDescriptions() {
         val packageManager = context.packageManager
         val notificationService = packageManager.getServiceInfo(
             ComponentName(context, ZhiBanNotificationListenerService::class.java),

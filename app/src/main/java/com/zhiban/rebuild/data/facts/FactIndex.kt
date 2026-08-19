@@ -106,6 +106,14 @@ internal interface FactDao {
     )
     fun observeByContact(contactId: String, now: Long): Flow<List<FactEntity>>
 
+    /** 关系图谱互动边与关系推断共用的证据快照:全部互动摘要,按时间倒序。 */
+    @Query(
+        """SELECT * FROM facts WHERE factType = 'INTERACTION_SUMMARY' AND status = 'ACTIVE'
+        AND (expiresAtEpochMs IS NULL OR expiresAtEpochMs > :now)
+        ORDER BY createdAtEpochMs DESC LIMIT :limit""",
+    )
+    fun observeRecentInteractions(now: Long, limit: Int): Flow<List<FactEntity>>
+
     @Query(
         """SELECT * FROM facts f WHERE f.status='ACTIVE' AND f.sensitivity!='SENSITIVE'
         AND (f.expiresAtEpochMs IS NULL OR f.expiresAtEpochMs>:now)

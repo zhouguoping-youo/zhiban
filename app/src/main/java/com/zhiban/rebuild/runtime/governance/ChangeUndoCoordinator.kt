@@ -7,6 +7,7 @@ import com.zhiban.rebuild.data.autowrite.ChangeLogEntity
 import com.zhiban.rebuild.data.autowrite.canonicalChangeDigest
 import com.zhiban.rebuild.data.autowrite.changeDigestMatches
 import com.zhiban.rebuild.data.contact.enrichment.canonicalContactCompletionDigest
+import com.zhiban.rebuild.data.contact.enrichment.canonicalRelationshipDigest
 import com.zhiban.rebuild.data.facts.FactEntity
 import com.zhiban.rebuild.data.facts.FactIndex
 import com.zhiban.rebuild.foundation.runSuspendCatching
@@ -72,6 +73,8 @@ internal class ChangeUndoCoordinator(private val database: AgentDatabase) {
         AutoWriteToolNames.CONTACT_TAG_ADD -> undoContactTag(change, nowEpochMs)
 
         AutoWriteToolNames.CONTACT_COMPLETION -> undoContactCompletion(change, nowEpochMs)
+
+        AutoWriteToolNames.RELATIONSHIP_AUTO_INFER -> undoInferredRelationship(change, nowEpochMs)
 
         AutoWriteToolNames.CONTACT_IDENTITY_AUTO_LINK -> undoAutomaticIdentityLink(change, nowEpochMs)
 
@@ -152,6 +155,13 @@ internal class ChangeUndoCoordinator(private val database: AgentDatabase) {
             updatedAtEpochMs = nowEpochMs,
         )
         return database.contactDao().update(updated) == 1
+    }
+
+    /** 撤销自动推断的关系边:当前边仍等于写入后的状态才允许,软停用保留证据。 */
+    private suspend fun undoInferredRelationship(change: ChangeLogEntity, nowEpochMs: Long): Boolean {
+        val current = database.relationshipEdgeDao().find(change.targetId) ?: return false
+        if (canonicalRelationshipDigest(current) != change.afterDigest) return false
+        return database.relationshipEdgeDao().deactivateInferredEdge(change.targetId, nowEpochMs) == 1
     }
 
     /** 撤销消息抽取自动补全:当前值仍等于写入后的值才允许,恢复为写入前的旧值(可含 null)。 */

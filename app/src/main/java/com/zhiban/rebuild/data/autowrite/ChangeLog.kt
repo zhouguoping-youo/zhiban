@@ -142,7 +142,7 @@ interface ChangeLogDao {
             auto_write_receipts.createdAtEpochMs AS createdAtEpochMs,
             CASE WHEN change_log.targetDomain = 'FACT' THEN facts.textContent
                  WHEN change_log.targetDomain = 'SCHEDULE' THEN schedules.title
-                 WHEN change_log.targetDomain = 'CONTACT' THEN auto_write_receipts.summary
+                 WHEN change_log.targetDomain IN ('CONTACT', 'RELATIONSHIP') THEN auto_write_receipts.summary
                  ELSE NULL END AS contentPreview
             FROM auto_write_receipts
             INNER JOIN change_log ON change_log.changeId = auto_write_receipts.changeId

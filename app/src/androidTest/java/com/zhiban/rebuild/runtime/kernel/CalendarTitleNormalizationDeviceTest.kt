@@ -1,8 +1,8 @@
 package com.zhiban.rebuild.runtime.kernel
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.zhiban.rebuild.runtime.context.LocalEntityExtractor
 import com.zhiban.rebuild.provider.ModelEvent
+import com.zhiban.rebuild.runtime.context.LocalEntityExtractor
 import com.zhiban.rebuild.runtime.tool.SchedulePlanValidator
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -45,6 +45,5 @@ class CalendarTitleNormalizationDeviceTest {
         return requireNotNull(deterministicCalendarToolCall(DecodedInput(text, "Work"), context, now)).title()
     }
 
-    private fun ModelEvent.ToolCall.title(): String =
-        Json.parseToJsonElement(argumentsJson).jsonObject.getValue("title").jsonPrimitive.content
+    private fun ModelEvent.ToolCall.title(): String = Json.parseToJsonElement(argumentsJson).jsonObject.getValue("title").jsonPrimitive.content
 }

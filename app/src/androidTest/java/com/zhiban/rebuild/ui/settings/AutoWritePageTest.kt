@@ -38,10 +38,7 @@ class AutoWritePageTest {
         createdAtEpochMs = 1_700_000_000_000,
     )
 
-    private fun render(
-        receipts: List<AutoWriteReceiptRow>,
-        undoSucceeds: Boolean = true,
-    ) {
+    private fun render(receipts: List<AutoWriteReceiptRow>, undoSucceeds: Boolean = true) {
         compose.setContent {
             ZhiBanTheme {
                 AutoWriteContent(

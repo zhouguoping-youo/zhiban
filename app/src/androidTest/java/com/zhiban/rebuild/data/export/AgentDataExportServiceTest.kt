@@ -1,8 +1,5 @@
 package com.zhiban.rebuild.data.export
 
-import com.zhiban.rebuild.data.store.RuntimeRunEntity
-import com.zhiban.rebuild.data.store.RuntimeSessionEntity
-
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -12,8 +9,10 @@ import com.zhiban.rebuild.data.agent.MemoryEntity
 import com.zhiban.rebuild.data.agent.ScheduleEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.crm.CrmLeadEntity
-import com.zhiban.rebuild.provider.SecretRedactor
 import com.zhiban.rebuild.data.store.RuntimeConversationTurnEntity
+import com.zhiban.rebuild.data.store.RuntimeRunEntity
+import com.zhiban.rebuild.data.store.RuntimeSessionEntity
+import com.zhiban.rebuild.provider.SecretRedactor
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.After
@@ -135,13 +134,7 @@ class AgentDataExportServiceTest {
         createdAtEpochMs = 10,
     )
 
-    private fun contact(
-        id: String,
-        phone: String? = null,
-        email: String? = null,
-        wechatId: String? = null,
-        name: String = "张三",
-    ) = ContactEntity(
+    private fun contact(id: String, phone: String? = null, email: String? = null, wechatId: String? = null, name: String = "张三") = ContactEntity(
         contactId = id,
         displayName = name,
         normalizedName = name,

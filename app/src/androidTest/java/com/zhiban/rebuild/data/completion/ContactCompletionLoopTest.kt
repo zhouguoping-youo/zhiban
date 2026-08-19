@@ -6,9 +6,9 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.ContactAgentDataRepository
+import com.zhiban.rebuild.data.config.AgentControlStore
 import com.zhiban.rebuild.data.contact.ContactProfileField
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
-import com.zhiban.rebuild.data.config.AgentControlStore
 import com.zhiban.rebuild.provider.CapabilitySnapshot
 import com.zhiban.rebuild.provider.ModelEvent
 import com.zhiban.rebuild.provider.ModelRequest
@@ -158,7 +158,7 @@ class ContactCompletionLoopTest {
     private suspend fun insertIncomingReply(contactId: String, body: String, postedAt: Long) {
         database.notificationCandidateDao().upsert(
             NotificationCandidateEntity(
-                candidateId = "reply-${postedAt}",
+                candidateId = "reply-$postedAt",
                 sourceKey = "sk-reply-$postedAt",
                 packageName = "com.tencent.mm",
                 appLabel = "微信",
@@ -175,14 +175,9 @@ class ContactCompletionLoopTest {
         )
     }
 
-    private class FakeGenerator(private val draft: String?) :
-        ContactCompletionOutreachGenerator(UnusedProvider, FakeProfileStore(null)) {
-        override suspend fun generateDraft(
-            contactName: String,
-            fields: List<ContactProfileField>,
-            businessContext: String?,
-            requestKey: String,
-        ): String? = draft
+    private class FakeGenerator(private val draft: String?) : ContactCompletionOutreachGenerator(UnusedProvider, FakeProfileStore(null)) {
+        override suspend fun generateDraft(contactName: String, fields: List<ContactProfileField>, businessContext: String?, requestKey: String): String? =
+            draft
     }
 
     private class FakeHandoff(var available: Boolean) {

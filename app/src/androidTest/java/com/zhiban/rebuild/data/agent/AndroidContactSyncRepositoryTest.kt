@@ -202,5 +202,4 @@ class AndroidContactSyncRepositoryTest {
             row.mimeType == ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE &&
                 normalizeContactPhone(row.value) == normalizeContactPhone(testSecondPhone)
         }
-
 }

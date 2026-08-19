@@ -29,13 +29,7 @@ class NotificationInboxDedupTest {
 
     @After fun tearDown() = database.close()
 
-    private suspend fun insert(
-        key: String,
-        conversationTitle: String?,
-        body: String?,
-        postedAt: Long,
-        direction: String = "INCOMING",
-    ) {
+    private suspend fun insert(key: String, conversationTitle: String?, body: String?, postedAt: Long, direction: String = "INCOMING") {
         database.notificationCandidateDao().upsert(
             NotificationCandidateEntity(
                 candidateId = "c-$key",

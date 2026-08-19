@@ -1,14 +1,13 @@
 package com.zhiban.rebuild.runtime.tool
 
-import com.zhiban.rebuild.data.store.RuntimeAttemptEntity
-
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
-import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.autowrite.AutoWriteRepository
+import com.zhiban.rebuild.data.contact.ContactEntity
+import com.zhiban.rebuild.data.store.RuntimeAttemptEntity
 import com.zhiban.rebuild.runtime.kernel.PersistentRuntimeKernel
 import com.zhiban.rebuild.runtime.kernel.RuntimeSignal
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore

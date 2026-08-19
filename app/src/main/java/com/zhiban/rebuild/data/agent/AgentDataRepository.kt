@@ -99,6 +99,7 @@ class AgentDataRepository internal constructor(
     private val replySuggestionSink: () -> Unit = { },
     private val contactCompletionSink: () -> Unit = { },
     private val messageContactCompletionSink: () -> Unit = { },
+    private val relationshipInferenceSink: () -> Unit = { },
 ) {
     private val daos = infrastructure.daos
     private val transactions = infrastructure.transactions
@@ -124,6 +125,12 @@ class AgentDataRepository internal constructor(
     fun observePendingScheduleFeedback(beforeEpochMs: Long, oldestEpochMs: Long, limit: Int = 20): Flow<List<ScheduleProjection>> =
         calendar.observePendingFeedback(beforeEpochMs, oldestEpochMs, limit)
 
+    /** 关系图谱互动边与关系推断共用的互动摘要快照。 */
+    fun observeRecentInteractionSummaries(limit: Int = 100): Flow<List<FactEntity>> = daos.factDao.observeRecentInteractions(System.currentTimeMillis(), limit)
+
+    /** 关系推断协调器的启动扫掠(同公司同事边/互动推断),关系页打开时补一次。 */
+    fun sweepRelationshipInference() = relationshipInferenceSink()
+
     suspend fun stageNotificationCandidate(candidate: NotificationCandidateEntity) {
         val nowEpochMs = System.currentTimeMillis()
         // 发送者归一化键在入库时算好落列(收件箱节流折叠按它分组),静默闸门复用同一把尺子。
@@ -145,6 +152,8 @@ class AgentDataRepository internal constructor(
             contactCompletionSink()
             // 消息正文 → 联系人资料补全(高置信自动写/低置信建议卡):协调器再核对关联与字段空缺。
             messageContactCompletionSink()
+            // 关系图谱自动补全(同公司同事/LLM 关系类型推断):协调器再核对已有边与幂等键。
+            relationshipInferenceSink()
         }
     }
 

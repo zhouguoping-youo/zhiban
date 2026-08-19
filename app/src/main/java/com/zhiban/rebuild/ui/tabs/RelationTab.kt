@@ -319,13 +319,10 @@ fun RelationTab(
         val ownerSourceIds = ownerContactLinks.mapTo(hashSetOf()) { it.contactId }
         rawContacts.filter { it.contactId in ownerSourceIds }
     }
-    val graphRelationships = remember(contacts, ownerContactSources, relationships, temporalEmployments) {
-        withInferredCompanyRelationships(
-            contacts,
-            ownerContactSources,
-            relationships,
-            temporalEmployments,
-        )
+    // 图谱边 = 落库边(含关系推断协调器自动写的可撤销推断边) + 互动证据边(只读投影)。
+    // 同公司同事推断已全部由协调器落库,UI 层不再产生临时推断边。
+    val graphRelationships = remember(relationships, page.recentInteractions, contacts, ownerContactSources) {
+        relationships + interactionEvidenceEdges(page.recentInteractions, contacts, ownerContactSources)
     }
     val ownerEmploymentPersonIds = remember(ownerContactLinks) {
         ownerContactLinks.mapTo(hashSetOf(), OwnerContactLinkEntity::contactId) + RelationshipPersonIds.SELF

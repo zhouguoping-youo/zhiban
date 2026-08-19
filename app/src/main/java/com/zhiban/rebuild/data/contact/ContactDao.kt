@@ -477,6 +477,12 @@ interface RelationshipEdgeDao {
     @Query("DELETE FROM relationship_edges WHERE edgeId = :edgeId AND userConfirmed = 1")
     suspend fun deleteConfirmed(edgeId: String): Int
 
+    /** 撤销自动推断边:软停用,历史时间线仍可保留证据。 */
+    @Query(
+        "UPDATE relationship_edges SET status = 'DELETED', updatedAtEpochMs = :nowEpochMs WHERE edgeId = :edgeId AND userConfirmed = 0 AND status = 'ACTIVE'",
+    )
+    suspend fun deactivateInferredEdge(edgeId: String, nowEpochMs: Long): Int
+
     @Query(
         "UPDATE relationship_edges SET status = 'DELETED', updatedAtEpochMs = :nowEpochMs WHERE status = 'ACTIVE' AND (fromContactId IN (:contactIds) OR toContactId IN (:contactIds))",
     )

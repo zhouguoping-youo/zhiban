@@ -7,13 +7,13 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.runtime.kernel.PersistentRuntimeKernel
 import com.zhiban.rebuild.runtime.kernel.RuntimeSignal
-import com.zhiban.rebuild.runtime.spi.RuntimeRunStatus
 import com.zhiban.rebuild.runtime.spi.RuntimeAction
+import com.zhiban.rebuild.runtime.spi.RuntimeRunStatus
 import com.zhiban.rebuild.runtime.spi.RuntimeUiCommand
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -243,7 +243,13 @@ class RoomRuntimeStoreTest {
         val input = RoomTextInputGateway(database, { true }, { 10 }).stage("atomic reply")
         RoomRuntimeGateways(database, "test") { 11 }.accept(
             com.zhiban.rebuild.runtime.spi.RuntimeUiCommand.Start(
-                "s-reply-atomic", input.inputRef, "c-reply-atomic", "a-reply-atomic", 0, "chat", "r-reply-atomic",
+                "s-reply-atomic",
+                input.inputRef,
+                "c-reply-atomic",
+                "a-reply-atomic",
+                0,
+                "chat",
+                "r-reply-atomic",
             ),
         )
         com.zhiban.rebuild.runtime.kernel.KernelCommandProcessor(database, "owner", { true }, { 12 }).processNext()
@@ -257,7 +263,11 @@ class RoomRuntimeStoreTest {
         assertTrue(
             runCatching {
                 store.completeProviderRunWithAssistantTurn(
-                    "r-reply-atomic", "操作已完成。", "owner", session.leaseEpoch, 14,
+                    "r-reply-atomic",
+                    "操作已完成。",
+                    "owner",
+                    session.leaseEpoch,
+                    14,
                 )
             }.isFailure,
         )

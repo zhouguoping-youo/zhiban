@@ -88,6 +88,7 @@ data class RelationPageSnapshot(
     val cloudAsrAvailability: CloudAsrAvailability = CloudAsrAvailability.CONSENT_REQUIRED,
     val enabledMessagePlatforms: Set<String> = MessageCollectionPreferences.DEFAULT_PLATFORMS,
     val outgoingMessageCollectionEnabled: Boolean = false,
+    val recentInteractions: List<FactEntity> = emptyList(),
 )
 
 private data class RelationInboxSnapshot(
@@ -96,6 +97,7 @@ private data class RelationInboxSnapshot(
     val pendingCallNotes: List<CallRecordEntity>,
     val importState: ContactImportUiState,
     val cloudAsrAvailability: CloudAsrAvailability,
+    val recentInteractions: List<FactEntity>,
 )
 
 private const val PLATFORM_WECHAT = "WECHAT"
@@ -156,6 +158,8 @@ class RelationViewModel @Inject constructor(
     val unresolvedSourceIdentities: StateFlow<List<SourceIdentityEntity>> =
         repository.observeUnresolvedSourceIdentities()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val recentInteractions: StateFlow<List<FactEntity>> = repository.observeRecentInteractionSummaries(100)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val mergeSuggestions: StateFlow<List<ContactMergeSuggestion>> = combine(
         repository.observeRawContacts(),
         repository.observeContactAliases(),
@@ -266,18 +270,19 @@ class RelationViewModel @Inject constructor(
             Triple(ownerContactLinks, temporalEmployments, maintenanceOverview)
         },
         combine(
+            combine(recentInteractions, cloudAsrAvailability) { recentInteractions, cloudAsr -> recentInteractions to cloudAsr },
             unresolvedSourceIdentities,
             notificationCandidates,
             pendingCallNotes,
             importState,
-            cloudAsrAvailability,
-        ) { unresolvedSourceIdentities, notificationCandidates, pendingCallNotes, importState, cloudAsr ->
+        ) { (recentInteractions, cloudAsr), unresolvedSourceIdentities, notificationCandidates, pendingCallNotes, importState ->
             RelationInboxSnapshot(
                 unresolvedSourceIdentities,
                 notificationCandidates,
                 pendingCallNotes,
                 importState,
                 cloudAsr,
+                recentInteractions,
             )
         },
         combine(enabledMessagePlatforms, outgoingMessageCollectionEnabled) { enabled, outgoing -> enabled to outgoing },
@@ -293,6 +298,7 @@ class RelationViewModel @Inject constructor(
             cloudAsrAvailability = inbox.cloudAsrAvailability,
             enabledMessagePlatforms = collection.first,
             outgoingMessageCollectionEnabled = collection.second,
+            recentInteractions = inbox.recentInteractions,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RelationPageSnapshot())
 
@@ -303,6 +309,8 @@ class RelationViewModel @Inject constructor(
             recordCompanyRefresh(companyEnrichment.refresh())
         }
         refreshCloudAsrAvailability()
+        // 关系图谱自动补全的启动扫掠(同公司同事边/互动推断),幂等、失败不影响页面。
+        repository.sweepRelationshipInference()
     }
 
     /** 企业全称联网补全的降级码不得丢弃(R20):至少落日志,供诊断"为什么没查到"。 */

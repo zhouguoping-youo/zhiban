@@ -113,6 +113,11 @@ object AgentDataModule {
     ): com.zhiban.rebuild.data.contact.enrichment.MessageContactFieldExtraction = extractor
 
     @Provides
+    internal fun provideRelationshipTypeExtraction(
+        extractor: com.zhiban.rebuild.data.contact.enrichment.RelationshipTypeExtractor,
+    ): com.zhiban.rebuild.data.contact.enrichment.RelationshipTypeExtraction = extractor
+
+    @Provides
     @Singleton
     internal fun provideAgentDataRepository(
         infrastructure: com.zhiban.rebuild.data.agent.AgentRepositoryInfrastructure,
@@ -122,6 +127,7 @@ object AgentDataModule {
         replySuggestionCoordinator: com.zhiban.rebuild.data.reply.ReplySuggestionCoordinator,
         contactCompletionCoordinator: com.zhiban.rebuild.data.completion.ContactCompletionCoordinator,
         messageContactCompletionCoordinator: com.zhiban.rebuild.data.contact.enrichment.MessageContactCompletionCoordinator,
+        relationshipInferenceCoordinator: com.zhiban.rebuild.data.contact.enrichment.RelationshipInferenceCoordinator,
     ): AgentDataRepository = AgentDataRepository(
         infrastructure,
         domains,
@@ -136,6 +142,7 @@ object AgentDataModule {
         replySuggestionSink = replySuggestionCoordinator::onIncomingWechatActivity,
         contactCompletionSink = contactCompletionCoordinator::onIncomingWechatActivity,
         messageContactCompletionSink = messageContactCompletionCoordinator::onIncomingWechatActivity,
+        relationshipInferenceSink = relationshipInferenceCoordinator::onIncomingWechatActivity,
     )
 
     @Provides
