@@ -1,13 +1,12 @@
 package com.zhiban.rebuild.runtime.tool
 
-import com.zhiban.rebuild.foundation.RuntimeToolRisk
-
 import com.zhiban.rebuild.data.contact.ContactDao
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.crm.CrmDao
 import com.zhiban.rebuild.data.crm.CrmLeadEntity
 import com.zhiban.rebuild.data.crm.CrmNextActionEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
+import com.zhiban.rebuild.foundation.RuntimeToolRisk
 import com.zhiban.rebuild.provider.ProviderFailure
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
 import io.mockk.coEvery

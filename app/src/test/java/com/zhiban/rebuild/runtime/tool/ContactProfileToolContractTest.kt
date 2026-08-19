@@ -1,11 +1,10 @@
 package com.zhiban.rebuild.runtime.tool
 
-import com.zhiban.rebuild.foundation.RuntimeToolRisk
-
-import com.zhiban.rebuild.runtime.governance.contactProfileFieldsDigest
-import com.zhiban.rebuild.runtime.governance.ownerEmploymentDigest
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.PersonEmploymentEpisodeEntity
+import com.zhiban.rebuild.foundation.RuntimeToolRisk
+import com.zhiban.rebuild.runtime.governance.contactProfileFieldsDigest
+import com.zhiban.rebuild.runtime.governance.ownerEmploymentDigest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue

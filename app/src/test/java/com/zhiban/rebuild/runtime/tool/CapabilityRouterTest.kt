@@ -1,9 +1,8 @@
 package com.zhiban.rebuild.runtime.tool
 
+import com.zhiban.rebuild.data.autowrite.ReversibleWriteReadiness
 import com.zhiban.rebuild.foundation.RuntimeToolRisk
 import com.zhiban.rebuild.foundation.RuntimeToolSpec
-
-import com.zhiban.rebuild.data.autowrite.ReversibleWriteReadiness
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest

@@ -1,7 +1,6 @@
 package com.zhiban.rebuild.runtime.context
 
 import com.zhiban.rebuild.foundation.Sensitivity
-
 import com.zhiban.rebuild.provider.CapabilitySnapshot
 import com.zhiban.rebuild.provider.DefaultOutboundDataPolicy
 import com.zhiban.rebuild.provider.ModelEvent
