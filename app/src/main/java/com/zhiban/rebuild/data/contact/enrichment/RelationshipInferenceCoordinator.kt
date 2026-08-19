@@ -102,12 +102,18 @@ internal class RelationshipInferenceCoordinator @Inject constructor(private val 
 
     /** ③ 同公司 → 同事(本地信号,零 LLM)。幂等键保证撤销后不会被重新写回。 */
     private suspend fun applyCompanyColleagueEdges(nowEpochMs: Long) {
-        val ownerCompany = ownerCompanyName() ?: return
+        val ownerLinks = database.contactKnowledgeDao().listActiveOwnerContactLinks()
+        val ownerIds = ownerLinks.mapTo(hashSetOf()) { it.contactId }
+        val ownerCompany = ownerLinks.firstNotNullOfOrNull { link ->
+            database.contactDao().findRawById(link.contactId)?.company?.trim()?.takeIf(String::isNotBlank)
+        } ?: return
         val ownerKey = ownerCompany.normalizedCompanyKey() ?: return
         val existing = database.relationshipEdgeDao()
             .touching(listOf(RelationshipPersonIds.SELF), MAX_EDGES)
             .mapTo(hashSetOf()) { it.toContactId.takeIf { id -> id != RelationshipPersonIds.SELF } ?: it.fromContactId }
         database.contactDao().listActiveForIntelligence()
+            // 排除本人联系人卡片:「我↔我自己」的同事边是语义错误,与互动投影层口径一致。
+            .filter { it.contactId !in ownerIds }
             .filter { it.company?.normalizedCompanyKey() == ownerKey }
             .filter { it.contactId !in existing }
             .forEach { contact ->
@@ -127,13 +133,14 @@ internal class RelationshipInferenceCoordinator @Inject constructor(private val 
 
     /** ② 从互动摘要 LLM 推断关系类型。 */
     private suspend fun inferFromInteractions(nowEpochMs: Long) {
+        val ownerIds = database.contactKnowledgeDao().listActiveOwnerContactLinks().mapTo(hashSetOf()) { it.contactId }
         val existing = database.relationshipEdgeDao()
             .touching(listOf(RelationshipPersonIds.SELF), MAX_EDGES)
             .mapTo(hashSetOf()) { it.toContactId.takeIf { id -> id != RelationshipPersonIds.SELF } ?: it.fromContactId }
         val interactions = database.factDao().observeRecentInteractions(nowEpochMs, MAX_FACTS).first()
         interactions.groupBy { it.contactId }.forEach { (contactId, facts) ->
             val idempotencyKey = sha256("relation-infer:$contactId")
-            if (contactId == null || contactId in existing) return@forEach
+            if (contactId == null || contactId in existing || contactId in ownerIds) return@forEach
             if (database.changeLogDao().findByIdempotencyKey(idempotencyKey) != null) return@forEach
             val contact = database.contactDao().findRawById(contactId) ?: return@forEach
             val evidence = facts.take(5).joinToString(" · ") { it.textContent }
@@ -260,13 +267,6 @@ internal class RelationshipInferenceCoordinator @Inject constructor(private val 
                 updatedAtEpochMs = nowEpochMs,
             ),
         )
-    }
-
-    private suspend fun ownerCompanyName(): String? {
-        val links = database.contactKnowledgeDao().listActiveOwnerContactLinks()
-        return links.firstNotNullOfOrNull { link ->
-            database.contactDao().findRawById(link.contactId)?.company?.trim()?.takeIf(String::isNotBlank)
-        }
     }
 
     internal companion object {
