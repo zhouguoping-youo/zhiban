@@ -64,6 +64,7 @@ class AgentDataRepositoryTest {
                     contactIntelligenceDao = database.contactIntelligenceDao(),
                     factDao = database.factDao(),
                     changeLogDao = database.changeLogDao(),
+                    senderMuteDao = database.senderMuteDao(),
                 ),
                 transactions = RoomAgentTransactionRunner(database),
                 factIndex = FactIndex(database),
@@ -1350,6 +1351,65 @@ class AgentDataRepositoryTest {
             listOf("cap-outgoing", "cap-other-body", "cap-late"),
             visible.map { it.candidateId },
         )
+    }
+
+    @Test
+    fun mutedSenderMessagesStayStoredAsEvidenceButNeverSurfaceInInbox() = runBlocking {
+        fun message(id: String, sourceKey: String, body: String) = NotificationCandidateEntity(
+            candidateId = id,
+            sourceKey = sourceKey,
+            packageName = "com.tencent.mm",
+            appLabel = "微信",
+            title = "推广小李",
+            body = body,
+            postedAtEpochMs = 1_000L,
+            platform = "WECHAT",
+            conversationTitle = "推广小李",
+            senderName = "推广小李",
+        )
+        repository.stageNotificationCandidate(message("muted-1", "muted-source-1", "在吗"))
+        assertTrue(repository.observeNotificationCandidates().first().any { it.candidateId == "muted-1" })
+
+        assertTrue(repository.muteNotificationSender("muted-1", nowEpochMs = 2_000L))
+        assertEquals("DISMISSED", database.notificationCandidateDao().find("muted-1")?.status)
+
+        // 同一发送者的新消息照常入库为证据(行保留、观察身份照写),但状态为 MUTED,不进待处理列表。
+        repository.stageNotificationCandidate(message("muted-2", "muted-source-2", "有空吗"))
+        assertEquals("MUTED", database.notificationCandidateDao().find("muted-2")?.status)
+        assertTrue(repository.observeNotificationCandidates().first().none { it.candidateId == "muted-2" })
+        // 被静默的发送者也不再计入"待核实身份"。
+        assertTrue(repository.observeUnresolvedSourceIdentities().first().none { it.normalizedHandle == "推广小李" })
+
+        // 解除静默后,新消息恢复上浮;历史 MUTED 行不回流。
+        assertTrue(repository.unmuteNotificationSender("WECHAT", "推广小李"))
+        repository.stageNotificationCandidate(message("muted-3", "muted-source-3", "还在吗"))
+        val visible = repository.observeNotificationCandidates().first()
+        assertTrue(visible.any { it.candidateId == "muted-3" })
+        assertTrue(visible.none { it.candidateId == "muted-2" })
+    }
+
+    @Test
+    fun mutingSenderSweepsAllPendingCardsFromThatSender() = runBlocking {
+        fun message(id: String, sourceKey: String, body: String) = NotificationCandidateEntity(
+            candidateId = id,
+            sourceKey = sourceKey,
+            packageName = "com.tencent.mm",
+            appLabel = "微信",
+            title = "推广小李",
+            body = body,
+            postedAtEpochMs = 1_000L,
+            platform = "WECHAT",
+            conversationTitle = "推广小李",
+            senderName = "推广小李",
+        )
+        repository.stageNotificationCandidate(message("sweep-1", "sweep-source-1", "第一条"))
+        repository.stageNotificationCandidate(message("sweep-2", "sweep-source-2", "第二条"))
+        assertEquals(2, repository.observeNotificationCandidates().first().size)
+
+        assertTrue(repository.muteNotificationSender("sweep-2"))
+        assertEquals("DISMISSED", database.notificationCandidateDao().find("sweep-1")?.status)
+        assertEquals("DISMISSED", database.notificationCandidateDao().find("sweep-2")?.status)
+        assertTrue(repository.observeNotificationCandidates().first().isEmpty())
     }
 
     @Test

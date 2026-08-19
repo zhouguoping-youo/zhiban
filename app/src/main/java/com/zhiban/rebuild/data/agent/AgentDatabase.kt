@@ -77,6 +77,8 @@ import com.zhiban.rebuild.data.memory.StagedMemoryCandidateDao
 import com.zhiban.rebuild.data.memory.StagedMemoryCandidateEntity
 import com.zhiban.rebuild.data.notification.NotificationCandidateDao
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
+import com.zhiban.rebuild.data.notification.SenderMuteDao
+import com.zhiban.rebuild.data.notification.SenderMuteEntity
 import com.zhiban.rebuild.data.store.*
 import com.zhiban.rebuild.data.store.RuntimeApprovalStagingDao
 import com.zhiban.rebuild.data.store.RuntimeApprovalStagingEntity
@@ -107,7 +109,7 @@ import com.zhiban.rebuild.data.store.RuntimeToolExecutionEntity
 
 /** 知伴本机数据库文件名，供数据层以外的只读场景（如存储页显示大小）使用，避免引用 internal 的 AgentDatabase。 */
 const val AGENT_DATABASE_FILE_NAME = "zhiban-agent.db"
-const val AGENT_DATABASE_SCHEMA_VERSION = 42
+const val AGENT_DATABASE_SCHEMA_VERSION = 43
 
 @Database(
     entities = [
@@ -149,6 +151,7 @@ const val AGENT_DATABASE_SCHEMA_VERSION = 42
         com.zhiban.rebuild.data.contact.ContactFtsEntity::class,
         OwnerContactLinkEntity::class,
         NotificationCandidateEntity::class,
+        SenderMuteEntity::class,
         CrmLeadEntity::class,
         CrmOpportunityEntity::class,
         CrmOpportunityStakeholderEntity::class,
@@ -199,6 +202,7 @@ internal abstract class AgentDatabase : RoomDatabase() {
     internal abstract fun relationshipEventDao(): RelationshipEventDao
     internal abstract fun contactKnowledgeDao(): ContactKnowledgeDao
     abstract fun notificationCandidateDao(): NotificationCandidateDao
+    abstract fun senderMuteDao(): SenderMuteDao
     abstract fun replySuggestionDao(): com.zhiban.rebuild.data.reply.ReplySuggestionDao
     abstract fun contactCompletionRequestDao(): ContactCompletionRequestDao
     abstract fun crmDao(): CrmDao
@@ -248,6 +252,7 @@ internal abstract class AgentDatabase : RoomDatabase() {
         val MIGRATION_39_40 = AgentDatabaseSchema.MIGRATION_39_40
         val MIGRATION_40_41 = AgentDatabaseSchema.MIGRATION_40_41
         val MIGRATION_41_42 = AgentDatabaseSchema.MIGRATION_41_42
+        val MIGRATION_42_43 = AgentDatabaseSchema.MIGRATION_42_43
         val CALLBACK = AgentDatabaseSchema.CALLBACK
     }
 }

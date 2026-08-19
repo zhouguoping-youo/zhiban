@@ -23,6 +23,7 @@ internal data class AgentDataDaos(
     val contactIntelligenceDao: ContactIntelligenceDao,
     val factDao: FactDao,
     val changeLogDao: ChangeLogDao,
+    val senderMuteDao: com.zhiban.rebuild.data.notification.SenderMuteDao,
 )
 
 /**

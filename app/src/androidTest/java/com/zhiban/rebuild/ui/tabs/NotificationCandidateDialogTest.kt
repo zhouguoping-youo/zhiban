@@ -41,6 +41,7 @@ class NotificationCandidateDialogTest {
                     onOptOutReply = {},
                     onEnable = {},
                     onDismissCandidate = {},
+                    onMuteSender = {},
                     onConfirmCandidate = { _, _, done -> done(null) },
                     onCreateContact = { _, name, done ->
                         created.set(name)
@@ -92,6 +93,7 @@ class NotificationCandidateDialogTest {
                     onOptOutReply = {},
                     onEnable = {},
                     onDismissCandidate = {},
+                    onMuteSender = {},
                     onConfirmCandidate = { _, _, done -> done(null) },
                     onCreateContact = { _, _, done -> done(null) },
                     onConfirmSchedule = { _, done -> done(null) },

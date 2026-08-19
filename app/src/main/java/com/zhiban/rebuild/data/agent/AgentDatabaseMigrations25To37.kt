@@ -4,7 +4,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.zhiban.rebuild.data.contact.normalizeContactPhone
 
-/** Current schema steps 25 through 38. */
+/** Current schema steps 25 through 43 (filename keeps its original 25–37 range). */
 internal object AgentDatabaseMigrations25To37 {
     val MIGRATION_25_26 = object : Migration(25, 26) {
         override fun migrate(db: SupportSQLiteDatabase) {
@@ -655,6 +655,28 @@ internal object AgentDatabaseMigrations25To37 {
             db.execSQL(
                 "CREATE INDEX IF NOT EXISTS `index_notification_candidates_platform_direction` " +
                     "ON `notification_candidates` (`platform`, `direction`)",
+            )
+        }
+    }
+
+    /**
+     * 发送者级静默名单:用户在候选卡点"不再提醒此人"后的持久出口。与被观察身份证据
+     * (source_identities)分表存放——静默是用户决策、身份是观察证据,且静默键是发送者级
+     * (不分群会话),键位与按会话范围分键的身份行不一致。
+     */
+    val MIGRATION_42_43 = object : Migration(42, 43) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // CALLBACK 托管的部分索引不在 43 schema 里,旧安装(42)经 onOpen 建过它——照 41_42 先例,
+            // 迁移开头先删,CALLBACK.onOpen 在验证后再重建,否则 Room 校验因多余索引失败。
+            db.execSQL("DROP INDEX IF EXISTS `index_plan_runs_single_active_per_definition`")
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `sender_mutes` (`muteId` TEXT NOT NULL, `platform` TEXT NOT NULL, `normalizedHandle` TEXT NOT NULL, `visibleHandle` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`muteId`))",
+            )
+            db.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS `index_sender_mutes_platform_normalizedHandle` ON `sender_mutes` (`platform`, `normalizedHandle`)",
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_sender_mutes_createdAtEpochMs` ON `sender_mutes` (`createdAtEpochMs`)",
             )
         }
     }

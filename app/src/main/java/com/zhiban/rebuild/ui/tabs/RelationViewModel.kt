@@ -375,6 +375,15 @@ class RelationViewModel @Inject constructor(
         viewModelScope.launch { repository.dismissNotificationCandidate(candidateId) }
     }
 
+    /** 候选卡"不再提醒此人":按 (平台, 归一化发送者) 落静默名单,同发送者的待处理卡一并收走。 */
+    fun muteNotificationSender(candidateId: String, onResult: (String?) -> Unit) {
+        viewModelScope.launch {
+            runSuspendCatching { repository.muteNotificationSender(candidateId) }
+                .onSuccess { changed -> onResult(if (changed) null else "候选或发送者不存在") }
+                .onFailure { onResult(it.message ?: "暂时无法设置不再提醒") }
+        }
+    }
+
     fun confirmNotificationCandidate(candidateId: String, contactId: String, onResult: (String?) -> Unit) {
         viewModelScope.launch {
             runSuspendCatching { repository.confirmNotificationCandidate(candidateId, contactId) }

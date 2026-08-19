@@ -400,6 +400,7 @@ internal fun NotificationCandidateDialog(
     onOptOutReply: (ReplySuggestionCardModel) -> Unit,
     onEnable: () -> Unit,
     onDismissCandidate: (String) -> Unit,
+    onMuteSender: (String) -> Unit,
     onConfirmCandidate: (String, String, (String?) -> Unit) -> Unit,
     onCreateContact: (String, String, (String?) -> Unit) -> Unit,
     onConfirmSchedule: (String, (String?) -> Unit) -> Unit,
@@ -752,10 +753,16 @@ internal fun NotificationCandidateDialog(
                             }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 TextButton(onClick = { onDismissCandidate(item.candidateId) }) {
                                     Text("忽略", color = RelationMuted)
+                                }
+                                if (needsContact) {
+                                    TextButton(onClick = { onMuteSender(item.candidateId) }) {
+                                        Text("不再提醒此人", color = RelationInk)
+                                    }
                                 }
                                 if (needsContact && (canUseSuggestion || canCreateContact)) {
                                     TextButton(onClick = {

@@ -54,7 +54,10 @@ import com.zhiban.rebuild.data.notification.MessageCollectionPreferences
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.NotificationInsightAnalyzer
 import com.zhiban.rebuild.data.notification.ScheduleInsight
+import com.zhiban.rebuild.data.notification.SenderMuteEntity
 import com.zhiban.rebuild.data.notification.SocialNotificationParser
+import com.zhiban.rebuild.data.notification.normalizeIdentityValue
+import com.zhiban.rebuild.data.notification.normalizeSenderHandle
 import com.zhiban.rebuild.foundation.RuntimeToolRisk
 import com.zhiban.rebuild.foundation.RuntimeToolSpec
 import com.zhiban.rebuild.foundation.changeIdFor
@@ -121,58 +124,16 @@ class AgentDataRepository internal constructor(
 
     suspend fun stageNotificationCandidate(candidate: NotificationCandidateEntity) {
         val nowEpochMs = System.currentTimeMillis()
-        val externalConflict = hasExternalConflictForAutomaticSchedule(candidate)
-        val automaticSchedule = transactions.runInTransaction {
-            val existing = daos.notificationCandidateDao.findBySourceKey(candidate.sourceKey)
-            if (existing?.status in setOf("CONFIRMED", "DISMISSED")) return@runInTransaction null
-            var enriched = enrichNotificationCandidate(candidate)
-            // Dedup against the calendar: if this message's schedule is already on the calendar
-            // (e.g. the same message re-received), link the candidate to that existing schedule and
-            // mark it handled, so it never surfaces again as a fresh "加入日程" offer for an event
-            // the user already has. A genuine change (different time or title) does not match the
-            // equivalence check, so it still surfaces normally for the user to review.
-            scheduleDuplicateOf(enriched)?.let { existingSchedule ->
-                daos.notificationCandidateDao.upsert(
-                    enriched.copy(createdScheduleId = existingSchedule.id, status = "CONFIRMED"),
-                )
-                return@runInTransaction null
-            }
-            var automaticallyProcessed = false
-            if (isLikelyReplyContext(enriched, nowEpochMs) &&
-                recordInferredInteractionEvidence(enriched, nowEpochMs)
-            ) {
-                enriched = enriched.copy(linkedContactId = enriched.linkedContactId ?: enriched.suggestedContactId)
-                automaticallyProcessed = true
-            } else if (enriched.suggestedContactId != null && enriched.suggestedContactConfidence >= AUTO_LINK_CONFIDENCE &&
-                recordAutoInteractionEvidence(enriched, enriched.suggestedContactId, nowEpochMs)
-            ) {
-                enriched = enriched.copy(linkedContactId = enriched.suggestedContactId)
-                automaticallyProcessed = true
-            }
-            val createdSchedule = if (!externalConflict) {
-                recordAutomaticSchedule(enriched, nowEpochMs)
-            } else {
-                null
-            }
-            if (createdSchedule != null) {
-                enriched = enriched.copy(createdScheduleId = createdSchedule.id)
-                automaticallyProcessed = true
-            }
-            if (automaticallyProcessed) {
-                enriched = enriched.copy(status = enriched.completionStatus())
-            }
-            persistObservedCommunicationIdentity(enriched, nowEpochMs)
-            daos.notificationCandidateDao.upsert(enriched)
-            // A matched contact may become a CRM lead candidate, but never a formal lead without confirmation.
-            enriched.suggestedContactId?.let { matchedContactId ->
-                crm.suggestNewLeadFromNotification(matchedContactId, enriched.candidateId, nowEpochMs)
-            }
-            createdSchedule
-        }
+        // 用户点过"不再提醒此人"的发送者:消息照常入库为证据(行保留、观察身份照写),
+        // 但状态直接置 MUTED——不进待处理列表,也不跑三级匹配/自动关联/自动日程等
+        // 任何自动整理,被忽略的人不再制造提醒。
+        if (stageMutedSenderIfNeeded(candidate, nowEpochMs)) return
+        val automaticSchedule = transactions.runInTransaction { stageUnmutedCandidate(candidate, nowEpochMs) }
         automaticSchedule?.let(scheduleReminderSink::replace)
         // T1: a fresh incoming WeChat message may warrant an AI reply suggestion. Fired outside the
         // transaction so the coordinator reads the committed candidate; the coordinator re-gates on
-        // attribution and reply-worthiness, so this is only a cheap "go look" nudge.
+        // attribution and reply-worthiness, so this is only a cheap "go look" nudge. 被静默的
+        // 发送者已在上方提前返回,不会触发任何下游提示。
         if (candidate.direction == "INCOMING" && candidate.platform == "WECHAT") {
             replySuggestionSink()
             // 同一触发也喂补全闭环:这条来消息可能是某个"请补全资料"请求的回复。协调器自行再核对
@@ -181,7 +142,99 @@ class AgentDataRepository internal constructor(
         }
     }
 
+    /** 静默闸门:命中则在一个独立事务里落证据并置 MUTED,返回 true 表示本条已处理完毕。 */
+    private suspend fun stageMutedSenderIfNeeded(candidate: NotificationCandidateEntity, nowEpochMs: Long): Boolean {
+        val mutedSender = normalizeSenderHandle(candidate.platform, candidate.senderName) ?: return false
+        if (daos.senderMuteDao.find(candidate.platform, mutedSender) == null) return false
+        transactions.runInTransaction {
+            persistObservedCommunicationIdentity(candidate, nowEpochMs)
+            daos.notificationCandidateDao.upsert(candidate.copy(status = "MUTED"))
+        }
+        return true
+    }
+
+    private suspend fun stageUnmutedCandidate(candidate: NotificationCandidateEntity, nowEpochMs: Long): ScheduleEntity? {
+        val existing = daos.notificationCandidateDao.findBySourceKey(candidate.sourceKey)
+        if (existing?.status in setOf("CONFIRMED", "DISMISSED")) return null
+        val externalConflict = hasExternalConflictForAutomaticSchedule(candidate)
+        var enriched = enrichNotificationCandidate(candidate)
+        // Dedup against the calendar: if this message's schedule is already on the calendar
+        // (e.g. the same message re-received), link the candidate to that existing schedule and
+        // mark it handled, so it never surfaces again as a fresh "加入日程" offer for an event
+        // the user already has. A genuine change (different time or title) does not match the
+        // equivalence check, so it still surfaces normally for the user to review.
+        scheduleDuplicateOf(enriched)?.let { existingSchedule ->
+            daos.notificationCandidateDao.upsert(
+                enriched.copy(createdScheduleId = existingSchedule.id, status = "CONFIRMED"),
+            )
+            return null
+        }
+        var automaticallyProcessed = false
+        if (isLikelyReplyContext(enriched, nowEpochMs) &&
+            recordInferredInteractionEvidence(enriched, nowEpochMs)
+        ) {
+            enriched = enriched.copy(linkedContactId = enriched.linkedContactId ?: enriched.suggestedContactId)
+            automaticallyProcessed = true
+        } else if (enriched.suggestedContactId != null && enriched.suggestedContactConfidence >= AUTO_LINK_CONFIDENCE &&
+            recordAutoInteractionEvidence(enriched, enriched.suggestedContactId, nowEpochMs)
+        ) {
+            enriched = enriched.copy(linkedContactId = enriched.suggestedContactId)
+            automaticallyProcessed = true
+        }
+        val createdSchedule = if (!externalConflict) {
+            recordAutomaticSchedule(enriched, nowEpochMs)
+        } else {
+            null
+        }
+        if (createdSchedule != null) {
+            enriched = enriched.copy(createdScheduleId = createdSchedule.id)
+            automaticallyProcessed = true
+        }
+        if (automaticallyProcessed) {
+            enriched = enriched.copy(status = enriched.completionStatus())
+        }
+        persistObservedCommunicationIdentity(enriched, nowEpochMs)
+        daos.notificationCandidateDao.upsert(enriched)
+        // A matched contact may become a CRM lead candidate, but never a formal lead without confirmation.
+        enriched.suggestedContactId?.let { matchedContactId ->
+            crm.suggestNewLeadFromNotification(matchedContactId, enriched.candidateId, nowEpochMs)
+        }
+        return createdSchedule
+    }
+
     suspend fun dismissNotificationCandidate(candidateId: String): Boolean = daos.notificationCandidateDao.dismiss(candidateId) == 1
+
+    fun observeMutedSenders(): Flow<List<SenderMuteEntity>> = daos.senderMuteDao.observeAll()
+
+    /**
+     * 用户确认"不再提醒此人"后的落库:按 (platform, normalizedHandle) 记录静默键,并把该发送者
+     * 当前所有待处理候选一并收走(含本条)。此后该发送者的新消息只入库为证据,不再上浮。
+     */
+    suspend fun muteNotificationSender(candidateId: String, nowEpochMs: Long = System.currentTimeMillis()): Boolean = transactions.runInTransaction {
+        val candidate = daos.notificationCandidateDao.find(candidateId) ?: return@runInTransaction false
+        val normalized = normalizeSenderHandle(candidate.platform, candidate.senderName) ?: return@runInTransaction false
+        daos.senderMuteDao.insertIgnore(
+            SenderMuteEntity(
+                muteId = "sender-mute:${candidate.platform}:${sha256(normalized).take(32)}",
+                platform = candidate.platform,
+                normalizedHandle = normalized,
+                visibleHandle = candidate.senderName.orEmpty().trim().take(80),
+                createdAtEpochMs = nowEpochMs,
+            ),
+        )
+        daos.notificationCandidateDao.listPendingCandidates().forEach { pending ->
+            if (pending.candidateId != candidateId &&
+                normalizeSenderHandle(pending.platform, pending.senderName) == normalized
+            ) {
+                daos.notificationCandidateDao.dismiss(pending.candidateId)
+            }
+        }
+        daos.notificationCandidateDao.dismiss(candidateId)
+        true
+    }
+
+    /** 解除对某发送者的静默。历史 MUTED/DISMISSED 候选不回浮,只影响之后的新消息。 */
+    suspend fun unmuteNotificationSender(platform: String, normalizedHandle: String): Boolean = daos.senderMuteDao.delete(platform, normalizedHandle) == 1
 
     suspend fun purgeNonPersonalSmsCandidates(): Int = transactions.runInTransaction {
         daos.notificationCandidateDao.deleteNonPersonalSmsCandidates() +
@@ -1010,8 +1063,6 @@ class AgentDataRepository internal constructor(
     }
 
     private fun String?.cleanContactField(): String? = this?.trim()?.takeIf(String::isNotEmpty)
-
-    private fun normalizeIdentityValue(value: String): String = value.lowercase().filterNot(Char::isWhitespace).trimStart('@')
 
     private companion object {
         const val NOTIFICATION_EVIDENCE_PREFIX = "notification-evidence:"

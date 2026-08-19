@@ -153,6 +153,10 @@ interface NotificationCandidateDao {
     )
     suspend fun incomingAttributedAfter(platform: String, sinceEpochMs: Long, afterEpochMs: Long, limit: Int): List<NotificationCandidateEntity>
 
+    /** "不再提醒此人"的收尾扫描:仓库在事务内按发送者归一化键过滤后收走同发送者的待处理卡。 */
+    @Query("SELECT * FROM notification_candidates WHERE status = 'PENDING' LIMIT 500")
+    suspend fun listPendingCandidates(): List<NotificationCandidateEntity>
+
     @Query(
         "UPDATE notification_candidates SET status = 'DISMISSED' WHERE candidateId = :candidateId AND status = 'PENDING'",
     )

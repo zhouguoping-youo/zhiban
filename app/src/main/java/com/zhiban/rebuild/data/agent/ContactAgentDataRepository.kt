@@ -626,7 +626,15 @@ internal class ContactAgentDataRepository(internal val database: AgentDatabase) 
     fun observeContactImportantDates(contactId: String) = database.contactKnowledgeDao().observeImportantDates(contactId)
     fun observeAllContactImportantDates() = database.contactKnowledgeDao().observeAllImportantDates()
     fun observeAllTemporalEmployments() = database.contactIntelligenceDao().observeAllEmployments()
-    fun observeUnresolvedSourceIdentities() = database.contactIntelligenceDao().observeUnresolvedIdentities()
+
+    /** 被静默的发送者不进"待核实身份"列表——用户已选择不再被此人打扰,但仍可在设置中解除。 */
+    fun observeUnresolvedSourceIdentities(): Flow<List<SourceIdentityEntity>> = combine(
+        database.contactIntelligenceDao().observeUnresolvedIdentities(),
+        database.senderMuteDao().observeAll(),
+    ) { identities, mutes ->
+        val mutedKeys = mutes.mapTo(hashSetOf()) { it.platform to it.normalizedHandle }
+        identities.filterNot { (it.sourceType to it.normalizedHandle) in mutedKeys }
+    }
     fun observeContactFacets(contactId: String) = database.contactKnowledgeDao().observeFacets(contactId)
     fun observePendingContactEnrichment(contactId: String) = database.contactKnowledgeDao().observePendingEnrichment(contactId)
     fun observeAllPendingContactEnrichment(nowEpochMs: Long = System.currentTimeMillis()) =

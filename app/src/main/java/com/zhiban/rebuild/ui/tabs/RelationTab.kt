@@ -824,6 +824,11 @@ fun RelationTab(
                 context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
             },
             onDismissCandidate = viewModel::dismissNotificationCandidate,
+            onMuteSender = { candidateId ->
+                viewModel.muteNotificationSender(candidateId) { error ->
+                    showFeedback(error ?: "已不再提醒该发送者，可在设置中解除")
+                }
+            },
             onConfirmCandidate = viewModel::confirmNotificationCandidate,
             onCreateContact = viewModel::createContactFromNotification,
             onConfirmSchedule = viewModel::confirmNotificationSchedule,

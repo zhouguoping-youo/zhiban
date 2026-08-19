@@ -709,7 +709,9 @@ object SocialNotificationParser {
     }
 
     private val GROUP_MESSAGE = Regex("""^([^:：]{1,80})\s*[:：]\s*(.+)$""")
-    private val UNREAD_COUNT_PREFIX = Regex("""^\[\d+条?]\s*""")
+
+    // 发送者静默/收件箱折叠的归一化也剥同一前缀,故为 internal 而非 private。
+    internal val UNREAD_COUNT_PREFIX = Regex("""^\[\d+条?]\s*""")
     internal const val REPLY_FOCUS_WINDOW_MS = 8 * 60 * 60_000L
     private val REPLY_INDICATORS = listOf(
         "收到",
