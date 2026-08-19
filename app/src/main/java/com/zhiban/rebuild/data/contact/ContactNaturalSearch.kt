@@ -109,6 +109,7 @@ private fun buildMultiTermSql(termCount: Int): String {
               WHERE content MATCH ? OR $instrOrs
             ) f
           )
+        LIMIT 800
     """.trimIndent()
 }
 

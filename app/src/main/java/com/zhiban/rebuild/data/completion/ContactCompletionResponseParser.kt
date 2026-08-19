@@ -3,6 +3,7 @@ package com.zhiban.rebuild.data.completion
 import com.zhiban.rebuild.data.contact.ContactEnrichmentCandidateEntity
 import com.zhiban.rebuild.data.contact.ContactProfileField
 import com.zhiban.rebuild.data.contact.normalizeContactPhone
+import com.zhiban.rebuild.foundation.runSuspendCatching
 import com.zhiban.rebuild.provider.CapabilitySnapshot
 import com.zhiban.rebuild.provider.ModelEvent
 import com.zhiban.rebuild.provider.ModelMessage
@@ -136,7 +137,7 @@ internal class ContactCompletionResponseParser @Inject constructor(private val p
 
     private suspend fun extractOrganizationViaLlm(replyText: String, asked: Set<ContactProfileField>, requestId: String): Map<String, String> {
         val profile = profileStore.load() ?: return emptyMap()
-        val capability = runCatching { provider.probe(profile, "ccx-$requestId") }.getOrNull() ?: return emptyMap()
+        val capability = runSuspendCatching { provider.probe(profile, "ccx-$requestId") }.getOrNull() ?: return emptyMap()
         repeat(MAX_LLM_ATTEMPTS) { attempt ->
             val raw = try {
                 streamExtraction(buildExtractionRequest(replyText, "$requestId-x$attempt", profile, capability))

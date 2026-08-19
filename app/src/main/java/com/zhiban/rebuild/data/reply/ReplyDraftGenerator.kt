@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.data.reply
 
+import com.zhiban.rebuild.foundation.runSuspendCatching
 import com.zhiban.rebuild.provider.CapabilitySnapshot
 import com.zhiban.rebuild.provider.ModelEvent
 import com.zhiban.rebuild.provider.ModelMessage
@@ -44,12 +45,12 @@ internal open class ReplyDraftGenerator @Inject constructor(private val provider
 
     open suspend fun generateDrafts(context: ReplyDraftContext): List<String> {
         val profile = profileStore.load() ?: return emptyList()
-        val capability = runCatching { provider.probe(profile, context.requestId) }.getOrNull() ?: return emptyList()
+        val capability = runSuspendCatching { provider.probe(profile, context.requestId) }.getOrNull() ?: return emptyList()
         // Live probing showed the small flash model returns clean JSON only intermittently in free-form, and can
         // occasionally truncate even under a response_format schema. Keep the first parseable batch, retrying the
         // one-shot a bounded number of times so a single malformed reply doesn't cost the user a suggestion card.
         repeat(MAX_ATTEMPTS) { attempt ->
-            val drafts = runCatching { draftOnce(context, profile, capability, attempt) }
+            val drafts = runSuspendCatching { draftOnce(context, profile, capability, attempt) }
                 .onFailure { if (it is CancellationException) throw it }
                 .getOrNull()
                 .orEmpty()

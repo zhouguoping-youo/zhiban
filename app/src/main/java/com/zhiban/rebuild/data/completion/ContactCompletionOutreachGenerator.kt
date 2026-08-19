@@ -2,6 +2,7 @@ package com.zhiban.rebuild.data.completion
 
 import com.zhiban.rebuild.data.contact.ContactProfileField
 import com.zhiban.rebuild.data.notification.SensitiveMessageFilter
+import com.zhiban.rebuild.foundation.runSuspendCatching
 import com.zhiban.rebuild.provider.CapabilitySnapshot
 import com.zhiban.rebuild.provider.ModelEvent
 import com.zhiban.rebuild.provider.ModelMessage
@@ -62,7 +63,7 @@ internal open class ContactCompletionOutreachGenerator @Inject constructor(
     open suspend fun generateDraft(contactName: String, fields: List<ContactProfileField>, businessContext: String?, requestKey: String): String? {
         if (fields.isEmpty()) return null
         val profile = profileStore.load() ?: return null
-        val capability = runCatching { provider.probe(profile, requestKey) }.getOrNull() ?: return null
+        val capability = runSuspendCatching { provider.probe(profile, requestKey) }.getOrNull() ?: return null
         repeat(MAX_ATTEMPTS) { attempt ->
             val draft = try {
                 draftAttempt(contactName, fields, businessContext, "$requestKey-$attempt", profile, capability)
