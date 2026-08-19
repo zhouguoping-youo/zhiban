@@ -98,6 +98,25 @@ class SocialMessagePerceptionTest {
     }
 
     @Test
+    fun wechatStackedGroupStillParsesAsGroupAfterPrefixStrip() {
+        // The unread-count strip must not flatten a genuinely stacked GROUP message: stripping "[5条]"
+        // still leaves "李雷：…", which keeps the group classification and the real sender attribution.
+        val candidate = SocialNotificationParser.parse(
+            snapshot(
+                packageName = "com.tencent.mm",
+                title = "产品项目群 (3)",
+                text = "[5条]李雷：明天下午3点开会",
+            ),
+        )
+
+        assertNotNull(candidate)
+        assertEquals("产品项目群", candidate!!.conversationTitle)
+        assertEquals("李雷", candidate.senderName)
+        assertEquals("明天下午3点开会", candidate.body)
+        assertTrue(candidate.isGroupChat)
+    }
+
+    @Test
     fun wechatStackedSenderUnreadCountPrefixIsStrippedForAttribution() {
         // When WeChat messages stack, the MessagingStyle sender arrives as "[3条]周国平". The unread-count tag is
         // not part of the name; it must be stripped or name-based attribution/auto-linking silently misses.

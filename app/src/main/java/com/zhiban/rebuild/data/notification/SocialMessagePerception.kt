@@ -587,10 +587,12 @@ object SocialNotificationParser {
 
         val body = when {
             isGroup -> prefixed?.groupValues?.get(2)?.trim()
+
             // Non-group but the text still carries a "sender:" prefix whose sender IS the
             // conversation title: a stacked 1:1 notification artifact, not message content.
             prefixedSender != null && title != null &&
                 title.equals(prefixedSender, ignoreCase = true) -> prefixed!!.groupValues[2].trim()
+
             else -> cleanText
         }
         if (platform.code == "SMS" && isNonPersonalSms(sender, body)) return null
