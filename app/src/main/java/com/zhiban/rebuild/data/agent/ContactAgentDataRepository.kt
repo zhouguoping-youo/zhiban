@@ -94,15 +94,17 @@ internal class ContactAgentDataRepository(internal val database: AgentDatabase) 
         database.contactDao().deleteRole(contactId, skillId, roleType) == 1
 
     fun observeContacts(): Flow<List<ContactEntity>> = combine(
-        // observeActive 已在 SQL 里排除合并源联系人,省掉内存 filterNot 一步(P1-性能4)。
-        database.contactDao().observeActive(),
+        // 注意:必须用 observeAllActive——fold 要从列表里取合并源联系人做字段回填,
+        // observeActive 已在 SQL 排除源行会让回填永远取不到源值(回归教训,见测试)。
+        database.contactDao().observeAllActive(),
         database.contactIdentityDao().observeActiveMergeLinks(),
         database.contactKnowledgeDao().observeActiveOwnerContactLinks(),
     ) { contacts, links, ownerLinks ->
+        val mergedSourceIds = links.mapTo(hashSetOf(), ContactMergeLinkEntity::sourceContactId)
         val ownerContactIds = ownerLinks.mapTo(hashSetOf(), OwnerContactLinkEntity::contactId)
         val sourcesByCanonical = links.groupBy(ContactMergeLinkEntity::canonicalContactId)
         val contactsById = contacts.associateBy(ContactEntity::contactId)
-        contacts.filterNot { it.contactId in ownerContactIds }
+        contacts.filterNot { it.contactId in mergedSourceIds || it.contactId in ownerContactIds }
             .map { canonical ->
                 sourcesByCanonical[canonical.contactId].orEmpty()
                     .mapNotNull { contactsById[it.sourceContactId] }
