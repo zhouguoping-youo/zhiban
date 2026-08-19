@@ -15,15 +15,20 @@ class OutboundDataPreferences @Inject constructor(@ApplicationContext context: C
             KEY_ALLOW_REDACTED_AUTOMATIC_PERSONAL_CONTEXT,
             true,
         ),
-        // Cloud speech is only invoked after an explicit user action (voice input or call note).
-        // Keep it ready by default so the feature does not fail behind a technical setting.
-        allowCloudSpeech = preferences.getBoolean(KEY_ALLOW_CLOUD_SPEECH, true),
+        // 云语音只有显式操作(语音输入/通话备注)才调用;与其他出站通道一致 fail-closed,
+        // 默认关闭,首次使用时由界面引导开启(复检 P1-2)。
+        allowCloudSpeech = preferences.getBoolean(KEY_ALLOW_CLOUD_SPEECH, false),
+        allowCloudLlm = preferences.getBoolean(KEY_ALLOW_CLOUD_LLM, true),
         allowRemoteMcp = preferences.getBoolean(KEY_ALLOW_REMOTE_MCP, false),
         allowRemoteEmbedding = preferences.getBoolean(KEY_ALLOW_REMOTE_EMBEDDING, false),
     )
 
     fun setAllowRedactedAutomaticPersonalContext(enabled: Boolean) {
         check(preferences.edit().putBoolean(KEY_ALLOW_REDACTED_AUTOMATIC_PERSONAL_CONTEXT, enabled).commit())
+    }
+
+    fun setAllowCloudLlm(enabled: Boolean) {
+        check(preferences.edit().putBoolean(KEY_ALLOW_CLOUD_LLM, enabled).commit())
     }
 
     fun setAllowCloudSpeech(enabled: Boolean) {
@@ -42,6 +47,7 @@ class OutboundDataPreferences @Inject constructor(@ApplicationContext context: C
         const val KEY_ALLOW_REDACTED_AUTOMATIC_PERSONAL_CONTEXT =
             "allow_redacted_automatic_personal_context"
         const val KEY_ALLOW_CLOUD_SPEECH = "allow_cloud_speech"
+        const val KEY_ALLOW_CLOUD_LLM = "allow_cloud_llm"
         const val KEY_ALLOW_REMOTE_MCP = "allow_remote_mcp"
         const val KEY_ALLOW_REMOTE_EMBEDDING = "allow_remote_embedding"
     }
