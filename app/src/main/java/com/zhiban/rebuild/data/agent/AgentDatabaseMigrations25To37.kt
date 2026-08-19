@@ -703,4 +703,18 @@ internal object AgentDatabaseMigrations25To37 {
             db.execSQL("ALTER TABLE `notification_candidates` ADD COLUMN `identityDriftJson` TEXT")
         }
     }
+
+    /**
+     * 索引簿记修正:9c2c875 起 CALLBACK 在 onOpen 建了 contacts 的部分索引
+     * index_contacts_active_deleted,但 42→43/43→44/44→45 未按 plan_runs 先例在迁移
+     * 开头删它——旧安装库带着该索引升级时,Room 校验因多余索引失败,App 崩溃循环
+     * (真机 2026-08-19 实测)。此迁移在验证前把 CALLBACK 托管的两个部分索引都删掉,
+     * onOpen 会在验证后重建。之后的每个新迁移开头都要继续删这两个索引(既有约定)。
+     */
+    val MIGRATION_45_46 = object : Migration(45, 46) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("DROP INDEX IF EXISTS `index_plan_runs_single_active_per_definition`")
+            db.execSQL("DROP INDEX IF EXISTS `index_contacts_active_deleted`")
+        }
+    }
 }
