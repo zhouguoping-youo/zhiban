@@ -39,6 +39,8 @@ data class OutboundPolicySettings(
     val allowCloudSpeech: Boolean = false,
     val allowRemoteMcp: Boolean = false,
     val allowRemoteEmbedding: Boolean = false,
+    /** 大模型通道总开关(复检 P1-3):关闭后 LLM 推理/重排一律不放行。默认开——对话是核心功能。 */
+    val allowCloudLlm: Boolean = true,
 )
 
 data class OutboundExportDescriptor(
@@ -73,7 +75,7 @@ class OutboundExportGate(
     fun consentGranted(channel: OutboundChannel): Boolean = when (channel) {
         OutboundChannel.LLM_INFERENCE,
         OutboundChannel.LLM_RERANK,
-        -> true
+        -> settings().allowCloudLlm
 
         OutboundChannel.ASR_BATCH,
         OutboundChannel.ASR_REALTIME,

@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 data class OutboundPrivacyState(
     val allowRedactedAutomaticPersonalContext: Boolean = true,
     val allowCloudSpeech: Boolean = true,
+    val allowCloudLlm: Boolean = true,
     val allowRemoteMcp: Boolean = false,
     val allowRemoteEmbedding: Boolean = false,
     val auditCount: Int = 0,
@@ -31,11 +32,17 @@ class OutboundPrivacyViewModel @Inject constructor(private val preferences: Outb
             allowRedactedAutomaticPersonalContext =
                 preferences.snapshot().allowRedactedAutomaticPersonalContext,
             allowCloudSpeech = preferences.snapshot().allowCloudSpeech,
+            allowCloudLlm = preferences.snapshot().allowCloudLlm,
             allowRemoteMcp = preferences.snapshot().allowRemoteMcp,
             allowRemoteEmbedding = preferences.snapshot().allowRemoteEmbedding,
         ),
     )
     val state = _state.asStateFlow()
+
+    fun setAllowCloudLlm(enabled: Boolean) {
+        preferences.setAllowCloudLlm(enabled)
+        _state.update { it.copy(allowCloudLlm = enabled) }
+    }
 
     init {
         viewModelScope.launch {

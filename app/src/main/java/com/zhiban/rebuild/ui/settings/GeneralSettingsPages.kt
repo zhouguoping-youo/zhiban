@@ -358,6 +358,13 @@ fun PrivacySecurityPage(
             }
             item {
                 SettingsCard {
+                    SettingsToggleRow(
+                        title = "AI 对话与检索",
+                        subtitle = if (outboundState.allowCloudLlm) "已开启 · 大模型请求可出云" else "已关闭 · 停止所有云端大模型请求",
+                        checked = outboundState.allowCloudLlm,
+                        onCheckedChange = outboundViewModel::setAllowCloudLlm,
+                    )
+                    Divider()
                     SettingsRow("文字、图片与联系人", "使用时按需处理 · 敏感信息自动保护")
                     Divider()
                     SettingsRow("语音输入", if (outboundState.allowCloudSpeech) "可用 · 仅主动使用时处理" else "首次使用时开启")

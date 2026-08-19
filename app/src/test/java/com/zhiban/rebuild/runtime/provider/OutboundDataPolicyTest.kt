@@ -128,6 +128,35 @@ class OutboundDataPolicyTest {
         assertEquals("AUTOMATIC_SENSITIVE_ATTACHMENT_BLOCKED", failure?.message)
     }
 
+    @Test fun llmChannelAllowedByDefaultAndBlockedByMasterSwitch() = runTest {
+        val audits = mutableListOf<OutboundAuditEvent>()
+        val descriptor = OutboundExportDescriptor(
+            requestId = "llm-request",
+            channel = OutboundChannel.LLM_INFERENCE,
+            purpose = OutboundPurpose.USER_AUTHORED,
+            sensitivities = setOf(OutboundSensitivity.PERSONAL),
+            payloadCount = 1,
+            byteCount = 128,
+        )
+
+        // 默认:大模型通道放行(对话是核心功能)。
+        val allowed = OutboundExportGate(
+            settings = { OutboundPolicySettings() },
+            auditSink = OutboundAuditSink(audits::add),
+            clock = { 77L },
+        ).evaluate(descriptor)
+        assertEquals(OutboundExportDecision.ALLOWED, allowed)
+
+        // 总开关关闭:一律 CONSENT_REQUIRED(复检 P1-3)。
+        val blocked = OutboundExportGate(
+            settings = { OutboundPolicySettings(allowCloudLlm = false) },
+            auditSink = OutboundAuditSink(audits::add),
+            clock = { 77L },
+        ).evaluate(descriptor)
+        assertEquals(OutboundExportDecision.CONSENT_REQUIRED, blocked)
+        assertEquals(OutboundAuditOutcome.BLOCKED_CONSENT, audits.last().outcome)
+    }
+
     @Test fun nonModelChannelsDefaultClosedAndRecordMetadataOnlyBlock() = runTest {
         val audits = mutableListOf<OutboundAuditEvent>()
         val gate = OutboundExportGate(
