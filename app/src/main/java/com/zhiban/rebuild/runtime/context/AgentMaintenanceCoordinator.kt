@@ -4,6 +4,7 @@ import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.CrmAgentDataRepository
 import com.zhiban.rebuild.data.facts.FactIndex
 import com.zhiban.rebuild.data.interaction.SilentContactSuggestionScanner
+import com.zhiban.rebuild.data.interaction.UnobservedReplySuggestionScanner
 import com.zhiban.rebuild.data.suggestion.AgentSuggestionNotifier
 import com.zhiban.rebuild.runtime.memory.RoomMemoryGate
 import javax.inject.Inject
@@ -22,6 +23,7 @@ data class AgentMaintenanceResult(
     val notificationExpired: Int = 0,
     val agentSuggestionsExpired: Int = 0,
     val silenceSuggestionsCreated: Int = 0,
+    val unobservedReplySuggestionsCreated: Int = 0,
     val degradationReasons: Set<String> = emptySet(),
 )
 
@@ -32,6 +34,7 @@ internal class AgentMaintenanceCoordinator @Inject constructor(
     private val embeddingGateway: EmbeddingGateway,
     private val suggestionNotifier: AgentSuggestionNotifier,
     private val silentContactScanner: SilentContactSuggestionScanner,
+    private val unobservedReplyScanner: UnobservedReplySuggestionScanner,
 ) {
     suspend fun run(nowEpochMs: Long = System.currentTimeMillis()): AgentMaintenanceResult {
         val facts = FactIndex(database)
@@ -69,6 +72,7 @@ internal class AgentMaintenanceCoordinator @Inject constructor(
             .imminentSchedules(nowEpochMs, nowEpochMs + SCHEDULE_ESCALATION_WINDOW_MS)
         suggestionNotifier.publishScheduleEscalation(imminentSchedules, nowEpochMs)
         val silenceSuggestionsCreated = if (silentContactScanner.scan(nowEpochMs)) 1 else 0
+        val unobservedReplySuggestionsCreated = unobservedReplyScanner.scan(nowEpochMs)
         // One bounded batch per startup; retrieval remains FTS-only until every active fact is rebuilt.
         val degradationReasons = try {
             EmbeddingIndex(database, embeddingGateway) { nowEpochMs }.backfillBatch(32)
@@ -90,6 +94,7 @@ internal class AgentMaintenanceCoordinator @Inject constructor(
             notificationExpired = notificationExpired,
             agentSuggestionsExpired = agentSuggestionsExpired,
             silenceSuggestionsCreated = silenceSuggestionsCreated,
+            unobservedReplySuggestionsCreated = unobservedReplySuggestionsCreated,
             degradationReasons = degradationReasons,
         )
     }

@@ -20,6 +20,8 @@ object InteractionSourceType {
 
 object InteractionDirection {
     const val UNKNOWN = "UNKNOWN"
+    const val INCOMING = "INCOMING"
+    const val OUTGOING = "OUTGOING"
 }
 
 @Entity(
@@ -51,6 +53,8 @@ data class ContactInteractionEntity(
 )
 
 data class ContactInteractionRecency(val contactId: String, val lastInteractionAtEpochMs: Long?, val silenceDays: Long?)
+
+data class UnobservedReplyFollowUp(val contactId: String, val displayName: String, val outgoingSourceId: String, val outgoingAtEpochMs: Long)
 
 @Dao
 interface ContactInteractionDao {
@@ -95,6 +99,43 @@ interface ContactInteractionDao {
         LIMIT :limit OFFSET :offset""",
     )
     suspend fun contactRecencyPage(nowEpochMs: Long, limit: Int, offset: Int): List<ContactInteractionRecency>
+
+    @Query(
+        """SELECT contact.contactId AS contactId, contact.displayName AS displayName,
+          outgoing.sourceId AS outgoingSourceId, outgoing.occurredAtEpochMs AS outgoingAtEpochMs
+        FROM contacts contact
+        INNER JOIN contact_interactions outgoing ON COALESCE(
+            (SELECT canonicalContactId FROM contact_merge_links
+             WHERE sourceContactId = outgoing.contactId AND undoneAtEpochMs IS NULL),
+            outgoing.contactId
+        ) = contact.contactId
+        WHERE contact.deletedAtEpochMs IS NULL
+          AND contact.contactId NOT IN (
+            SELECT sourceContactId FROM contact_merge_links WHERE undoneAtEpochMs IS NULL
+          )
+          AND outgoing.direction = 'OUTGOING'
+          AND outgoing.occurredAtEpochMs <= :cutoffEpochMs
+          AND outgoing.occurredAtEpochMs = (
+            SELECT MAX(latest.occurredAtEpochMs) FROM contact_interactions latest
+            WHERE latest.direction = 'OUTGOING' AND COALESCE(
+                (SELECT canonicalContactId FROM contact_merge_links
+                 WHERE sourceContactId = latest.contactId AND undoneAtEpochMs IS NULL),
+                latest.contactId
+            ) = contact.contactId
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM contact_interactions incoming
+            WHERE incoming.direction = 'INCOMING'
+              AND incoming.occurredAtEpochMs > outgoing.occurredAtEpochMs
+              AND COALESCE(
+                (SELECT canonicalContactId FROM contact_merge_links
+                 WHERE sourceContactId = incoming.contactId AND undoneAtEpochMs IS NULL),
+                incoming.contactId
+              ) = contact.contactId
+          )
+        ORDER BY outgoing.occurredAtEpochMs LIMIT :limit""",
+    )
+    suspend fun unobservedReplyFollowUps(cutoffEpochMs: Long, limit: Int): List<UnobservedReplyFollowUp>
 }
 
 internal fun factInteraction(factId: String, contactId: String, occurredAtEpochMs: Long, createdAtEpochMs: Long): ContactInteractionEntity =

@@ -88,6 +88,12 @@ class AgentControlStore internal constructor(context: Context, prefsName: String
         )
     }
 
+    fun unobservedReplyDays(): Int = store.getInt("unobserved_reply_days", 3).coerceIn(1, 30)
+
+    fun saveUnobservedReplyDays(days: Int) {
+        check(store.edit().putInt("unobserved_reply_days", days.coerceIn(1, 30)).commit())
+    }
+
     // AI 回复建议：全局总开关（默认开）+ 按联系人"不再建议"。
     fun replySuggestionsEnabled(): Boolean = store.getBoolean("reply_suggestions_enabled", true)
 

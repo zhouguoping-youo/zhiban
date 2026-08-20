@@ -7,6 +7,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.config.AgentControlStore
 import com.zhiban.rebuild.data.interaction.SilentContactSuggestionScanner
+import com.zhiban.rebuild.data.interaction.UnobservedReplySuggestionScanner
 import com.zhiban.rebuild.data.suggestion.AgentSuggestionNotifier
 import java.util.concurrent.CancellationException
 import kotlinx.coroutines.test.runTest
@@ -61,6 +62,7 @@ class AgentMaintenanceDegradationTest {
             gateway,
             notifier,
             SilentContactSuggestionScanner(database, controls, notifier),
+            UnobservedReplySuggestionScanner(database, controls, notifier),
         )
     }
 }
