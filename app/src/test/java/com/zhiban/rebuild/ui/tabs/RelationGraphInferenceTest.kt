@@ -2,6 +2,10 @@ package com.zhiban.rebuild.ui.tabs
 
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
+import com.zhiban.rebuild.data.contact.RelationshipEventEntity
+import com.zhiban.rebuild.data.contact.RelationshipEventParticipantEntity
+import com.zhiban.rebuild.data.contact.RelationshipEventWithParticipants
+import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.facts.FactEntity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -128,5 +132,46 @@ class RelationGraphInferenceTest {
 
         assertTrue(contactMatchesRelationCategory(li, "工作", listOf(colleagueEdge)))
         assertTrue(contactMatchesRelationCategory(li, "家人", listOf(colleagueEdge)).not())
+    }
+
+    @Test
+    fun `profile company suppresses owner employment completion prompt`() {
+        assertTrue(shouldShowOwnerEmploymentAnchor("", null))
+        assertTrue(shouldShowOwnerEmploymentAnchor("平凯星辰（北京）科技有限公司", null).not())
+    }
+
+    @Test
+    fun `introduction event projects owner subject and introducer edges`() {
+        val subject = contact("huang", "黄勇")
+        val introducer = contact("ding", "丁波")
+        val event = RelationshipEventWithParticipants(
+            event = RelationshipEventEntity(
+                eventId = "event-1",
+                eventType = "INTRODUCTION",
+                title = "丁波介绍我认识黄勇",
+                note = null,
+                occurredAtEpochMs = 1_000L,
+                evidenceDigest = "user-confirmed",
+                evidenceRefsJson = "[]",
+                userConfirmed = true,
+                status = "ACTIVE",
+                createdAtEpochMs = 1_000L,
+                updatedAtEpochMs = 1_000L,
+            ),
+            participants = listOf(
+                RelationshipEventParticipantEntity("p-user", "event-1", "USER", null, "RECIPIENT", "我", 1_000L),
+                RelationshipEventParticipantEntity("p-subject", "event-1", "CONTACT", "huang", "SUBJECT", "黄勇", 1_000L),
+                RelationshipEventParticipantEntity("p-introducer", "event-1", "CONTACT", "ding", "INTRODUCER", "丁波", 1_000L),
+            ),
+        )
+
+        val edges = relationshipEventEdges(listOf(event), listOf(subject, introducer))
+
+        assertEquals(3, edges.size)
+        assertEquals("介绍认识", edges.first { it.toContactId == "huang" }.displayRelationLabel())
+        assertEquals("介绍人", edges.first { it.toContactId == "ding" }.displayRelationLabel())
+        assertTrue(edges.all { it.status == INTRODUCTION_EVENT_STATUS })
+        assertTrue(edges.all(RelationshipEdgeEntity::isInferredEvidenceRelationship))
+        assertTrue(edges.any { it.fromContactId == "huang" && it.toContactId == "ding" })
     }
 }

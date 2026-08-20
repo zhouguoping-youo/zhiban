@@ -3,6 +3,7 @@ package com.zhiban.rebuild.ui.tabs
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEpisodeEntity
+import com.zhiban.rebuild.data.contact.RelationshipEventWithParticipants
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.data.facts.FactEntity
 import com.zhiban.rebuild.relationship.HistoricalRelationshipVisibility
@@ -14,6 +15,7 @@ internal const val INFERRED_HISTORICAL_COMPANY_RELATIONSHIP_STATUS = "INFERRED_H
 internal const val INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME_STATUS = "INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME"
 internal const val INFERRED_COMPANY_UNKNOWN_TIME_STATUS = "INFERRED_COMPANY_UNKNOWN_TIME"
 internal const val INTERACTION_EVIDENCE_STATUS = "INTERACTION_EVIDENCE"
+internal const val INTRODUCTION_EVENT_STATUS = "INTRODUCTION_EVENT"
 
 internal fun contactMatchesRelationCategory(contact: ContactEntity, category: String, relationships: List<RelationshipEdgeEntity>): Boolean {
     if (category == "全部") return true
@@ -44,6 +46,7 @@ internal fun RelationshipEdgeEntity.isInferredEvidenceRelationship(): Boolean = 
     INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME_STATUS,
     INFERRED_COMPANY_UNKNOWN_TIME_STATUS,
     INTERACTION_EVIDENCE_STATUS,
+    INTRODUCTION_EVENT_STATUS,
 )
 
 internal fun RelationshipEdgeEntity.inferredEvidenceLabel(): String? = when (status) {
@@ -52,8 +55,89 @@ internal fun RelationshipEdgeEntity.inferredEvidenceLabel(): String? = when (sta
     INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME_STATUS -> "曾在同公司 · 时间待核实"
     INFERRED_COMPANY_UNKNOWN_TIME_STATUS -> "同公司 · 时间待核实"
     INTERACTION_EVIDENCE_STATUS -> "有联系 · 来自消息互动"
+    INTRODUCTION_EVENT_STATUS -> "来自共同经历"
     else -> null
 }
+
+/**
+ * Projects a confirmed introduction event into the graph without pretending that the event is a
+ * manually confirmed relationship edge.  The three incident edges make the chain visible from
+ * either side: owner—introduced person, owner—introducer, and introduced person—introducer.
+ */
+internal fun relationshipEventEdges(
+    events: List<RelationshipEventWithParticipants>,
+    contacts: List<ContactEntity>,
+    ownerId: String = RelationshipPersonIds.SELF,
+): List<RelationshipEdgeEntity> {
+    val visibleIds = contacts.mapTo(hashSetOf(), ContactEntity::contactId)
+    return events.asSequence()
+        .filter { it.event.status == "ACTIVE" && it.event.eventType == "INTRODUCTION" }
+        .mapNotNull { eventWithParticipants ->
+            val participants = eventWithParticipants.participants
+            val hasOwner = participants.any { it.participantKind == "USER" }
+            val subject = participants.firstOrNull { it.participantRole == "SUBJECT" }?.contactId
+            val introducer = participants.firstOrNull { it.participantRole == "INTRODUCER" }?.contactId
+            if (!hasOwner || subject == null || introducer == null ||
+                subject !in visibleIds || introducer !in visibleIds || subject == introducer
+            ) {
+                return@mapNotNull null
+            }
+            val title = eventWithParticipants.event.title.ifBlank { "通过介绍认识" }
+            val confidence = if (eventWithParticipants.event.userConfirmed) 1.0 else 0.85
+            val evidence = "共同经历：$title"
+            listOf(
+                introductionEventEdge(
+                    edgeId = "event:${eventWithParticipants.event.eventId}:owner-subject",
+                    from = ownerId,
+                    to = subject,
+                    relationType = "ACQUAINTANCE",
+                    evidence = evidence,
+                    confidence = confidence,
+                ),
+                introductionEventEdge(
+                    edgeId = "event:${eventWithParticipants.event.eventId}:owner-introducer",
+                    from = ownerId,
+                    to = introducer,
+                    relationType = "REFERRER",
+                    evidence = evidence,
+                    confidence = confidence,
+                ),
+                introductionEventEdge(
+                    edgeId = "event:${eventWithParticipants.event.eventId}:subject-introducer",
+                    from = subject,
+                    to = introducer,
+                    relationType = "REFERRER",
+                    evidence = evidence,
+                    confidence = confidence,
+                ),
+            )
+        }
+        .flatten()
+        .distinctBy(RelationshipEdgeEntity::edgeId)
+        .toList()
+}
+
+private fun introductionEventEdge(
+    edgeId: String,
+    from: String,
+    to: String,
+    relationType: String,
+    evidence: String,
+    confidence: Double,
+): RelationshipEdgeEntity = RelationshipEdgeEntity(
+    edgeId = edgeId,
+    fromContactId = from,
+    toContactId = to,
+    relationType = relationType,
+    evidenceDigest = evidence,
+    evidenceRefsJson = "[]",
+    confidence = confidence,
+    userConfirmed = false,
+    skillId = null,
+    status = INTRODUCTION_EVENT_STATUS,
+    createdAtEpochMs = 0L,
+    updatedAtEpochMs = 0L,
+)
 
 /**
  * ① 互动边:从互动摘要事实投影 SELF↔联系人 的只读边(不落库、不可点开编辑),
@@ -140,8 +224,17 @@ internal fun RelationshipEdgeEntity.isHistoricalRelationship(): Boolean = status
 
 internal fun RelationshipEdgeEntity.displayRelationLabel(): String = when (status) {
     INFERRED_HISTORICAL_COMPANY_UNKNOWN_TIME_STATUS -> "可能是前同事"
+
     INFERRED_COMPANY_UNKNOWN_TIME_STATUS -> "同公司"
+
     INTERACTION_EVIDENCE_STATUS -> "有联系"
+
+    INTRODUCTION_EVENT_STATUS -> when (relationType) {
+        "ACQUAINTANCE" -> "介绍认识"
+        "REFERRER" -> "介绍人"
+        else -> relationLabel(relationType)
+    }
+
     else -> relationLabel(relationType, isHistorical = isHistoricalRelationship())
 }
 

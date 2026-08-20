@@ -287,7 +287,9 @@ internal fun RelationshipGraphState(
                 Text("添加关系", color = if (canAddRelationship) RelationInk else RelationMuted)
             }
         }
-        if (root.isOwner && activeGroup == RelationshipGroup.WORK && currentOwnerEmployment == null) {
+        if (root.isOwner && activeGroup == RelationshipGroup.WORK &&
+            shouldShowOwnerEmploymentAnchor(owner.company, currentOwnerEmployment)
+        ) {
             Spacer(Modifier.height(ZhiBanSpacing.Md))
             OwnerEmploymentAnchor(
                 current = currentOwnerEmployment,
@@ -385,6 +387,14 @@ internal fun RelationshipGraphState(
         }
     }
 }
+
+/**
+ * The profile company is the user's authoritative current-company input.  A temporal employment
+ * episode is optional enrichment, so it must not trigger the same completion prompt when the
+ * profile already has a company value.
+ */
+internal fun shouldShowOwnerEmploymentAnchor(ownerCompany: String, currentEmployment: PersonEmploymentEpisodeEntity?): Boolean =
+    ownerCompany.isBlank() && currentEmployment == null
 
 private fun relationshipGraphEmptyMessage(activeFilter: String?, group: RelationshipGroup?): String = when {
     group != null -> "还没有可靠关系 · ${RelationshipTaxonomy.groupGuidance(group)}"

@@ -190,6 +190,7 @@ internal fun ContactDetailDialog(
     onMessage: () -> Unit,
 ) {
     val openCrmOpportunities = crmOpportunities.filter { it.status == "OPEN" }
+    val visiblePlatformIdentities = deduplicatePlatformIdentities(platformIdentities)
     val hasRelationshipContext = relatedEdges.isNotEmpty() || relatedEvents.isNotEmpty()
     // 微信等消息观察自动投影的互动摘录(INTERACTION_SUMMARY)属于「活动流」而非「资料」,
     // 不在详情资料区展示,这里只保留用户主动记录的重要信息,保证资料区干净。
@@ -201,7 +202,7 @@ internal fun ContactDetailDialog(
         contact.company,
         contact.title,
         contact.note,
-    ).any { !it.isNullOrBlank() } || aliases.isNotEmpty() || platformIdentities.isNotEmpty()
+    ).any { !it.isNullOrBlank() } || aliases.isNotEmpty() || visiblePlatformIdentities.isNotEmpty()
 
     ZhiBanTaskDialog(onDismissRequest = onDismiss, maxHeight = 720.dp) {
         LazyColumn(
@@ -297,12 +298,12 @@ internal fun ContactDetailDialog(
                         }
                         contact.wechatId?.takeIf(String::isNotBlank)
                             ?.takeUnless { wechat ->
-                                platformIdentities.any {
+                                visiblePlatformIdentities.any {
                                     it.platform == "WECHAT" &&
                                         it.normalizedHandle == wechat.trim().trimStart('@').lowercase()
                                 }
                             }?.let { IdentityValueRow("微信", it, null) }
-                        platformIdentities.forEach { identity ->
+                        visiblePlatformIdentities.forEach { identity ->
                             IdentityValueRow(
                                 platformLabel(identity.platform),
                                 identity.handle,
@@ -465,7 +466,7 @@ internal fun ContactDetailDialog(
                                     )
                                     Text(
                                         if (edge.isInferredEvidenceRelationship()) {
-                                            "${relationLabel(edge.relationType)} · ${edge.inferredEvidenceLabel()}"
+                                            "${edge.displayRelationLabel()} · ${edge.inferredEvidenceLabel().orEmpty()}"
                                         } else {
                                             relationLabel(edge.relationType)
                                         },
