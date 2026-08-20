@@ -440,6 +440,18 @@ internal interface MemoryPersistenceDao {
     """,
     )
     suspend fun recall(namespaceId: String, trustedNow: Long): List<MemoryRecordEntity>
+
+    @Query(
+        """
+        SELECT r.* FROM memory_current_versions c
+        JOIN memory_records r ON r.namespaceId=c.namespaceId AND r.memoryId=c.memoryId AND r.recordVersion=c.recordVersion
+        WHERE r.status='ACTIVE' AND r.txToEpochMs IS NULL
+          AND (r.expiresAtEpochMs IS NULL OR r.expiresAtEpochMs>:trustedNow)
+          AND NOT EXISTS (SELECT 1 FROM memory_tombstones t WHERE t.namespaceId=c.namespaceId AND t.logicalMemoryId=c.logicalMemoryId)
+        ORDER BY r.namespaceId, r.logicalMemoryId LIMIT :limit OFFSET :offset
+    """,
+    )
+    suspend fun listCurrentPageForExport(trustedNow: Long, limit: Int, offset: Int): List<MemoryRecordEntity>
 }
 
 private const val SUBSTRING_CANDIDATES_SQL_TEMPLATE = """

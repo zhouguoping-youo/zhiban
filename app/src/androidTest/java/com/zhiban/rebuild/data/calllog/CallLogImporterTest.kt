@@ -160,6 +160,25 @@ class CallLogImporterTest {
     }
 
     @Test
+    fun initialHistoryBackfillImportsCallsWithoutCreatingStaleSuggestions() = runTest {
+        database.contactDao().insert(contact("contact-1"))
+        database.contactKnowledgeDao().upsertMethods(listOf(method("contact-1", "13800138000")))
+        database.crmDao().insertOpportunity(opportunity("opportunity-1", "contact-1"))
+        val historicalCall = row(11, "13800138000", CallLog.Calls.PRESENTATION_ALLOWED)
+
+        importCallsAndSuggestionsAtomically(
+            database = database,
+            crmRepository = CrmAgentDataRepository(database),
+            rows = listOf(historicalCall),
+            nowEpochMs = 90L * 24 * 60 * 60_000L,
+            generateFollowUps = false,
+        )
+
+        assertNotNull(database.callLogDao().findBySourceRow(CallLogImporter.SOURCE_ANDROID, historicalCall.providerRowId))
+        assertEquals(0, database.crmDao().observePendingSuggestions(0.0).first().size)
+    }
+
+    @Test
     fun failedCrmSuggestionRollsBackTheImportedCall() = runTest {
         database.contactDao().insert(contact("contact-1"))
         database.contactKnowledgeDao().upsertMethods(listOf(method("contact-1", "13800138000")))

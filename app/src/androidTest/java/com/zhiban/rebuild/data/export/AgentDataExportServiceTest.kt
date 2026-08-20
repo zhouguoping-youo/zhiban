@@ -9,6 +9,9 @@ import com.zhiban.rebuild.data.agent.MemoryEntity
 import com.zhiban.rebuild.data.agent.ScheduleEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.crm.CrmLeadEntity
+import com.zhiban.rebuild.data.memory.MemoryCurrentVersionEntity
+import com.zhiban.rebuild.data.memory.MemoryNamespaceEntity
+import com.zhiban.rebuild.data.memory.MemoryRecordEntity
 import com.zhiban.rebuild.data.store.RuntimeConversationTurnEntity
 import com.zhiban.rebuild.data.store.RuntimeRunEntity
 import com.zhiban.rebuild.data.store.RuntimeSessionEntity
@@ -115,6 +118,24 @@ class AgentDataExportServiceTest {
         assertEquals(2, json.getJSONObject("crm").getJSONArray("leads").length())
     }
 
+    @Test fun exportIncludesCurrentLongTermMemoryAndLegacyHistory() = runBlocking {
+        database.memoryDao().insert(memory("legacy-memory"))
+        database.memoryPersistenceDao().insertNamespace(
+            MemoryNamespaceEntity("runtime-global", "owner", "profile", "GLOBAL", "global", "ACTIVE", 0, 0, 1),
+        )
+        database.memoryPersistenceDao().insertRecord(memoryRecord("current-memory", "记住客户喜欢简洁报价"))
+        database.memoryPersistenceDao().insertCurrent(
+            MemoryCurrentVersionEntity("runtime-global", "current-memory", 1, "current-memory", 1),
+        )
+
+        val json = JSONObject(AgentDataExportService(context, database, SecretRedactor()).create(200).readText())
+        val memories = json.getJSONArray("memories")
+
+        assertEquals(2, memories.length())
+        assertTrue(memories.toString().contains("记住客户喜欢简洁报价"))
+        assertTrue(memories.toString().contains("喜欢简短回复"))
+    }
+
     private fun schedule(id: String, title: String = "周会") = ScheduleEntity(
         id = id,
         title = title,
@@ -132,6 +153,32 @@ class AgentDataExportServiceTest {
         content = "喜欢简短回复",
         sourceRunId = null,
         createdAtEpochMs = 10,
+    )
+
+    private fun memoryRecord(id: String, text: String) = MemoryRecordEntity(
+        namespaceId = "runtime-global",
+        memoryId = id,
+        recordVersion = 1,
+        logicalMemoryId = id,
+        memoryType = "USER_PREFERENCE",
+        subjectKey = "user",
+        predicateKey = "preference",
+        objectText = text,
+        canonicalText = text,
+        canonicalDigest = "digest-$id",
+        sensitivity = "PERSONAL",
+        confidence = 1.0,
+        importance = 0.8,
+        status = "ACTIVE",
+        validFromEpochMs = null,
+        validToEpochMs = null,
+        observedAtEpochMs = 10,
+        txFromEpochMs = 10,
+        txToEpochMs = null,
+        createdAtEpochMs = 10,
+        expiresAtEpochMs = null,
+        schemaVersion = 1,
+        sourceSetDigest = "source-$id",
     )
 
     private fun contact(id: String, phone: String? = null, email: String? = null, wechatId: String? = null, name: String = "张三") = ContactEntity(

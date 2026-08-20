@@ -179,7 +179,7 @@ internal class CrmAgentDataRepository(private val database: AgentDatabase) {
                     contactId = contactId,
                     suggestionType = CrmSuggestionType.CALL_FOLLOW_UP,
                     title = "记录通话跟进",
-                    summary = "刚和$name 通话 ${formatCallMinutes(durationSeconds)}，要不要记一条跟进记录？",
+                    summary = "刚和$name 通话 ${formatCallDuration(durationSeconds)}，要不要记一条跟进记录？",
                     rationale = "通话后及时记录跟进有助于推进「${opportunity.title}」".take(500),
                     evidenceRefsJson = evidenceRefsJson,
                     confidence = CALL_FOLLOW_UP_CONFIDENCE,
@@ -545,10 +545,11 @@ internal class CrmAgentDataRepository(private val database: AgentDatabase) {
 
         /** PENDING suggestions older than this are marked EXPIRED by maintenance. */
         internal const val SUGGESTION_TTL_MS = 7L * 24 * 60 * 60 * 1_000
-
-        private fun formatCallMinutes(durationSeconds: Long): String {
-            val minutes = (durationSeconds + 30) / 60
-            return if (minutes <= 1) "1 分钟" else "$minutes 分钟"
-        }
     }
+}
+
+internal fun formatCallDuration(durationSeconds: Long): String = when {
+    durationSeconds <= 0 -> "0 分钟"
+    durationSeconds < 60 -> "不到 1 分钟"
+    else -> "${(durationSeconds + 30) / 60} 分钟"
 }

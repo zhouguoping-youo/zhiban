@@ -41,7 +41,13 @@ class CallLogSyncCoordinator @Inject internal constructor(
         } catch (_: Throwable) {
             return CallLogSyncResult(0, 0, 0, 0, "call_log:failure")
         }
-        val result = importCallsAndSuggestionsAtomically(database, crmRepository, rows, nowEpochMs)
+        val result = importCallsAndSuggestionsAtomically(
+            database = database,
+            crmRepository = crmRepository,
+            rows = rows,
+            nowEpochMs = nowEpochMs,
+            generateFollowUps = storedCursor > 0L,
+        )
         rows.maxOfOrNull(SystemCallLogRow::lastModifiedEpochMs)?.let { preferences.advanceCursor(it) }
         return result.copy(rowsRead = rows.size)
     }
@@ -62,9 +68,10 @@ internal suspend fun importCallsAndSuggestionsAtomically(
     crmRepository: com.zhiban.rebuild.data.agent.CrmAgentDataRepository,
     rows: List<SystemCallLogRow>,
     nowEpochMs: Long,
+    generateFollowUps: Boolean = true,
 ): CallLogSyncResult = database.withTransaction {
     val result = CallLogImporter(database).import(rows, nowEpochMs)
-    suggestCrmFollowUpsForSyncedCalls(database, crmRepository, rows, nowEpochMs)
+    if (generateFollowUps) suggestCrmFollowUpsForSyncedCalls(database, crmRepository, rows, nowEpochMs)
     result
 }
 
@@ -76,10 +83,18 @@ internal suspend fun suggestCrmFollowUpsForSyncedCalls(
 ) {
     for (row in rows.distinctBy { it.providerRowId }) {
         val call = database.callLogDao().findBySourceRow(CallLogImporter.SOURCE_ANDROID, row.providerRowId) ?: continue
+        if (!isEligibleForCallFollowUp(call.direction, call.durationSeconds, call.startedAtEpochMs, nowEpochMs)) continue
         val contactId = call.linkedContactId ?: continue
         crmRepository.suggestCallFollowUpActivity(contactId, call.callRecordId, call.durationSeconds, nowEpochMs)
     }
 }
+
+internal fun isEligibleForCallFollowUp(direction: String, durationSeconds: Long, startedAtEpochMs: Long, nowEpochMs: Long): Boolean = durationSeconds > 0 &&
+    direction in setOf("INCOMING", "OUTGOING", "ANSWERED_EXTERNALLY") &&
+    startedAtEpochMs in (nowEpochMs - FOLLOW_UP_FRESHNESS_MS)..(nowEpochMs + CLOCK_SKEW_TOLERANCE_MS)
+
+private const val FOLLOW_UP_FRESHNESS_MS = 24L * 60 * 60_000L
+private const val CLOCK_SKEW_TOLERANCE_MS = 5 * 60_000L
 
 internal class CallLogImporter(private val database: AgentDatabase) {
     suspend fun import(rows: List<SystemCallLogRow>, nowEpochMs: Long): CallLogSyncResult = database.withTransaction {

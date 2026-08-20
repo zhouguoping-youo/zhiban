@@ -12,6 +12,7 @@ import com.zhiban.rebuild.data.crm.CrmActivityEntity
 import com.zhiban.rebuild.data.crm.CrmLeadEntity
 import com.zhiban.rebuild.data.crm.CrmNextActionEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
+import com.zhiban.rebuild.data.memory.MemoryRecordEntity
 import com.zhiban.rebuild.data.store.RuntimeConversationTurnEntity
 import com.zhiban.rebuild.provider.SecretRedactor
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -72,7 +73,7 @@ class AgentDataExportService @Inject internal constructor(
         name("conversations")
         writePagedArray(database.runtimeConversationTurnDao()::listPageForExport) { writeConversation(it) }
         name("memories")
-        writePagedArray(database.memoryDao()::listPageForExport) { writeMemory(it) }
+        writeMemories(this, nowEpochMs)
         name("contacts")
         writePagedArray(database.contactDao()::listActivePageForExport) { writeContact(it) }
         name("schedules")
@@ -98,12 +99,29 @@ class AgentDataExportService @Inject internal constructor(
 
     private suspend fun <T> JsonWriter.writePagedArray(fetchPage: ExportPageFetcher<T>, writeItem: ExportItemWriter<T>) {
         beginArray()
+        writePagedItems(fetchPage, writeItem)
+        endArray()
+    }
+
+    private suspend fun <T> JsonWriter.writePagedItems(fetchPage: ExportPageFetcher<T>, writeItem: ExportItemWriter<T>) {
         var offset = 0
         do {
             val page = fetchPage(pageSize, offset)
             page.forEach { writeItem(it) }
             offset += page.size
         } while (page.size == pageSize)
+    }
+
+    private suspend fun writeMemories(writer: JsonWriter, nowEpochMs: Long) = with(writer) {
+        beginArray()
+        writePagedItems(
+            fetchPage = { limit, offset ->
+                database.memoryPersistenceDao().listCurrentPageForExport(nowEpochMs, limit, offset)
+            },
+        ) { writeMemoryRecord(it) }
+        // Older installations may still contain pre-foundation rows. Keep them in the export so
+        // upgrading the runtime never makes user history disappear from a data portability file.
+        writePagedItems(database.memoryDao()::listPageForExport) { writeMemory(it) }
         endArray()
     }
 
@@ -119,6 +137,14 @@ class AgentDataExportService @Inject internal constructor(
         beginObject()
         name("kind").value(memory.kind)
         name("content").value(redactor.redactWithoutTruncation(memory.content))
+        name("createdAtEpochMs").value(memory.createdAtEpochMs)
+        endObject()
+    }
+
+    private fun JsonWriter.writeMemoryRecord(memory: MemoryRecordEntity) {
+        beginObject()
+        name("kind").value(memory.memoryType)
+        name("content").value(redactor.redactWithoutTruncation(memory.canonicalText))
         name("createdAtEpochMs").value(memory.createdAtEpochMs)
         endObject()
     }
