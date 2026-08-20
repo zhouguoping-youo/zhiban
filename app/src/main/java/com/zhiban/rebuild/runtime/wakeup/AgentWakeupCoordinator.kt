@@ -129,12 +129,33 @@ internal class AgentWakeupCoordinator @Inject constructor(
         val context = contextLoader.load(candidate, decision.contactId, System.currentTimeMillis())
         // 每次唤醒用唯一 sessionId：复用旧 session 会因 revision 已推进导致 start CONFLICT。
         // 建议去重仍走 dedupeKey="wakeup-<candidateId>"，幂等不受影响。
-        val sessionId = "wakeup-$candidateId-${System.currentTimeMillis()}"
-        val session = HeadlessAgentSession(runtimeUiClient, textInputGateway, scope)
-        sessionWorkspace.ensure(sessionId)
         val input = encodeRuntimeInput(buildWakeupPrompt(candidate, contact, opportunity, context))
-        val result = session.run(sessionId, input)
-        persistSuggestion(candidateId, decision, result)
+        var retryableFailures = 0
+        var result: HeadlessAgentSession.HeadlessResult? = null
+        while (result == null) {
+            val sessionId = "wakeup-$candidateId-${System.currentTimeMillis()}-$retryableFailures"
+            val session = HeadlessAgentSession(runtimeUiClient, textInputGateway, scope)
+            sessionWorkspace.ensure(sessionId)
+            val attemptResult = session.run(sessionId, input)
+            if (attemptResult.finalStatus != RuntimeRunStatus.FAILED_RETRYABLE) {
+                retryableFailures = 0
+                result = attemptResult
+                continue
+            }
+            retryableFailures++
+            when (WakeupRetryPolicy.afterRetryableFailure(retryableFailures)) {
+                WakeupRetryPolicy.Decision.RETRY_ONCE -> {
+                    Log.i(TAG, "wakeup:retry_retryable candidate=$candidateId attempt=$retryableFailures")
+                    delay(RETRY_BACKOFF_MS)
+                }
+
+                WakeupRetryPolicy.Decision.SKIP_CYCLE -> {
+                    Log.i(TAG, "wakeup:skip_retryable candidate=$candidateId failures=$retryableFailures")
+                    return
+                }
+            }
+        }
+        persistSuggestion(candidateId, decision, requireNotNull(result))
         // 保留会话痕迹（可在历史里回看），不清不删；上限由既有会话治理兜底。
     }
 
@@ -184,7 +205,10 @@ internal class AgentWakeupCoordinator @Inject constructor(
         }
         val candidate = database.notificationCandidateDao().find(candidateId)
         val sender = candidate?.senderName ?: "联系人"
-        val intent = extractEventIntent(candidate, decision, sender)
+        val intent = extractEventIntent(candidate, decision, sender, structured)
+        if (decision.reason == REASON_UNSCHEDULED_TIME_INTENT && !intent.canCreateSchedule) {
+            Log.i(TAG, "wakeup:schedule_time_unresolved candidate=$candidateId")
+        }
         val title = suggestionTitle(intent, decision.reason, sender)
         val executed = if (result.changeCommitted) "知伴已顺带完成可撤销的自动操作，可在「自动整理」查看与撤销。" else ""
         val now = System.currentTimeMillis()
@@ -210,6 +234,7 @@ internal class AgentWakeupCoordinator @Inject constructor(
         candidate: com.zhiban.rebuild.data.notification.NotificationCandidateEntity?,
         decision: WakeupDecision.Wake,
         sender: String,
+        structured: WakeupStructuredOutput?,
     ): EventIntentExtractor.EventIntent {
         if (decision.reason != REASON_UNSCHEDULED_TIME_INTENT) {
             return EventIntentExtractor.EventIntent(hasScheduleIntent = false)
@@ -231,6 +256,8 @@ internal class AgentWakeupCoordinator @Inject constructor(
             authoritativeStartAtEpochMs = authoritativeInsight?.startAtEpochMs,
             authoritativeDurationMinutes = authoritativeInsight?.durationMinutes,
             authoritativeTitle = authoritativeInsight?.title,
+            fallbackTimeExpression = structured?.schedule?.timeExpression,
+            forceScheduleIntent = true,
         )
     }
 
@@ -375,6 +402,7 @@ internal class AgentWakeupCoordinator @Inject constructor(
 
     private companion object {
         const val TAG = "AgentWakeup"
+        const val RETRY_BACKOFF_MS = 1_000L
         const val TRIGGER_BUFFER_CAPACITY = 64
         const val TRIGGER_DEBOUNCE_MS = 5_000L
         const val MAX_PROMPT_BODY_LENGTH = 600

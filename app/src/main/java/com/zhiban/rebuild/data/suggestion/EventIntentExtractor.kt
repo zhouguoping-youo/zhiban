@@ -133,6 +133,8 @@ object EventIntentExtractor {
         authoritativeStartAtEpochMs: Long? = null,
         authoritativeDurationMinutes: Int? = null,
         authoritativeTitle: String? = null,
+        fallbackTimeExpression: String? = null,
+        forceScheduleIntent: Boolean = false,
     ): EventIntent {
         val text = body.trim()
         if (text.isBlank()) return EventIntent(hasScheduleIntent = false)
@@ -149,7 +151,14 @@ object EventIntentExtractor {
             now = now,
             allowTimeOnly = TIME_ACTION_WORD_PATTERN.containsMatchIn(text),
             defaultTimeForDate = true,
-        )
+        ) ?: fallbackTimeExpression?.let {
+            ScheduleTimeParser.resolve(
+                text = it,
+                now = now,
+                allowTimeOnly = true,
+                defaultTimeForDate = false,
+            )
+        }
         val start = timeResolution?.dateTime
         val pickupLocation = extractPickupLocation(text)
         val company = extractCompany(text)
@@ -172,6 +181,7 @@ object EventIntentExtractor {
         val (departAt, travelNote) = estimateDeparture(start, company != null, departure, pickupCoordinate, visitAddress, zoneId)
 
         val confirmations = buildList {
+            if (forceScheduleIntent && start == null) add("时间未识别，请手动补充")
             if (locationIsBlank(pickupLocation)) add("接人地点不明确，建议与${contactName ?: "对方"}确认")
             if (company != null && visitLocation == null) {
                 add("拜访地点未知（$company 的地址），建议确认")
@@ -191,7 +201,7 @@ object EventIntentExtractor {
             }
         }
 
-        if (start == null && pickupLocation == null && company == null && pickup == null) {
+        if (start == null && pickupLocation == null && company == null && pickup == null && !forceScheduleIntent) {
             return EventIntent(hasScheduleIntent = false)
         }
 
@@ -220,7 +230,7 @@ object EventIntentExtractor {
             confirmations = confirmations,
         )
         return EventIntent(
-            hasScheduleIntent = hasScheduleAnchor,
+            hasScheduleIntent = forceScheduleIntent || hasScheduleAnchor,
             startAtEpochMs = start?.atZone(zoneId)?.toEpochSecond()?.times(1_000),
             timeDescription = timeDescription,
             durationMinutes = authoritativeDurationMinutes

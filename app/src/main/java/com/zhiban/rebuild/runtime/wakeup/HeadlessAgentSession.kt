@@ -114,6 +114,7 @@ internal class HeadlessAgentSession(private val client: RuntimeUiClient, private
             RuntimeRunStatus.SUCCEEDED,
             RuntimeRunStatus.CANCELLED,
             RuntimeRunStatus.FAILED_FINAL,
+            RuntimeRunStatus.FAILED_RETRYABLE,
         )
     }
 }
