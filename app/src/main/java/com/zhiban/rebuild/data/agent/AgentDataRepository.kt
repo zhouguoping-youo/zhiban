@@ -183,7 +183,15 @@ class AgentDataRepository internal constructor(
         if (candidate.identityDriftJson != null) return candidate to false
         var enriched = candidate
         var processed = false
-        if (isLikelyReplyContext(enriched, nowEpochMs) &&
+        if (enriched.isGroupChat &&
+            enriched.suggestedContactId != null &&
+            enriched.suggestedContactConfidence >= AUTO_LINK_CONFIDENCE
+        ) {
+            // 这个昵称已由用户在当前群内确认过。只复用 scoped resolution 关联后续消息，
+            // 不创建全局平台身份，也不把群消息写成一对一互动事实。
+            enriched = enriched.copy(linkedContactId = enriched.suggestedContactId)
+            processed = true
+        } else if (isLikelyReplyContext(enriched, nowEpochMs) &&
             recordInferredInteractionEvidence(enriched, nowEpochMs)
         ) {
             enriched = enriched.copy(linkedContactId = enriched.linkedContactId ?: enriched.suggestedContactId)
@@ -443,6 +451,14 @@ class AgentDataRepository internal constructor(
                 daos.contactKnowledgeDao.findContactByMethod("PHONE", phone)
                     ?: daos.contactDao.findByPhone(phone)
             }?.let { it to 1.0 }
+                ?: return candidate
+        } else if (candidate.isGroupChat) {
+            val sourceIdentityId = communicationSourceIdentityId(candidate, normalized) ?: return candidate
+            daos.contactIntelligenceDao.findSourceIdentity(sourceIdentityId)
+                ?.takeIf { it.resolutionStatus == "RESOLVED" }
+                ?.personId
+                ?.let { daos.contactDao.findById(it) }
+                ?.let { it to 1.0 }
                 ?: return candidate
         } else {
             daos.contactIdentityDao.findContactByPlatformHandle(candidate.platform, normalized)?.let { it to 1.0 }
@@ -759,7 +775,9 @@ class AgentDataRepository internal constructor(
     private suspend fun persistConfirmedPlatformIdentity(candidate: NotificationCandidateEntity, contactId: String, nowEpochMs: Long) {
         val sender = candidate.senderName?.trim()?.takeIf(String::isNotBlank) ?: return
         val normalized = normalizeIdentityValue(sender)
-        if (candidate.platform == "SMS") return
+        // 群昵称只在当前会话内有身份意义。即使用户确认了这条群消息的发送者，也只解析
+        // scoped source identity；不能把“老张”一类显示名升级成跨群、跨会话的全局账号。
+        if (candidate.platform == "SMS" || candidate.isGroupChat) return
         // 用确定性 UUID 而非 hashCode()：hashCode 是 32 位哈希，不同 handle 碰撞会
         // 在 REPLACE 主键下静默覆盖前一条身份记录（见 stableContactKnowledgeId 同款做法）。
         val id = stableContactKnowledgeId("platform-identity", contactId, candidate.platform, normalized)
@@ -792,12 +810,7 @@ class AgentDataRepository internal constructor(
         if (normalizedHandle.isBlank()) return
         val personId = candidate.linkedContactId?.takeIf { daos.contactIntelligenceDao.findPerson(it) != null }
         val groupScope = candidate.conversationTitle?.takeIf { candidate.isGroupChat }?.let(::normalizeIdentityValue)
-        val sourceIdentityId = stableContactKnowledgeId(
-            "communication-source",
-            candidate.platform,
-            groupScope ?: "DIRECT",
-            normalizedHandle,
-        )
+        val sourceIdentityId = communicationSourceIdentityId(candidate, normalizedHandle) ?: return
         val existing = daos.contactIntelligenceDao.findSourceIdentity(sourceIdentityId)
         daos.contactIntelligenceDao.upsertSourceIdentity(
             SourceIdentityEntity(
@@ -862,6 +875,23 @@ class AgentDataRepository internal constructor(
                 sourceRef = candidate.candidateId,
                 recordedAtEpochMs = nowEpochMs,
             ),
+        )
+    }
+
+    private fun communicationSourceIdentityId(candidate: NotificationCandidateEntity, normalizedHandle: String): String? {
+        val conversationScope = if (candidate.isGroupChat) {
+            candidate.conversationTitle
+                ?.let(::normalizeIdentityValue)
+                ?.takeIf(String::isNotBlank)
+                ?: return null
+        } else {
+            "DIRECT"
+        }
+        return stableContactKnowledgeId(
+            "communication-source",
+            candidate.platform,
+            conversationScope,
+            normalizedHandle,
         )
     }
 

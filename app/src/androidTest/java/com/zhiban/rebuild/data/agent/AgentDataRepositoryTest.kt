@@ -442,6 +442,48 @@ class AgentDataRepositoryTest {
     }
 
     @Test
+    fun sameNicknameInDifferentGroupsResolvesToDifferentContacts() = runBlocking {
+        val firstContactId = repository.saveUserContact(
+            null, "张一", null, null, null, null, null, null, nowEpochMs = 1_000L,
+        )
+        val secondContactId = repository.saveUserContact(
+            null, "张二", null, null, null, null, null, null, nowEpochMs = 1_100L,
+        )
+
+        fun groupMessage(id: String, group: String, postedAt: Long) = NotificationCandidateEntity(
+            candidateId = id,
+            sourceKey = "$id-source",
+            packageName = "com.tencent.mm",
+            appLabel = "微信",
+            title = group,
+            body = "项目进展同步",
+            postedAtEpochMs = postedAt,
+            createdAtEpochMs = postedAt,
+            platform = "WECHAT",
+            conversationTitle = group,
+            senderName = "老张",
+            isGroupChat = true,
+        )
+
+        repository.stageNotificationCandidate(groupMessage("group-a-first", "甲项目群", 2_000L))
+        assertTrue(repository.confirmNotificationCandidate("group-a-first", firstContactId, 2_100L))
+        assertNull(database.contactIdentityDao().findContactByPlatformHandle("WECHAT", "老张"))
+
+        repository.stageNotificationCandidate(groupMessage("group-b-first", "乙项目群", 3_000L))
+        val unresolvedSecondGroup = requireNotNull(database.notificationCandidateDao().find("group-b-first"))
+        assertNull(unresolvedSecondGroup.suggestedContactId)
+        assertNull(unresolvedSecondGroup.linkedContactId)
+        assertTrue(repository.confirmNotificationCandidate("group-b-first", secondContactId, 3_100L))
+
+        repository.stageNotificationCandidate(groupMessage("group-a-next", "甲项目群", 4_000L))
+        repository.stageNotificationCandidate(groupMessage("group-b-next", "乙项目群", 5_000L))
+
+        assertEquals(firstContactId, database.notificationCandidateDao().find("group-a-next")?.linkedContactId)
+        assertEquals(secondContactId, database.notificationCandidateDao().find("group-b-next")?.linkedContactId)
+        assertNull(database.contactIdentityDao().findContactByPlatformHandle("WECHAT", "老张"))
+    }
+
+    @Test
     fun sameConfirmedPlatformAccountLinksReimportedCardToExistingPerson() = runBlocking {
         val identity = SystemContactPlatformIdentity("FEISHU", "ou_verified_123")
         val summary = repository.importConfirmedSystemContacts(
