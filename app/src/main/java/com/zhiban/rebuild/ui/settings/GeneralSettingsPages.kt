@@ -131,6 +131,7 @@ fun PrivacySecurityPage(
     completionViewModel: CompletionSettingsViewModel = hiltViewModel(),
     locationConsentViewModel: LocationConsentSettingsViewModel = hiltViewModel(),
     smartForwardViewModel: SmartForwardSettingsViewModel = hiltViewModel(),
+    screenshotVisionViewModel: ScreenshotVisionSettingsViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val outboundState by outboundViewModel.state.collectAsStateWithLifecycle()
@@ -140,6 +141,7 @@ fun PrivacySecurityPage(
     val completionEnabled by completionViewModel.enabled.collectAsStateWithLifecycle()
     val locationAccessEnabled by locationConsentViewModel.enabled.collectAsStateWithLifecycle()
     val smartForwardEnabled by smartForwardViewModel.enabled.collectAsStateWithLifecycle()
+    val screenshotVisionEnabled by screenshotVisionViewModel.enabled.collectAsStateWithLifecycle()
     var showSmartForwardInfo by remember { mutableStateOf(false) }
     var callLogAccessStatus by remember { mutableStateOf(CallLogAccessStatus.NOT_GRANTED) }
     var refreshVersion by remember { mutableIntStateOf(0) }
@@ -355,6 +357,13 @@ fun PrivacySecurityPage(
                             }
                         },
                     )
+                    Divider()
+                    SettingsToggleRow(
+                        title = "截图视觉解析",
+                        subtitle = "OCR识别不完整时，允许把截图交给已连接的视觉模型；默认关闭",
+                        checked = screenshotVisionEnabled,
+                        onCheckedChange = screenshotVisionViewModel::setEnabled,
+                    )
                 }
             }
             item {
@@ -490,6 +499,18 @@ class SmartForwardSettingsViewModel @Inject constructor(private val controls: Ag
     fun setEnabled(enabled: Boolean) {
         controls.saveSmartForwardEnabled(enabled)
         if (enabled) controls.markSmartForwardExplained()
+        mutableEnabled.value = enabled
+    }
+}
+
+/** Backs the opt-in cloud vision fallback for manually shared screenshots. */
+@HiltViewModel
+class ScreenshotVisionSettingsViewModel @Inject constructor(private val controls: AgentControlStore) : ViewModel() {
+    private val mutableEnabled = MutableStateFlow(controls.screenshotVisionEnabled())
+    val enabled: StateFlow<Boolean> = mutableEnabled.asStateFlow()
+
+    fun setEnabled(enabled: Boolean) {
+        controls.saveScreenshotVisionEnabled(enabled)
         mutableEnabled.value = enabled
     }
 }

@@ -21,6 +21,8 @@ import com.zhiban.rebuild.data.agent.AgentDataRepository
 import com.zhiban.rebuild.data.calendar.ScheduleReminderWorker
 import com.zhiban.rebuild.data.calllog.CallHangupReconcileWorker
 import com.zhiban.rebuild.data.calllog.CallLogSyncCoordinator
+import com.zhiban.rebuild.data.notification.ScreenshotVisionCandidateFormatter
+import com.zhiban.rebuild.data.notification.ScreenshotVisionParser
 import com.zhiban.rebuild.data.notification.sharedTextCandidate
 import com.zhiban.rebuild.data.reply.ReplySuggestionCoordinator
 import com.zhiban.rebuild.navigation.ZhiBanNavHost
@@ -44,6 +46,8 @@ class MainActivity : ComponentActivity() {
     @Inject internal lateinit var replySuggestionCoordinator: ReplySuggestionCoordinator
 
     @Inject internal lateinit var contactCompletionCoordinator: com.zhiban.rebuild.data.completion.ContactCompletionCoordinator
+
+    @Inject internal lateinit var screenshotVisionParser: ScreenshotVisionParser
 
     @Inject lateinit var themePreferenceStore: ThemePreferenceStore
 
@@ -159,13 +163,19 @@ class MainActivity : ComponentActivity() {
     private fun acceptSharedImage(intent: Intent) {
         val uri = getSharedImageUri(intent) ?: return
         lifecycleScope.launch {
-            val recognized = recognizeImageText(uri) ?: return@launch
+            val recognized = recognizeImageText(uri)
+            val visionCandidate = if (!recognized.isNullOrBlank() && ScreenshotVisionCandidateFormatter.isStructuredOcr(recognized)) {
+                null
+            } else {
+                screenshotVisionParser.parse(uri.toString())
+            }
+            val candidateBody = visionCandidate ?: recognized ?: return@launch
             val source = resolveShareSource(intent)
             val candidate = sharedTextCandidate(
                 sourcePackage = source.packageName,
                 sourceLabel = source.label,
                 subject = null,
-                body = recognized,
+                body = candidateBody,
             ) ?: return@launch
             repository.stageNotificationCandidate(candidate)
             relationInboxRequest.longValue = System.currentTimeMillis()
