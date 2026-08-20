@@ -48,7 +48,7 @@ class MessageContactCompletionCoordinatorTest {
             database,
             MessageContactFieldExtraction { _, _, _ -> fields.toList() },
             completion,
-            AgentSuggestionRepository(database, completion),
+            AgentSuggestionRepository(database, completion, com.zhiban.rebuild.data.calendar.ScheduleReminderRegistrar { _, _, _ -> }),
         )
     }
 
@@ -157,7 +157,7 @@ class MessageContactCompletionCoordinatorTest {
                 emptyList()
             },
             completion,
-            AgentSuggestionRepository(database, completion),
+            AgentSuggestionRepository(database, completion, com.zhiban.rebuild.data.calendar.ScheduleReminderRegistrar { _, _, _ -> }),
         ).processOnce()
 
         assertEquals(0, extractCalls)

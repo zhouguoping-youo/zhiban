@@ -4,6 +4,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.calendar.ScheduleReminderRegistrar
 import com.zhiban.rebuild.data.completion.CompletionHandoff
 import com.zhiban.rebuild.data.completion.ContactCompletionRepository
 import com.zhiban.rebuild.data.completion.ContactCompletionRequestEntity
@@ -40,6 +41,7 @@ class AgentSuggestionRepositoryTest {
     private lateinit var database: AgentDatabase
     private lateinit var repository: AgentSuggestionRepository
     private var handoffSucceeds = true
+    private val registeredReminders = mutableListOf<Triple<String, Long, Int?>>()
 
     @Before fun setUp() {
         database = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AgentDatabase::class.java)
@@ -51,7 +53,14 @@ class AgentSuggestionRepositoryTest {
             FakeOutreachGenerator(),
             controls,
         )
-        repository = AgentSuggestionRepository(database, completion)
+        registeredReminders.clear()
+        repository = AgentSuggestionRepository(
+            database,
+            completion,
+            ScheduleReminderRegistrar { scheduleId, startAtEpochMs, reminderMinutesBefore ->
+                registeredReminders += Triple(scheduleId, startAtEpochMs, reminderMinutesBefore)
+            },
+        )
     }
 
     @After fun tearDown() = database.close()
@@ -155,6 +164,9 @@ class AgentSuggestionRepositoryTest {
         assertTrue(schedule.note!!.contains("对接人：李雷"))
         assertTrue(schedule.note!!.contains("来自知伴 · 智能建议"))
         assertEquals(1, database.scheduleDao().count())
+        assertEquals(schedule.id, registeredReminders.single().first)
+        assertEquals(schedule.startAtEpochMs, registeredReminders.single().second)
+        assertEquals(60, registeredReminders.single().third)
     }
 
     @Test fun scheduleWithoutParticipantRemainsPendingAndWritesNothing() = runBlocking {

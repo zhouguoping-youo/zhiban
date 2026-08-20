@@ -5,14 +5,22 @@ import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import dagger.Binds
+import dagger.Module
+import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class ScheduleReminderScheduler @Inject constructor(@ApplicationContext private val context: Context) {
-    fun replace(scheduleId: String, startAtEpochMs: Long, reminderMinutesBefore: Int?, nowEpochMs: Long = System.currentTimeMillis()) {
+class ScheduleReminderScheduler @Inject constructor(@ApplicationContext private val context: Context) : ScheduleReminderRegistrar {
+    override fun replace(scheduleId: String, startAtEpochMs: Long, reminderMinutesBefore: Int?) {
+        replace(scheduleId, startAtEpochMs, reminderMinutesBefore, System.currentTimeMillis())
+    }
+
+    fun replace(scheduleId: String, startAtEpochMs: Long, reminderMinutesBefore: Int?, nowEpochMs: Long) {
         val manager = WorkManager.getInstance(context)
         val uniqueName = uniqueName(scheduleId)
         if (reminderMinutesBefore == null) {
@@ -41,6 +49,16 @@ class ScheduleReminderScheduler @Inject constructor(@ApplicationContext private 
     companion object {
         const val TAG = "zhiban-schedule-reminder"
     }
+}
+
+fun interface ScheduleReminderRegistrar {
+    fun replace(scheduleId: String, startAtEpochMs: Long, reminderMinutesBefore: Int?)
+}
+
+@Module
+@InstallIn(SingletonComponent::class)
+internal abstract class ScheduleReminderBindingModule {
+    @Binds abstract fun bindScheduleReminderRegistrar(scheduler: ScheduleReminderScheduler): ScheduleReminderRegistrar
 }
 
 /** WorkManager persists input data outside the encrypted app database, so it only receives IDs and validation fields. */

@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.room.withTransaction
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.ScheduleEntity
+import com.zhiban.rebuild.data.calendar.ScheduleReminderRegistrar
 import com.zhiban.rebuild.data.completion.ContactCompletionDraft
 import com.zhiban.rebuild.data.completion.ContactCompletionRepository
 import com.zhiban.rebuild.data.event.EventPlanEntity
@@ -21,7 +22,11 @@ import kotlinx.coroutines.CancellationException
  * 接受时会把日程要素、参与人、日历事件和建议状态作为一笔原子写入；冲突、缺参与人
  * 或过期等失败会完整回滚并保留待处理建议，绝不显示没有真实结果的成功状态。
  */
-class AgentSuggestionRepository @Inject internal constructor(private val database: AgentDatabase, private val contactCompletion: ContactCompletionRepository) {
+class AgentSuggestionRepository @Inject internal constructor(
+    private val database: AgentDatabase,
+    private val contactCompletion: ContactCompletionRepository,
+    private val reminderRegistrar: ScheduleReminderRegistrar,
+) {
     fun observeSuggestions(limit: Int = 100) = database.agentSuggestionDao().observeRecent(limit)
 
     fun observePendingCount() = database.agentSuggestionDao().observePendingCount()
@@ -122,12 +127,13 @@ class AgentSuggestionRepository @Inject internal constructor(private val databas
         database.agentSuggestionDao().pruneSettledBefore(nowEpochMs - olderThanDays * 24L * 60 * 60 * 1_000)
 
     private suspend fun createScheduleAndAccept(suggestionId: String, chosenContactId: String?, nowEpochMs: Long): Boolean = try {
-        database.withTransaction {
+        val schedule = database.withTransaction {
             val creation = resolveScheduleCreation(suggestionId, chosenContactId, nowEpochMs)
-                ?: return@withTransaction false
+                ?: return@withTransaction null
             persistScheduleCreation(creation, nowEpochMs)
-            true
-        }
+        } ?: return false
+        reminderRegistrar.replace(schedule.id, schedule.startAtEpochMs, schedule.reminderMinutesBefore)
+        true
     } catch (failure: CancellationException) {
         throw failure
     } catch (failure: Exception) {
@@ -162,22 +168,21 @@ class AgentSuggestionRepository @Inject internal constructor(private val databas
         startAtEpochMs + durationMinutes * 60_000L,
     ).isNotEmpty()
 
-    private suspend fun persistScheduleCreation(creation: ScheduleCreation, nowEpochMs: Long) {
+    private suspend fun persistScheduleCreation(creation: ScheduleCreation, nowEpochMs: Long): ScheduleEntity {
         val planId = "event-suggestion-${sha256(creation.suggestion.suggestionId).take(24)}"
         val scheduleId = "event-schedule-$planId"
-        database.scheduleDao().insert(
-            ScheduleEntity(
-                id = scheduleId,
-                title = creation.title,
-                startAtEpochMs = creation.startAtEpochMs,
-                durationMinutes = creation.durationMinutes,
-                note = creation.note,
-                createdByRunId = null,
-                createdAtEpochMs = nowEpochMs,
-                updatedAtEpochMs = nowEpochMs,
-                reminderMinutesBefore = DEFAULT_REMINDER_MINUTES,
-            ),
+        val schedule = ScheduleEntity(
+            id = scheduleId,
+            title = creation.title,
+            startAtEpochMs = creation.startAtEpochMs,
+            durationMinutes = creation.durationMinutes,
+            note = creation.note,
+            createdByRunId = null,
+            createdAtEpochMs = nowEpochMs,
+            updatedAtEpochMs = nowEpochMs,
+            reminderMinutesBefore = DEFAULT_REMINDER_MINUTES,
         )
+        database.scheduleDao().insert(schedule)
         database.eventPlanningDao().insertPlan(
             EventPlanEntity(
                 planId = planId,
@@ -203,6 +208,7 @@ class AgentSuggestionRepository @Inject internal constructor(private val databas
             ),
         )
         check(database.agentSuggestionDao().markScheduleCreated(creation.suggestion.suggestionId, planId, nowEpochMs) == 1)
+        return schedule
     }
 
     private fun isAllowedParticipant(suggestion: AgentSuggestionEntity, contactId: String): Boolean = contactId == suggestion.contactId ||
