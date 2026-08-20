@@ -167,6 +167,19 @@ class ForceRelationshipGraphTest {
         assertEquals(1, projection.edges.size)
     }
 
+    @Test
+    fun `edge labels stay hidden at overview scale and appear for selected edges`() {
+        assertTrue(shouldShowRelationshipEdgeLabel(1.0f, selected = false, touchesSelectedNode = false).not())
+        assertTrue(shouldShowRelationshipEdgeLabel(1.0f, selected = false, touchesSelectedNode = true))
+        assertTrue(shouldShowRelationshipEdgeLabel(1.2f, selected = false, touchesSelectedNode = false))
+    }
+
+    @Test
+    fun `inferred edge caption visibly identifies the evidence`() {
+        val link = ForceGraphLink("a", "b", "COLLEAGUE", "同事", 0.6f, isInferred = true)
+        assertEquals("同事 · 推测", relationshipGraphEdgeCaption(link))
+    }
+
     private fun edge(id: String, from: String, to: String, type: String, confidence: Double, confirmed: Boolean) = RelationshipEdgeEntity(
         edgeId = id,
         fromContactId = from,

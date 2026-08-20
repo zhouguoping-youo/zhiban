@@ -553,8 +553,14 @@ internal fun ForceRelationshipGraphCanvas(
                                 else -> null
                             },
                         )
-                        val relationshipText = link.displayLabel
-                        if (relationshipText.isNotBlank()) {
+                        val touchesSelectedNode = selectedNodeId == link.fromId || selectedNodeId == link.toId
+                        val showEdgeLabel = shouldShowRelationshipEdgeLabel(
+                            scale = graphScale,
+                            selected = selectedNodeId != null && touchesSelectedNode,
+                            touchesSelectedNode = touchesSelectedNode,
+                        )
+                        val relationshipText = relationshipGraphEdgeCaption(link)
+                        if (showEdgeLabel && relationshipText.isNotBlank()) {
                             val center = (from + to) / 2f
                             val labelWidth = max(50.dp.toPx(), (relationshipText.length * 13 + 16).dp.toPx())
                             val labelHeight = 22.dp.toPx()
