@@ -3,11 +3,13 @@ package com.zhiban.rebuild.runtime.memory
 import com.zhiban.agent.memory.*
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.memory.MemoryNamespaceEntity
+import com.zhiban.rebuild.runtime.context.EmbeddingGateway
 
 /** Room adapter. Runtime depends on the :agent:memory contract, while persistence stays replaceable. */
-internal class RoomMemoryGate(database: AgentDatabase, private val clock: () -> Long = System::currentTimeMillis) : MemoryGate {
+internal class RoomMemoryGate(database: AgentDatabase, private val clock: () -> Long = System::currentTimeMillis, embeddingGateway: EmbeddingGateway? = null) :
+    MemoryGate {
     private val atomic = MemoryAtomicStore(database, clock)
-    private val search = MemorySearch(database, clock)
+    private val search = MemorySearch(database, clock, embeddingGateway)
 
     override suspend fun ensureNamespace(namespace: MemoryNamespace) = atomic.ensureNamespace(
         MemoryNamespaceEntity(

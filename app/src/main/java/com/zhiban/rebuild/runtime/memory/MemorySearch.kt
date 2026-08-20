@@ -3,6 +3,8 @@ package com.zhiban.rebuild.runtime.memory
 import androidx.room.withTransaction
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.memory.MemoryRecordEntity
+import com.zhiban.rebuild.runtime.context.EmbeddingGateway
+import com.zhiban.rebuild.runtime.context.EmbeddingIndex
 import com.zhiban.rebuild.runtime.context.attemptRetrieval
 import kotlin.math.ceil
 
@@ -26,19 +28,55 @@ data class MemorySearchResult(
 
 data class MemorySearchQuery(val namespaceId: String, val ownerUserId: String, val profileId: String, val query: String, val limit: Int, val tokenBudget: Int)
 
-/** Scope-fenced exact + FTS retrieval. It returns data only, never executable prompt instructions. */
-internal class MemorySearch(private val database: AgentDatabase, private val clock: () -> Long = System::currentTimeMillis) {
-    suspend fun search(request: MemorySearchQuery): MemorySearchResult = database.withTransaction {
-        val normalized = request.query.trim().replace(Regex("\\s+"), " ")
-        require(normalized.isNotBlank() && normalized.toByteArray().size <= 4096) { "INVALID_RETRIEVAL_REQUEST" }
-        require(request.limit in 1..50 && request.tokenBudget in 0..32_768) { "INVALID_RETRIEVAL_REQUEST" }
+/** Scope-fenced exact + lexical + semantic retrieval. It returns data only, never prompt instructions. */
+internal class MemorySearch(
+    private val database: AgentDatabase,
+    private val clock: () -> Long = System::currentTimeMillis,
+    private val embeddingGateway: EmbeddingGateway? = null,
+) {
+    suspend fun search(request: MemorySearchQuery): MemorySearchResult {
+        val normalized = validateRequest(request)
+        val namespace = database.memoryPersistenceDao().namespace(request.namespaceId)
+        requireNotNull(namespace) { "NAMESPACE_NOT_FOUND" }
+        require(namespace.ownerUserId == request.ownerUserId && namespace.profileId == request.profileId) {
+            "MEMORY_SCOPE_MISMATCH"
+        }
+        val vectorAttempt = semanticSearch(normalized)
+        val vectorResult = vectorAttempt?.value
+        return searchLocalAndMerge(request, normalized, vectorResult, vectorAttempt?.degradation)
+    }
+
+    private suspend fun semanticSearch(normalized: String) = embeddingGateway?.let { gateway ->
+        attemptRetrieval("memory_vector") {
+            EmbeddingIndex(database, gateway, clock)
+                .search(normalized, VECTOR_CANDIDATE_LIMIT, factType = MEMORY_FACT_TYPE)
+        }
+    }
+
+    private suspend fun searchLocalAndMerge(
+        request: MemorySearchQuery,
+        normalized: String,
+        vectorResult: com.zhiban.rebuild.runtime.context.VectorSearchResult?,
+        vectorFailure: String?,
+    ): MemorySearchResult = database.withTransaction {
+        val vectorMemoryIds = vectorResult?.candidates.orEmpty()
+            .mapNotNull { candidate ->
+                candidate.id.takeIf { it.startsWith(MEMORY_FACT_PREFIX) }
+                    ?.removePrefix(MEMORY_FACT_PREFIX)
+            }
+            .distinct()
+
         val dao = database.memoryPersistenceDao()
-        val namespace = requireNotNull(dao.namespace(request.namespaceId)) { "NAMESPACE_NOT_FOUND" }
-        require(namespace.ownerUserId == request.ownerUserId && namespace.profileId == request.profileId) { "MEMORY_SCOPE_MISMATCH" }
         val terms = searchTerms(normalized)
         val ftsQuery = terms.joinToString(" OR ") { "\"$it\"" }.ifBlank { "\"__no_match__\"" }
         val now = clock()
         val exact = dao.exactCandidates(request.namespaceId, normalized, now, 64)
+        val semantic = if (vectorMemoryIds.isEmpty()) {
+            emptyList()
+        } else {
+            dao.currentRecordsByMemoryIds(request.namespaceId, vectorMemoryIds, now)
+                .sortedBy { vectorMemoryIds.indexOf(it.memoryId) }
+        }
         val ftsAttempt = attemptRetrieval("memory_fts") {
             dao.ftsCandidates(request.namespaceId, ftsQuery, now, 64)
         }
@@ -48,12 +86,15 @@ internal class MemorySearch(private val database: AgentDatabase, private val clo
         val fts = ftsAttempt.value.orEmpty()
         val substring = substringAttempt.value.orEmpty()
         val exactIds = exact.map { it.memoryId to it.recordVersion }.toSet()
+        val semanticIds = semantic.map { it.memoryId to it.recordVersion }.toSet()
         val substringIds = substring.map { it.memoryId to it.recordVersion }.toSet()
         var tokens = 0
-        val items = (exact + substring + fts).distinctBy { it.memoryId to it.recordVersion }
+        val items = (exact + semantic + substring + fts).distinctBy { it.memoryId to it.recordVersion }
             .sortedWith(
                 compareByDescending<MemoryRecordEntity> {
                     (it.memoryId to it.recordVersion) in exactIds
+                }.thenByDescending {
+                    (it.memoryId to it.recordVersion) in semanticIds
                 }.thenByDescending {
                     (it.memoryId to it.recordVersion) in substringIds
                 }.thenByDescending { it.confidence }
@@ -74,6 +115,7 @@ internal class MemorySearch(private val database: AgentDatabase, private val clo
                         sources,
                         when (record.memoryId to record.recordVersion) {
                             in exactIds -> 1.0
+                            in semanticIds -> 0.9
                             in substringIds -> 0.8
                             else -> 0.6
                         },
@@ -83,9 +125,23 @@ internal class MemorySearch(private val database: AgentDatabase, private val clo
         MemorySearchResult(
             items,
             tokens,
-            semanticSearchDegraded = true,
-            degradationReasons = listOfNotNull(ftsAttempt.degradation, substringAttempt.degradation),
+            semanticSearchDegraded = embeddingGateway == null ||
+                vectorFailure != null ||
+                vectorResult?.degradation != null,
+            degradationReasons = listOfNotNull(
+                vectorFailure,
+                vectorResult?.degradation,
+                ftsAttempt.degradation,
+                substringAttempt.degradation,
+            ).distinct(),
         )
+    }
+
+    private fun validateRequest(request: MemorySearchQuery): String {
+        val normalized = request.query.trim().replace(Regex("\\s+"), " ")
+        require(normalized.isNotBlank() && normalized.toByteArray().size <= 4096) { "INVALID_RETRIEVAL_REQUEST" }
+        require(request.limit in 1..50 && request.tokenBudget in 0..32_768) { "INVALID_RETRIEVAL_REQUEST" }
+        return normalized
     }
 
     private fun estimateTokens(value: String) = ceil(value.toByteArray().size / 4.0).toInt().coerceAtLeast(1)
@@ -117,6 +173,9 @@ internal class MemorySearch(private val database: AgentDatabase, private val clo
         const val HAN_FRAGMENT_LENGTH = 2
         const val MAX_WHOLE_HAN_TERM_LENGTH = 4
         const val MAX_SEARCH_TERMS = 16
+        const val VECTOR_CANDIDATE_LIMIT = 32
+        const val MEMORY_FACT_TYPE = "AGENT_MEMORY"
+        const val MEMORY_FACT_PREFIX = "memory:"
         val CHINESE_QUERY_STOP_FRAGMENTS = setOf("的是", "是谁", "哪个", "什么", "怎么", "如何", "那家", "这家", "一个")
     }
 }

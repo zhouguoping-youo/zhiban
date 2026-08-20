@@ -7,6 +7,7 @@ import com.zhiban.rebuild.data.facts.EmbeddingVectorEntity
 import com.zhiban.rebuild.data.facts.FactEntity
 import com.zhiban.rebuild.foundation.Sensitivity
 import com.zhiban.rebuild.foundation.runSuspendCatching
+import com.zhiban.rebuild.provider.OutboundPiiDetector
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.MessageDigest
@@ -23,7 +24,7 @@ internal class EmbeddingIndex(
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     suspend fun backfillBatch(limit: Int = 32): Int {
-        require(limit in 1..128)
+        require(limit in 1..256)
         val space = gateway.activeSpace() ?: return 0
         val facts = database.factDao().missingEmbeddings(
             clock(),
@@ -33,25 +34,39 @@ internal class EmbeddingIndex(
             limit,
         )
         if (facts.isEmpty()) return 0
-        // Isolate each row so a fact the export gate blocks (a direct identifier in free
-        // text, e.g. a phone number inside a schedule note) skips only itself instead of
-        // aborting the whole batch — that all-or-nothing failure was the backfill deadlock.
-        val indexed = facts.mapNotNull { fact ->
-            val input = EmbeddingInput(
+        val eligible = facts.mapNotNull { fact ->
+            if (OutboundPiiDetector.containsDirectIdentifier(fact.textContent)) return@mapNotNull null
+            fact to EmbeddingInput(
                 text = fact.textContent,
                 sensitivity = fact.sensitivity.toSensitivity(),
                 purpose = EmbeddingPurpose.LOCAL_INDEX_CONTENT,
                 sourceKind = "fact",
                 sourceId = fact.factId,
             )
-            runSuspendCatching { gateway.embed(listOf(input), space).single().also { validate(it, space) } }
-                .onFailure { failure ->
-                    // Log only the exception class, never the message: a blocked row may carry a
-                    // direct identifier (e.g. a phone in free text) that must not reach logcat.
-                    Log.w(LOG_TAG, "embedding backfill row skipped (${failure.javaClass.simpleName})")
-                }
-                .getOrNull()
-                ?.let { vector -> fact to vector }
+        }
+        if (eligible.isEmpty()) return 0
+        // Fast path: one provider request for the whole bounded batch. If a provider rejects
+        // a single row, fall back to isolated calls so one malformed record cannot deadlock
+        // all later backfill work.
+        val batchVectors = runSuspendCatching {
+            gateway.embed(eligible.map { it.second }, space).also { vectors ->
+                require(vectors.size == eligible.size) { "EMBEDDING_RESULT_COUNT_MISMATCH" }
+                vectors.forEach { validate(it, space) }
+            }
+        }.getOrNull()
+        val indexed = if (batchVectors != null) {
+            eligible.mapIndexed { index, pair -> pair.first to batchVectors[index] }
+        } else {
+            eligible.mapNotNull { (fact, input) ->
+                runSuspendCatching { gateway.embed(listOf(input), space).single().also { validate(it, space) } }
+                    .onFailure { failure ->
+                        // Log only the exception class, never the message: a blocked row may carry a
+                        // direct identifier (e.g. a phone in free text) that must not reach logcat.
+                        Log.w(LOG_TAG, "embedding backfill row skipped (${failure.javaClass.simpleName})")
+                    }
+                    .getOrNull()
+                    ?.let { vector -> fact to vector }
+            }
         }
         if (indexed.isEmpty()) return 0
         database.withTransaction {
@@ -73,22 +88,43 @@ internal class EmbeddingIndex(
         return indexed.size
     }
 
-    suspend fun search(query: String, limit: Int = 20): VectorSearchResult {
+    suspend fun search(query: String, limit: Int = 20, factType: String? = null): VectorSearchResult {
         require(limit in 1..100)
         val space = gateway.activeSpace() ?: return VectorSearchResult(emptyList(), "vector_skipped:not_configured")
-        val missing = database.factDao().missingEmbeddingCount(
-            clock(),
-            space.providerId,
-            space.modelId,
-            space.dimensions,
-        )
-        val rows = database.embeddingVectorDao().active(
-            space.providerId,
-            space.modelId,
-            space.dimensions,
-            clock(),
-            MAX_SCAN,
-        )
+        val missing = if (factType == null) {
+            database.factDao().missingEmbeddingCount(
+                clock(),
+                space.providerId,
+                space.modelId,
+                space.dimensions,
+            )
+        } else {
+            database.factDao().missingEmbeddingCountByFactType(
+                clock(),
+                space.providerId,
+                space.modelId,
+                space.dimensions,
+                factType,
+            )
+        }
+        val rows = if (factType == null) {
+            database.embeddingVectorDao().active(
+                space.providerId,
+                space.modelId,
+                space.dimensions,
+                clock(),
+                MAX_SCAN,
+            )
+        } else {
+            database.embeddingVectorDao().activeByFactType(
+                space.providerId,
+                space.modelId,
+                space.dimensions,
+                factType,
+                clock(),
+                MAX_SCAN,
+            )
+        }
         if (rows.isEmpty() && missing > 0) {
             return VectorSearchResult(emptyList(), "vector_skipped:rebuild_pending")
         }

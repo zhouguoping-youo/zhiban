@@ -150,7 +150,8 @@ internal class RoomApprovalStore(
             val logicalMemoryId = text("logicalMemoryId")
             val digest = text("canonicalInputDigest")
             require(digest == sha256("${logicalMemoryId.toByteArray().size}:$logicalMemoryId"))
-            val deletion = RoomMemoryGate(database) { nowEpochMs }.delete("runtime-global", logicalMemoryId, digest)
+            val deletion = RoomMemoryGate(database, clock = { nowEpochMs })
+                .delete("runtime-global", logicalMemoryId, digest)
             val safeResult = buildJsonObject {
                 put("logicalMemoryId", logicalMemoryId)
                 put("status", "deleted")

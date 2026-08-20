@@ -530,7 +530,7 @@ internal suspend fun ProviderExecutionEngine.prepareObservationContext(ids: RunI
             if (failure is CancellationException) throw failure
             ContextRetrievalResult(emptyList(), 0, listOf("retrieval_pipeline_failed"), 0)
         }
-    val memory = loadMemoryContext(initialRetrieval, policy, sessionId, runId)
+    val memory = loadMemoryContext(initialRetrieval, policy, sessionId, runId, input.text)
     val attempts = store.recoverySnapshot(runId, "ui").attempts
     val attemptId = "attempt-$runId-${attempts.size + 1}"
     store.startObservationAttempt(AttemptStartRequest(attemptId, runId, attempts.size + 1, ownerId, fencingEpoch, clock()))

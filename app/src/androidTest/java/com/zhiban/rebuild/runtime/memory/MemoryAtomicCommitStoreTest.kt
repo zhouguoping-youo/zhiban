@@ -11,6 +11,10 @@ import com.zhiban.rebuild.data.memory.MemoryNamespaceEntity
 import com.zhiban.rebuild.data.memory.RoomStagedMemoryCandidateStore
 import com.zhiban.rebuild.foundation.MemoryScope
 import com.zhiban.rebuild.foundation.Sensitivity
+import com.zhiban.rebuild.runtime.context.EmbeddingGateway
+import com.zhiban.rebuild.runtime.context.EmbeddingIndex
+import com.zhiban.rebuild.runtime.context.EmbeddingInput
+import com.zhiban.rebuild.runtime.context.EmbeddingSpace
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -57,7 +61,7 @@ class MemoryAtomicCommitStoreTest {
         assertEquals(1, scalar("SELECT COUNT(*) FROM memory_events"))
         assertEquals(2, scalar("SELECT COUNT(*) FROM memory_index_outbox"))
         assertEquals(listOf("value"), store.recall("namespace-1").records.map { it.objectText })
-        val search = MemorySearch(database) { now++ }.search(
+        val search = MemorySearch(database, clock = { now++ }).search(
             MemorySearchQuery(
                 "namespace-1",
                 "owner-1",
@@ -71,7 +75,7 @@ class MemoryAtomicCommitStoreTest {
         assertTrue(search.semanticSearchDegraded)
         assertTrue(
             runCatching {
-                MemorySearch(database) { now++ }.search(
+                MemorySearch(database, clock = { now++ }).search(
                     MemorySearchQuery("namespace-1", "wrong-owner", "profile-1", "value", 10, 1_000),
                 )
             }.isFailure,
@@ -84,7 +88,7 @@ class MemoryAtomicCommitStoreTest {
         store.commit(commitRequest(candidateId))
         database.openHelper.writableDatabase.execSQL("DROP TABLE memory_fts")
 
-        val search = MemorySearch(database) { now++ }.search(
+        val search = MemorySearch(database, clock = { now++ }).search(
             MemorySearchQuery(
                 "namespace-1",
                 "owner-1",
@@ -105,7 +109,7 @@ class MemoryAtomicCommitStoreTest {
         val candidateId = stage("chinese-recall", memoryText)
         store.commit(commitRequest(candidateId, memoryText))
 
-        val search = MemorySearch(database) { now++ }.search(
+        val search = MemorySearch(database, clock = { now++ }).search(
             MemorySearchQuery(
                 "namespace-1",
                 "owner-1",
@@ -117,6 +121,31 @@ class MemoryAtomicCommitStoreTest {
         )
 
         assertEquals(listOf(memoryText), search.items.map { it.canonicalText })
+    }
+
+    @Test fun semanticQuestionRecallsMemoryWithoutLiteralOverlap() = runBlocking {
+        store.ensureNamespace(namespace())
+        val memoryText = "用户喜欢手冲咖啡"
+        val candidateId = stage("semantic-recall", memoryText)
+        store.commit(commitRequest(candidateId, memoryText))
+        val gateway = SameMeaningEmbeddingGateway()
+        assertEquals(1, EmbeddingIndex(database, gateway) { now++ }.backfillBatch())
+
+        val search = MemorySearch(database, { now++ }, gateway).search(
+            MemorySearchQuery(
+                "namespace-1",
+                "owner-1",
+                "profile-1",
+                "常喝什么饮料",
+                limit = 10,
+                tokenBudget = 1_000,
+            ),
+        )
+
+        assertEquals(listOf(memoryText), search.items.map { it.canonicalText })
+        assertEquals(0.9, search.items.single().score, 0.0)
+        assertFalse(search.semanticSearchDegraded)
+        assertTrue(search.degradationReasons.isEmpty())
     }
 
     @Test fun recallReturnsNewestHighConfidenceMemoriesFirst() = runBlocking {
@@ -411,4 +440,12 @@ class MemoryAtomicCommitStoreTest {
 
     private fun digest(value: String): String = java.security.MessageDigest.getInstance("SHA-256")
         .digest(value.toByteArray()).joinToString("") { "%02x".format(it) }
+
+    private class SameMeaningEmbeddingGateway : EmbeddingGateway {
+        private val space = EmbeddingSpace("test", "meaning", 8)
+
+        override suspend fun activeSpace() = space
+
+        override suspend fun embed(inputs: List<EmbeddingInput>, space: EmbeddingSpace) = inputs.map { FloatArray(8).also { vector -> vector[0] = 1f } }
+    }
 }

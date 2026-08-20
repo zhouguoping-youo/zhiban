@@ -9,6 +9,7 @@ import com.zhiban.rebuild.data.store.RuntimeEventEntity
 import com.zhiban.rebuild.data.store.RuntimeToolExecutionEntity
 import com.zhiban.rebuild.provider.ProviderFailure
 import com.zhiban.rebuild.provider.SecretRedactor
+import com.zhiban.rebuild.runtime.context.EmbeddingGateway
 import com.zhiban.rebuild.runtime.context.attemptRetrieval
 import com.zhiban.rebuild.runtime.input.asr.PrivacyConsent
 import com.zhiban.rebuild.runtime.memory.RoomMemoryGate
@@ -34,12 +35,22 @@ internal class RoomMemoryToolExecutor(
     // secrets (bearer tokens, api keys) are masked before any inner
     // field is read.
     private val redactor: SecretRedactor = SecretRedactor(),
+    private val embeddingGateway: EmbeddingGateway? = null,
 ) {
-    private val memory by lazy { RoomMemoryGate(database(), clock) }
+    private val memory by lazy { RoomMemoryGate(database(), clock, embeddingGateway) }
 
-    suspend fun recallApproved(maxItems: Int = 20): ApprovedMemoryRecallResult {
+    suspend fun recallApproved(query: String, maxItems: Int = 8): ApprovedMemoryRecallResult {
         val attempt = attemptRetrieval("memory_approved") {
-            memory.recall(GLOBAL_NAMESPACE).records.take(maxItems).map { it.canonicalText }
+            memory.search(
+                com.zhiban.agent.memory.MemoryQuery(
+                    GLOBAL_NAMESPACE,
+                    "local-user",
+                    "default",
+                    query,
+                    maxItems,
+                    APPROVED_RECALL_TOKEN_BUDGET,
+                ),
+            ).items.map { it.canonicalText }
         }
         return ApprovedMemoryRecallResult(
             items = attempt.value.orEmpty(),
@@ -136,6 +147,7 @@ internal class RoomMemoryToolExecutor(
 
     companion object {
         const val GLOBAL_NAMESPACE = "runtime-global"
+        const val APPROVED_RECALL_TOKEN_BUDGET = 600
     }
 }
 

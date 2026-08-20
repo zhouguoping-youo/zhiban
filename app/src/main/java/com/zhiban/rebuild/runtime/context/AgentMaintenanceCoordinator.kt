@@ -44,7 +44,7 @@ internal class AgentMaintenanceCoordinator @Inject constructor(
             deleted += batch
         } while (batch == 128)
         val factFtsRebuilt = facts.repairIfInconsistent()
-        val dormant = RoomMemoryGate(database) { nowEpochMs }.applyDormancyPolicy()
+        val dormant = RoomMemoryGate(database, clock = { nowEpochMs }).applyDormancyPolicy()
         val auditDao = database.toolAuditDao()
         val expiredAudits = auditDao.deleteExpired(nowEpochMs) +
             auditDao.deleteOlderThan(nowEpochMs - AUDIT_RETENTION_MS)
@@ -73,9 +73,10 @@ internal class AgentMaintenanceCoordinator @Inject constructor(
         suggestionNotifier.publishScheduleEscalation(imminentSchedules, nowEpochMs)
         val silenceSuggestionsCreated = if (silentContactScanner.scan(nowEpochMs)) 1 else 0
         val unobservedReplySuggestionsCreated = unobservedReplyScanner.scan(nowEpochMs)
-        // One bounded batch per startup; retrieval remains FTS-only until every active fact is rebuilt.
+        // One provider-batched chunk per startup. 128 records closes large-library backlogs
+        // four times faster than the old 32-row cycle without exceeding the 256-input API cap.
         val degradationReasons = try {
-            EmbeddingIndex(database, embeddingGateway) { nowEpochMs }.backfillBatch(32)
+            EmbeddingIndex(database, embeddingGateway) { nowEpochMs }.backfillBatch(EMBEDDING_BACKFILL_BATCH_SIZE)
             emptySet()
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -105,6 +106,7 @@ internal class AgentMaintenanceCoordinator @Inject constructor(
         const val CHANGE_LOG_RETENTION_MS = 365L * 24 * 60 * 60 * 1_000
         const val MAINTENANCE_BATCH_SIZE = 256
         const val EMBEDDING_BACKFILL_FAILURE = "embedding_backfill:failure"
+        const val EMBEDDING_BACKFILL_BATCH_SIZE = 128
         const val AGENT_SUGGESTION_TTL_MS = 7L * 24 * 60 * 60 * 1_000
         const val SCHEDULE_ESCALATION_WINDOW_MS = 24L * 60 * 60 * 1_000
     }

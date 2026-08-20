@@ -159,6 +159,15 @@ internal interface FactDao {
     suspend fun missingEmbeddingCount(now: Long, providerId: String, modelId: String, dimensions: Int): Int
 
     @Query(
+        """SELECT COUNT(*) FROM facts f WHERE f.factType=:factType AND f.status='ACTIVE'
+        AND f.sensitivity!='SENSITIVE'
+        AND (f.expiresAtEpochMs IS NULL OR f.expiresAtEpochMs>:now)
+        AND NOT EXISTS (SELECT 1 FROM embedding_vectors e WHERE e.factId=f.factId
+            AND e.providerId=:providerId AND e.modelId=:modelId AND e.dimensions=:dimensions)""",
+    )
+    suspend fun missingEmbeddingCountByFactType(now: Long, providerId: String, modelId: String, dimensions: Int, factType: String): Int
+
+    @Query(
         "SELECT factId FROM facts WHERE expiresAtEpochMs IS NOT NULL AND expiresAtEpochMs<=:now ORDER BY factId LIMIT :limit",
     )
     suspend fun expiredFactIds(now: Long, limit: Int): List<String>
@@ -187,6 +196,15 @@ internal interface EmbeddingVectorDao {
         ORDER BY f.updatedAtEpochMs DESC LIMIT :limit""",
     )
     suspend fun active(providerId: String, modelId: String, dimensions: Int, now: Long, limit: Int): List<EmbeddingVectorEntity>
+
+    @Query(
+        """SELECT e.* FROM embedding_vectors e INNER JOIN facts f ON f.factId=e.factId
+        WHERE e.providerId=:providerId AND e.modelId=:modelId AND e.dimensions=:dimensions
+        AND f.factType=:factType AND f.status='ACTIVE'
+        AND (f.expiresAtEpochMs IS NULL OR f.expiresAtEpochMs>:now)
+        ORDER BY f.updatedAtEpochMs DESC LIMIT :limit""",
+    )
+    suspend fun activeByFactType(providerId: String, modelId: String, dimensions: Int, factType: String, now: Long, limit: Int): List<EmbeddingVectorEntity>
 
     @Query("DELETE FROM embedding_vectors WHERE providerId=:providerId AND modelId=:modelId")
     suspend fun deleteSpace(providerId: String, modelId: String): Int

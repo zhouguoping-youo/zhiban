@@ -302,9 +302,7 @@ internal class RoomContextRetrievalPipeline(
         return result.value ?: PathResult(emptyList(), listOf(requireNotNull(result.degradation)))
     }
 
-    private fun retrievalQuery(input: String, context: QueryContext): String = context.entities.firstOrNull { it.type == ExtractedEntityType.PERSON }?.value
-        ?: context.keywords.firstOrNull()
-        ?: input.trim().take(64)
+    private fun retrievalQuery(input: String, context: QueryContext): String = buildRetrievalQuery(input, context)
 
     private fun scheduleCandidate(schedule: ScheduleProjection) = RetrievalCandidate(
         "schedule:${schedule.id}",
@@ -344,4 +342,18 @@ internal class RoomContextRetrievalPipeline(
         const val MAX_CONTEXT_ITEMS = 15
         const val MAX_OWNER_EMPLOYMENTS = 8
     }
+}
+
+internal fun buildRetrievalQuery(input: String, context: QueryContext): String {
+    val entityTerms = context.entities
+        .filter { it.type in setOf(ExtractedEntityType.PERSON, ExtractedEntityType.PHONE, ExtractedEntityType.EMAIL, ExtractedEntityType.KEYWORD) }
+        .map(ExtractedEntity::value)
+    return (entityTerms + context.keywords)
+        .map(String::trim)
+        .filter(String::isNotBlank)
+        .distinct()
+        .joinToString(" ")
+        .takeIf(String::isNotBlank)
+        ?.take(64)
+        ?: input.trim().take(64)
 }

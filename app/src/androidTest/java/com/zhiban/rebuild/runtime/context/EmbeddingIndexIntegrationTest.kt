@@ -223,6 +223,32 @@ class EmbeddingIndexIntegrationTest {
         assertEquals(listOf("fact:good"), result.candidates.map { it.id })
     }
 
+    @Test fun backfillEmbedsABatchInOneProviderCall() = runTest {
+        val gateway = FakeEmbeddingGateway()
+        val facts = FactIndex(database)
+        repeat(40) { index -> facts.upsert(fact("fact:batch-$index", "批量语义资料第${index}项")) }
+
+        assertEquals(40, EmbeddingIndex(database, gateway) { now }.backfillBatch(limit = 40))
+
+        assertEquals(1, gateway.embedCallCount)
+        assertEquals(40, gateway.lastInputs.size)
+    }
+
+    @Test fun retrievalQueryKeepsAllPeopleAndKeywords() {
+        val context = QueryContext(
+            IntentLabel.CONTACT_QUERY,
+            .9,
+            listOf(
+                ExtractedEntity(ExtractedEntityType.PERSON, "张三", confidence = .9),
+                ExtractedEntity(ExtractedEntityType.PERSON, "李四", confidence = .9),
+            ),
+            null,
+            listOf("合作项目"),
+        )
+
+        assertEquals("张三 李四 合作项目", buildRetrievalQuery("比较他们", context))
+    }
+
     private fun fact(id: String, text: String, sensitivity: String = "PERSONAL") = FactEntity(
         id, "NOTE", text, null, "test", id, null, null, 1.0, sensitivity, "ACTIVE", -1, null, now, now++,
     )
@@ -231,8 +257,10 @@ class EmbeddingIndexIntegrationTest {
         var space = EmbeddingSpace("provider-a", "embed-v1", 8)
         var lastInputs: List<EmbeddingInput> = emptyList()
         var blockedSourceId: String? = null
+        var embedCallCount = 0
         override suspend fun activeSpace() = space
         override suspend fun embed(inputs: List<EmbeddingInput>, space: EmbeddingSpace): List<FloatArray> {
+            embedCallCount++
             lastInputs = inputs
             return inputs.map { input ->
                 if (input.sourceId == blockedSourceId) error("EMBEDDING_SENSITIVE_INPUT_BLOCKED")

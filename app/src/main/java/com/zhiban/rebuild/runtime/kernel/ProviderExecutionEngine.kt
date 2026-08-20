@@ -244,7 +244,7 @@ internal class ProviderExecutionEngine(
     private val memoryWriteConsent = {
         if (memoryPolicy().longTermMemoryEnabled) PrivacyConsent.Granted else PrivacyConsent.NotGranted
     }
-    private val memoryExecutor = RoomMemoryToolExecutor({ database }, clock, memoryWriteConsent)
+    private val memoryExecutor = RoomMemoryToolExecutor({ database }, clock, memoryWriteConsent, embeddingGateway = embeddingGateway)
     private val crmExecutor = RoomCrmToolExecutor(database, store)
     private val perceptionPipeline: PerceptionGateway = perception ?: RoomPerceptionPipeline(database, clock)
     internal val retrievalPipeline = RoomContextRetrievalPipeline(
@@ -289,7 +289,7 @@ internal class ProviderExecutionEngine(
                 store,
                 MemoryUpsertDomainWriter(database, store, memoryWriteConsent),
             ),
-            MemorySearchToolBinding(toolCatalog.requireRegistered("memory.search"), RoomMemoryGate(database, clock)),
+            MemorySearchToolBinding(toolCatalog.requireRegistered("memory.search"), RoomMemoryGate(database, clock, embeddingGateway)),
             MemoryDeleteToolBinding(toolCatalog.requireRegistered("memory.delete"), store),
             ContactSearchToolBinding(toolCatalog.requireRegistered("contact.search"), database.contactDao()),
             ContactDetailToolBinding(toolCatalog.requireRegistered("contact.getDetail"), database.contactDao()),
@@ -617,9 +617,10 @@ internal class ProviderExecutionEngine(
         policy: com.zhiban.rebuild.data.config.MemoryPolicy,
         sessionId: String,
         runId: String,
+        inputText: String,
     ): MemoryContext {
         val approvedRecall = if (policy.longTermMemoryEnabled && !policy.temporaryModeEnabled) {
-            memoryExecutor.recallApproved()
+            memoryExecutor.recallApproved(inputText)
         } else {
             com.zhiban.rebuild.runtime.tool.ApprovedMemoryRecallResult(emptyList())
         }
@@ -711,7 +712,7 @@ internal class ProviderExecutionEngine(
         val retrievalStartedAt = clock()
         val initialRetrieval = performRetrieval(input.text, perception.context, currentNetwork, config, policy)
         val retrievalDurationMs = (clock() - retrievalStartedAt).coerceAtLeast(0)
-        val memory = loadMemoryContext(initialRetrieval, policy, sessionId, runId)
+        val memory = loadMemoryContext(initialRetrieval, policy, sessionId, runId, input.text)
         val attemptId = startRunAttempt(runActiveAttemptId, runId, fencingEpoch)
         events.appendPerception(
             attemptId,

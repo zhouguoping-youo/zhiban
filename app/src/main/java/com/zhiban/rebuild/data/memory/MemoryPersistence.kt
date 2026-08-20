@@ -334,6 +334,15 @@ internal interface MemoryPersistenceDao {
     suspend fun record(namespaceId: String, memoryId: String, recordVersion: Long): MemoryRecordEntity?
 
     @Query(
+        """SELECT r.* FROM memory_current_versions c
+        JOIN memory_records r ON r.namespaceId=c.namespaceId AND r.memoryId=c.memoryId AND r.recordVersion=c.recordVersion
+        WHERE c.namespaceId=:namespaceId AND c.memoryId IN (:memoryIds) AND r.status='ACTIVE'
+          AND (r.expiresAtEpochMs IS NULL OR r.expiresAtEpochMs>:trustedNow)
+          AND NOT EXISTS (SELECT 1 FROM memory_tombstones t WHERE t.namespaceId=c.namespaceId AND t.logicalMemoryId=c.logicalMemoryId)""",
+    )
+    suspend fun currentRecordsByMemoryIds(namespaceId: String, memoryIds: List<String>, trustedNow: Long): List<MemoryRecordEntity>
+
+    @Query(
         "DELETE FROM memory_records WHERE namespaceId=:namespaceId AND memoryId=:memoryId AND recordVersion=:recordVersion",
     )
     suspend fun deleteRecord(namespaceId: String, memoryId: String, recordVersion: Long): Int
