@@ -48,7 +48,12 @@ class MessageContactCompletionCoordinatorTest {
             database,
             MessageContactFieldExtraction { _, _, _ -> fields.toList() },
             completion,
-            AgentSuggestionRepository(database, completion, com.zhiban.rebuild.data.calendar.ScheduleReminderRegistrar { _, _, _ -> }),
+            AgentSuggestionRepository(
+                database,
+                completion,
+                com.zhiban.rebuild.data.calendar.ScheduleReminderRegistrar { _, _, _ -> },
+                testSuggestionNotifier(),
+            ),
         )
     }
 
@@ -157,11 +162,21 @@ class MessageContactCompletionCoordinatorTest {
                 emptyList()
             },
             completion,
-            AgentSuggestionRepository(database, completion, com.zhiban.rebuild.data.calendar.ScheduleReminderRegistrar { _, _, _ -> }),
+            AgentSuggestionRepository(
+                database,
+                completion,
+                com.zhiban.rebuild.data.calendar.ScheduleReminderRegistrar { _, _, _ -> },
+                testSuggestionNotifier(),
+            ),
         ).processOnce()
 
         assertEquals(0, extractCalls)
     }
+
+    private fun testSuggestionNotifier() = com.zhiban.rebuild.data.suggestion.AgentSuggestionNotifier(
+        context,
+        com.zhiban.rebuild.data.config.AgentControlStore(context, "suggestion_notification_test_${System.nanoTime()}"),
+    )
 
     @Test
     fun undoRestoresPreviousFieldValues() = runBlocking {

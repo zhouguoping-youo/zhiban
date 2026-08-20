@@ -56,12 +56,18 @@ import com.zhiban.rebuild.ui.tabs.RelationTab
 import com.zhiban.rebuild.ui.tabs.SkillTab
 
 @Composable
-fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L, callNoteRequest: Long = 0L, calendarFocusRequest: Long = 0L) {
+fun ZhiBanNavHost(
+    modifier: Modifier = Modifier,
+    relationInboxRequest: Long = 0L,
+    callNoteRequest: Long = 0L,
+    calendarFocusRequest: Long = 0L,
+    agentSuggestionsRequest: Long = 0L,
+) {
     val navController = rememberNavController()
     var lastHandledRelationInboxRequest by rememberSaveable { mutableLongStateOf(0L) }
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
-    ExternalRequestEffects(navController, relationInboxRequest, callNoteRequest, calendarFocusRequest)
+    ExternalRequestEffects(navController, relationInboxRequest, callNoteRequest, calendarFocusRequest, agentSuggestionsRequest)
     val showBottomBar = TAB_ROUTES.any { routeClass ->
         currentDestination?.hasRoute(routeClass) == true
     }
@@ -101,7 +107,13 @@ fun ZhiBanNavHost(modifier: Modifier = Modifier, relationInboxRequest: Long = 0L
 }
 
 @Composable
-private fun ExternalRequestEffects(navController: NavHostController, relationInboxRequest: Long, callNoteRequest: Long, calendarFocusRequest: Long) {
+private fun ExternalRequestEffects(
+    navController: NavHostController,
+    relationInboxRequest: Long,
+    callNoteRequest: Long,
+    calendarFocusRequest: Long,
+    agentSuggestionsRequest: Long,
+) {
     LaunchedEffect(relationInboxRequest) {
         if (relationInboxRequest > 0L) {
             navController.navigate(Relation) {
@@ -124,6 +136,11 @@ private fun ExternalRequestEffects(navController: NavHostController, relationInb
                 popUpTo(navController.graph.findStartDestination().id) { saveState = false }
                 launchSingleTop = true
             }
+        }
+    }
+    LaunchedEffect(agentSuggestionsRequest) {
+        if (agentSuggestionsRequest > 0L) {
+            navController.navigate(AgentSuggestions) { launchSingleTop = true }
         }
     }
 }

@@ -26,6 +26,7 @@ class AgentSuggestionRepository @Inject internal constructor(
     private val database: AgentDatabase,
     private val contactCompletion: ContactCompletionRepository,
     private val reminderRegistrar: ScheduleReminderRegistrar,
+    private val notifier: AgentSuggestionNotifier,
 ) {
     fun observeSuggestions(limit: Int = 100) = database.agentSuggestionDao().observeRecent(limit)
 
@@ -36,7 +37,13 @@ class AgentSuggestionRepository @Inject internal constructor(
      * 幂等由 dedupeKey unique 索引保证（同一候选只产一条建议）。不建议改成 REPLACE——
      * 那会整行覆盖，破坏已流转的 PENDING→ACCEPTED/DISMISSED 状态。
      */
-    suspend fun insert(suggestion: AgentSuggestionEntity): Boolean = database.agentSuggestionDao().insert(suggestion) != -1L
+    suspend fun insert(suggestion: AgentSuggestionEntity): Boolean {
+        val inserted = database.agentSuggestionDao().insert(suggestion) != -1L
+        if (inserted) {
+            notifier.publish(database.agentSuggestionDao().pendingCount(), suggestion.contactId)
+        }
+        return inserted
+    }
 
     /**
      * 用户认可建议：PENDING → ACCEPTED（乐观锁，重复点击返回 false）。日程建议只有在

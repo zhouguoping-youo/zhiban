@@ -60,6 +60,7 @@ class AgentSuggestionRepositoryTest {
             ScheduleReminderRegistrar { scheduleId, startAtEpochMs, reminderMinutesBefore ->
                 registeredReminders += Triple(scheduleId, startAtEpochMs, reminderMinutesBefore)
             },
+            AgentSuggestionNotifier(ApplicationProvider.getApplicationContext(), controls),
         )
     }
 

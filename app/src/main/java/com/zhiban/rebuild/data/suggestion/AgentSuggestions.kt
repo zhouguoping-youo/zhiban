@@ -119,6 +119,9 @@ interface AgentSuggestionDao {
     @Query("SELECT COUNT(*) FROM agent_suggestions WHERE status = 'PENDING'")
     fun observePendingCount(): Flow<Int>
 
+    @Query("SELECT COUNT(*) FROM agent_suggestions WHERE status = 'PENDING'")
+    suspend fun pendingCount(): Int
+
     @Query("SELECT * FROM agent_suggestions WHERE suggestionId = :suggestionId")
     suspend fun find(suggestionId: String): AgentSuggestionEntity?
 

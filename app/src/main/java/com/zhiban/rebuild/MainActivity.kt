@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
     private val relationInboxRequest = mutableLongStateOf(0L)
     private val callNoteRequest = mutableLongStateOf(0L)
     private val calendarFocusRequest = mutableLongStateOf(0L)
+    private val agentSuggestionsRequest = mutableLongStateOf(0L)
     private var textRecognizer: TextRecognizer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,12 +63,14 @@ class MainActivity : ComponentActivity() {
                     relationInboxRequest = relationInboxRequest.longValue,
                     callNoteRequest = callNoteRequest.longValue,
                     calendarFocusRequest = calendarFocusRequest.longValue,
+                    agentSuggestionsRequest = agentSuggestionsRequest.longValue,
                 )
             }
         }
         acceptSharedContent(intent)
         acceptCallNoteRequest(intent)
         acceptScheduleReminderRequest(intent)
+        acceptAgentSuggestionsRequest(intent)
         // 启动时主动扫掠关系推断(同公司同事边/互动推断),避免用户必须点进关系页才触发。
         lifecycleScope.launch { repository.sweepRelationshipInference() }
     }
@@ -78,6 +81,7 @@ class MainActivity : ComponentActivity() {
         acceptSharedContent(intent)
         acceptCallNoteRequest(intent)
         acceptScheduleReminderRequest(intent)
+        acceptAgentSuggestionsRequest(intent)
     }
 
     private fun acceptCallNoteRequest(intent: Intent?) {
@@ -91,6 +95,13 @@ class MainActivity : ComponentActivity() {
         val startAtEpochMs = safeScheduleReminderEpoch(intent) ?: return
         calendarFocusRequest.longValue = startAtEpochMs
         intent?.removeExtra(ScheduleReminderWorker.EXTRA_OPEN_SCHEDULE_AT)
+    }
+
+    private fun acceptAgentSuggestionsRequest(intent: Intent?) {
+        if (intent?.getBooleanExtra(com.zhiban.rebuild.data.suggestion.AgentSuggestionNotifier.EXTRA_OPEN_SUGGESTIONS, false) == true) {
+            agentSuggestionsRequest.longValue = System.currentTimeMillis()
+            intent.removeExtra(com.zhiban.rebuild.data.suggestion.AgentSuggestionNotifier.EXTRA_OPEN_SUGGESTIONS)
+        }
     }
 
     override fun onResume() {
