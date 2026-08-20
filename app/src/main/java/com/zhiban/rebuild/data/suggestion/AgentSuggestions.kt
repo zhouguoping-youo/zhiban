@@ -126,6 +126,12 @@ interface AgentSuggestionDao {
     suspend fun find(suggestionId: String): AgentSuggestionEntity?
 
     @Query(
+        "SELECT * FROM agent_suggestions WHERE status = 'PENDING' AND contactId = :contactId " +
+            "ORDER BY createdAtEpochMs DESC LIMIT :limit",
+    )
+    suspend fun pendingForContact(contactId: String, limit: Int): List<AgentSuggestionEntity>
+
+    @Query(
         "SELECT * FROM agent_suggestions WHERE status = 'PENDING' AND execActionType = 'SCHEDULE' " +
             "AND startAtEpochMs BETWEEN :nowEpochMs AND :beforeEpochMs ORDER BY startAtEpochMs",
     )

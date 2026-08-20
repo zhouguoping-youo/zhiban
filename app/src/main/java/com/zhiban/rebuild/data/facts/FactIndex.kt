@@ -115,6 +115,17 @@ internal interface FactDao {
     fun observeRecentInteractions(now: Long, limit: Int): Flow<List<FactEntity>>
 
     @Query(
+        """SELECT * FROM facts WHERE factType = 'INTERACTION_SUMMARY' AND status = 'ACTIVE'
+        AND (contactId = :contactId OR contactId IN (
+            SELECT sourceContactId FROM contact_merge_links
+            WHERE canonicalContactId = :contactId AND undoneAtEpochMs IS NULL
+        ))
+        AND (expiresAtEpochMs IS NULL OR expiresAtEpochMs > :now)
+        ORDER BY createdAtEpochMs DESC LIMIT :limit""",
+    )
+    suspend fun recentInteractionsForContact(contactId: String, now: Long, limit: Int): List<FactEntity>
+
+    @Query(
         """SELECT * FROM facts f WHERE f.status='ACTIVE' AND f.sensitivity!='SENSITIVE'
         AND (f.expiresAtEpochMs IS NULL OR f.expiresAtEpochMs>:now)
         AND (f.contactId IS NULL OR NOT EXISTS (

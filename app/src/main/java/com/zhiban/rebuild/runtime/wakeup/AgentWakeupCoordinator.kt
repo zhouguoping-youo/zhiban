@@ -44,6 +44,7 @@ internal class AgentWakeupCoordinator @Inject constructor(
     private val textInputGateway: TextInputGateway,
     private val sessionWorkspace: SessionWorkspaceGateway,
     private val suggestions: AgentSuggestionRepository,
+    private val contextLoader: WakeupContextLoader,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val triggers = Channel<String>(capacity = TRIGGER_BUFFER_CAPACITY)
@@ -96,12 +97,13 @@ internal class AgentWakeupCoordinator @Inject constructor(
         val candidate = database.notificationCandidateDao().find(candidateId) ?: return
         val contact = decision.contactId?.let { database.contactDao().findById(it) }
         val opportunity = decision.contactId?.let { database.crmDao().findOpenOpportunityByContact(it) }
+        val context = contextLoader.load(candidate, decision.contactId, System.currentTimeMillis())
         // 每次唤醒用唯一 sessionId：复用旧 session 会因 revision 已推进导致 start CONFLICT。
         // 建议去重仍走 dedupeKey="wakeup-<candidateId>"，幂等不受影响。
         val sessionId = "wakeup-$candidateId-${System.currentTimeMillis()}"
         val session = HeadlessAgentSession(runtimeUiClient, textInputGateway, scope)
         sessionWorkspace.ensure(sessionId)
-        val input = encodeRuntimeInput(buildWakeupPrompt(candidate, contact, opportunity))
+        val input = encodeRuntimeInput(buildWakeupPrompt(candidate, contact, opportunity, context))
         val result = session.run(sessionId, input)
         persistSuggestion(candidateId, decision, result)
         // 保留会话痕迹（可在历史里回看），不清不删；上限由既有会话治理兜底。
@@ -111,6 +113,7 @@ internal class AgentWakeupCoordinator @Inject constructor(
         candidate: com.zhiban.rebuild.data.notification.NotificationCandidateEntity,
         contact: com.zhiban.rebuild.data.contact.ContactEntity?,
         opportunity: com.zhiban.rebuild.data.crm.CrmOpportunityEntity?,
+        context: WakeupContext,
     ): String = buildString {
         appendLine("【知伴主动助手·后台唤醒】刚收到一条来自「${candidate.senderName ?: candidate.conversationTitle ?: "未知发送者"}」的微信消息。")
         appendLine("消息正文：${candidate.body.orEmpty().take(MAX_PROMPT_BODY_LENGTH)}")
@@ -125,6 +128,7 @@ internal class AgentWakeupCoordinator @Inject constructor(
             appendLine("未归因到任何联系人（可能是陌生人）。")
         }
         if (opportunity != null) appendLine("CRM 状态：存在进行中机会「${opportunity.title}」（阶段 ${opportunity.stage}）。")
+        appendLine(buildWakeupContextPrompt(context))
         appendLine()
         appendLine("请作为用户的个人助理快速判断：")
         appendLine("1. 这条消息是否需要用户跟进？给出一条不超过 150 字的简短建议，说明下一步做什么。")
