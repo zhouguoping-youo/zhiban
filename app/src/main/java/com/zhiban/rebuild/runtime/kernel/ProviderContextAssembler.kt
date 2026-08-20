@@ -151,7 +151,7 @@ internal class ProviderContextAssembler(private val clock: () -> Long, private v
                     TrustLevel.TRUSTED_APP,
                     Sensitivity.PERSONAL,
                     cost(input.text),
-                    provenance("user_input", "current-input", input.text),
+                    provenance(input.origin.provenanceType(), "current-input", input.text),
                     isRequired = true,
                 ),
             )
@@ -376,7 +376,11 @@ internal class ProviderContextAssembler(private val clock: () -> Long, private v
             role = "user",
             content = block.content,
             sensitivity = block.sensitivity.toOutboundSensitivity(),
-            purpose = OutboundPurpose.USER_AUTHORED,
+            purpose = if (block.provenance.sourceType == AUTOMATIC_INPUT_SOURCE) {
+                OutboundPurpose.AUTO_RETRIEVED
+            } else {
+                OutboundPurpose.USER_AUTHORED
+            },
             provenance = OutboundProvenance(block.provenance.sourceType, block.provenance.sourceId),
         )
 
@@ -395,7 +399,13 @@ internal class ProviderContextAssembler(private val clock: () -> Long, private v
         Sensitivity.SENSITIVE -> OutboundSensitivity.SENSITIVE
     }
 
+    private fun InputOrigin.provenanceType(): String = when (this) {
+        InputOrigin.USER_AUTHORED -> "user_input"
+        InputOrigin.AUTO_RETRIEVED -> AUTOMATIC_INPUT_SOURCE
+    }
+
     private companion object {
+        const val AUTOMATIC_INPUT_SOURCE = "automatic_input"
         const val SESSION_MEMORY_SOURCE = "session_memory"
         const val DEFAULT_MAX_OUTPUT_TOKENS = 2_048
         val CONVERSATION_ROLES = setOf("user", "assistant")

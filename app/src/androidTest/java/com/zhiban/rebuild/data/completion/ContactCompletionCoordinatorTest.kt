@@ -135,6 +135,40 @@ class ContactCompletionCoordinatorTest {
         assertEquals(ContactCompletionStatus.AWAITING_REPLY, database.contactCompletionRequestDao().findById("ccr-1")!!.status)
     }
 
+    @Test fun attributedReplyStagesWechatIdentityStub() = runBlocking {
+        // 无 wechatId 也无 WECHAT 身份的联系人：对方在微信里回复（归因成功）即证明微信可达，
+        // 自动挂 WECHAT stub（handle=发送者显示名、userConfirmed=false、source=COMPLETION_REPLY），
+        // 之后微信号字段不再算缺失、后续触达闸门自然通过——每个联系人只需操作一次。
+        insertContact("c1", wechatId = null)
+        val sentAt = System.currentTimeMillis() - 10_000
+        seedAwaitingRequest("c1", """["PHONE"]""", sentAt)
+        insertIncoming("msg-1", "c1", body = "好的回头说", postedAt = sentAt + 5_000)
+
+        coordinator.processOnce()
+
+        val identities = database.contactIdentityDao().platformIdentities("c1")
+        val stub = identities.firstOrNull { it.platform == "WECHAT" }
+        assertNotNull(stub)
+        assertEquals("张三", stub!!.handle)
+        assertEquals("COMPLETION_REPLY", stub.source)
+        assertEquals(false, stub.userConfirmed)
+    }
+
+    @Test fun wechatIdentityStubNotDuplicatedOrOverwritten() = runBlocking {
+        // 已有 WECHAT 身份（含已确认真值）时不重复挂、不覆盖。
+        insertContact("c1", wechatId = null)
+        insertWechatIdentity("c1", handle = "real-wxid", confirmed = true)
+        val sentAt = System.currentTimeMillis() - 10_000
+        seedAwaitingRequest("c1", """["PHONE"]""", sentAt)
+        insertIncoming("msg-1", "c1", body = "好的回头说", postedAt = sentAt + 5_000)
+
+        coordinator.processOnce()
+
+        val identities = database.contactIdentityDao().platformIdentities("c1")
+        assertEquals(1, identities.count { it.platform == "WECHAT" })
+        assertEquals("real-wxid", identities.first { it.platform == "WECHAT" }.handle)
+    }
+
     @Test fun expiresStaleAwaitingRequests() = runBlocking {
         insertContact("c1")
         val now = System.currentTimeMillis()
@@ -217,6 +251,24 @@ class ContactCompletionCoordinatorTest {
                 createdAtEpochMs = 1,
                 updatedAtEpochMs = 1,
                 responsibilities = responsibilities,
+            ),
+        )
+    }
+
+    private suspend fun insertWechatIdentity(contactId: String, handle: String, confirmed: Boolean) {
+        val now = System.currentTimeMillis()
+        database.contactIdentityDao().upsertPlatformIdentity(
+            com.zhiban.rebuild.data.contact.ContactPlatformIdentityEntity(
+                identityId = "id-$handle",
+                contactId = contactId,
+                platform = "WECHAT",
+                handle = handle,
+                normalizedHandle = handle.lowercase(),
+                platformUserId = null,
+                source = "USER_INPUT",
+                userConfirmed = confirmed,
+                createdAtEpochMs = now,
+                updatedAtEpochMs = now,
             ),
         )
     }

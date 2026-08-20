@@ -189,6 +189,34 @@ fun RelationIcon(modifier: Modifier = Modifier.size(24.dp), color: Color = Local
     }
 }
 
+// ═══════════════ TimelineIcon ═══════════════
+// 时间线：带节点的上升折线，表达「活动流按时间展开」。
+@Composable
+fun TimelineIcon(modifier: Modifier = Modifier.size(24.dp), color: Color = LocalContentColor.current, selected: Boolean = false) {
+    val strokeColor = color
+    Canvas(modifier = modifier) {
+        val stroke = Stroke(
+            width = (if (selected) 2.2.dp else 1.8.dp).toPx(),
+            cap = StrokeCap.Round,
+            join = StrokeJoin.Round,
+        )
+        val path = Path().apply {
+            moveTo(size.width * 3f / 24f, size.height * 18f / 24f)
+            lineTo(size.width * 9f / 24f, size.height * 12f / 24f)
+            lineTo(size.width * 13f / 24f, size.height * 16f / 24f)
+            lineTo(size.width * 19f / 24f, size.height * 8f / 24f)
+            lineTo(size.width * 21.5f / 24f, size.height * 10f / 24f)
+        }
+        drawPath(path = path, color = strokeColor, style = stroke)
+        val dotRadius = (if (selected) 1.7.dp else 1.4.dp).toPx()
+        drawCircle(color = strokeColor, radius = dotRadius, center = Offset(size.width * 3f / 24f, size.height * 18f / 24f))
+        drawCircle(color = strokeColor, radius = dotRadius, center = Offset(size.width * 9f / 24f, size.height * 12f / 24f))
+        drawCircle(color = strokeColor, radius = dotRadius, center = Offset(size.width * 13f / 24f, size.height * 16f / 24f))
+        drawCircle(color = strokeColor, radius = dotRadius, center = Offset(size.width * 19f / 24f, size.height * 8f / 24f))
+        drawCircle(color = strokeColor, radius = dotRadius, center = Offset(size.width * 21.5f / 24f, size.height * 10f / 24f))
+    }
+}
+
 // ═══════════════ SkillGridIcon ═══════════════
 @Composable
 fun SkillGridIcon(modifier: Modifier = Modifier.size(24.dp), color: Color = LocalContentColor.current, selected: Boolean = false) {

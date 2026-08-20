@@ -98,7 +98,10 @@ class MemoryFoundationMigrationTest {
     private fun insertRecord(db: SupportSQLiteDatabase, memoryId: String, logicalId: String, version: Long, txTo: Long?) {
         val txToSql = txTo?.toString() ?: "NULL"
         db.execSQL(
-            "INSERT INTO memory_records(namespaceId,memoryId,recordVersion,logicalMemoryId,memoryType,subjectKey,predicateKey,objectText,canonicalText,canonicalDigest,sensitivity,confidence,importance,status,validFromEpochMs,validToEpochMs,observedAtEpochMs,txFromEpochMs,txToEpochMs,createdAtEpochMs,expiresAtEpochMs,schemaVersion,sourceSetDigest) " +
+            "INSERT INTO memory_records(namespaceId,memoryId,recordVersion,logicalMemoryId,memoryType,subjectKey," +
+                "predicateKey,objectText,canonicalText,canonicalDigest,sensitivity,confidence,importance,status," +
+                "validFromEpochMs,validToEpochMs,observedAtEpochMs,txFromEpochMs,txToEpochMs,createdAtEpochMs," +
+                "expiresAtEpochMs,schemaVersion,sourceSetDigest) " +
                 "VALUES ('ns','$memoryId',$version,'$logicalId','SEMANTIC','subject','predicate','value','value','digest','PERSONAL',1.0,1.0,'ACTIVE',1,NULL,1,1,$txToSql,1,NULL,1,'sources')",
         )
     }

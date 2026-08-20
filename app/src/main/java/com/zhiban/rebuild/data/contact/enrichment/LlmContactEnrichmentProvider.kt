@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.data.contact.enrichment
 
+import com.zhiban.rebuild.foundation.runSuspendCatching
 import com.zhiban.rebuild.provider.ModelEvent
 import com.zhiban.rebuild.provider.ModelMessage
 import com.zhiban.rebuild.provider.ModelRequest
@@ -9,6 +10,7 @@ import com.zhiban.rebuild.provider.OutboundPurpose
 import com.zhiban.rebuild.provider.OutboundSensitivity
 import com.zhiban.rebuild.provider.ProviderAdapter
 import com.zhiban.rebuild.provider.ProviderProfileStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collect
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -45,7 +47,9 @@ class LlmContactEnrichmentProvider(private val provider: ProviderAdapter, privat
         val prompt = buildPrompt(request, approved)
 
         val profile = profileStore.load() ?: return emptyList()
-        val capability = provider.probe(profile, request.contactId)
+        val capability = runSuspendCatching { provider.probe(profile, request.contactId) }
+            .onFailure { if (it is CancellationException) throw it }
+            .getOrNull() ?: return emptyList()
 
         val output = StringBuilder()
         var final = false

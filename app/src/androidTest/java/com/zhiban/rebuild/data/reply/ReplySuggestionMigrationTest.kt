@@ -24,7 +24,8 @@ class ReplySuggestionMigrationTest {
         helper.createDatabase(name, 39)
         helper.runMigrationsAndValidate(name, 40, true, AgentDatabase.MIGRATION_39_40).use { db ->
             db.execSQL(
-                "INSERT INTO reply_suggestions (suggestionId, candidateId, threadKey, contactId, draft, draftIndex, status, createdAtEpochMs, forwardedAtEpochMs, confirmedAtEpochMs, contactName, incomingExcerpt) " +
+                "INSERT INTO reply_suggestions (suggestionId, candidateId, threadKey, contactId, draft, draftIndex, " +
+                    "status, createdAtEpochMs, forwardedAtEpochMs, confirmedAtEpochMs, contactName, incomingExcerpt) " +
                     "VALUES ('rs-1', 'cand-1', 'WECHAT|张三', 'contact-1', '好的', 0, 'PENDING', 1000, NULL, NULL, '张三', '合同能发我一份吗')",
             )
             // Row omitting the denormalized display columns exercises the incomingExcerpt default.

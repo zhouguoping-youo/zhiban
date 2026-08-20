@@ -25,8 +25,9 @@ class NotificationSenderDedupMigrationTest {
             db.execSQL(
                 """INSERT INTO notification_candidates
                     (candidateId,sourceKey,packageName,appLabel,title,body,postedAtEpochMs,status,createdAtEpochMs,
-                     normalizedSender)
-                    VALUES ('n1','hash','com.tencent.mm','微信','老李头','在吗',1000,'PENDING',1000,'laolitou')""",
+                     sourceType,platform,direction,isGroupChat,messageKind,suggestedContactConfidence,normalizedSender)
+                    VALUES ('n1','hash','com.tencent.mm','微信','老李头','在吗',1000,'PENDING',1000,
+                     'NOTIFICATION','WECHAT','INCOMING',0,'MESSAGE',0.0,'laolitou')""",
             )
             db.query("SELECT normalizedSender FROM notification_candidates WHERE candidateId = 'n1'").use {
                 it.moveToFirst()

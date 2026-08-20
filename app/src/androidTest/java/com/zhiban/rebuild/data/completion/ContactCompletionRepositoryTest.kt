@@ -30,9 +30,9 @@ import org.junit.runner.RunWith
 
 /**
  * Drives [ContactCompletionRepository] against an in-memory database with a stubbed generator and a fake
- * [CompletionHandoff]. Covers the prepareOutreach 闸门（总开关/免打扰/单活跃请求/资料已完整/微信不可达）、微信
- * 平台身份可达、确定性 requestId 幂等，以及 confirmAndHandoff 的 DRAFTED→AWAITING_REPLY 状态机（含微信未装时
- * 保持 DRAFTED)。知伴绝不代发——handoff 只表示"已打开预填面板"。
+ * [CompletionHandoff]. Covers the prepareOutreach 闸门（总开关/免打扰/单活跃请求/资料已完整）、确定性
+ * requestId 幂等，以及 confirmAndHandoff 的 DRAFTED→AWAITING_REPLY 状态机（含微信未装时保持 DRAFTED)。
+ * 知伴绝不代发——handoff 只表示"已打开分享面板"。不要求预知对方微信号（分享面板用户亲选联系人）。
  */
 @RunWith(AndroidJUnit4::class)
 class ContactCompletionRepositoryTest {
@@ -96,11 +96,16 @@ class ContactCompletionRepositoryTest {
         assertEquals(0, generator.calls) // 无缺失字段不起草
     }
 
-    @Test fun prepareOutreachReturnsNullWhenNotWechatReachable() = runBlocking {
-        insertContact("c1", phone = null, wechatId = null) // 无 wechatId 也无 WECHAT 平台身份
+    @Test fun prepareOutreachDraftsEvenWithoutWechatHandle() = runBlocking {
+        // 无 wechatId 也无 WECHAT 平台身份：依然起草——触达走微信分享面板由用户亲选联系人，
+        // 无需预知对方微信号；对方回复归因成功后协调器自动挂 WECHAT stub 身份（每联系人操作一次）。
+        insertContact("c1", phone = null, wechatId = null, email = "a@b.c", company = "司", title = "职", responsibilities = "责")
 
-        assertNull(repository.prepareOutreach("c1"))
-        assertEquals(0, generator.calls) // 触达只走微信，不可达不起草
+        val draft = repository.prepareOutreach("c1")
+
+        assertNotNull(draft)
+        // 无微信时缺失字段本身含 WECHAT——草稿里也会请对方补微信号，合理。
+        assertEquals(listOf(ContactProfileField.PHONE, ContactProfileField.WECHAT), draft!!.fields)
     }
 
     @Test fun prepareOutreachReachableViaWechatPlatformIdentity() = runBlocking {

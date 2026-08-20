@@ -21,6 +21,9 @@ data class ContactImportantDateProjection(
     val updatedAtEpochMs: Long,
 )
 
+/** 联系人库公司地址投影：公司名 + 该联系人关联地址（用于拜访地点检索）。 */
+data class CompanyContactAddressRow(val company: String, val formattedAddress: String, val longitude: Double?, val latitude: Double?)
+
 @Dao
 interface ContactKnowledgeDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -116,6 +119,32 @@ interface ContactKnowledgeDao {
     ) ORDER BY userConfirmed DESC, updatedAtEpochMs DESC""",
     )
     fun observeAddresses(contactId: String): Flow<List<ContactAddressEntity>>
+
+    /** 同步版地址查询（唤醒协调器/行程估算用，避免 Flow 订阅开销）。 */
+    @Query(
+        """SELECT * FROM contact_addresses WHERE contactId = :contactId OR contactId IN (
+        SELECT sourceContactId FROM contact_merge_links WHERE canonicalContactId = :contactId AND undoneAtEpochMs IS NULL
+    ) ORDER BY userConfirmed DESC, updatedAtEpochMs DESC""",
+    )
+    suspend fun listAddresses(contactId: String): List<ContactAddressEntity>
+
+    /** 公司注册地址注册表（来源 REGISTRY，供拜访地点检索）。 */
+    @Query(
+        "SELECT * FROM organizations WHERE registeredAddress IS NOT NULL AND trim(registeredAddress) != ''",
+    )
+    suspend fun listOrganizationsWithAddress(): List<OrganizationEntity>
+
+    /** 联系人库公司地址（来源 CONTACT）：联系人公司名 + 其关联地址，供拜访地点检索。 */
+    @Query(
+        """SELECT c.company AS company, a.formattedAddress AS formattedAddress,
+           a.longitude AS longitude, a.latitude AS latitude
+           FROM contact_addresses a
+           INNER JOIN contacts c ON c.contactId = a.contactId
+           WHERE c.deletedAtEpochMs IS NULL
+             AND c.company IS NOT NULL AND trim(c.company) != ''
+             AND a.formattedAddress IS NOT NULL AND trim(a.formattedAddress) != ''""",
+    )
+    suspend fun listCompanyContactAddresses(): List<CompanyContactAddressRow>
 
     @Query(
         """SELECT * FROM contact_important_dates WHERE contactId = :contactId OR contactId IN (

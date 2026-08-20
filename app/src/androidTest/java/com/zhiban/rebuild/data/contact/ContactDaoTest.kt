@@ -33,8 +33,8 @@ class ContactDaoTest {
         )
         dao.upsertRole(ContactRoleEntity("c1", "crm", "CUSTOMER", .9, true, "{}", 1, 2))
 
-        val byName = dao.search("张三", "张三", 20)
-        val byCompany = dao.search("知伴科技", "知伴科技", 20)
+        val byName = dao.searchNatural("张三", 20)
+        val byCompany = dao.searchNatural("知伴科技", 20)
 
         assertEquals("c1", byName.single().contactId)
         assertEquals("c1", byCompany.single().contactId)
@@ -108,8 +108,10 @@ class ContactDaoTest {
         )
         identities.upsertMergeLink(ContactMergeLinkEntity("source", "canonical", "手机号相同", true, 4, null))
 
-        assertEquals("canonical", contacts.search("王老师", "王老师", 20).single().contactId)
-        assertEquals("13800138008", contacts.search("13800138008", "13800138008", 20).single().phone)
+        // 整词"王老师"经 bigram 拆出"老师"会同时召回"李老师"——断言改为 first()
+        // (canonical 整词+bigram 共命中 3 个 term,排序居首),而非 single()。
+        assertEquals("canonical", contacts.searchNatural("王老师", 20).first().contactId)
+        assertEquals("13800138008", contacts.searchNatural("13800138008", 20).single().phone)
         assertEquals("canonical", contacts.findById("source")?.contactId)
         assertEquals("13800138008", contacts.findById("source")?.phone)
         assertEquals("source", contacts.findRawById("source")?.contactId)
@@ -123,7 +125,8 @@ class ContactDaoTest {
 
         assertEquals(1, identities.undoConfirmedMerge("source", 5))
 
-        assertEquals("source", contacts.search("王老师", "王老师", 20).single().contactId)
+        // undo 后 source 恢复独立;显示名精确匹配优先,source 居首。
+        assertEquals("source", contacts.searchNatural("王老师", 20).first().contactId)
         assertEquals("source", contacts.findById("source")?.contactId)
         assertTrue(knowledge.observeMethods("canonical").first().isEmpty())
         assertTrue(db.factDao().observeByContact("canonical", 5).first().isEmpty())

@@ -16,13 +16,13 @@ class OutboundDataPreferencesTest {
     }
 
     @Test
-    fun voiceIsReadyForExplicitVoiceActionsWithoutExposingTechnicalSetup() {
+    fun cloudChannelsRemainFailClosedUntilTheUserExplicitlyEnablesThem() {
         cleanup()
 
         val settings = OutboundDataPreferences(context).snapshot()
 
         assertTrue(settings.allowRedactedAutomaticPersonalContext)
-        assertTrue(settings.allowCloudSpeech)
+        assertFalse(settings.allowCloudSpeech)
         assertFalse(settings.allowRemoteMcp)
         assertFalse(settings.allowRemoteEmbedding)
     }

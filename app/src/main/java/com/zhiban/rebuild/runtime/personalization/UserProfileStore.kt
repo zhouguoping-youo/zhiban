@@ -22,6 +22,7 @@ data class UserProfile(
     val phone: String = "",
     val wechatId: String = "",
     val douyinId: String = "",
+    val company: String = "",
     val avatarUri: String? = null,
     val feishuId: String? = null,
     val wecomId: String? = null,
@@ -42,6 +43,7 @@ data class UserProfile(
         appendLine("- 手机号：${phone.safeMarkdownValue()}")
         appendLine("- 微信号：${wechatId.safeMarkdownValue()}")
         appendLine("- 抖音号：${douyinId.safeMarkdownValue()}")
+        appendLine("- 公司全称：${company.safeMarkdownValue()}")
         appendLine("- 职业：${occupations.joinToString("、").safeMarkdownValue()}")
         append("- 给知伴的指令：${customInstructions.safeMarkdownValue()}")
     }
@@ -108,6 +110,7 @@ class UserProfileStore internal constructor(private val context: Context, prefer
         wecomId = preferences.getString(KEY_WECOM_ID, null)?.takeIf(String::isNotBlank),
         dingtalkId = preferences.getString(KEY_DINGTALK_ID, null)?.takeIf(String::isNotBlank),
         qqId = preferences.getString(KEY_QQ_ID, null)?.takeIf(String::isNotBlank),
+        company = preferences.getString(KEY_COMPANY, "").orEmpty(),
         additionalAccounts = decodeAccounts(preferences.getString(KEY_ADDITIONAL_ACCOUNTS, null)),
         occupations = decodeOccupations(preferences.getString(KEY_OCCUPATIONS, null)),
         customInstructions = preferences.getString(KEY_CUSTOM_INSTRUCTIONS, "").orEmpty(),
@@ -140,6 +143,7 @@ class UserProfileStore internal constructor(private val context: Context, prefer
             wecomId = value.wecomId?.trim()?.takeIf(String::isNotEmpty),
             dingtalkId = value.dingtalkId?.trim()?.takeIf(String::isNotEmpty),
             qqId = value.qqId?.trim()?.takeIf(String::isNotEmpty),
+            company = value.company.trim(),
             customInstructions = value.customInstructions.trim(),
         )
         check(
@@ -154,6 +158,7 @@ class UserProfileStore internal constructor(private val context: Context, prefer
                 .putString(KEY_WECOM_ID, normalized.wecomId.orEmpty())
                 .putString(KEY_DINGTALK_ID, normalized.dingtalkId.orEmpty())
                 .putString(KEY_QQ_ID, normalized.qqId.orEmpty())
+                .putString(KEY_COMPANY, normalized.company)
                 .putString(KEY_ADDITIONAL_ACCOUNTS, encodeAccounts(normalized.additionalAccounts))
                 .putString(KEY_OCCUPATIONS, encodeOccupations(normalized.occupations))
                 .putString(KEY_CUSTOM_INSTRUCTIONS, normalized.customInstructions)
@@ -231,6 +236,7 @@ class UserProfileStore internal constructor(private val context: Context, prefer
         const val KEY_WECOM_ID = "wecom_id"
         const val KEY_DINGTALK_ID = "dingtalk_id"
         const val KEY_QQ_ID = "qq_id"
+        const val KEY_COMPANY = "company"
         const val KEY_ADDITIONAL_ACCOUNTS = "additional_accounts"
         const val KEY_OCCUPATIONS = "occupations"
         const val KEY_CUSTOM_INSTRUCTIONS = "custom_instructions"

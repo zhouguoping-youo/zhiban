@@ -10,9 +10,16 @@ import com.zhiban.rebuild.data.autowrite.AutoWriteToolNames
 import com.zhiban.rebuild.data.autowrite.ChangeLogEntity
 import com.zhiban.rebuild.data.autowrite.ReversibleWriteReadiness
 import com.zhiban.rebuild.data.autowrite.insertVisibleAutoWrite
+import com.zhiban.rebuild.data.common.ConflatedDebouncedTrigger
+import com.zhiban.rebuild.data.completion.ContactCompletionRepository
 import com.zhiban.rebuild.data.contact.ContactEnrichmentCandidateEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
+import com.zhiban.rebuild.data.suggestion.AgentSuggestionCodecs
+import com.zhiban.rebuild.data.suggestion.AgentSuggestionEntity
+import com.zhiban.rebuild.data.suggestion.AgentSuggestionRepository
+import com.zhiban.rebuild.data.suggestion.AgentSuggestionStatus
+import com.zhiban.rebuild.data.suggestion.AgentSuggestionType
 import com.zhiban.rebuild.foundation.RuntimeToolRisk
 import com.zhiban.rebuild.foundation.changeIdFor
 import com.zhiban.rebuild.foundation.runSuspendCatching
@@ -20,12 +27,6 @@ import com.zhiban.rebuild.foundation.sha256
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonNull
@@ -44,56 +45,54 @@ import kotlinx.serialization.json.put
 internal class MessageContactCompletionCoordinator @Inject constructor(
     private val database: AgentDatabase,
     private val extractor: MessageContactFieldExtraction,
+    private val completion: ContactCompletionRepository,
+    private val suggestions: AgentSuggestionRepository,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val triggers = Channel<Unit>(capacity = Channel.CONFLATED)
     private val processMutex = Mutex()
-
-    @Volatile
-    private var consumerStarted = false
+    private val trigger = ConflatedDebouncedTrigger(
+        scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO),
+        debounceMs = TRIGGER_DEBOUNCE_MS,
+        onFailure = { failure -> Log.w(TAG, "completion:scan_failure", failure) },
+        action = ::processOnce,
+    )
 
     /** 廉价非阻塞信号(与回复建议同模式):微信来消息后由感知管线触发。 */
     fun onIncomingWechatActivity() {
-        ensureConsumerStarted()
-        triggers.trySend(Unit)
-    }
-
-    @Synchronized
-    private fun ensureConsumerStarted() {
-        if (consumerStarted) return
-        consumerStarted = true
-        scope.launch {
-            for (trigger in triggers) {
-                delay(TRIGGER_DEBOUNCE_MS)
-                runSuspendCatching { processOnce() }
-                    .onFailure { failure ->
-                        if (failure is CancellationException) throw failure
-                        Log.w(TAG, "completion:scan_failure", failure)
-                    }
-            }
-        }
+        trigger.signal()
     }
 
     internal suspend fun processOnce() {
         processMutex.withLock {
             val now = System.currentTimeMillis()
-            database.notificationCandidateDao()
-                .recentIncomingAttributed(WECHAT_PLATFORM, now - CANDIDATE_WINDOW_MS, CANDIDATE_LIMIT)
-                .forEach { candidate ->
+            // 游标式分页扫描:24h 窗口内消息可能远超一页,固定 LIMIT 会把旧消息的补全请求永久漏掉。
+            // 处理幂等(幂等键),重复扫描无害。
+            var cursor = now - CANDIDATE_WINDOW_MS
+            var page: List<NotificationCandidateEntity>
+            do {
+                page = database.notificationCandidateDao()
+                    .incomingAttributedAfter(WECHAT_PLATFORM, now - CANDIDATE_WINDOW_MS, cursor, SCAN_PAGE_SIZE)
+                page.forEach { candidate ->
                     runSuspendCatching { processCandidate(candidate, now) }
                         .onFailure { failure ->
                             if (failure is CancellationException) throw failure
                             Log.w(TAG, "completion:candidate_failure", failure)
                         }
                 }
+                val lastEpoch = page.lastOrNull()?.postedAtEpochMs
+                if (lastEpoch == null || lastEpoch <= cursor) break // 防同毫秒多条消息导致游标不前进的死循环
+                cursor = lastEpoch
+            } while (page.size == SCAN_PAGE_SIZE)
         }
     }
 
     private suspend fun processCandidate(candidate: NotificationCandidateEntity, nowEpochMs: Long) {
         val contactId = candidate.linkedContactId ?: return
         val body = candidate.body?.trim()?.takeIf(String::isNotBlank) ?: return
-        // 廉价本地闸门:消息里既没有手机号也没有自述信号,不值得付 LLM 钱。
-        if (!looksLikeSelfIntroduction(body)) return
+        // 非自述消息：不付 LLM 抽取钱；联系人资料不全且有微信身份 → 主动起草补全消息建议卡。
+        if (!looksLikeSelfIntroduction(body)) {
+            maybeStageCompletionSuggestion(contactId, candidate, nowEpochMs)
+            return
+        }
         // 幂等:一条消息的补全只做一次(无论成功与否,避免重复付钱/重复建议)。
         val idempotencyKey = sha256("completion:${candidate.candidateId}")
         if (database.changeLogDao().findByIdempotencyKey(idempotencyKey) != null) return
@@ -102,7 +101,11 @@ internal class MessageContactCompletionCoordinator @Inject constructor(
 
         val extracted = extractor.extract(candidate.candidateId, contact.displayName, body)
         val applicable = extracted.filter { field -> contactField(contact, field.kind) == null }
-        if (applicable.isEmpty()) return
+        if (applicable.isEmpty()) {
+            // 自述消息但没抽到可写字段:对方刚发来消息,资料仍不全 → 转主动补全(请对方补充)。
+            maybeStageCompletionSuggestion(contactId, candidate, nowEpochMs)
+            return
+        }
 
         val autoFields = applicable.filter { it.confidence >= AUTO_APPLY_CONFIDENCE }
         if (autoFields.isNotEmpty()) {
@@ -134,6 +137,60 @@ internal class MessageContactCompletionCoordinator @Inject constructor(
         }
     }
 
+    /**
+     * 主动补全（TASK 74 核心）：微信来消息但对方没自述、或自述没抽到可写字段时，
+     * 若联系人资料不全且微信可达 → 复用 [ContactCompletionRepository.prepareOutreach]（闸门：
+     * 总开关/免打扰/单活跃请求/微信可达/缺字段上限）起草一条「请补充资料」的消息，
+     * 落一条 WAKEUP_COMPLETION 建议卡（dedupeKey = completion-suggest-<contactId>，同联系人只产一条）。
+     * 用户点「一键转发」→ 建议卡对话框 → completeAndHandoff 拉起微信预填（知伴绝不代发）。
+     * 幂等边界：建议已存在（含已忽略）不再重复起草；insert 幂等冲突时撤掉刚起草的请求，不留孤儿。
+     */
+    private suspend fun maybeStageCompletionSuggestion(contactId: String, candidate: NotificationCandidateEntity, nowEpochMs: Long) {
+        val suggestionId = completionSuggestionId(contactId)
+        if (database.agentSuggestionDao().find(suggestionId) != null) return
+        val draft = try {
+            completion.prepareOutreach(contactId)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            Log.w(TAG, "completion:outreach_failed contact=$contactId", failure)
+            null
+        } ?: return
+        val inserted = suggestions.insert(
+            AgentSuggestionEntity(
+                suggestionId = suggestionId,
+                type = AgentSuggestionType.WAKEUP_COMPLETION,
+                title = "「${draft.contactName}」的资料还不全，可以一键转发请 TA 补充",
+                body = buildString {
+                    append("知伴发现「${draft.contactName}」还缺 ")
+                    append(draft.fields.joinToString("、") { it.label })
+                    append("。已起草好一条微信消息，确认后会跳到微信，请你选择 TA 发送，请 TA 协助补充。")
+                },
+                contactId = contactId,
+                candidateId = candidate.candidateId,
+                sourceEvent = "NOTIFICATION",
+                dedupeKey = completionSuggestionId(contactId),
+                status = AgentSuggestionStatus.PENDING,
+                createdAtEpochMs = nowEpochMs,
+                updatedAtEpochMs = nowEpochMs,
+                execActionType = EXEC_COMPLETION,
+                completionRequestId = draft.requestId,
+                forwardMessage = draft.draftText,
+                missingFieldsJson = AgentSuggestionCodecs.encodeMissingFields(draft.fields),
+            ),
+        )
+        if (!inserted) {
+            // 幂等冲突（罕见）：撤掉刚起草的请求，不留孤儿 DRAFTED 挡下次起草。
+            try {
+                completion.cancel(draft.requestId)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                Log.w(TAG, "completion:rollback_draft_failed contact=$contactId", failure)
+            }
+        }
+    }
+
     /** 高置信自动写:一个事务内改联系人 + 落可撤销变更账 + 收据;策略闸门同互动摘要自动写。 */
     private suspend fun applyAutoCompletion(
         candidate: NotificationCandidateEntity,
@@ -144,7 +201,7 @@ internal class MessageContactCompletionCoordinator @Inject constructor(
     ) {
         if (ActionPolicy().evaluate(
                 RuntimeToolRisk.REVERSIBLE_AUTO_WRITE,
-                reversibleWriteReadiness = ReversibleWriteReadiness(true, true, true),
+                reversibleWriteReadiness = ReversibleWriteReadiness.Ready,
             ) != ActionDecision.AutoExecuteReversibleWrite
         ) {
             return
@@ -232,9 +289,15 @@ internal class MessageContactCompletionCoordinator @Inject constructor(
         const val WECHAT_PLATFORM = "WECHAT"
         const val TRIGGER_DEBOUNCE_MS = 2_500L
         const val CANDIDATE_WINDOW_MS = 24 * 60 * 60 * 1_000L
-        const val CANDIDATE_LIMIT = 30
+        const val SCAN_PAGE_SIZE = 50
         const val SUGGESTION_TTL_MS = 7L * 24 * 60 * 60 * 1_000
         const val AUTO_APPLY_CONFIDENCE = 0.85
+
+        /** 补全建议卡的执行动作类型（accept 时走 completeAndHandoff）。 */
+        const val EXEC_COMPLETION = "CONTACT_COMPLETION"
+
+        /** 幂等建议 id 与 dedupeKey：同一联系人只产一条补全建议（含已忽略，避免重复打扰）。 */
+        fun completionSuggestionId(contactId: String): String = "completion-suggest-$contactId"
     }
 }
 

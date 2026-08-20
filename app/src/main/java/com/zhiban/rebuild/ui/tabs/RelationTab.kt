@@ -117,6 +117,7 @@ import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventWithParticipants
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.data.contact.SystemContactCandidate
+import com.zhiban.rebuild.data.contact.enrichment.matchOwnerContactIds
 import com.zhiban.rebuild.data.facts.FactEntity
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.OutgoingMessageAccessibilityService
@@ -315,8 +316,11 @@ fun RelationTab(
         }
     }
 
-    val ownerContactSources = remember(rawContacts, ownerContactLinks) {
+    val ownerContactSources = remember(rawContacts, ownerContactLinks, ownerProfile) {
+        // 本人排除集与关系推断协调器同口径：owner link + 个人资料匹配（手机/微信/姓名）。
+        // 避免 profile 匹配到的本人卡片在互动投影层出现「我↔我自己」的边。
         val ownerSourceIds = ownerContactLinks.mapTo(hashSetOf()) { it.contactId }
+        ownerSourceIds += matchOwnerContactIds(ownerProfile, rawContacts)
         rawContacts.filter { it.contactId in ownerSourceIds }
     }
     // 图谱边 = 落库边(含关系推断协调器自动写的可撤销推断边) + 互动证据边(只读投影)。
@@ -442,8 +446,8 @@ fun RelationTab(
             item {
                 ZhiBanSegmentedControl(
                     options = listOf("联系人", "关系图"),
-                    selectedIndex = if (mode == "list") 0 else 1,
-                    onSelected = { mode = if (it == 0) "list" else "graph" },
+                    selectedIndex = if (mode == "graph") 1 else 0,
+                    onSelected = { mode = if (it == 1) "graph" else "list" },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(14.dp))
@@ -486,87 +490,91 @@ fun RelationTab(
                     Spacer(Modifier.height(12.dp))
                 }
             }
-            if (mode == "list") {
-                if (shouldShowOwnerProfilePrompt(ownerProfile, tag, query)) {
-                    item {
-                        OwnerProfilePrompt(ownerProfile, onOwnerClick)
-                        Spacer(Modifier.height(12.dp))
+            when (mode) {
+                "list" -> {
+                    if (shouldShowOwnerProfilePrompt(ownerProfile, tag, query)) {
+                        item {
+                            OwnerProfilePrompt(ownerProfile, onOwnerClick)
+                            Spacer(Modifier.height(12.dp))
+                        }
                     }
-                }
-                if (tag == "全部" && query.isBlank()) {
-                    ownerContactLinks.forEach { link ->
-                        val linkedContact = rawContacts.firstOrNull { it.contactId == link.contactId }
-                        if (linkedContact != null) {
-                            item(key = "owner-link-${link.contactId}") {
-                                Row(
-                                    Modifier.fillMaxWidth().padding(start = 58.dp, top = 6.dp, bottom = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text(
-                                        "已将 ${linkedContact.displayName} 归入本人",
-                                        color = RelationMuted,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                    TextButton(onClick = { viewModel.undoContactIsOwner(link.contactId) }) {
-                                        Text("撤销", color = RelationInk)
+                    if (tag == "全部" && query.isBlank()) {
+                        ownerContactLinks.forEach { link ->
+                            val linkedContact = rawContacts.firstOrNull { it.contactId == link.contactId }
+                            if (linkedContact != null) {
+                                item(key = "owner-link-${link.contactId}") {
+                                    Row(
+                                        Modifier.fillMaxWidth().padding(start = 58.dp, top = 6.dp, bottom = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Text(
+                                            "已将 ${linkedContact.displayName} 归入本人",
+                                            color = RelationMuted,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        TextButton(onClick = { viewModel.undoContactIsOwner(link.contactId) }) {
+                                            Text("撤销", color = RelationInk)
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+                    if (contacts.isEmpty() && query.isBlank() && tag == "全部") {
+                        item {
+                            RelationEmpty(
+                                searching = false,
+                                onImport = openContactImport,
+                                onAdd = {
+                                    editingId = null
+                                    showEditor = true
+                                },
+                            )
+                        }
+                    } else if (visible.isEmpty()) {
+                        item {
+                            RelationEmpty(
+                                searching = query.isNotBlank() || tag != "全部",
+                                onImport = openContactImport,
+                                onAdd = {
+                                    editingId = null
+                                    showEditor = true
+                                },
+                            )
+                        }
+                    } else {
+                        items(visible.size, key = { visible[it].contactId }) { index ->
+                            ContactRow(visible[index]) {
+                                selected = visible[index]
+                                onContactClick(visible[index].contactId)
+                            }
+                            if (index != visible.lastIndex) {
+                                Box(Modifier.fillMaxWidth().padding(start = 58.dp).height(1.dp).background(RelationLine))
+                            }
+                        }
+                    }
                 }
-                if (contacts.isEmpty() && query.isBlank() && tag == "全部") {
+
+                "graph" -> {
                     item {
-                        RelationEmpty(
-                            searching = false,
-                            onImport = openContactImport,
-                            onAdd = {
-                                editingId = null
-                                showEditor = true
-                            },
+                        RelationshipGraphState(
+                            owner = ownerProfile,
+                            contacts = visible,
+                            edges = graphRelationships,
+                            historicalEdges = historyRelationships,
+                            currentOwnerEmployment = currentOwnerEmployment,
+                            ownerEmploymentHistoryCount = ownerEmploymentHistoryCount,
+                            events = relationshipEvents,
+                            canAddRelationship = contacts.isNotEmpty(),
+                            activeFilter = tag.takeUnless { it == "全部" } ?: query.takeIf(String::isNotBlank),
+                            activeGroup = selectedRelationshipGroup,
+                            onAdd = { showRelationEditor = true },
+                            onInspect = { selectedEdge = it },
+                            onInspectEvent = { selectedEvent = it },
+                            onEditOwnerEmployment = { showOwnerEmploymentEditor = true },
                         )
                     }
-                } else if (visible.isEmpty()) {
-                    item {
-                        RelationEmpty(
-                            searching = query.isNotBlank() || tag != "全部",
-                            onImport = openContactImport,
-                            onAdd = {
-                                editingId = null
-                                showEditor = true
-                            },
-                        )
-                    }
-                } else {
-                    items(visible.size, key = { visible[it].contactId }) { index ->
-                        ContactRow(visible[index]) {
-                            selected = visible[index]
-                            onContactClick(visible[index].contactId)
-                        }
-                        if (index != visible.lastIndex) {
-                            Box(Modifier.fillMaxWidth().padding(start = 58.dp).height(1.dp).background(RelationLine))
-                        }
-                    }
-                }
-            } else {
-                item {
-                    RelationshipGraphState(
-                        owner = ownerProfile,
-                        contacts = visible,
-                        edges = graphRelationships,
-                        historicalEdges = historyRelationships,
-                        currentOwnerEmployment = currentOwnerEmployment,
-                        ownerEmploymentHistoryCount = ownerEmploymentHistoryCount,
-                        events = relationshipEvents,
-                        canAddRelationship = contacts.isNotEmpty(),
-                        activeFilter = tag.takeUnless { it == "全部" } ?: query.takeIf(String::isNotBlank),
-                        activeGroup = selectedRelationshipGroup,
-                        onAdd = { showRelationEditor = true },
-                        onInspect = { selectedEdge = it },
-                        onInspectEvent = { selectedEvent = it },
-                        onEditOwnerEmployment = { showOwnerEmploymentEditor = true },
-                    )
                 }
             }
         }

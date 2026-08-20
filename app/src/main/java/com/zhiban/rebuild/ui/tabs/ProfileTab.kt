@@ -25,6 +25,7 @@ import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.DataUsage
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Psychology
@@ -104,6 +105,7 @@ internal data class ProfileSettingItem(
 fun ProfileTab(
     onNavigateToAgentSettings: () -> Unit = {},
     onNavigateToAutoWrites: () -> Unit = {},
+    onNavigateToAgentSuggestions: () -> Unit = {},
     onNavigateToProfileEdit: () -> Unit = {},
     onNavigateToPrivacySecurity: () -> Unit = {},
     onNavigateToAppearance: () -> Unit = {},
@@ -116,6 +118,7 @@ fun ProfileTab(
     isDataEmpty: Boolean = false,
     viewModel: ProfileTabViewModel = hiltViewModel(),
     autoWriteViewModel: com.zhiban.rebuild.ui.settings.AutoWriteViewModel = hiltViewModel(),
+    agentSuggestionViewModel: com.zhiban.rebuild.ui.settings.AgentSuggestionViewModel = hiltViewModel(),
 ) {
     if (isDataEmpty) {
         MainTabEmptyPage("profile", modifier)
@@ -125,6 +128,7 @@ fun ProfileTab(
     val profile by viewModel.profile.collectAsStateWithLifecycle()
     val providerConfigured by viewModel.providerConfigured.collectAsStateWithLifecycle()
     val autoWriteState by autoWriteViewModel.state.collectAsStateWithLifecycle()
+    val pendingSuggestionCount by agentSuggestionViewModel.pendingCount.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.refreshProviderState() }
     val pendingAutoWriteCount = autoWriteState.receipts.count { it.reviewState == "UNREVIEWED" }
     val preferredName = profile.preferredName.ifBlank { profile.name }
@@ -156,6 +160,14 @@ fun ProfileTab(
             statusText = pendingAutoWriteCount.takeIf { it > 0 }?.let { "$it 条待查看" },
             statusNeedsAttention = pendingAutoWriteCount > 0,
             onClick = onNavigateToAutoWrites,
+        ),
+        ProfileSettingItem(
+            icon = Icons.Outlined.Lightbulb,
+            title = "智能建议",
+            accessibilityDescription = "知伴主动发现的事项与下一步行动",
+            statusText = pendingSuggestionCount.takeIf { it > 0 }?.let { "$it 条新建议" },
+            statusNeedsAttention = pendingSuggestionCount > 0,
+            onClick = onNavigateToAgentSuggestions,
         ),
     )
     val appItems = listOf(

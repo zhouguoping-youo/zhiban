@@ -304,7 +304,12 @@ class RoomScheduleToolExecutorTest {
             "UPDATE runtime_runs SET activeAttemptId = 'attempt' WHERE runId = 'run'",
         )
         store.appendEvent(
-            RuntimeEventDraft("approval", "ApprovalRequested", "session", "run", "attempt", "plan", "run", "{\"proposalId\":\"proposal\",\"payloadRef\":\"payload\",\"revision\":7,\"canonicalInputDigest\":\"${approvedCall.canonicalInputDigest}\"}", 7),
+            RuntimeEventDraft(
+                "approval", "ApprovalRequested", "session", "run", "attempt", "plan", "run",
+                "{\"proposalId\":\"proposal\",\"payloadRef\":\"payload\",\"revision\":7," +
+                    "\"canonicalInputDigest\":\"${approvedCall.canonicalInputDigest}\"}",
+                7,
+            ),
             "owner",
             lease.leaseEpoch,
             7,

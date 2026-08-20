@@ -137,11 +137,11 @@ class CallLogImporterTest {
         )
 
         assertEquals("canonical", repository.observePendingNotes().first().single().linkedContactId)
-        assertEquals(callId, repository.observeForContact("canonical").first().single().callRecordId)
+        assertEquals(callId, database.callLogDao().observeForContact("canonical").first().single().callRecordId)
 
         assertEquals(1, database.contactIdentityDao().undoConfirmedMerge("source", 5_000))
         assertEquals("source", repository.observePendingNotes().first().single().linkedContactId)
-        assertEquals(callId, repository.observeForContact("source").first().single().callRecordId)
+        assertEquals(callId, database.callLogDao().observeForContact("source").first().single().callRecordId)
     }
 
     @Test

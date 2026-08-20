@@ -509,10 +509,11 @@ class AgentDataRepositoryTest {
         val link = database.contactIdentityDao().observeActiveMergeLinks().first().single()
         assertFalse(link.userConfirmed)
         assertEquals("duplicate-a", link.canonicalContactId)
-        val receipt = AutoWriteRepository(database, context, fakeUndoApplier).observeReceipts().first().single {
+        val undoApplier = com.zhiban.rebuild.runtime.governance.ChangeUndoApplierImpl(database)
+        val receipt = AutoWriteRepository(database, context, undoApplier).observeReceipts().first().single {
             it.presentationType == "CONTACT_IDENTITY_LINK"
         }
-        assertTrue(AutoWriteRepository(database, context, fakeUndoApplier).undo(receipt.changeId, 3_000L))
+        assertTrue(AutoWriteRepository(database, context, undoApplier).undo(receipt.changeId, 3_000L))
         assertNull(database.contactIdentityDao().activeMergeLink(link.sourceContactId))
 
         repository.refreshLocalContactIntelligence()
@@ -1012,9 +1013,14 @@ class AgentDataRepositoryTest {
         assertEquals(contactId, receipt.subjectContactId)
         assertEquals("INTERACTION_SUMMARY", receipt.presentationType)
         assertEquals("AVAILABLE", receipt.undoState)
-        assertEquals(true, AutoWriteRepository(database, context, fakeUndoApplier).undo(receipt.changeId, now + 3_000L))
+        val autoWriteRepository = AutoWriteRepository(
+            database,
+            context,
+            com.zhiban.rebuild.runtime.governance.ChangeUndoApplierImpl(database),
+        )
+        assertEquals(true, autoWriteRepository.undo(receipt.changeId, now + 3_000L))
         assertEquals("CORRECTED", database.changeLogDao().findAutoWriteReceipt(receipt.changeId)?.reviewState)
-        assertEquals(0, AutoWriteRepository(database, context, fakeUndoApplier).observeUnreviewedCount().first())
+        assertEquals(0, autoWriteRepository.observeUnreviewedCount().first())
         assertEquals(
             0,
             repository.observeContactFacts(contactId).first().count {
@@ -1051,7 +1057,13 @@ class AgentDataRepositoryTest {
         assertEquals("INTERACTION_SUMMARY", fact.factType)
         val receipt = database.changeLogDao().observeAutoWriteReceipts().first().single()
         assertEquals(0.99, receipt.confidence ?: 0.0, 0.0)
-        assertTrue(AutoWriteRepository(database, context, fakeUndoApplier).undo(receipt.changeId, now + 1_000L))
+        assertTrue(
+            AutoWriteRepository(
+                database,
+                context,
+                com.zhiban.rebuild.runtime.governance.ChangeUndoApplierImpl(database),
+            ).undo(receipt.changeId, now + 1_000L),
+        )
     }
 
     @Test
@@ -1114,7 +1126,13 @@ class AgentDataRepositoryTest {
         val receipt = database.changeLogDao().observeAutoWriteReceipts().first()
             .single { it.presentationType == "SCHEDULE_CREATE" }
         assertEquals(schedule.id, receipt.targetId)
-        assertTrue(AutoWriteRepository(database, context, fakeUndoApplier).undo(receipt.changeId, now + 1_000L))
+        assertTrue(
+            AutoWriteRepository(
+                database,
+                context,
+                com.zhiban.rebuild.runtime.governance.ChangeUndoApplierImpl(database),
+            ).undo(receipt.changeId, now + 1_000L),
+        )
         assertNull(database.scheduleDao().findById(schedule.id))
     }
 
@@ -1404,7 +1422,9 @@ class AgentDataRepositoryTest {
         )
         repository.stageNotificationCandidate(message("sweep-1", "sweep-source-1", "第一条"))
         repository.stageNotificationCandidate(message("sweep-2", "sweep-source-2", "第二条"))
-        assertEquals(2, repository.observeNotificationCandidates().first().size)
+        // The inbox intentionally collapses unresolved messages from one sender to the latest card,
+        // while mute still sweeps every pending row from that sender.
+        assertEquals(1, repository.observeNotificationCandidates().first().size)
 
         assertTrue(repository.muteNotificationSender("sweep-2"))
         assertEquals("DISMISSED", database.notificationCandidateDao().find("sweep-1")?.status)
@@ -1696,8 +1716,4 @@ class AgentDataRepositoryTest {
         note = null,
     )
 
-    private val fakeUndoApplier = object : com.zhiban.rebuild.data.autowrite.ChangeUndoApplier {
-        override suspend fun undoVisible(changeId: String, nowEpochMs: Long): Boolean = false
-        override suspend fun undoForRun(changeId: String, runId: String, nowEpochMs: Long): Boolean = false
-    }
 }

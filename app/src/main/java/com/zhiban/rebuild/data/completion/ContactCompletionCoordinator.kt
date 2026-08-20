@@ -3,20 +3,17 @@ package com.zhiban.rebuild.data.completion
 import android.util.Log
 import androidx.room.withTransaction
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.agent.stableContactKnowledgeId
+import com.zhiban.rebuild.data.common.ConflatedDebouncedTrigger
 import com.zhiban.rebuild.data.config.AgentControlStore
 import com.zhiban.rebuild.data.contact.ContactEnrichmentCandidateEntity
+import com.zhiban.rebuild.data.contact.ContactPlatformIdentityEntity
 import com.zhiban.rebuild.data.contact.ContactProfileCompletenessEvaluator
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.foundation.runSuspendCatching
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -35,33 +32,17 @@ internal class ContactCompletionCoordinator @Inject constructor(
     private val parser: ContactCompletionResponseParser,
     private val controls: AgentControlStore,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val triggers = Channel<Unit>(capacity = Channel.CONFLATED)
     private val processMutex = Mutex()
-
-    @Volatile
-    private var consumerStarted = false
+    private val trigger = ConflatedDebouncedTrigger(
+        scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO),
+        debounceMs = TRIGGER_DEBOUNCE_MS,
+        onFailure = { failure -> Log.w(TAG, "completion:scan_failure", failure) },
+        action = ::processOnce,
+    )
 
     /** 廉价非阻塞信号：微信来消息（T1）或 App 回前台（T2)。 */
     fun onIncomingWechatActivity() {
-        ensureConsumerStarted()
-        triggers.trySend(Unit)
-    }
-
-    @Synchronized
-    private fun ensureConsumerStarted() {
-        if (consumerStarted) return
-        consumerStarted = true
-        scope.launch {
-            for (trigger in triggers) {
-                delay(TRIGGER_DEBOUNCE_MS)
-                runSuspendCatching { processOnce() }
-                    .onFailure { failure ->
-                        if (failure is CancellationException) throw failure
-                        Log.w(TAG, "completion:scan_failure", failure)
-                    }
-            }
-        }
+        trigger.signal()
     }
 
     internal suspend fun processOnce() {
@@ -135,10 +116,43 @@ internal class ContactCompletionCoordinator @Inject constructor(
         val request = dao.findAwaitingForContact(contactId, now) ?: return // 该联系人无进行中请求
         if (candidate.postedAtEpochMs <= (request.sentAtEpochMs ?: 0L)) return // 必须晚于我们发出
 
+        // 归因成功 = 对方在微信里回复了 → 该联系人微信可达。自动挂 WECHAT stub 身份
+        // (handle=发送者显示名):补全触达走分享面板不需要精确 wxid,stub 只为让后续
+        // 微信可达闸门与「微信号不算缺失」判定通过——每个联系人只需操作一次。
+        ensureWechatIdentityStub(contactId, candidate.senderName ?: candidate.conversationTitle, now)
+
         val extraction = parser.extract(request, candidate.body.orEmpty())
         val candidates = parser.buildCompletionCandidates(request, extraction, now)
         // 候选表+请求表跨表写,同一事务(R10/P2-1):候选与状态转换要么一起落地,要么都不落。
         database.withTransaction { stageCandidatesAndMark(request, candidates, now) }
+    }
+
+    /**
+     * 幂等挂 WECHAT stub 身份：已有真 wechatId 或已有 WECHAT 身份则不动；否则以发送者显示名
+     * 作 handle、source=COMPLETION_REPLY、userConfirmed=false 落一条（可撤销、可被真值覆盖）。
+     */
+    private suspend fun ensureWechatIdentityStub(contactId: String, senderName: String?, now: Long) {
+        val contact = database.contactDao().findById(contactId) ?: return
+        if (!contact.wechatId.isNullOrBlank()) return
+        val identities = database.contactIdentityDao().platformIdentities(contactId)
+        if (identities.any { it.platform == WECHAT_PLATFORM }) return
+        val handle = senderName?.trim()?.takeIf { it.isNotBlank() } ?: contact.displayName.trim()
+        if (handle.isBlank()) return
+        val normalized = handle.trimStart('@').lowercase()
+        database.contactIdentityDao().insertPlatformIdentityIfAbsent(
+            ContactPlatformIdentityEntity(
+                identityId = stableContactKnowledgeId(contactId, WECHAT_PLATFORM, normalized),
+                contactId = contactId,
+                platform = WECHAT_PLATFORM,
+                handle = handle,
+                normalizedHandle = normalized,
+                platformUserId = null,
+                source = "COMPLETION_REPLY",
+                userConfirmed = false,
+                createdAtEpochMs = now,
+                updatedAtEpochMs = now,
+            ),
+        )
     }
 
     /**

@@ -726,4 +726,87 @@ internal object AgentDatabaseMigrations25To37 {
             db.execSQL("ALTER TABLE `auto_write_receipts` ADD COLUMN `summary` TEXT")
         }
     }
+
+    /**
+     * 建议中心:事件唤醒 LLM 综合判断的产出统一落 agent_suggestions 表(主动到达通道
+     * 的数据面)。dedupeKey 唯一索引保证同一候选只产一条建议;status+createdAtEpochMs
+     * 支撑徽标计数与列表排序。迁移开头按既有约定先删 CALLBACK 托管的两个部分索引。
+     */
+    val MIGRATION_47_48 = object : Migration(47, 48) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("DROP INDEX IF EXISTS `index_plan_runs_single_active_per_definition`")
+            db.execSQL("DROP INDEX IF EXISTS `index_contacts_active_deleted`")
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `agent_suggestions` (" +
+                    "`suggestionId` TEXT NOT NULL, `type` TEXT NOT NULL, `title` TEXT NOT NULL, " +
+                    "`body` TEXT NOT NULL, `contactId` TEXT, `candidateId` TEXT, `sourceEvent` TEXT NOT NULL, " +
+                    "`dedupeKey` TEXT NOT NULL, `status` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, " +
+                    "`updatedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`suggestionId`))",
+            )
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_agent_suggestions_dedupeKey` ON `agent_suggestions` (`dedupeKey`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_agent_suggestions_status` ON `agent_suggestions` (`status`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_agent_suggestions_createdAtEpochMs` ON `agent_suggestions` (`createdAtEpochMs`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_agent_suggestions_contactId` ON `agent_suggestions` (`contactId`)")
+        }
+    }
+
+    /**
+     * 建议中心结构化执行负载：接受建议后能真正执行动作（创建日历事件）。
+     * execActionType=SCHEDULE 时，scheduleTitle/startAtEpochMs/durationMinutes/location/
+     * companyFull/confirmNotes 为日程要素；planId 由接受动作回写。
+     * 纯 ALTER TABLE ADD COLUMN，旧行全部为 NULL → 降级为"仅状态迁移"（老建议不受影响）。
+     * 开头按既有约定 DROP CALLBACK 托管的两个部分索引（48 版期间 onOpen 防御性重建过，
+     * 否则迁移后 validate 会因 Found 残留索引 ≠ Expected 而崩）。
+     */
+    val MIGRATION_48_49 = object : Migration(48, 49) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("DROP INDEX IF EXISTS `index_plan_runs_single_active_per_definition`")
+            db.execSQL("DROP INDEX IF EXISTS `index_contacts_active_deleted`")
+            db.execSQL("ALTER TABLE `agent_suggestions` ADD COLUMN `execActionType` TEXT")
+            db.execSQL("ALTER TABLE `agent_suggestions` ADD COLUMN `scheduleTitle` TEXT")
+            db.execSQL("ALTER TABLE `agent_suggestions` ADD COLUMN `startAtEpochMs` INTEGER")
+            db.execSQL("ALTER TABLE `agent_suggestions` ADD COLUMN `durationMinutes` INTEGER")
+            db.execSQL("ALTER TABLE `agent_suggestions` ADD COLUMN `location` TEXT")
+            db.execSQL("ALTER TABLE `agent_suggestions` ADD COLUMN `companyFull` TEXT")
+            db.execSQL("ALTER TABLE `agent_suggestions` ADD COLUMN `confirmNotes` TEXT")
+            db.execSQL("ALTER TABLE `agent_suggestions` ADD COLUMN `planId` TEXT")
+        }
+    }
+
+    /**
+     * 49→50：agent_suggestions 增加双地点/对接人候选/行程字段。
+     * pickupLocation（接人地点）、visitLocation（拜访地点）、visitLocationSource（来源）、
+     * contactCandidatesJson（对接人候选 JSON）、departAtEpochMs（建议出发时间）、travelNote（行程说明）。
+     * 纯 ALTER TABLE ADD COLUMN，旧行全 NULL → 老建议不受影响。
+     * 开头按既有约定 DROP CALLBACK 托管的两个部分索引（49 版期间 onOpen 防御性重建过）。
+     */
+    val MIGRATION_49_50 = object : Migration(49, 50) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("DROP INDEX IF EXISTS `index_plan_runs_single_active_per_definition`")
+            db.execSQL("DROP INDEX IF EXISTS `index_contacts_active_deleted`")
+            db.execSQL("ALTER TABLE `agent_suggestions` ADD COLUMN `pickupLocation` TEXT")
+            db.execSQL("ALTER TABLE `agent_suggestions` ADD COLUMN `visitLocation` TEXT")
+            db.execSQL("ALTER TABLE `agent_suggestions` ADD COLUMN `visitLocationSource` TEXT")
+            db.execSQL("ALTER TABLE `agent_suggestions` ADD COLUMN `contactCandidatesJson` TEXT")
+            db.execSQL("ALTER TABLE `agent_suggestions` ADD COLUMN `departAtEpochMs` INTEGER")
+            db.execSQL("ALTER TABLE `agent_suggestions` ADD COLUMN `travelNote` TEXT")
+        }
+    }
+
+    /**
+     * 50→51：agent_suggestions 增加一键转发补全字段。
+     * completionRequestId（关联 contact_completion_requests.requestId）、
+     * forwardMessage（起草好的补全微信文案）、missingFieldsJson（本轮要问的字段名 JSON 数组）。
+     * 纯 ALTER TABLE ADD COLUMN，旧行全 NULL → 老建议不受影响。
+     * 开头按既有约定 DROP CALLBACK 托管的两个部分索引（50 版期间 onOpen 防御性重建过）。
+     */
+    val MIGRATION_50_51 = object : Migration(50, 51) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("DROP INDEX IF EXISTS `index_plan_runs_single_active_per_definition`")
+            db.execSQL("DROP INDEX IF EXISTS `index_contacts_active_deleted`")
+            db.execSQL("ALTER TABLE `agent_suggestions` ADD COLUMN `completionRequestId` TEXT")
+            db.execSQL("ALTER TABLE `agent_suggestions` ADD COLUMN `forwardMessage` TEXT")
+            db.execSQL("ALTER TABLE `agent_suggestions` ADD COLUMN `missingFieldsJson` TEXT")
+        }
+    }
 }

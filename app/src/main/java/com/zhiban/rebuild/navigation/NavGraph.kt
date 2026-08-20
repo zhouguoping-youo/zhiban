@@ -185,6 +185,7 @@ private fun ZhiBanNavContent(
             ProfileTab(
                 onNavigateToAgentSettings = { navController.navigate(AgentSettings) },
                 onNavigateToAutoWrites = { navController.navigate(AutoWrites) },
+                onNavigateToAgentSuggestions = { navController.navigate(AgentSuggestions) },
                 onNavigateToProfileEdit = { navController.navigate(ProfileEdit) },
                 onNavigateToPrivacySecurity = { navController.navigate(PrivacySecurity) },
                 onNavigateToAppearance = { navController.navigate(Appearance) },

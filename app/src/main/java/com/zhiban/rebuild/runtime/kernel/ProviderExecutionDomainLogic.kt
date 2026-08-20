@@ -348,12 +348,19 @@ internal data class DecodedAttachment(
     val contentRef: String,
     val expiresAtEpochMs: Long,
 )
+
+internal enum class InputOrigin {
+    USER_AUTHORED,
+    AUTO_RETRIEVED,
+}
+
 internal data class DecodedInput(
     val text: String,
     val mode: String = "Chat",
     val model: String? = null,
     val level: String? = null,
     val attachments: List<DecodedAttachment> = emptyList(),
+    val origin: InputOrigin = InputOrigin.USER_AUTHORED,
 )
 
 internal fun decodeInput(raw: String): DecodedInput {
@@ -364,6 +371,9 @@ internal fun decodeInput(raw: String): DecodedInput {
         mode = value["mode"]?.jsonPrimitive?.content?.takeIf { it == "Work" } ?: "Chat",
         model = value["model"]?.jsonPrimitive?.content,
         level = value["level"]?.jsonPrimitive?.content,
+        origin = value["origin"]?.jsonPrimitive?.content
+            ?.let { runCatching { InputOrigin.valueOf(it) }.getOrNull() }
+            ?: InputOrigin.USER_AUTHORED,
         attachments = value["attachments"]?.jsonArray?.mapNotNull { item ->
             val attachment = runCatching { item.jsonObject }.getOrNull() ?: return@mapNotNull null
             DecodedAttachment(

@@ -2,6 +2,7 @@ package com.zhiban.rebuild.data.reply
 
 import android.util.Log
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.common.ConflatedDebouncedTrigger
 import com.zhiban.rebuild.data.config.AgentControlStore
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.SensitiveMessageFilter
@@ -9,12 +10,6 @@ import com.zhiban.rebuild.foundation.runSuspendCatching
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -32,33 +27,17 @@ internal class ReplySuggestionCoordinator @Inject constructor(
     private val generator: ReplyDraftGenerator,
     private val controls: AgentControlStore,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val triggers = Channel<Unit>(capacity = Channel.CONFLATED)
     private val processMutex = Mutex()
-
-    @Volatile
-    private var consumerStarted = false
+    private val trigger = ConflatedDebouncedTrigger(
+        scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO),
+        debounceMs = TRIGGER_DEBOUNCE_MS,
+        onFailure = { failure -> Log.w(TAG, "reply:scan_failure", failure) },
+        action = ::processOnce,
+    )
 
     /** Cheap, non-blocking signal that a WeChat message arrived (T1) or the app came to the foreground (T2). */
     fun onIncomingWechatActivity() {
-        ensureConsumerStarted()
-        triggers.trySend(Unit)
-    }
-
-    @Synchronized
-    private fun ensureConsumerStarted() {
-        if (consumerStarted) return
-        consumerStarted = true
-        scope.launch {
-            for (trigger in triggers) {
-                delay(TRIGGER_DEBOUNCE_MS)
-                runSuspendCatching { processOnce() }
-                    .onFailure { failure ->
-                        if (failure is CancellationException) throw failure
-                        Log.w(TAG, "reply:scan_failure", failure)
-                    }
-            }
-        }
+        trigger.signal()
     }
 
     internal suspend fun processOnce() {

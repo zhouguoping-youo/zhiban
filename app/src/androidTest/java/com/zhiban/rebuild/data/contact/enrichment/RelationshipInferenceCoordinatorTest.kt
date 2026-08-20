@@ -10,6 +10,7 @@ import com.zhiban.rebuild.data.contact.OwnerContactLinkEntity
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.data.facts.FactEntity
 import com.zhiban.rebuild.runtime.governance.ChangeUndoApplierImpl
+import com.zhiban.rebuild.runtime.personalization.UserProfileStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -143,5 +144,10 @@ class RelationshipInferenceCoordinatorTest {
     private fun coordinator(inferred: InferredRelationship?) = RelationshipInferenceCoordinator(
         database,
         RelationshipTypeExtraction { _, _, _ -> inferred },
+        UserProfileStore(
+            context,
+            "test-profile-${System.currentTimeMillis()}",
+            "test-avatar",
+        ),
     )
 }

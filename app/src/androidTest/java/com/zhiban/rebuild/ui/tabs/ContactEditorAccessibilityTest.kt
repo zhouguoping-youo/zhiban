@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.ui.tabs
 
+import android.view.KeyEvent
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
@@ -15,6 +16,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.test.platform.app.InstrumentationRegistry
 import com.zhiban.rebuild.ui.theme.ZhiBanTheme
 import kotlin.math.abs
 import org.junit.Assert.assertTrue
@@ -55,9 +57,11 @@ class ContactEditorAccessibilityTest {
             }
         }
 
-        compose.onNodeWithText("保存").assertIsNotEnabled()
-        compose.onNodeWithText("姓名").performTextInput("王小明")
-        compose.onNodeWithText("保存").assertIsEnabled()
+        compose.onNodeWithText("保存").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("姓名").performScrollTo().performTextInput("王小明")
+        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+        compose.waitForIdle()
+        compose.onNodeWithText("保存").performScrollTo().assertIsEnabled()
     }
 
     @Test

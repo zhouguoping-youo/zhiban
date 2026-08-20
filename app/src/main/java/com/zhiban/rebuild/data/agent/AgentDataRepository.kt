@@ -100,6 +100,9 @@ class AgentDataRepository internal constructor(
     private val contactCompletionSink: () -> Unit = { },
     private val messageContactCompletionSink: () -> Unit = { },
     private val relationshipInferenceSink: () -> Unit = { },
+    // 事件驱动唤醒:规则流水线全部跑完后的一声"去看看"(传候选 id)。协调器自行做
+    // 唤醒裁决/节流/无UI会话,任何失败都被吞掉,绝不影响消息入库主链路。
+    private val agentWakeupSink: (String) -> Unit = { },
 ) {
     private val daos = infrastructure.daos
     private val transactions = infrastructure.transactions
@@ -154,6 +157,10 @@ class AgentDataRepository internal constructor(
             messageContactCompletionSink()
             // 关系图谱自动补全(同公司同事/LLM 关系类型推断):协调器再核对已有边与幂等键。
             relationshipInferenceSink()
+            // 事件驱动唤醒:规则层处理完毕后,把候选交给唤醒决策器——规则裁决不了的
+            // 复杂场景(陌生人自述/备注漂移/未落日程的待办/跨源 CRM 信号)自动唤醒
+            // LLM 在无 UI 会话里综合判断,产出落建议中心。
+            agentWakeupSink(candidate.candidateId)
         }
     }
 
@@ -486,7 +493,7 @@ class AgentDataRepository internal constructor(
         if (candidate.linkedContactId == null || !candidate.isEligibleForAutomaticSchedule(insight)) return null
         if (ActionPolicy().evaluate(
                 RuntimeToolRisk.REVERSIBLE_AUTO_WRITE,
-                reversibleWriteReadiness = ReversibleWriteReadiness(true, true, true),
+                reversibleWriteReadiness = ReversibleWriteReadiness.Ready,
             ) != ActionDecision.AutoExecuteReversibleWrite
         ) {
             return null
@@ -549,7 +556,7 @@ class AgentDataRepository internal constructor(
         if (serviceSender || candidate.isGroupChat) return false
         if (ActionPolicy().evaluate(
                 RuntimeToolRisk.REVERSIBLE_AUTO_WRITE,
-                reversibleWriteReadiness = ReversibleWriteReadiness(true, true, true),
+                reversibleWriteReadiness = ReversibleWriteReadiness.Ready,
             ) != ActionDecision.AutoExecuteReversibleWrite
         ) {
             return false
@@ -651,7 +658,7 @@ class AgentDataRepository internal constructor(
             ?: "对方"
         if (ActionPolicy().evaluate(
                 RuntimeToolRisk.REVERSIBLE_AUTO_WRITE,
-                reversibleWriteReadiness = ReversibleWriteReadiness(true, true, true),
+                reversibleWriteReadiness = ReversibleWriteReadiness.Ready,
             ) != ActionDecision.AutoExecuteReversibleWrite
         ) {
             return false
@@ -753,7 +760,9 @@ class AgentDataRepository internal constructor(
         val sender = candidate.senderName?.trim()?.takeIf(String::isNotBlank) ?: return
         val normalized = normalizeIdentityValue(sender)
         if (candidate.platform == "SMS") return
-        val id = "identity-$contactId-${candidate.platform}-${normalized.hashCode().toUInt().toString(16)}"
+        // 用确定性 UUID 而非 hashCode()：hashCode 是 32 位哈希，不同 handle 碰撞会
+        // 在 REPLACE 主键下静默覆盖前一条身份记录（见 stableContactKnowledgeId 同款做法）。
+        val id = stableContactKnowledgeId("platform-identity", contactId, candidate.platform, normalized)
         daos.contactIdentityDao.upsertPlatformIdentity(
             ContactPlatformIdentityEntity(
                 identityId = id,

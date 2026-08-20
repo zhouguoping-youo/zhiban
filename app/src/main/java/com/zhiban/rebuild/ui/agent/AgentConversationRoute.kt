@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
@@ -62,7 +63,8 @@ fun AgentConversationRoute(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var input by rememberConversationDraftState()
-    var multimodal by remember { mutableStateOf(MultimodalUiState()) }
+    // 附件草稿必须跨配置变更/进程重建存活：用户选好文件未发送时旋转屏幕，草稿不应丢失。
+    var multimodal by rememberSaveable(stateSaver = MultimodalUiStateSaver) { mutableStateOf(MultimodalUiState()) }
     var voiceInputLevel by remember { mutableFloatStateOf(0f) }
     var pendingCaptureUri by remember { mutableStateOf<Uri?>(null) }
     var pendingCaptureFile by remember { mutableStateOf<File?>(null) }
@@ -629,6 +631,70 @@ fun AgentConversationRoute(
 
 @Composable
 internal fun rememberConversationDraftState(): MutableState<String> = rememberSaveable { mutableStateOf("") }
+
+/**
+ * 附件草稿 Saver：跨配置变更/进程重建保存「用户已选但未发送」的附件。
+ * 只持久化可恢复的静态阶段（SELECTED/READY/FAILED/URI_EXPIRED）；
+ * 上传中/取消中的瞬态（进度、取消态）与录音转写不保存——恢复后由 LaunchedEffect 重新探测。
+ * actions 不入 Bundle，恢复时由 AttachmentUiState.defaultActions(phase, retryable) 重算。
+ */
+private val MultimodalUiStateSaver = listSaver<MultimodalUiState, Any>(
+    save = { state ->
+        val savable = state.attachments.items.filter { it.phase in SAVABLE_ATTACHMENT_PHASES }
+        buildList {
+            add(savable.size)
+            savable.forEach { item ->
+                add(item.attachmentId)
+                add(item.displayName)
+                add(item.modality.name)
+                add(item.sourceUri ?: "")
+                add(item.phase.name)
+                add(item.bytesSent)
+                add(item.totalBytes)
+                add(item.retryable)
+                add(item.safeMessage ?: "")
+            }
+        }
+    },
+    restore = { saved ->
+        if (saved.isEmpty()) return@listSaver null
+        val size = saved[0] as? Int ?: return@listSaver null
+        var index = 1
+        val items = (0 until size).mapNotNull {
+            if (index + 8 >= saved.size) return@mapNotNull null
+            val attachmentId = saved[index++] as? String ?: return@mapNotNull null
+            val displayName = saved[index++] as? String ?: return@mapNotNull null
+            val modality = (saved[index++] as? String)?.let { runCatching { InputModality.valueOf(it) }.getOrNull() }
+                ?: return@mapNotNull null
+            val sourceUri = (saved[index++] as? String)?.takeIf { it.isNotEmpty() }
+            val phase = (saved[index++] as? String)?.let { runCatching { AttachmentPhase.valueOf(it) }.getOrNull() }
+                ?: return@mapNotNull null
+            val bytesSent = saved[index++] as? Long ?: return@mapNotNull null
+            val totalBytes = saved[index++] as? Long ?: return@mapNotNull null
+            val retryable = saved[index++] as? Boolean ?: return@mapNotNull null
+            val safeMessage = (saved[index++] as? String)?.takeIf { it.isNotEmpty() }
+            AttachmentUiState(
+                attachmentId = attachmentId,
+                displayName = displayName,
+                modality = modality,
+                sourceUri = sourceUri,
+                phase = phase,
+                bytesSent = bytesSent,
+                totalBytes = totalBytes,
+                retryable = retryable,
+                safeMessage = safeMessage,
+            )
+        }
+        MultimodalUiState(attachments = AttachmentBatchUiState(items))
+    },
+)
+
+private val SAVABLE_ATTACHMENT_PHASES = setOf(
+    AttachmentPhase.SELECTED,
+    AttachmentPhase.READY,
+    AttachmentPhase.FAILED,
+    AttachmentPhase.URI_EXPIRED,
+)
 
 private fun cloudAsrFailureMessage(code: String): String = when (code) {
     "ASR_EMPTY_RESULT", "AUDIO_EMPTY" -> "没有听清，请删除录音后重新说一次"

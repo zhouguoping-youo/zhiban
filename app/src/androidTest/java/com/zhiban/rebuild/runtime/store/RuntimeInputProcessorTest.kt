@@ -664,7 +664,9 @@ class RuntimeInputProcessorTest {
     }
 
     @Test fun explicitCalendarIntentFallsBackToLocalConfirmedPlanWhenProviderReturnsEmpty() = runBlocking {
-        val input = """{"schemaVersion":1,"text":"Create a calendar event tomorrow at 9 PM called Local fallback, remind me 10 minutes before.","mode":"Work","model":"M2.7","level":"高"}"""
+        val input = """
+            {"schemaVersion":1,"text":"Create a calendar event tomorrow at 9 PM called Local fallback, remind me 10 minutes before.","mode":"Work","model":"M2.7","level":"高"}
+        """.trimIndent()
         val staged = RoomTextInputGateway(database, { true }, { now }).stage(input)
         val gateway = RoomRuntimeGateways(database, "test") { now++ }
         gateway.accept(
@@ -2829,7 +2831,17 @@ class RuntimeInputProcessorTest {
             val payload = Json.parseToJsonElement(approval.payloadJson).jsonObject
             val revision = database.runtimeSessionDao().find("s-dag")!!.nextSequence - 1
             gateway.accept(
-                RuntimeUiCommand.RunAction(RuntimeAction.APPROVE, "s-dag", "r-dag", commandId, "$commandId-action", revision, "chat", payload["proposalId"]!!.jsonPrimitive.content, payload["payloadRef"]!!.jsonPrimitive.content),
+                RuntimeUiCommand.RunAction(
+                    RuntimeAction.APPROVE,
+                    "s-dag",
+                    "r-dag",
+                    commandId,
+                    "$commandId-action",
+                    revision,
+                    "chat",
+                    payload["proposalId"]!!.jsonPrimitive.content,
+                    payload["payloadRef"]!!.jsonPrimitive.content,
+                ),
             )
             processor.processNext()
         }
@@ -3538,7 +3550,17 @@ class RuntimeInputProcessorTest {
         val store = RoomRuntimeStore(database, "test")
         store.startAttempt(AttemptStartRequest("attempt-old", "r-recover", 1, "owner-a", firstLease.leaseEpoch, now++))
         store.appendProviderEventOnce(
-            RuntimeEventDraft("event-provider-attempt-old-delta-0", "AssistantDelta", "s-recover", "r-recover", "attempt-old", "attempt-old", "r-recover", "{\"ordinal\":0,\"part\":\"old-partial\",\"final\":false}", now++),
+            RuntimeEventDraft(
+                "event-provider-attempt-old-delta-0",
+                "AssistantDelta",
+                "s-recover",
+                "r-recover",
+                "attempt-old",
+                "attempt-old",
+                "r-recover",
+                "{\"ordinal\":0,\"part\":\"old-partial\",\"final\":false}",
+                now++,
+            ),
             "owner-a",
             firstLease.leaseEpoch,
             now++,
@@ -3975,7 +3997,10 @@ class RuntimeInputProcessorTest {
             if (action == RuntimeAction.APPROVE || action == RuntimeAction.REJECT) {
                 val leaseEpoch = database.runtimeSessionDao().find(session)!!.leaseEpoch
                 RoomRuntimeStore(database, "test").appendEvent(
-                    RuntimeEventDraft("approval-$index", "ApprovalRequested", session, run, null, "plan-$index", run, "{\"proposalId\":\"p$index\",\"payloadRef\":\"payload-$index\"}", now),
+                    RuntimeEventDraft(
+                        "approval-$index", "ApprovalRequested", session, run, null, "plan-$index", run,
+                        "{\"proposalId\":\"p$index\",\"payloadRef\":\"payload-$index\"}", now,
+                    ),
                     "processor",
                     leaseEpoch,
                     now,
@@ -3983,7 +4008,10 @@ class RuntimeInputProcessorTest {
             }
             val revision = database.runtimeSessionDao().find(session)!!.nextSequence - 1
             gateway.accept(
-                RuntimeUiCommand.RunAction(action, session, run, "action-$index", "client-$index", revision, "chat", proposalId = "p$index", payloadRef = "payload-$index"),
+                RuntimeUiCommand.RunAction(
+                    action, session, run, "action-$index", "client-$index", revision, "chat",
+                    proposalId = "p$index", payloadRef = "payload-$index",
+                ),
             )
             assertEquals(
                 KernelCommandProcessor.Outcome.PROCESSED,
@@ -4006,14 +4034,20 @@ class RuntimeInputProcessorTest {
         KernelCommandProcessor(database, "processor", { true }, { now++ }).processNext()
         val leaseEpoch = database.runtimeSessionDao().find(session)!!.leaseEpoch
         RoomRuntimeStore(database, "test").appendEvent(
-            RuntimeEventDraft("illegal-approval", "ApprovalRequested", session, run, null, "plan", run, "{\"proposalId\":\"expected\",\"payloadRef\":\"expected-ref\"}", now),
+            RuntimeEventDraft(
+                "illegal-approval", "ApprovalRequested", session, run, null, "plan", run,
+                "{\"proposalId\":\"expected\",\"payloadRef\":\"expected-ref\"}", now,
+            ),
             "processor",
             leaseEpoch,
             now,
         )
         val revision = database.runtimeSessionDao().find(session)!!.nextSequence - 1
         gateway.accept(
-            RuntimeUiCommand.RunAction(RuntimeAction.APPROVE, session, run, "illegal-approve", "b", revision, "chat", proposalId = "wrong", payloadRef = "wrong-ref"),
+            RuntimeUiCommand.RunAction(
+                RuntimeAction.APPROVE, session, run, "illegal-approve", "b", revision, "chat",
+                proposalId = "wrong", payloadRef = "wrong-ref",
+            ),
         )
         assertEquals(
             KernelCommandProcessor.Outcome.FAILED,

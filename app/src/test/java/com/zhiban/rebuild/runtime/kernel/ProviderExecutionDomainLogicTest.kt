@@ -13,6 +13,18 @@ import org.junit.Test
  * 但其纯决策逻辑集中在本文件,先补满这里的 JVM 覆盖)。
  */
 class ProviderExecutionDomainLogicTest {
+    @Test
+    fun `decode input defaults to user authored and recognizes automatic input`() {
+        assertEquals(InputOrigin.USER_AUTHORED, decodeInput("普通用户输入").origin)
+        assertEquals(
+            InputOrigin.USER_AUTHORED,
+            decodeInput("""{"text":"用户输入","origin":"UNKNOWN"}""").origin,
+        )
+        assertEquals(
+            InputOrigin.AUTO_RETRIEVED,
+            decodeInput("""{"text":"后台消息","origin":"AUTO_RETRIEVED"}""").origin,
+        )
+    }
 
     @Test fun `assistant text streams unless a schedule plan is being forced`() {
         assertTrue(shouldStreamAssistantText(null))

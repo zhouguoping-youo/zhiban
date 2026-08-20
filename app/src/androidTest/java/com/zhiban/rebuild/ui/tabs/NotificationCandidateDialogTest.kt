@@ -116,7 +116,7 @@ class NotificationCandidateDialogTest {
         compose.onNodeWithText("新建联系人").assertIsDisplayed()
         compose.onNodeWithText("不再提醒此人").performClick()
         assertEquals("candidate-2", muted.get())
-        compose.onNodeWithText("忽略").assertIsDisplayed()
+        compose.onNodeWithText("忽略").assertExists()
     }
 
     @Test

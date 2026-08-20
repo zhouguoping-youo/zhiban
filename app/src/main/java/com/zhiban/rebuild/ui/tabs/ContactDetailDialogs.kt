@@ -102,7 +102,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zhiban.rebuild.data.agent.RelationshipEventParticipantInput
-import com.zhiban.rebuild.data.calllog.CallRecordEntity
 import com.zhiban.rebuild.data.contact.ContactAliasEntity
 import com.zhiban.rebuild.data.contact.ContactEnrichmentCandidateEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
@@ -169,7 +168,6 @@ internal fun ContactDetailDialog(
     mergedSources: List<Pair<ContactMergeLinkEntity, ContactEntity>>,
     relatedEdges: List<RelationshipEdgeEntity>,
     relatedEvents: List<RelationshipEventWithParticipants>,
-    recentCalls: List<CallRecordEntity>,
     crmOpportunities: List<CrmOpportunityEntity>,
     enrichmentSuggestions: List<ContactEnrichmentCandidateEntity>,
     contactNames: Map<String, String>,
@@ -193,6 +191,10 @@ internal fun ContactDetailDialog(
 ) {
     val openCrmOpportunities = crmOpportunities.filter { it.status == "OPEN" }
     val hasRelationshipContext = relatedEdges.isNotEmpty() || relatedEvents.isNotEmpty()
+    // 微信等消息观察自动投影的互动摘录(INTERACTION_SUMMARY)属于「活动流」而非「资料」,
+    // 不在详情资料区展示,这里只保留用户主动记录的重要信息,保证资料区干净。
+    // 互动活动流数据保留在消息/通话底座,供后续「关系温度/沉默预警」消费。
+    val importantFacts = facts.filterNot { it.factType == "INTERACTION_SUMMARY" }
     val hasProfileDetails = listOf(
         contact.phone,
         contact.wechatId,
@@ -345,10 +347,10 @@ internal fun ContactDetailDialog(
                 }
             }
 
-            if (facts.isNotEmpty()) {
+            if (importantFacts.isNotEmpty()) {
                 item {
                     ContactDetailSection("重要信息", "添加", onAddFact) {
-                        facts.forEach { fact ->
+                        importantFacts.forEach { fact ->
                             Row(
                                 Modifier.fillMaxWidth().padding(vertical = 7.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -476,43 +478,6 @@ internal fun ContactDetailDialog(
                         if (relatedEvents.isNotEmpty()) {
                             ContactDetailSubheading("共同经历")
                             relatedEvents.forEach { event -> RelationshipEventRow(event, onInspectEvent) }
-                        }
-                    }
-                }
-            }
-
-            if (recentCalls.isNotEmpty()) {
-                item {
-                    ContactDetailSection("最近互动") {
-                        recentCalls.take(5).forEach { call ->
-                            Row(
-                                Modifier.fillMaxWidth().padding(vertical = 7.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(
-                                    Icons.Rounded.Call,
-                                    contentDescription = null,
-                                    tint = RelationMuted,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                                Column(Modifier.weight(1f).padding(start = 10.dp)) {
-                                    Text(
-                                        callDirectionLabel(call.direction),
-                                        color = RelationInk,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                    )
-                                    Text(
-                                        formatCallTime(call.startedAtEpochMs),
-                                        color = RelationMuted,
-                                        style = MaterialTheme.typography.labelSmall,
-                                    )
-                                }
-                                Text(
-                                    formatCallDuration(call.durationSeconds),
-                                    color = RelationMuted,
-                                    style = MaterialTheme.typography.labelMedium,
-                                )
-                            }
                         }
                     }
                 }
@@ -706,9 +671,12 @@ internal fun callDirectionLabel(direction: String): String = when (direction) {
     else -> "通话记录"
 }
 
-internal fun formatCallTime(epochMs: Long): String = Instant.ofEpochMilli(epochMs)
-    .atZone(ZoneId.systemDefault())
-    .format(DateFormats.MonthDayTimePadded)
+internal fun formatCallTime(epochMs: Long): String {
+    if (epochMs <= 0) return "时间未知"
+    return Instant.ofEpochMilli(epochMs)
+        .atZone(ZoneId.systemDefault())
+        .format(DateFormats.MonthDayTimePadded)
+}
 
 internal fun formatCallDuration(seconds: Long): String = when {
     seconds <= 0 -> "未接通"

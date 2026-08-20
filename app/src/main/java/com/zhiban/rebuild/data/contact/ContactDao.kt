@@ -130,35 +130,7 @@ interface ContactDao {
     @Query("DELETE FROM contact_roles WHERE contactId = :contactId AND skillId = :skillId AND roleType = :roleType")
     suspend fun deleteRole(contactId: String, skillId: String, roleType: String): Int
 
-    @Query(
-        """SELECT canonical.contactId, canonical.displayName,
-           COALESCE(canonical.phone, (SELECT source.phone FROM contact_merge_links link INNER JOIN contacts source ON source.contactId = link.sourceContactId WHERE link.canonicalContactId = canonical.contactId AND link.undoneAtEpochMs IS NULL AND source.phone IS NOT NULL LIMIT 1)) AS phone,
-           COALESCE(canonical.email, (SELECT source.email FROM contact_merge_links link INNER JOIN contacts source ON source.contactId = link.sourceContactId WHERE link.canonicalContactId = canonical.contactId AND link.undoneAtEpochMs IS NULL AND source.email IS NOT NULL LIMIT 1)) AS email,
-           COALESCE(canonical.wechatId, (SELECT source.wechatId FROM contact_merge_links link INNER JOIN contacts source ON source.contactId = link.sourceContactId WHERE link.canonicalContactId = canonical.contactId AND link.undoneAtEpochMs IS NULL AND source.wechatId IS NOT NULL LIMIT 1)) AS wechatId,
-           COALESCE(canonical.company, (SELECT source.company FROM contact_merge_links link INNER JOIN contacts source ON source.contactId = link.sourceContactId WHERE link.canonicalContactId = canonical.contactId AND link.undoneAtEpochMs IS NULL AND source.company IS NOT NULL LIMIT 1)) AS company,
-           COALESCE(canonical.title, (SELECT source.title FROM contact_merge_links link INNER JOIN contacts source ON source.contactId = link.sourceContactId WHERE link.canonicalContactId = canonical.contactId AND link.undoneAtEpochMs IS NULL AND source.title IS NOT NULL LIMIT 1)) AS title,
-           COALESCE(canonical.note, (SELECT source.note FROM contact_merge_links link INNER JOIN contacts source ON source.contactId = link.sourceContactId WHERE link.canonicalContactId = canonical.contactId AND link.undoneAtEpochMs IS NULL AND source.note IS NOT NULL LIMIT 1)) AS note
-           FROM contacts canonical
-           WHERE canonical.deletedAtEpochMs IS NULL
-             AND canonical.contactId NOT IN (SELECT sourceContactId FROM contact_merge_links WHERE undoneAtEpochMs IS NULL)
-             AND canonical.contactId IN (
-               SELECT COALESCE(
-                 (SELECT m.canonicalContactId FROM contact_merge_links m
-                  WHERE m.sourceContactId = f.contactId AND m.undoneAtEpochMs IS NULL),
-                 f.contactId
-               )
-               FROM (
-                 SELECT contactId FROM contact_search_fts WHERE content MATCH :query
-                 UNION
-                 SELECT contactId FROM contact_search_fts WHERE instr(lower(content), lower(:normalizedQuery)) > 0
-               ) f
-             )
-           ORDER BY CASE WHEN canonical.normalizedName = :normalizedQuery THEN 0 ELSE 1 END, canonical.updatedAtEpochMs DESC
-           LIMIT :limit""",
-    )
-    suspend fun search(query: String, normalizedQuery: String, limit: Int): List<ContactSearchProjection>
-
-    /** 多词一次检索(P1-性能2):OR'd FTS + OR'd instr + termMask,替代每 term 一次 search()。 */
+    /** 多词一次检索(P1-性能2):OR'd FTS + OR'd instr + termMask,替代逐词检索。 */
     @RawQuery
     suspend fun searchNaturalMultiTermRaw(query: SupportSQLiteQuery): List<ContactSearchProjectionWithMask>
 

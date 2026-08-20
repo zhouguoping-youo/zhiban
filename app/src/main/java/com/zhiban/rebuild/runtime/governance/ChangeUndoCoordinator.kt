@@ -171,10 +171,13 @@ internal class ChangeUndoCoordinator(private val database: AgentDatabase) {
         val inverse =
             runSuspendCatching { Json.parseToJsonElement(change.inversePayloadJson).jsonObject }.getOrNull() ?: return false
         val oldFields = inverse["fields"]?.jsonObject ?: return false
+        // 用「字段是否存在」而非「值是否为 null」判断：旧值本为 null（新建联系人首次补全）时
+        // 恢复为 null（清空写入值）同样是有效的撤销，不能因为三个旧值都 null 而拒绝。
+        val anyFieldRecorded = listOf("company", "title", "phone").any(oldFields::containsKey)
+        if (!anyFieldRecorded) return false
         val oldCompany = (oldFields["company"] as? JsonPrimitive)?.contentOrNull
         val oldTitle = (oldFields["title"] as? JsonPrimitive)?.contentOrNull
         val oldPhone = (oldFields["phone"] as? JsonPrimitive)?.contentOrNull
-        if (oldCompany == null && oldTitle == null && oldPhone == null) return false
         val restored = current.copy(
             company = oldCompany,
             title = oldTitle,

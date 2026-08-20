@@ -647,7 +647,6 @@ class RelationViewModel @Inject constructor(
     }
 
     fun contactFacts(contactId: String): Flow<List<FactEntity>> = repository.observeContactFacts(contactId)
-    fun contactCalls(contactId: String): Flow<List<CallRecordEntity>> = callLogRepository.observeForContact(contactId)
     fun contactOpportunities(contactId: String): Flow<List<CrmOpportunityEntity>> = repository.observeCrmOpportunitiesByContact(contactId)
 
     fun contactEnrichment(contactId: String): Flow<List<ContactEnrichmentCandidateEntity>> = repository.observePendingContactEnrichment(contactId)

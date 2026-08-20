@@ -6,8 +6,9 @@ import java.text.Normalizer
 /**
  * 联系人自然语言检索。多词一次检索(P1-性能2):过去每 term 各执行一次 search()(FTS MATCH +
  * instr 全表扫 + canonical 解析 + 6 个 fill COALESCE),最多 16 次;现在合并为一条 SQL——
- * OR'd FTS 短语 + OR'd instr 子串链(中文 bigram/词内子串无法由 FTS simple tokenizer 命中,
- * instr 链不可去),候选行附带 termMask(每位一个 term,instr 命中=1)供 Kotlin 排序,
+ * FTS 整词 MATCH 独立成 IN 子查询限定候选集(MATCH 不能与普通谓词同 OR,见 buildMultiTermSql)
+ * + OR'd instr 子串链(中文 bigram/词内子串无法由 FTS simple tokenizer 命中,instr 链不可去),
+ * 候选行附带 termMask(每位一个 term,instr 命中=1)供 Kotlin 排序,
  * canonical 解析与 fill-only COALESCE 与原 SQL 一字不差。
  *
  * 排序语义与原实现一致:显示名精确匹配优先、命中词数降序、首个命中词序升序,取前 [limit]。
@@ -21,8 +22,8 @@ internal suspend fun ContactDao.searchNatural(query: String, limit: Int): List<C
         .toList()
     if (terms.isEmpty()) return emptyList()
     val ftsQuery = terms.joinToString(" OR ") { ftsLiteral(it) }
-    // 绑定顺序与 SQL 中的 ? 一致:ftsQuery → termMask 各 term → instr 链各 term。
-    val args = arrayOf(ftsQuery) + terms.toTypedArray() + terms.toTypedArray()
+    // 绑定顺序与 SQL 中的 ? 出现顺序一致：termMask 各 term（N 个）→ WHERE 的 MATCH ftsQuery（1 个）→ instr 链各 term（N 个）。
+    val args = terms.toTypedArray() + arrayOf(ftsQuery) + terms.toTypedArray()
     val rows = searchNaturalMultiTermRaw(SimpleSQLiteQuery(buildMultiTermSql(terms.size), args))
     val matches = linkedMapOf<String, ScoredContact>()
     rows.forEach { row ->
@@ -80,7 +81,10 @@ private fun ContactSearchProjectionWithMask.toProjection() = ContactSearchProjec
     note = note,
 )
 
-/** 与 ContactDao.search 相同的 canonical 解析 + fill-only COALESCE,加 termMask;经 @RawQuery 执行。 */
+/** 与 ContactDao.search 相同的 canonical 解析 + fill-only COALESCE,加 termMask;经 @RawQuery 执行。
+ *
+ * 注意:f 子查询必须提升到 JOIN,原 IN(...) 写法会让外层 SELECT 看不到 f.termMask。
+ */
 private fun buildMultiTermSql(termCount: Int): String {
     val instrOrs = List(termCount) { "instr(lower(content), lower(?)) > 0" }.joinToString(" OR ")
     val maskCases = List(termCount) { "CASE WHEN instr(lower(content), lower(?)) > 0 THEN '1' ELSE '0' END" }
@@ -95,20 +99,22 @@ private fun buildMultiTermSql(termCount: Int): String {
           COALESCE(canonical.note, (SELECT source.note FROM contact_merge_links link INNER JOIN contacts source ON source.contactId = link.sourceContactId WHERE link.canonicalContactId = canonical.contactId AND link.undoneAtEpochMs IS NULL AND source.note IS NOT NULL LIMIT 1)) AS note,
           f.termMask AS termMask
         FROM contacts canonical
+        JOIN (
+          SELECT contactId, $maskCases AS termMask
+          FROM contact_search_fts
+          -- SQLite 限制:MATCH 不能与普通谓词(instr)混在同一个 OR 里,否则报
+          -- "unable to use function MATCH in the requested context"。因此 MATCH
+          -- 必须独立成 IN 子查询,FTS 整词命中只用于缩小候选集;中文 bigram/子串
+          -- 仍由外层 instr OR 链兜底(termMask 也仅由 instr 判定,与 FTS 命中一致)。
+          WHERE contactId IN (SELECT contactId FROM contact_search_fts WHERE content MATCH ?)
+             OR $instrOrs
+        ) f ON canonical.contactId = COALESCE(
+          (SELECT m.canonicalContactId FROM contact_merge_links m
+           WHERE m.sourceContactId = f.contactId AND m.undoneAtEpochMs IS NULL),
+          f.contactId
+        )
         WHERE canonical.deletedAtEpochMs IS NULL
           AND canonical.contactId NOT IN (SELECT sourceContactId FROM contact_merge_links WHERE undoneAtEpochMs IS NULL)
-          AND canonical.contactId IN (
-            SELECT COALESCE(
-              (SELECT m.canonicalContactId FROM contact_merge_links m
-               WHERE m.sourceContactId = f.contactId AND m.undoneAtEpochMs IS NULL),
-              f.contactId
-            )
-            FROM (
-              SELECT contactId, $maskCases AS termMask
-              FROM contact_search_fts
-              WHERE content MATCH ? OR $instrOrs
-            ) f
-          )
         LIMIT 800
     """.trimIndent()
 }

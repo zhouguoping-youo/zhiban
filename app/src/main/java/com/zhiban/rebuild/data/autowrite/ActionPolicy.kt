@@ -28,6 +28,15 @@ data class ReversibleWriteReadiness(
 
     companion object {
         val Unavailable = ReversibleWriteReadiness(false, false, false)
+
+        /**
+         * 全就绪：三项能力由治理层真实提供——
+         * inverseSupported=ChangeUndoCoordinator 支持反操作；
+         * atomicChangeLogSupported=change_log 表原子落账；
+         * visibleUndoSupported=自动整理页提供撤销入口。
+         * 若任一能力下线，必须改用 [Unavailable] 或带 rejectionReason 的实例，禁止继续声称就绪。
+         */
+        val Ready = ReversibleWriteReadiness(true, true, true)
     }
 }
 

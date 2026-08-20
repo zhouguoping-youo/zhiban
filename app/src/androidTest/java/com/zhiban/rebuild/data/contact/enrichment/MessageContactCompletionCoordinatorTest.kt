@@ -6,8 +6,10 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.autowrite.ChangeUndoApplier
+import com.zhiban.rebuild.data.completion.buildCompletionRepository
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
+import com.zhiban.rebuild.data.suggestion.AgentSuggestionRepository
 import com.zhiban.rebuild.runtime.governance.ChangeUndoApplierImpl
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -38,10 +40,17 @@ class MessageContactCompletionCoordinatorTest {
     @After
     fun tearDown() = database.close()
 
-    private fun coordinator(vararg fields: ExtractedContactField) = MessageContactCompletionCoordinator(
-        database,
-        MessageContactFieldExtraction { _, _, _ -> fields.toList() },
-    )
+    private fun coordinator(vararg fields: ExtractedContactField): MessageContactCompletionCoordinator {
+        // TASK 74：构造函数新增 completion + suggestions（主动补全建议卡）；用共享替身组装，
+        // 测试消息无 wechatId/WECHAT 身份 → 主动补全闸门（微信可达）不过，不会真的起草。
+        val completion = buildCompletionRepository(database)
+        return MessageContactCompletionCoordinator(
+            database,
+            MessageContactFieldExtraction { _, _, _ -> fields.toList() },
+            completion,
+            AgentSuggestionRepository(database, completion),
+        )
+    }
 
     private fun linkedCandidate(id: String, body: String) = NotificationCandidateEntity(
         candidateId = id,
@@ -140,12 +149,15 @@ class MessageContactCompletionCoordinatorTest {
         database.contactDao().insert(contact())
         database.notificationCandidateDao().upsert(linkedCandidate("msg-3", "收到，明天见"))
         var extractCalls = 0
+        val completion = buildCompletionRepository(database)
         MessageContactCompletionCoordinator(
             database,
             MessageContactFieldExtraction { _, _, _ ->
                 extractCalls += 1
                 emptyList()
             },
+            completion,
+            AgentSuggestionRepository(database, completion),
         ).processOnce()
 
         assertEquals(0, extractCalls)

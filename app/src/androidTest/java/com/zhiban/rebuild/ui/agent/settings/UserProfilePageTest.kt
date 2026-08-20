@@ -75,8 +75,8 @@ class UserProfilePageTest {
     @Test fun validProfileShowsSavedResultAndPersists() {
         render()
         val fields = compose.onAllNodes(hasSetTextAction())
-        fields[2].performTextInput("13800138000")
-        fields[3].performTextInput("zhiban_test")
+        fields[3].performTextInput("13800138000")
+        fields[4].performTextInput("zhiban_test")
         compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("保存"))
         compose.onNodeWithText("保存").performClick()
 

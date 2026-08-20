@@ -66,6 +66,8 @@ import kotlinx.serialization.Serializable
 
 @Serializable data object AutoWrites
 
+@Serializable data object AgentSuggestions
+
 @Serializable data object ContactMaintenance
 
 @Serializable data object AboutZhiBan

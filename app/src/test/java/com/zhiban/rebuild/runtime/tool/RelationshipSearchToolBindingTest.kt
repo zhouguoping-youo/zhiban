@@ -31,6 +31,7 @@ class RelationshipSearchToolBindingTest {
         ).filter { it.contactId in contactIds }
         override suspend fun find(edgeId: String) = edge.takeIf { it.edgeId == edgeId }
         override suspend fun deleteConfirmed(edgeId: String) = if (edge.edgeId == edgeId) 1 else 0
+        override suspend fun deactivateInferredEdge(edgeId: String, nowEpochMs: Long) = if (edge.edgeId == edgeId) 1 else 0
         override suspend fun deactivateForContacts(contactIds: List<String>, nowEpochMs: Long) = 0
     }
 

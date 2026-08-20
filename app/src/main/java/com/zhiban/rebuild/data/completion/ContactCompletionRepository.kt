@@ -29,9 +29,9 @@ fun interface CompletionHandoff {
 /**
  * 补全触达的读写面。与 [com.zhiban.rebuild.data.agent.AgentDataRepository] 分开（后者逼近行数上限）。
  *
- * 半自动纪律：草稿只在 [confirmAndHandoff] 里交给微信预填、由用户亲选联系人亲发，知伴绝不代发；
- * handoff 成功才转 AWAITING_REPLY。闸门（总开关/免打扰/单活跃请求/有缺失/微信可达）任一不过即返回 null，
- * 不往 UI 抛异常。
+ * 半自动纪律：草稿只在 [confirmAndHandoff] 里交给微信分享面板、由用户亲选联系人亲发，知伴绝不代发；
+ * handoff 成功才转 AWAITING_REPLY。闸门（总开关/免打扰/单活跃请求/有缺失）任一不过即返回 null，
+ * 不往 UI 抛异常。不要求预知对方微信号——对方回复归因成功后协调器自动挂 WECHAT stub 身份。
  *
  * Public 类型 + internal 构造（仿 [com.zhiban.rebuild.data.reply.ReplySuggestionRepository]），可跨进
  * public 的 RelationViewModel 而构造留在 DI 后。
@@ -53,6 +53,10 @@ class ContactCompletionRepository internal constructor(
     /**
      * 闸门过后起草并落一条 DRAFTED 请求（7 天过期）。任一闸门不过或起草失败返回 null。
      * 确定性 requestId：同一联系人同一字段集重复起草会 upsert 覆盖而非重复。
+     *
+     * 不要求已知对方微信号：触达走微信分享面板（ACTION_SEND），用户亲选联系人亲发；
+     * 对方回复归因成功后由 [ContactCompletionCoordinator] 自动挂 WECHAT stub 身份，
+     * 之后该联系人的微信可达性闸门自然通过（每个联系人只需操作一次）。
      */
     suspend fun prepareOutreach(contactId: String): ContactCompletionDraft? {
         if (!controls.contactCompletionEnabled()) return null
@@ -61,9 +65,6 @@ class ContactCompletionRepository internal constructor(
         if (dao.countActiveForContact(contactId, now) > 0) return null // 每联系人至多一个进行中请求
         val contact = contactDao.findById(contactId) ?: return null
         val identities = identityDao.platformIdentities(contactId)
-        // 触达只走微信：无 wechatId 也无 WECHAT 平台身份（stub 的 handle 身份）则无法触达。
-        val wechatReachable = !contact.wechatId.isNullOrBlank() || identities.any { it.platform == PLATFORM_WECHAT }
-        if (!wechatReachable) return null
         val fieldsToAsk = selectCompletionFieldsToAsk(ContactProfileCompletenessEvaluator.missingFields(contact, identities))
         if (fieldsToAsk.isEmpty()) return null // 资料已完整
         val businessContext = listOfNotNull(contact.company, contact.title).joinToString(" / ").takeIf { it.isNotBlank() }

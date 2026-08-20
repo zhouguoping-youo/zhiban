@@ -102,6 +102,10 @@ object AgentDataModule {
                     AgentDatabase.MIGRATION_44_45,
                     AgentDatabase.MIGRATION_45_46,
                     AgentDatabase.MIGRATION_46_47,
+                    AgentDatabase.MIGRATION_47_48,
+                    AgentDatabase.MIGRATION_48_49,
+                    AgentDatabase.MIGRATION_49_50,
+                    AgentDatabase.MIGRATION_50_51,
                 )
                 .addCallback(AgentDatabase.CALLBACK).build()
         }
@@ -128,6 +132,7 @@ object AgentDataModule {
         contactCompletionCoordinator: com.zhiban.rebuild.data.completion.ContactCompletionCoordinator,
         messageContactCompletionCoordinator: com.zhiban.rebuild.data.contact.enrichment.MessageContactCompletionCoordinator,
         relationshipInferenceCoordinator: com.zhiban.rebuild.data.contact.enrichment.RelationshipInferenceCoordinator,
+        agentWakeupCoordinator: com.zhiban.rebuild.runtime.wakeup.AgentWakeupCoordinator,
     ): AgentDataRepository = AgentDataRepository(
         infrastructure,
         domains,
@@ -143,6 +148,7 @@ object AgentDataModule {
         contactCompletionSink = contactCompletionCoordinator::onIncomingWechatActivity,
         messageContactCompletionSink = messageContactCompletionCoordinator::onIncomingWechatActivity,
         relationshipInferenceSink = relationshipInferenceCoordinator::onIncomingWechatActivity,
+        agentWakeupSink = agentWakeupCoordinator::onCandidateProcessed,
     )
 
     @Provides

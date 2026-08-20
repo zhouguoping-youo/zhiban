@@ -45,8 +45,6 @@ internal fun RelationDetailOverlay(state: RelationDetailState, actions: Relation
     val mergeLinks by viewModel.mergeLinks.collectAsStateWithLifecycle()
     val facts by remember(contact.contactId) { viewModel.contactFacts(contact.contactId) }
         .collectAsStateWithLifecycle(initialValue = emptyList())
-    val recentCalls by remember(contact.contactId) { viewModel.contactCalls(contact.contactId) }
-        .collectAsStateWithLifecycle(initialValue = emptyList())
     val opportunities by remember(contact.contactId) { viewModel.contactOpportunities(contact.contactId) }
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val enrichment by remember(contact.contactId) { viewModel.contactEnrichment(contact.contactId) }
@@ -63,7 +61,6 @@ internal fun RelationDetailOverlay(state: RelationDetailState, actions: Relation
         relatedEvents = state.relationshipEvents.filter { event ->
             event.participants.any { it.contactId == contact.contactId }
         },
-        recentCalls = recentCalls,
         crmOpportunities = opportunities,
         enrichmentSuggestions = enrichment,
         contactNames = state.contacts.associate { it.contactId to it.displayName } +

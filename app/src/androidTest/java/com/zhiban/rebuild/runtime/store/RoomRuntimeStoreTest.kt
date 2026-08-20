@@ -192,7 +192,10 @@ class RoomRuntimeStoreTest {
         store.acceptStart("c1", "s1", "r1", "{}", 10)
         val lease = store.claimSession("s1", "owner-a", 11, 100)
         store.completeCommand("c1", "{\"status\":\"ok\"}", "owner-a", lease.leaseEpoch, 20)
-        store.recordToolSuccess("x1", "r1", "step1", "calendar.create", 1, "digest", "key", "result-1", "{\"scheduleId\":\"s\"}", "owner-a", lease.leaseEpoch, 20)
+        store.recordToolSuccess(
+            "x1", "r1", "step1", "calendar.create", 1, "digest", "key", "result-1",
+            "{\"scheduleId\":\"s\"}", "owner-a", lease.leaseEpoch, 20,
+        )
         database.close()
         database = Room.databaseBuilder(context, AgentDatabase::class.java, name).allowMainThreadQueries().build()
         store = RoomRuntimeStore(database, "test")

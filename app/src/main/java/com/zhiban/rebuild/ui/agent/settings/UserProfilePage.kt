@@ -56,6 +56,7 @@ data class UserProfileUiState(
     val phone: String = "",
     val wechatId: String = "",
     val douyinId: String = "",
+    val company: String = "",
     val avatarUri: String? = null,
     val avatarBytes: ByteArray? = null,
     val extraAccounts: List<ExtraAccount> = emptyList(),
@@ -99,6 +100,7 @@ internal fun isValidPhone(phone: String): Boolean = phone.isValidMainlandMobileN
             phone = current.phone,
             wechatId = current.wechatId,
             douyinId = current.douyinId,
+            company = current.company,
             avatarUri = current.avatarUri,
             extraAccounts = buildExtraAccounts(current),
             occupations = current.occupations,
@@ -119,6 +121,7 @@ internal fun isValidPhone(phone: String): Boolean = phone.isValidMainlandMobileN
     fun phone(v: String) = _state.update { it.copy(phone = v.filter(Char::isDigit).take(11), saved = false) }
     fun wechat(v: String) = _state.update { it.copy(wechatId = v.take(60), saved = false) }
     fun douyin(v: String) = _state.update { it.copy(douyinId = v.take(60), saved = false) }
+    fun company(v: String) = _state.update { it.copy(company = v.take(120), saved = false) }
     fun customInstructions(v: String) = _state.update { it.copy(customInstructions = v.take(500), saved = false) }
 
     fun toggleOccupation(option: String) = _state.update {
@@ -169,6 +172,7 @@ internal fun isValidPhone(phone: String): Boolean = phone.isValidMainlandMobileN
                 wechatId = s.wechatId,
                 douyinId = s.douyinId,
                 avatarUri = s.avatarUri,
+                company = s.company,
                 feishuId = s.extraAccounts.firstOrNull { it.platform == "飞书" }?.handle,
                 wecomId = s.extraAccounts.firstOrNull { it.platform == "企微" }?.handle,
                 dingtalkId = s.extraAccounts.firstOrNull { it.platform == "钉钉" }?.handle,
@@ -251,6 +255,13 @@ fun UserProfilePage(onBack: () -> Unit, viewModel: UserProfileViewModel = hiltVi
                             onValueChange = viewModel::preferredName,
                             label = "知伴怎么称呼你",
                             placeholder = "例如：老周",
+                            showDivider = true,
+                        )
+                        ProfileCardField(
+                            value = s.company,
+                            onValueChange = viewModel::company,
+                            label = "公司全称",
+                            placeholder = "选填，帮助知伴识别同事关系",
                             showDivider = false,
                         )
                     }

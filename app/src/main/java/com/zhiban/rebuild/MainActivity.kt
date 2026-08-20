@@ -68,6 +68,8 @@ class MainActivity : ComponentActivity() {
         acceptSharedContent(intent)
         acceptCallNoteRequest(intent)
         acceptScheduleReminderRequest(intent)
+        // 启动时主动扫掠关系推断(同公司同事边/互动推断),避免用户必须点进关系页才触发。
+        lifecycleScope.launch { repository.sweepRelationshipInference() }
     }
 
     override fun onNewIntent(intent: Intent) {

@@ -22,7 +22,9 @@ class CallLogRepository @Inject internal constructor(private val database: Agent
             call.copy(linkedContactId = call.linkedContactId?.let { canonicalBySource[it] ?: it })
         }
     }
-    fun observeForContact(contactId: String): Flow<List<CallRecordEntity>> = database.callLogDao().observeForContact(contactId)
+
+    /** 全局最近通话，按时间倒序。供互动活动流/后续关系温度底座消费。 */
+    fun observeRecent(limit: Int = 100): Flow<List<CallRecordEntity>> = database.callLogDao().observeRecent(limit)
 
     suspend fun markLatestCallPending(nowEpochMs: Long = System.currentTimeMillis()): String? = database.withTransaction {
         val call = database.callLogDao().findLatestSince(nowEpochMs - RECENT_CALL_WINDOW_MS)

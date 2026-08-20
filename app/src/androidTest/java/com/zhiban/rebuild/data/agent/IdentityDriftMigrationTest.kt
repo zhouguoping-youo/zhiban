@@ -25,8 +25,9 @@ class IdentityDriftMigrationTest {
             db.execSQL(
                 """INSERT INTO notification_candidates
                     (candidateId,sourceKey,packageName,appLabel,title,body,postedAtEpochMs,status,createdAtEpochMs,
-                     identityDriftJson)
+                     sourceType,platform,direction,isGroupChat,messageKind,suggestedContactConfidence,identityDriftJson)
                     VALUES ('n1','hash','com.tencent.mm','微信','李建国','在吗',1000,'PENDING',1000,
+                     'NOTIFICATION','WECHAT','INCOMING',0,'MESSAGE',0.0,
                      '{"platform":"WECHAT","newHandle":"lijiangguo","oldHandle":"老李头","oldIdentityId":"i1"}')""",
             )
             db.query("SELECT identityDriftJson FROM notification_candidates WHERE candidateId = 'n1'").use {

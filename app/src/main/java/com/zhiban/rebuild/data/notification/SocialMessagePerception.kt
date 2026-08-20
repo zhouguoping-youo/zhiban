@@ -145,6 +145,11 @@ object NotificationInsightAnalyzer {
     private val actionWords = listOf(
         "会议", "见面", "碰面", "拜访", "面试", "预约", "安排",
         "日程", "提醒", "参加", "集合", "出发", "回访", "电话沟通",
+        // 私人邀约/接送：商务词表之外的日程意图（周国平实测：微信收到「你明天开车来我家」
+        // 只进最近互动、不生成日程建议，根因是 actionWords 不含生活邀约词）。
+        "来我家", "来家里", "到我家", "到家里", "来接", "接我", "接一下",
+        "过来", "开车来", "打车来", "到我这", "来我这", "来一趟", "去一趟",
+        "碰头", "聚一下", "来吃饭", "吃个饭", "到公司", "来公司", "到我公司", "来单位", "到单位",
     )
     private val negativeWords = listOf("取消", "不用", "不去", "改天", "暂不", "无需")
 
@@ -572,7 +577,13 @@ object SocialNotificationParser {
         val latestSender = latest?.sender?.trim()?.takeIf(::isUsefulSender)
         val isOutgoing = !latestSender.isNullOrBlank() &&
             latestSender.equals(snapshot.selfDisplayName?.trim(), ignoreCase = true)
-        val isGroup = !prefixedSender.isNullOrBlank() && !title.equals(prefixedSender, ignoreCase = true)
+        // 群聊判定：MessagingStyle 的权威 sender 存在且与会话标题一致 → 1:1 确证，
+        // 正文开头的冒号（如「请问:明天有空吗」）是消息内容，绝不该被当作发送者前缀。
+        val isGroup = if (!latestSender.isNullOrBlank() && latestSender.equals(title, ignoreCase = true)) {
+            false
+        } else {
+            !prefixedSender.isNullOrBlank() && !title.equals(prefixedSender, ignoreCase = true)
+        }
         val sender = when {
             isOutgoing -> title
             isGroup -> prefixedSender
@@ -756,8 +767,6 @@ object SocialNotificationParser {
         return normalized.isNotBlank() && REPLY_INDICATOR.containsMatchIn(normalized)
     }
 
-    internal fun hasLikelyRecentOutboundContext(candidate: NotificationCandidateEntity): Boolean =
-        (candidate.direction == "INCOMING") && likelyReplySignal(candidate.body)
     private val GENERIC_SMS_TITLES = setOf(
         "信息",
         "新信息",

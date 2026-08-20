@@ -1,6 +1,5 @@
 package com.zhiban.rebuild.data.notification
 
-import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
@@ -76,6 +75,28 @@ class SocialMessagePerceptionTest {
         assertEquals("周国平", candidate.conversationTitle)
         assertFalse(candidate.isGroupChat)
         assertEquals("我是周国平，平凯星辰（北京）科技有限公司武汉分公司，13476110061", candidate.body)
+    }
+
+    @Test
+    fun wechatOneToOneBodyColonPrefixIsNotMistakenForGroupChat() {
+        // 1:1 会话正文以「请问:」开头带冒号。GROUP_MESSAGE 正则若只看「XXX: 」前缀，
+        // 会把「请问」当群聊发送者——但 MessagingStyle 权威 sender 与会话标题一致时，
+        // 必须优先确证 1:1，冒号前缀只是消息内容（修复 #3 回归）。
+        val candidate = SocialNotificationParser.parse(
+            snapshot(
+                packageName = "com.tencent.mm",
+                title = "周国平",
+                text = "请问:明天有空吗",
+            ).copy(
+                messages = listOf(NotificationMessageSnapshot("周国平", "请问:明天有空吗", now)),
+            ),
+        )
+
+        assertNotNull(candidate)
+        assertEquals("周国平", candidate!!.senderName)
+        assertEquals("周国平", candidate.conversationTitle)
+        assertFalse(candidate.isGroupChat)
+        assertEquals("请问:明天有空吗", candidate.body)
     }
 
     @Test
@@ -269,38 +290,6 @@ class SocialMessagePerceptionTest {
         assertTrue(SocialNotificationParser.likelyReplySignal("好的"))
         assertTrue(SocialNotificationParser.likelyReplySignal("收到，好的，确认了"))
         assertFalse(SocialNotificationParser.likelyReplySignal("周三有空吗"))
-    }
-
-    @Test
-    fun hasLikelyRecentOutboundContextUsesDirectionAndIndicator() {
-        assertFalse(
-            SocialNotificationParser.hasLikelyRecentOutboundContext(
-                NotificationCandidateEntity(
-                    candidateId = "c1",
-                    sourceKey = "k1",
-                    packageName = "com.tencent.mm",
-                    appLabel = "微信",
-                    title = "张三",
-                    body = "收到",
-                    postedAtEpochMs = 1L,
-                    direction = "OUTGOING",
-                ),
-            ),
-        )
-        assertTrue(
-            SocialNotificationParser.hasLikelyRecentOutboundContext(
-                NotificationCandidateEntity(
-                    candidateId = "c2",
-                    sourceKey = "k2",
-                    packageName = "com.tencent.mm",
-                    appLabel = "微信",
-                    title = "张三",
-                    body = "收到",
-                    postedAtEpochMs = 1L,
-                    direction = "INCOMING",
-                ),
-            ),
-        )
     }
 
     @Test

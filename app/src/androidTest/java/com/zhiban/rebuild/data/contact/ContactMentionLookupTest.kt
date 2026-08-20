@@ -30,13 +30,13 @@ class ContactMentionLookupTest {
 
     @After fun tearDown() = database.close()
 
-    private suspend fun insert(contactId: String, displayName: String, updatedAt: Long) {
+    private suspend fun insert(contactId: String, displayName: String, updatedAt: Long, phone: String? = null) {
         database.contactDao().insert(
             ContactEntity(
                 contactId = contactId,
                 displayName = displayName,
                 normalizedName = displayName.lowercase(),
-                phone = null,
+                phone = phone,
                 email = null,
                 wechatId = null,
                 company = null,
@@ -89,29 +89,7 @@ class ContactMentionLookupTest {
         // 回归:observeContacts 曾换用 observeActive(源行被 SQL 排除),导致合并联系人的字段回填
         // 静默失效。这里锚定:canonical 缺 phone 时,列表里必须回填源联系人的 phone。
         insert("c-canonical", "张三", updatedAt = 10)
-        insert("c-source", "小张", updatedAt = 20).also {
-            database.contactDao().insert(
-                ContactEntity(
-                    contactId = "c-source",
-                    displayName = "小张",
-                    normalizedName = "小张",
-                    phone = "13900139000",
-                    email = null,
-                    wechatId = null,
-                    company = null,
-                    title = null,
-                    aliasesJson = "[]",
-                    tagsJson = "[]",
-                    note = null,
-                    avatarUri = null,
-                    source = "SYSTEM_CONTACT:1",
-                    deletedAtEpochMs = null,
-                    createdAtEpochMs = 1,
-                    updatedAtEpochMs = 20,
-                    responsibilities = null,
-                ),
-            )
-        }
+        insert("c-source", "小张", updatedAt = 20, phone = "13900139000")
         database.contactIdentityDao().upsertMergeLink(
             ContactMergeLinkEntity(
                 sourceContactId = "c-source",

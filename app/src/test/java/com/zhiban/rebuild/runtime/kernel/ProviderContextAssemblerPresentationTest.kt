@@ -125,6 +125,35 @@ class ProviderContextAssemblerPresentationTest {
         assertEquals("接着上面说", governedByDefault.messages.last().content)
     }
 
+    @Test
+    fun automaticallyCapturedInputIsMarkedAndRedactedBeforeProviderExport() {
+        val assembled = ProviderContextAssembler(clock = { 0L }, personalization = { null }).assembleMessages(
+            input = DecodedInput(
+                text = "联系人回复：电话13800000000，邮箱auto@example.com",
+                mode = "Work",
+                origin = InputOrigin.AUTO_RETRIEVED,
+            ),
+            query = QueryAssemblyContext(
+                QueryContext(IntentLabel.GENERAL_CHAT, 0.0, emptyList(), null, emptyList()),
+                ContextRetrievalResult(emptyList(), 0, emptyList(), 0),
+            ),
+            session = SessionAssemblyContext(emptyList(), null, emptyList(), emptyList()),
+            activatedSkills = emptyList(),
+            maxContextTokens = 4_096,
+        )
+
+        val automaticInput = assembled.messages.last()
+        assertEquals("user", automaticInput.role)
+        assertEquals(OutboundPurpose.AUTO_RETRIEVED, automaticInput.purpose)
+        assertEquals("automatic_input", automaticInput.provenance.sourceType)
+
+        val governed = DefaultOutboundDataPolicy {
+            OutboundPolicySettings(allowUnmaskedPhoneNumbers = false)
+        }.enforce(requestFrom(assembled)).request.messages.last()
+        assertTrue(governed.content.contains("138****0000"))
+        assertTrue(!governed.content.contains("auto@example.com"))
+    }
+
     private fun requestFrom(assembled: AssembledModelContext) = ModelRequest(
         requestId = "request-history",
         channel = OutboundChannel.LLM_INFERENCE,

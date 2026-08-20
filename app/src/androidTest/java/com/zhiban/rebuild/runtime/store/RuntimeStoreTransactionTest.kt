@@ -9,6 +9,7 @@ import com.zhiban.rebuild.foundation.sha256
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -41,21 +42,22 @@ class RuntimeStoreTransactionTest {
             payloadJson = """{"input":"你好"}""",
             nowEpochMs = 1_000L,
         )
+        val lease = store.claimSession("session-1", "local-user", 1_001L, 10_000L)
         store.appendEvent(
             RuntimeEventDraft(
                 eventId = "event-1",
                 eventType = "RunStarted",
                 sessionId = "session-1",
                 runId = "run-1",
-                attemptId = "run-1",
+                attemptId = null,
                 causationId = "run-1",
                 correlationId = "run-1",
                 payloadJson = "{}",
                 createdAtEpochMs = 1_000L,
             ),
             ownerId = "local-user",
-            fencingEpoch = 0L,
-            nowEpochMs = 1_000L,
+            fencingEpoch = lease.leaseEpoch,
+            nowEpochMs = 1_002L,
         )
 
         val snapshot = store.projectionSnapshot("session-1", "ui")
@@ -67,6 +69,7 @@ class RuntimeStoreTransactionTest {
     @Test fun recordToolSuccessThenToolResultRoundTrip() = runBlocking {
         val store = RoomRuntimeStore(database, "test-producer")
         store.acceptStart("cmd-2", "session-2", "run-2", """{"input":"你好"}""", 1_000L)
+        val lease = store.claimSession("session-2", "local-user", 1_001L, 10_000L)
         val idempotencyKey = "key-1"
         store.recordToolSuccess(
             executionId = "exec-1",
@@ -79,8 +82,8 @@ class RuntimeStoreTransactionTest {
             resultRef = "result-1",
             safeResultJson = """{"count":0}""",
             ownerId = "local-user",
-            fencingEpoch = 0L,
-            nowEpochMs = 1_000L,
+            fencingEpoch = lease.leaseEpoch,
+            nowEpochMs = 1_002L,
         )
 
         val recorded = store.toolResult(idempotencyKey)
@@ -93,10 +96,13 @@ class RuntimeStoreTransactionTest {
 
     @Test fun claimedCommandFailureIsContainedAndRecoverable() = runBlocking {
         val store = RoomRuntimeStore(database, "test-producer")
-        store.acceptStart("cmd-3", "session-3", "run-3", """{"input":"你好"}""", 1_000L)
-        val claimed = store.processClaimedCommand("cmd-3", "local-user", 0L, 2_000L)
+        store.acceptStart("cmd-3", "session-3", "run-3", """{"inputRef":"missing-input"}""", 1_000L)
+        val lease = store.claimSession("session-3", "local-user", 1_001L, 10_000L)
+        assertTrue(store.claimCommand("cmd-3", "local-user", lease.leaseEpoch, 1_002L))
+        val claimed = store.processClaimedCommand("cmd-3", "local-user", lease.leaseEpoch, 2_000L)
 
-        assertTrue(claimed)
+        assertFalse(claimed)
+        assertEquals("FAILED_FINAL", database.runtimeRunDao().find("run-3")?.status)
         val snapshot = store.projectionSnapshot("session-3", "ui")
         assertNotNull(snapshot)
 

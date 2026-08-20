@@ -4,6 +4,7 @@ import android.app.Notification
 import android.content.ComponentName
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import android.util.Log
 import com.zhiban.rebuild.data.agent.AgentDataRepository
 import com.zhiban.rebuild.foundation.runSuspendCatching
 import dagger.hilt.EntryPoint
@@ -48,7 +49,11 @@ class ZhiBanNotificationListenerService : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        if (!canProcess(sbn)) return
+        Log.d("ZhiBanNotif", "posted pkg=${sbn.packageName} key=${sbn.key} title=${sbn.notification.extras.getCharSequence(Notification.EXTRA_TITLE)}")
+        if (!canProcess(sbn)) {
+            Log.d("ZhiBanNotif", "skip pkg=${sbn.packageName} ongoing=${sbn.isOngoing}")
+            return
+        }
         notifications.trySend(sbn)
     }
 
@@ -77,7 +82,13 @@ class ZhiBanNotificationListenerService : NotificationListenerService() {
 
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
-        scope.launch { collectionPreferences.onNotificationListenerDisconnected(System.currentTimeMillis()) }
+        // 断连后系统可能立刻销毁本 Service，onDestroy 的 scope.cancel() 会取消刚派发的写协程，
+        // 导致「断开时间戳」丢失、重连后的 gap 检测失效。这里用独立的一次性 scope 保证写盘完成。
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            runSuspendCatching {
+                collectionPreferences.onNotificationListenerDisconnected(System.currentTimeMillis())
+            }
+        }
         requestRebind(ComponentName(this, ZhiBanNotificationListenerService::class.java))
     }
 
@@ -87,6 +98,7 @@ class ZhiBanNotificationListenerService : NotificationListenerService() {
         sbn.notification.category != Notification.CATEGORY_SERVICE
 
     private suspend fun process(sbn: StatusBarNotification) {
+        Log.d("ZhiBanNotif", "process pkg=${sbn.packageName} key=${sbn.key}")
         val notification = sbn.notification
         val extras = notification.extras
         val appLabel = runSuspendCatching {
@@ -108,8 +120,18 @@ class ZhiBanNotificationListenerService : NotificationListenerService() {
                 isOngoing = sbn.isOngoing,
                 userHandle = runSuspendCatching { sbn.user?.toString() }.getOrNull(),
             ),
-        ) ?: return
-        if (!collectionPreferences.isEnabled(candidate.platform)) return
+        ) ?: run {
+            Log.d("ZhiBanNotif", "parse returned null for ${sbn.key}")
+            return
+        }
+        if (!collectionPreferences.isEnabled(candidate.platform)) {
+            Log.d("ZhiBanNotif", "platform disabled: ${candidate.platform}")
+            return
+        }
+        Log.d(
+            "ZhiBanNotif",
+            "stage candidate=${candidate.candidateId} platform=${candidate.platform} sender=${candidate.senderName} linked=${candidate.linkedContactId} suggested=${candidate.suggestedContactId}",
+        )
         repository.stageNotificationCandidate(candidate)
     }
 

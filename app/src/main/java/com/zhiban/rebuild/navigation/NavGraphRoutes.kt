@@ -30,6 +30,7 @@ import com.zhiban.rebuild.ui.agent.settings.UserProfilePage
 import com.zhiban.rebuild.ui.components.ZhiBanScaffold
 import com.zhiban.rebuild.ui.debug.debugAcceptanceRoute
 import com.zhiban.rebuild.ui.settings.AboutZhiBanPage
+import com.zhiban.rebuild.ui.settings.AgentSuggestionPage
 import com.zhiban.rebuild.ui.settings.AppearanceSettingsPage
 import com.zhiban.rebuild.ui.settings.AutoWritePage
 import com.zhiban.rebuild.ui.settings.DataSettingsPage
@@ -78,6 +79,7 @@ internal fun NavGraphBuilder.agentSettingsRoutes(navController: NavHostControlle
     }
     composable<AgentRunHistory> { AgentRunHistoryPage(onBack = { navController.popBackStack() }) }
     composable<AutoWrites> { AutoWritePage(onBack = { navController.popBackStack() }) }
+    composable<AgentSuggestions> { AgentSuggestionPage(onBack = { navController.popBackStack() }) }
     composable<ContactMaintenance> {
         ContactMaintenancePage(
             onBack = { navController.popBackStack() },

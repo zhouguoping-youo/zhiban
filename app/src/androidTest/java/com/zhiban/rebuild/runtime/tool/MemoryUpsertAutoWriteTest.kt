@@ -55,7 +55,13 @@ class MemoryUpsertAutoWriteTest {
         // A model-initiated auto write must not be mislabeled as something the user authored.
         assertEquals("AGENT_AUTO", receipt?.sourceType)
         assertTrue(result.safeResultJson.contains("undoAvailable"))
-        assertTrue(AutoWriteRepository(database, context, fakeUndoApplier).undo(change.changeId, 101))
+        assertTrue(
+            AutoWriteRepository(
+                database,
+                context,
+                com.zhiban.rebuild.runtime.governance.ChangeUndoApplierImpl(database),
+            ).undo(change.changeId, 101),
+        )
         assertTrue(database.memoryPersistenceDao().recall(RoomMemoryToolExecutor.GLOBAL_NAMESPACE, 102).isEmpty())
     }
 
@@ -138,8 +144,4 @@ class MemoryUpsertAutoWriteTest {
         )
     }
 
-    private val fakeUndoApplier = object : com.zhiban.rebuild.data.autowrite.ChangeUndoApplier {
-        override suspend fun undoVisible(changeId: String, nowEpochMs: Long): Boolean = false
-        override suspend fun undoForRun(changeId: String, runId: String, nowEpochMs: Long): Boolean = false
-    }
 }
