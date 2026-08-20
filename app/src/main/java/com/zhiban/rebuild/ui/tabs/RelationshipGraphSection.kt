@@ -73,6 +73,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -196,8 +197,14 @@ internal fun RelationshipGraphState(
             }
         }
     }
-    var rootId by remember(contacts, owner.name) { mutableStateOf(RelationshipPersonIds.SELF) }
-    if (rootId !in peopleById) rootId = RelationshipPersonIds.SELF
+    val viewPathState = rememberSaveable(owner.name) {
+        mutableStateOf(listOf(RelationshipPersonIds.SELF))
+    }
+    val storedViewPath = viewPathState.value
+    val viewPath = storedViewPath.takeIf { it.lastOrNull() in peopleById }
+        ?: listOf(RelationshipPersonIds.SELF)
+    if (viewPath != storedViewPath) viewPathState.value = viewPath
+    val rootId = viewPath.lastOrNull() ?: RelationshipPersonIds.SELF
     val allValidEdges = remember(edges, historicalEdges, peopleById) {
         mergeCurrentAndHistoricalRelationships(edges, historicalEdges)
             .filter { it.fromContactId in peopleById && it.toContactId in peopleById }
@@ -208,9 +215,10 @@ internal fun RelationshipGraphState(
     val visibleEdges = remember(allValidEdges, rootId) {
         allValidEdges.filter { it.fromContactId == rootId || it.toContactId == rootId }
     }
-    val displayedEdges = remember(rootId, allValidEdges) {
-        relationshipGraphEdgesForRoot(rootId, allValidEdges)
+    val graphProjection = remember(rootId, allValidEdges, peopleById) {
+        projectRelationshipGraph(rootId, peopleById.keys, allValidEdges)
     }
+    val displayedEdges = graphProjection.edges
     val root = peopleById.getValue(rootId)
     val graphEdges = displayedEdges
     val graphRootId = rootId
@@ -242,6 +250,15 @@ internal fun RelationshipGraphState(
             }
     }
     val hiddenGraphNodesCount = (graphRelatedIds.size - graphNeighborIds.size).coerceAtLeast(0)
+    fun switchEgo(nextId: String) {
+        if (nextId !in peopleById || nextId == rootId) return
+        val existingIndex = viewPath.indexOf(nextId)
+        viewPathState.value = if (existingIndex >= 0) {
+            viewPath.take(existingIndex + 1)
+        } else {
+            viewPath + nextId
+        }
+    }
     val relatedEvents = remember(root, events, relatedContactIds, rootId) {
         if (root.isOwner) {
             events.filter { event ->
@@ -279,12 +296,25 @@ internal fun RelationshipGraphState(
                 )
             }
             if (!root.isOwner) {
-                TextButton(onClick = { rootId = RelationshipPersonIds.SELF }) {
+                TextButton(onClick = { viewPathState.value = listOf(RelationshipPersonIds.SELF) }) {
                     Text("回到我", color = RelationInk)
                 }
             }
             TextButton(onClick = onAdd, enabled = canAddRelationship) {
                 Text("添加关系", color = if (canAddRelationship) RelationInk else RelationMuted)
+            }
+        }
+        if (viewPath.size > 1) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                viewPath.forEachIndexed { index, id ->
+                    if (index > 0) Text(" / ", color = RelationMuted, style = MaterialTheme.typography.labelSmall)
+                    TextButton(
+                        onClick = { viewPathState.value = viewPath.take(index + 1) },
+                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp),
+                    ) {
+                        Text(peopleById[id]?.displayName ?: "我", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
             }
         }
         if (root.isOwner && activeGroup == RelationshipGroup.WORK &&
@@ -330,7 +360,9 @@ internal fun RelationshipGraphState(
                     rootId = graphRootId,
                     peopleById = peopleById,
                     edges = visibleEdgesForGraph,
-                    onSelectContact = { rootId = it },
+                    presentationById = relationshipGraphPresentation(graphProjection),
+                    onSelectContact = {},
+                    onSwitchEgo = ::switchEgo,
                 )
                 Spacer(Modifier.height(14.dp))
                 if (hiddenGraphNodesCount > 0) {
@@ -349,9 +381,7 @@ internal fun RelationshipGraphState(
                     fontWeight = FontWeight.Medium,
                 )
                 Spacer(Modifier.height(6.dp))
-                RelationshipRows(graphEdges.take(12), peopleById, onInspect, onSelectContact = {
-                    rootId = it
-                })
+                RelationshipRows(graphEdges.take(12), peopleById, onInspect, onSelectContact = ::switchEgo)
                 Spacer(Modifier.height(12.dp))
             }
             if (allValidEdges.size > 12) {

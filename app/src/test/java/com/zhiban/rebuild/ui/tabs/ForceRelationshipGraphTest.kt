@@ -104,6 +104,45 @@ class ForceRelationshipGraphTest {
         assertEquals("前同事", graphRelationLabel("COLLEAGUE", isHistorical = true))
     }
 
+    @Test
+    fun `ego projection keeps two hops and excludes the third hop`() {
+        val edges = listOf(
+            edge("root-a", RelationshipPersonIds.SELF, "a", "COLLEAGUE", 1.0, true),
+            edge("a-b", "a", "b", "COLLEAGUE", 1.0, true),
+            edge("b-c", "b", "c", "COLLEAGUE", 1.0, true),
+            edge("c-d", "c", "d", "COLLEAGUE", 1.0, true),
+        )
+
+        val projection = projectRelationshipGraph(
+            rootId = "a",
+            peopleIds = setOf(RelationshipPersonIds.SELF, "a", "b", "c", "d"),
+            edges = edges,
+        )
+
+        assertEquals(mapOf("a" to 0, RelationshipPersonIds.SELF to 1, "b" to 1, "c" to 2), projection.hopByNode)
+        assertEquals(setOf("root-a", "a-b", "b-c"), projection.edges.map { it.edgeId }.toSet())
+        assertEquals(0.40f, relationshipGraphPresentation(projection).getValue("c").opacity)
+        assertTrue(relationshipGraphPresentation(projection).getValue("c").showLabel.not())
+    }
+
+    @Test
+    fun `root projection retains every connected edge`() {
+        val edges = listOf(
+            edge("a-b", "a", "b", "COLLEAGUE", 1.0, true),
+            edge("b-c", "b", "c", "FRIEND", 1.0, true),
+        )
+
+        val projection = projectRelationshipGraph(
+            rootId = RelationshipPersonIds.SELF,
+            peopleIds = setOf(RelationshipPersonIds.SELF, "a", "b", "c"),
+            edges = edges,
+        )
+
+        assertEquals(edges, projection.edges)
+        assertEquals(setOf("a", "b", "c"), projection.hopByNode.keys - RelationshipPersonIds.SELF)
+        assertTrue(projection.isEgoView.not())
+    }
+
     private fun edge(id: String, from: String, to: String, type: String, confidence: Double, confirmed: Boolean) = RelationshipEdgeEntity(
         edgeId = id,
         fromContactId = from,

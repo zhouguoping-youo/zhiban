@@ -100,7 +100,14 @@ private val WorkRelations = RelationshipTaxonomy.selectableDefinitions
 
 internal enum class ForceGraphNodeKind { FOCUS, CONTACT, WORK }
 
-internal data class ForceGraphNode(val id: String, val name: String, val kind: ForceGraphNodeKind, val company: String? = null, val title: String? = null)
+internal data class ForceGraphNode(
+    val id: String,
+    val name: String,
+    val kind: ForceGraphNodeKind,
+    val company: String? = null,
+    val title: String? = null,
+    val presentation: ForceGraphNodePresentation = ForceGraphNodePresentation(),
+)
 
 internal data class ForceGraphLink(
     val fromId: String,
@@ -117,7 +124,12 @@ internal data class ForceGraphModel(val nodes: List<ForceGraphNode>, val links: 
 
 internal data class ForceBody(var position: Offset, var velocity: Offset = Offset.Zero, var dragged: Boolean = false)
 
-internal fun buildForceGraphModel(rootId: String, peopleById: Map<String, RelationshipPersonUi>, edges: List<RelationshipEdgeEntity>): ForceGraphModel {
+internal fun buildForceGraphModel(
+    rootId: String,
+    peopleById: Map<String, RelationshipPersonUi>,
+    edges: List<RelationshipEdgeEntity>,
+    presentationById: Map<String, ForceGraphNodePresentation> = emptyMap(),
+): ForceGraphModel {
     val personIds = edges.flatMap { listOf(it.fromContactId, it.toContactId) }
         .toMutableSet()
         .apply { add(rootId) }
@@ -140,6 +152,7 @@ internal fun buildForceGraphModel(rootId: String, peopleById: Map<String, Relati
             kind = kind,
             company = person.company?.trim()?.takeIf(String::isNotBlank),
             title = person.title?.trim()?.takeIf(String::isNotBlank),
+            presentation = presentationById[id] ?: ForceGraphNodePresentation(),
         )
     }
 
@@ -262,8 +275,12 @@ internal fun ForceRelationshipGraphCanvas(
     peopleById: Map<String, RelationshipPersonUi>,
     edges: List<RelationshipEdgeEntity>,
     onSelectContact: (String) -> Unit,
+    presentationById: Map<String, ForceGraphNodePresentation> = emptyMap(),
+    onSwitchEgo: ((String) -> Unit)? = null,
 ) {
-    val model = remember(rootId, peopleById, edges) { buildForceGraphModel(rootId, peopleById, edges) }
+    val model = remember(rootId, peopleById, edges, presentationById) {
+        buildForceGraphModel(rootId, peopleById, edges, presentationById)
+    }
     if (model.nodes.size < 2) return
 
     val density = LocalDensity.current
@@ -659,7 +676,7 @@ internal fun ForceRelationshipGraphCanvas(
                 onRelatedClick = { relatedId ->
                     selectedNodeId = relatedId
                     focusNode(relatedId)
-                    onSelectContact(relatedId)
+                    (onSwitchEgo ?: onSelectContact).invoke(relatedId)
                 },
             )
         }
