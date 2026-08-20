@@ -8,6 +8,7 @@ import com.zhiban.rebuild.data.autowrite.AutoWriteAuditDraft
 import com.zhiban.rebuild.data.autowrite.AutoWriteToolNames
 import com.zhiban.rebuild.data.autowrite.ReversibleWriteReadiness
 import com.zhiban.rebuild.data.autowrite.insertVisibleAutoWrite
+import com.zhiban.rebuild.data.autowrite.recordWriteVerificationFailure
 import com.zhiban.rebuild.data.contact.ContactEnrichmentCandidateEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.enrichment.COMPLETION_FIELD_NAMES
@@ -45,48 +46,65 @@ internal class ContactCompletionAutoWriter @Inject constructor(private val datab
         }
         val patch = decodePatch(candidate.proposedValueJson) ?: return false
         val idempotencyKey = sha256("contact-completion-reply:${candidate.candidateId}")
-        return database.withTransaction {
-            val knowledge = database.contactKnowledgeDao()
-            if (database.changeLogDao().findByIdempotencyKey(idempotencyKey) != null) {
+        return try {
+            database.withTransaction {
+                val knowledge = database.contactKnowledgeDao()
+                if (database.changeLogDao().findByIdempotencyKey(idempotencyKey) != null) {
+                    knowledge.upsertEnrichmentCandidate(candidate.copy(status = STATUS_APPROVED, updatedAtEpochMs = nowEpochMs))
+                    pendingCandidates.forEach { knowledge.upsertEnrichmentCandidate(it) }
+                    database.contactCompletionRequestDao().markResponseReceived(request.requestId, candidate.candidateId, nowEpochMs)
+                    return@withTransaction true
+                }
+                val current = database.contactDao().findRawById(request.contactId) ?: return@withTransaction false
+                val updated = current.applyMissing(patch, nowEpochMs)
+                if (updated != current) {
+                    val before = canonicalContactCompletionDigest(current)
+                    val after = canonicalContactCompletionDigest(updated)
+                    database.contactDao().update(updated)
+                    val persisted = database.contactDao().findRawById(current.contactId)
+                    check(persisted != null && persisted.matches(updated)) { "CONTACT_WRITE_VERIFY_FAILED" }
+                    database.insertVisibleAutoWrite(
+                        AutoWriteAuditDraft(
+                            changeId = changeIdFor(idempotencyKey),
+                            runtimeRunId = null,
+                            toolName = AutoWriteToolNames.CONTACT_COMPLETION,
+                            idempotencyKey = idempotencyKey,
+                            targetDomain = "CONTACT",
+                            targetId = current.contactId,
+                            operation = "UPDATE",
+                            beforeDigest = before,
+                            afterDigest = after,
+                            inversePayloadJson = inversePayload(current),
+                            originType = "SYSTEM_PERCEPTION",
+                            subjectContactId = current.contactId,
+                            sourceType = "CONTACT_REPLY",
+                            sourceRef = candidate.sourceRef.orEmpty(),
+                            confidence = candidate.confidence,
+                            presentationType = "CONTACT_COMPLETION",
+                            correctionRoute = "CONTACT_PROFILE",
+                            createdAtEpochMs = nowEpochMs,
+                            summary = patch.summary(),
+                        ),
+                    )
+                }
                 knowledge.upsertEnrichmentCandidate(candidate.copy(status = STATUS_APPROVED, updatedAtEpochMs = nowEpochMs))
                 pendingCandidates.forEach { knowledge.upsertEnrichmentCandidate(it) }
                 database.contactCompletionRequestDao().markResponseReceived(request.requestId, candidate.candidateId, nowEpochMs)
-                return@withTransaction true
+                true
             }
-            val current = database.contactDao().findRawById(request.contactId) ?: return@withTransaction false
-            val updated = current.applyMissing(patch, nowEpochMs)
-            if (updated != current) {
-                val before = canonicalContactCompletionDigest(current)
-                val after = canonicalContactCompletionDigest(updated)
-                database.contactDao().update(updated)
-                database.insertVisibleAutoWrite(
-                    AutoWriteAuditDraft(
-                        changeId = changeIdFor(idempotencyKey),
-                        runtimeRunId = null,
-                        toolName = AutoWriteToolNames.CONTACT_COMPLETION,
-                        idempotencyKey = idempotencyKey,
-                        targetDomain = "CONTACT",
-                        targetId = current.contactId,
-                        operation = "UPDATE",
-                        beforeDigest = before,
-                        afterDigest = after,
-                        inversePayloadJson = inversePayload(current),
-                        originType = "SYSTEM_PERCEPTION",
-                        subjectContactId = current.contactId,
-                        sourceType = "CONTACT_REPLY",
-                        sourceRef = candidate.sourceRef.orEmpty(),
-                        confidence = candidate.confidence,
-                        presentationType = "CONTACT_COMPLETION",
-                        correctionRoute = "CONTACT_PROFILE",
-                        createdAtEpochMs = nowEpochMs,
-                        summary = patch.summary(),
-                    ),
+        } catch (failure: kotlinx.coroutines.CancellationException) {
+            throw failure
+        } catch (failure: Exception) {
+            if (failure.message == "CONTACT_WRITE_VERIFY_FAILED") {
+                database.recordWriteVerificationFailure(
+                    toolName = AutoWriteToolNames.CONTACT_COMPLETION,
+                    targetId = request.contactId,
+                    idempotencyKey = "contact-completion-reply:${candidate.candidateId}",
+                    reasonCode = failure.message.orEmpty(),
+                    nowEpochMs = nowEpochMs,
                 )
             }
-            knowledge.upsertEnrichmentCandidate(candidate.copy(status = STATUS_APPROVED, updatedAtEpochMs = nowEpochMs))
-            pendingCandidates.forEach { knowledge.upsertEnrichmentCandidate(it) }
-            database.contactCompletionRequestDao().markResponseReceived(request.requestId, candidate.candidateId, nowEpochMs)
-            true
+            throw failure
         }
     }
 
@@ -111,6 +129,11 @@ internal class ContactCompletionAutoWriter @Inject constructor(private val datab
         if (nextPhone == phone && nextEmail == email && nextWechat == wechatId) return this
         return copy(phone = nextPhone, email = nextEmail, wechatId = nextWechat, updatedAtEpochMs = nowEpochMs)
     }
+
+    private fun ContactEntity.matches(expected: ContactEntity): Boolean = phone == expected.phone &&
+        email == expected.email &&
+        wechatId == expected.wechatId &&
+        updatedAtEpochMs == expected.updatedAtEpochMs
 
     private fun inversePayload(contact: ContactEntity): String = buildJsonObject {
         put(

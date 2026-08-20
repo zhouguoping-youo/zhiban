@@ -9,6 +9,7 @@ import com.zhiban.rebuild.data.autowrite.AutoWriteAuditDraft
 import com.zhiban.rebuild.data.autowrite.AutoWriteToolNames
 import com.zhiban.rebuild.data.autowrite.ReversibleWriteReadiness
 import com.zhiban.rebuild.data.autowrite.insertVisibleAutoWrite
+import com.zhiban.rebuild.data.autowrite.recordWriteVerificationFailure
 import com.zhiban.rebuild.data.common.ConflatedDebouncedTrigger
 import com.zhiban.rebuild.data.contact.ContactEnrichmentCandidateEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
@@ -250,52 +251,75 @@ internal class RelationshipInferenceCoordinator @Inject constructor(
         ) {
             return
         }
-        database.withTransaction {
-            if (database.relationshipEdgeDao()
-                    .touching(listOf(RelationshipPersonIds.SELF), MAX_EDGES)
-                    .any { it.fromContactId == contactId || it.toContactId == contactId }
-            ) {
-                return@withTransaction
-            }
-            val edgeId = "auto-edge-user:self-$contactId-$relationType".take(220)
-            val edge = RelationshipEdgeEntity(
-                edgeId = edgeId,
-                fromContactId = RelationshipPersonIds.SELF,
-                toContactId = contactId,
-                relationType = relationType,
-                evidenceDigest = evidence.take(120),
-                evidenceRefsJson = evidenceRefs.toString(),
-                confidence = confidence,
-                userConfirmed = false,
-                skillId = null,
-                status = "ACTIVE",
-                createdAtEpochMs = nowEpochMs,
-                updatedAtEpochMs = nowEpochMs,
-            )
-            database.relationshipEdgeDao().upsert(edge)
-            database.insertVisibleAutoWrite(
-                AutoWriteAuditDraft(
-                    changeId = changeIdFor(idempotencyKey),
-                    runtimeRunId = null,
-                    toolName = AutoWriteToolNames.RELATIONSHIP_AUTO_INFER,
-                    idempotencyKey = idempotencyKey,
-                    targetDomain = "RELATIONSHIP",
-                    targetId = edgeId,
-                    operation = "CREATE",
-                    beforeDigest = null,
-                    afterDigest = canonicalRelationshipDigest(edge),
-                    inversePayloadJson = buildJsonObject { put("edgeId", edgeId) }.toString(),
-                    originType = "SYSTEM_PERCEPTION",
-                    subjectContactId = contactId,
-                    sourceType = "SYSTEM_PERCEPTION",
-                    sourceRef = edgeId,
+        try {
+            database.withTransaction {
+                if (database.relationshipEdgeDao()
+                        .touching(listOf(RelationshipPersonIds.SELF), MAX_EDGES)
+                        .any { it.fromContactId == contactId || it.toContactId == contactId }
+                ) {
+                    return@withTransaction
+                }
+                val edgeId = "auto-edge-user:self-$contactId-$relationType".take(220)
+                val edge = RelationshipEdgeEntity(
+                    edgeId = edgeId,
+                    fromContactId = RelationshipPersonIds.SELF,
+                    toContactId = contactId,
+                    relationType = relationType,
+                    evidenceDigest = evidence.take(120),
+                    evidenceRefsJson = evidenceRefs.toString(),
                     confidence = confidence,
-                    presentationType = "RELATIONSHIP_INFERRED",
-                    correctionRoute = "RELATIONSHIP_EDITOR",
+                    userConfirmed = false,
+                    skillId = null,
+                    status = "ACTIVE",
                     createdAtEpochMs = nowEpochMs,
-                    summary = "关系：${RelationshipTaxonomy.find(relationType)?.displayName ?: relationType}（${evidence.take(80)}）",
-                ),
-            )
+                    updatedAtEpochMs = nowEpochMs,
+                )
+                database.relationshipEdgeDao().upsert(edge)
+                check(
+                    database.relationshipEdgeDao().find(edgeId)?.let {
+                        it.fromContactId == edge.fromContactId &&
+                            it.toContactId == edge.toContactId &&
+                            it.relationType == edge.relationType &&
+                            it.status == "ACTIVE"
+                    } == true,
+                ) { "RELATIONSHIP_WRITE_VERIFY_FAILED" }
+                database.insertVisibleAutoWrite(
+                    AutoWriteAuditDraft(
+                        changeId = changeIdFor(idempotencyKey),
+                        runtimeRunId = null,
+                        toolName = AutoWriteToolNames.RELATIONSHIP_AUTO_INFER,
+                        idempotencyKey = idempotencyKey,
+                        targetDomain = "RELATIONSHIP",
+                        targetId = edgeId,
+                        operation = "CREATE",
+                        beforeDigest = null,
+                        afterDigest = canonicalRelationshipDigest(edge),
+                        inversePayloadJson = buildJsonObject { put("edgeId", edgeId) }.toString(),
+                        originType = "SYSTEM_PERCEPTION",
+                        subjectContactId = contactId,
+                        sourceType = "SYSTEM_PERCEPTION",
+                        sourceRef = edgeId,
+                        confidence = confidence,
+                        presentationType = "RELATIONSHIP_INFERRED",
+                        correctionRoute = "RELATIONSHIP_EDITOR",
+                        createdAtEpochMs = nowEpochMs,
+                        summary = "关系：${RelationshipTaxonomy.find(relationType)?.displayName ?: relationType}（${evidence.take(80)}）",
+                    ),
+                )
+            }
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (failure: Exception) {
+            if (failure.message == "RELATIONSHIP_WRITE_VERIFY_FAILED") {
+                database.recordWriteVerificationFailure(
+                    toolName = AutoWriteToolNames.RELATIONSHIP_AUTO_INFER,
+                    targetId = contactId,
+                    idempotencyKey = idempotencyKey,
+                    reasonCode = failure.message.orEmpty(),
+                    nowEpochMs = nowEpochMs,
+                )
+            }
+            throw failure
         }
     }
 

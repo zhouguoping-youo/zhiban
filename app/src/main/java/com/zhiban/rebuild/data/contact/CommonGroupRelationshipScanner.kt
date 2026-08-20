@@ -5,6 +5,7 @@ import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.autowrite.AutoWriteAuditDraft
 import com.zhiban.rebuild.data.autowrite.AutoWriteToolNames
 import com.zhiban.rebuild.data.autowrite.insertVisibleAutoWrite
+import com.zhiban.rebuild.data.autowrite.recordWriteVerificationFailure
 import com.zhiban.rebuild.data.contact.enrichment.canonicalRelationshipDigest
 import com.zhiban.rebuild.foundation.sha256
 import javax.inject.Inject
@@ -39,50 +40,73 @@ internal class CommonGroupRelationshipScanner @Inject constructor(private val da
         return created
     }
 
-    private suspend fun createIfAbsent(firstId: String, secondId: String, groupId: String, nowEpochMs: Long): Boolean = database.withTransaction {
-        if (database.relationshipEdgeDao().findActiveBetween(firstId, secondId) != null) return@withTransaction false
-        val pair = listOf(firstId, secondId).sorted()
-        val edgeId = "common-group:${sha256("${pair[0]}:${pair[1]}").take(24)}"
-        val groupRef = "group:${sha256(groupId).take(16)}"
-        val edge = RelationshipEdgeEntity(
-            edgeId = edgeId,
-            fromContactId = pair[0],
-            toContactId = pair[1],
-            relationType = "GROUP_MEMBER",
-            evidenceDigest = "共同群聊",
-            evidenceRefsJson = buildJsonArray { add(JsonPrimitive(groupRef)) }.toString(),
-            confidence = COMMON_GROUP_CONFIDENCE,
-            userConfirmed = false,
-            skillId = SKILL_ID,
-            status = "ACTIVE",
-            createdAtEpochMs = nowEpochMs,
-            updatedAtEpochMs = nowEpochMs,
-        )
-        database.relationshipEdgeDao().upsert(edge)
-        val idempotencyKey = "common-group:$edgeId"
-        database.insertVisibleAutoWrite(
-            AutoWriteAuditDraft(
-                changeId = "change:${sha256(idempotencyKey).take(32)}",
-                runtimeRunId = null,
-                toolName = AutoWriteToolNames.RELATIONSHIP_AUTO_INFER,
-                idempotencyKey = idempotencyKey,
-                targetDomain = "RELATIONSHIP",
-                targetId = edgeId,
-                operation = "CREATE",
-                afterDigest = canonicalRelationshipDigest(edge),
-                inversePayloadJson = "{\"edgeId\":\"$edgeId\"}",
-                originType = "SYSTEM_PERCEPTION",
-                subjectContactId = firstId,
-                sourceType = "GROUP_MEMBERSHIP",
-                sourceRef = groupRef,
+    private suspend fun createIfAbsent(firstId: String, secondId: String, groupId: String, nowEpochMs: Long): Boolean = try {
+        database.withTransaction {
+            if (database.relationshipEdgeDao().findActiveBetween(firstId, secondId) != null) return@withTransaction false
+            val pair = listOf(firstId, secondId).sorted()
+            val edgeId = "common-group:${sha256("${pair[0]}:${pair[1]}").take(24)}"
+            val groupRef = "group:${sha256(groupId).take(16)}"
+            val edge = RelationshipEdgeEntity(
+                edgeId = edgeId,
+                fromContactId = pair[0],
+                toContactId = pair[1],
+                relationType = "GROUP_MEMBER",
+                evidenceDigest = "共同群聊",
+                evidenceRefsJson = buildJsonArray { add(JsonPrimitive(groupRef)) }.toString(),
                 confidence = COMMON_GROUP_CONFIDENCE,
-                presentationType = "RELATIONSHIP_INFERRED",
-                correctionRoute = "RELATIONSHIP_EDITOR",
+                userConfirmed = false,
+                skillId = SKILL_ID,
+                status = "ACTIVE",
                 createdAtEpochMs = nowEpochMs,
-                summary = "关系：群友（共同群聊证据）",
-            ),
-        )
-        true
+                updatedAtEpochMs = nowEpochMs,
+            )
+            database.relationshipEdgeDao().upsert(edge)
+            check(
+                database.relationshipEdgeDao().find(edgeId)?.let {
+                    it.fromContactId == edge.fromContactId &&
+                        it.toContactId == edge.toContactId &&
+                        it.relationType == edge.relationType &&
+                        it.status == "ACTIVE"
+                } == true,
+            ) { "RELATIONSHIP_WRITE_VERIFY_FAILED" }
+            val idempotencyKey = "common-group:$edgeId"
+            database.insertVisibleAutoWrite(
+                AutoWriteAuditDraft(
+                    changeId = "change:${sha256(idempotencyKey).take(32)}",
+                    runtimeRunId = null,
+                    toolName = AutoWriteToolNames.RELATIONSHIP_AUTO_INFER,
+                    idempotencyKey = idempotencyKey,
+                    targetDomain = "RELATIONSHIP",
+                    targetId = edgeId,
+                    operation = "CREATE",
+                    afterDigest = canonicalRelationshipDigest(edge),
+                    inversePayloadJson = "{\"edgeId\":\"$edgeId\"}",
+                    originType = "SYSTEM_PERCEPTION",
+                    subjectContactId = firstId,
+                    sourceType = "GROUP_MEMBERSHIP",
+                    sourceRef = groupRef,
+                    confidence = COMMON_GROUP_CONFIDENCE,
+                    presentationType = "RELATIONSHIP_INFERRED",
+                    correctionRoute = "RELATIONSHIP_EDITOR",
+                    createdAtEpochMs = nowEpochMs,
+                    summary = "关系：群友（共同群聊证据）",
+                ),
+            )
+            true
+        }
+    } catch (failure: kotlinx.coroutines.CancellationException) {
+        throw failure
+    } catch (failure: Exception) {
+        if (failure.message == "RELATIONSHIP_WRITE_VERIFY_FAILED") {
+            database.recordWriteVerificationFailure(
+                toolName = AutoWriteToolNames.RELATIONSHIP_AUTO_INFER,
+                targetId = "$firstId:$secondId",
+                idempotencyKey = "common-group:${sha256(groupId)}",
+                reasonCode = failure.message.orEmpty(),
+                nowEpochMs = nowEpochMs,
+            )
+        }
+        throw failure
     }
 
     private companion object {

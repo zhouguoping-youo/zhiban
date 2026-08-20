@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.room.withTransaction
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.ScheduleEntity
+import com.zhiban.rebuild.data.autowrite.recordWriteVerificationFailure
 import com.zhiban.rebuild.data.calendar.ScheduleReminderRegistrar
 import com.zhiban.rebuild.data.completion.ContactCompletionDraft
 import com.zhiban.rebuild.data.completion.ContactCompletionRepository
@@ -152,6 +153,15 @@ class AgentSuggestionRepository @Inject internal constructor(
     } catch (failure: CancellationException) {
         throw failure
     } catch (failure: Exception) {
+        if (failure.message == "SCHEDULE_WRITE_VERIFY_FAILED") {
+            database.recordWriteVerificationFailure(
+                toolName = "calendar.schedule.create",
+                targetId = suggestionId,
+                idempotencyKey = "schedule-suggestion:$suggestionId",
+                reasonCode = failure.message.orEmpty(),
+                nowEpochMs = nowEpochMs,
+            )
+        }
         Log.w(TAG, "schedule:create_atomic_failed suggestion=$suggestionId", failure)
         false
     }
@@ -222,6 +232,13 @@ class AgentSuggestionRepository @Inject internal constructor(
                 updatedAtEpochMs = nowEpochMs,
             ),
         )
+        val persisted = database.scheduleDao().findById(scheduleId)
+        check(
+            persisted != null &&
+                persisted.title == creation.title &&
+                persisted.startAtEpochMs == creation.startAtEpochMs &&
+                persisted.reminderMinutesBefore == DEFAULT_REMINDER_MINUTES,
+        ) { "SCHEDULE_WRITE_VERIFY_FAILED" }
         check(database.agentSuggestionDao().markScheduleCreated(creation.suggestion.suggestionId, planId, nowEpochMs) == 1)
         return schedule
     }
