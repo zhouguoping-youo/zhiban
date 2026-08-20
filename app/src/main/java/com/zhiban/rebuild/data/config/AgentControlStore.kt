@@ -13,6 +13,8 @@ data class MemoryPolicy(
 )
 data class FeedbackPolicy(val useHumanFeedback: Boolean = true, val allowPreferenceImprovement: Boolean = true)
 data class SilenceContactThresholds(val customerDays: Int = 30, val familyOrCloseFriendDays: Int = 14, val generalDays: Int = 60)
+data class WakeupQuietHours(val enabled: Boolean = true, val startHour: Int = 23, val endHour: Int = 7)
+data class WakeupThrottleState(val contactWakes: Map<String, Long> = emptyMap(), val globalWakes: List<Long> = emptyList())
 data class PreferenceImprovementSuggestion(val id: String, val title: String, val description: String)
 enum class ExecutionPreference(val label: String, val runtimeLevel: String) {
     FAST("快速", "快速"),
@@ -92,6 +94,39 @@ class AgentControlStore internal constructor(context: Context, prefsName: String
 
     fun saveUnobservedReplyDays(days: Int) {
         check(store.edit().putInt("unobserved_reply_days", days.coerceIn(1, 30)).commit())
+    }
+
+    fun wakeupQuietHours() = WakeupQuietHours(
+        enabled = store.getBoolean("wakeup_quiet_enabled", true),
+        startHour = store.getInt("wakeup_quiet_start", 23).coerceIn(0, 23),
+        endHour = store.getInt("wakeup_quiet_end", 7).coerceIn(0, 23),
+    )
+
+    fun saveWakeupQuietHours(value: WakeupQuietHours) {
+        check(
+            store.edit()
+                .putBoolean("wakeup_quiet_enabled", value.enabled)
+                .putInt("wakeup_quiet_start", value.startHour.coerceIn(0, 23))
+                .putInt("wakeup_quiet_end", value.endHour.coerceIn(0, 23))
+                .commit(),
+        )
+    }
+
+    fun wakeupThrottleState(): WakeupThrottleState = WakeupThrottleState(
+        contactWakes = store.getStringSet("wakeup_contact_times", emptySet()).orEmpty().mapNotNull { encoded ->
+            val split = encoded.indexOf('=')
+            if (split <= 0) null else encoded.substring(0, split) to encoded.substring(split + 1).toLongOrNull()
+        }.mapNotNull { (key, value) -> value?.let { key to it } }.toMap(),
+        globalWakes = store.getStringSet("wakeup_global_times", emptySet()).orEmpty().mapNotNull(String::toLongOrNull).sorted(),
+    )
+
+    fun saveWakeupThrottleState(value: WakeupThrottleState) {
+        check(
+            store.edit()
+                .putStringSet("wakeup_contact_times", value.contactWakes.mapTo(mutableSetOf()) { "${it.key}=${it.value}" })
+                .putStringSet("wakeup_global_times", value.globalWakes.mapTo(mutableSetOf(), Long::toString))
+                .commit(),
+        )
     }
 
     // AI 回复建议：全局总开关（默认开）+ 按联系人"不再建议"。

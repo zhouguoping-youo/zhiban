@@ -196,7 +196,13 @@ internal suspend fun ProviderExecutionEngine.assembleReActContext(
     val assembledMessages = contextAssembler.assembleMessages(
         input,
         QueryAssemblyContext(queryContext, retrieval),
-        SessionAssemblyContext(approvedMemories, conversationContext.summary, conversationContext.recentTurns, feedback),
+        SessionAssemblyContext(
+            approvedMemories,
+            conversationContext.summary,
+            conversationContext.recentTurns,
+            feedback,
+            operationalContextLoader.load(clock()),
+        ),
         activatedSkills,
         minOf(
             capability.maxContextTokens,
@@ -577,7 +583,13 @@ internal suspend fun ProviderExecutionEngine.buildObservationRequest(
     val baseMessages = contextAssembler.assembleMessages(
         input,
         QueryAssemblyContext(queryContext, retrieval),
-        SessionAssemblyContext(approvedMemories, conversationContext.summary, conversationContext.recentTurns, feedback),
+        SessionAssemblyContext(
+            approvedMemories,
+            conversationContext.summary,
+            conversationContext.recentTurns,
+            feedback,
+            operationalContextLoader.load(clock()),
+        ),
         activatedSkills,
         minOf(
             capability.maxContextTokens,

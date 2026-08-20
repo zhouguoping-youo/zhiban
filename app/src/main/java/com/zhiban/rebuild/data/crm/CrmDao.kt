@@ -81,6 +81,9 @@ interface CrmDao {
     )
     suspend fun findOpenOpportunityByContact(contactId: String): CrmOpportunityEntity?
 
+    @Query("SELECT * FROM crm_opportunities WHERE status = 'OPEN' ORDER BY updatedAtEpochMs DESC LIMIT :limit")
+    suspend fun listOpenOpportunities(limit: Int): List<CrmOpportunityEntity>
+
     @Query(
         """SELECT * FROM crm_leads WHERE COALESCE(
             (SELECT canonicalContactId FROM contact_merge_links

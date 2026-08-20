@@ -2,6 +2,7 @@ package com.zhiban.rebuild.runtime.wakeup
 
 import android.util.Log
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.config.AgentControlStore
 import com.zhiban.rebuild.data.notification.ScheduleInsight
 import com.zhiban.rebuild.data.suggestion.AgentSuggestionCodecs
 import com.zhiban.rebuild.data.suggestion.AgentSuggestionEntity
@@ -45,11 +46,15 @@ internal class AgentWakeupCoordinator @Inject constructor(
     private val sessionWorkspace: SessionWorkspaceGateway,
     private val suggestions: AgentSuggestionRepository,
     private val contextLoader: WakeupContextLoader,
+    private val controls: AgentControlStore,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val triggers = Channel<String>(capacity = TRIGGER_BUFFER_CAPACITY)
     private val processMutex = Mutex()
-    private val throttle = WakeupThrottle()
+    private val throttle = WakeupThrottle(
+        stateLoader = controls::wakeupThrottleState,
+        stateSaver = controls::saveWakeupThrottleState,
+    )
 
     @Volatile
     private var consumerStarted = false
@@ -82,7 +87,13 @@ internal class AgentWakeupCoordinator @Inject constructor(
             val contactId = candidate.linkedContactId ?: candidate.suggestedContactId
             val hasOpenCrmOpportunity = contactId != null &&
                 database.crmDao().findOpenOpportunityByContact(contactId) != null
-            val decision = WakeupDecider.decide(candidate, hasOpenCrmOpportunity, System.currentTimeMillis(), throttle)
+            val decision = WakeupDecider.decide(
+                candidate,
+                hasOpenCrmOpportunity,
+                System.currentTimeMillis(),
+                throttle,
+                controls.wakeupQuietHours(),
+            )
             Log.d(
                 TAG,
                 "wakeup:decide candidate=$candidateId contact=$contactId drift=${candidate.identityDriftJson != null} schedule=${candidate.createdScheduleId} decision=$decision",

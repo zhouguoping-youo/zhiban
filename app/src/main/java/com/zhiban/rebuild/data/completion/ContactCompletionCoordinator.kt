@@ -31,6 +31,7 @@ internal class ContactCompletionCoordinator @Inject constructor(
     private val database: AgentDatabase,
     private val parser: ContactCompletionResponseParser,
     private val controls: AgentControlStore,
+    private val autoWriter: ContactCompletionAutoWriter = ContactCompletionAutoWriter(database),
 ) {
     private val processMutex = Mutex()
     private val trigger = ConflatedDebouncedTrigger(
@@ -123,8 +124,14 @@ internal class ContactCompletionCoordinator @Inject constructor(
 
         val extraction = parser.extract(request, candidate.body.orEmpty())
         val candidates = parser.buildCompletionCandidates(request, extraction, now)
-        // 候选表+请求表跨表写,同一事务(R10/P2-1):候选与状态转换要么一起落地,要么都不落。
-        database.withTransaction { stageCandidatesAndMark(request, candidates, now) }
+        val deterministic = candidates.firstOrNull { it.fieldKind == "COMMUNICATION_METHOD" && it.confidence >= 0.9 }
+        val autoApplied = deterministic?.let { selected ->
+            autoWriter.apply(request, selected, candidates - selected, now)
+        } == true
+        if (!autoApplied) {
+            // 候选表+请求表跨表写,同一事务(R10/P2-1):候选与状态转换要么一起落地,要么都不落。
+            database.withTransaction { stageCandidatesAndMark(request, candidates, now) }
+        }
     }
 
     /**

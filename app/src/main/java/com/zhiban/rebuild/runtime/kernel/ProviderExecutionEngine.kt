@@ -236,6 +236,7 @@ internal class ProviderExecutionEngine(
     internal val events = RuntimeEventAppender(store, ownerId, clock)
     internal val deterministicObservation = DeterministicObservationCompleter(store, ownerId, clock, ::perceiveForObservation)
     internal val contextAssembler = ProviderContextAssembler(clock, personalization)
+    internal val operationalContextLoader = ProviderOperationalContextLoader(database)
     private val scheduleExecutor = RoomScheduleToolExecutor(
         database,
         externalConflicts = externalCalendarConflicts,

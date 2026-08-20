@@ -2,6 +2,7 @@ package com.zhiban.rebuild.data.completion
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.withTransaction
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
@@ -9,12 +10,14 @@ import com.zhiban.rebuild.data.config.AgentControlStore
 import com.zhiban.rebuild.data.contact.ContactEnrichmentCandidateEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
+import com.zhiban.rebuild.foundation.sha256
 import com.zhiban.rebuild.provider.CapabilitySnapshot
 import com.zhiban.rebuild.provider.ModelEvent
 import com.zhiban.rebuild.provider.ModelRequest
 import com.zhiban.rebuild.provider.ProviderAdapter
 import com.zhiban.rebuild.provider.ProviderProfile
 import com.zhiban.rebuild.provider.ProviderProfileStore
+import com.zhiban.rebuild.runtime.governance.ChangeUndoCoordinator
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -61,10 +64,31 @@ class ContactCompletionCoordinatorTest {
         val candidate = database.contactKnowledgeDao().findEnrichmentCandidate("cc-ccr-1-COMMUNICATION_METHOD")
         assertNotNull(candidate)
         assertTrue(candidate!!.proposedValueJson.contains("13800138000"))
+        assertEquals("APPROVED", candidate.status)
+        assertEquals("13800138000", database.contactDao().findById("c1")!!.phone)
         val request = database.contactCompletionRequestDao().findById("ccr-1")!!
         assertEquals(ContactCompletionStatus.RESPONSE_RECEIVED, request.status)
         assertEquals("cc-ccr-1-COMMUNICATION_METHOD", request.responseCandidateId)
         assertNotNull(request.respondedAtEpochMs)
+    }
+
+    @Test fun deterministicPhoneAutoWriteIsVisibleAndReversible() = runBlocking {
+        insertContact("c1")
+        val sentAt = System.currentTimeMillis() - 10_000
+        seedAwaitingRequest("c1", """["PHONE"]""", sentAt)
+        insertIncoming("msg-1", "c1", body = "我电话13800138000", postedAt = sentAt + 5_000)
+
+        coordinator.processOnce()
+
+        val key = sha256("contact-completion-reply:cc-ccr-1-COMMUNICATION_METHOD")
+        val change = database.changeLogDao().findByIdempotencyKey(key)!!
+        assertNotNull(database.changeLogDao().findAutoWriteReceipt(change.changeId))
+        assertEquals("13800138000", database.contactDao().findById("c1")!!.phone)
+
+        database.withTransaction {
+            assertNotNull(ChangeUndoCoordinator(database).undoVisibleInTransaction(change.changeId, System.currentTimeMillis()))
+        }
+        assertNull(database.contactDao().findById("c1")!!.phone)
     }
 
     @Test fun excludesGroupChatReplies() = runBlocking {
@@ -120,6 +144,7 @@ class ContactCompletionCoordinatorTest {
         coordinator.processOnce()
 
         assertNotNull(database.contactKnowledgeDao().findEnrichmentCandidate("cc-ccr-1-COMMUNICATION_METHOD"))
+        assertEquals("13800138000", database.contactDao().findById("c1")!!.phone)
     }
 
     @Test fun noFieldReplyStaysAwaitingAndStagesNothing() = runBlocking {

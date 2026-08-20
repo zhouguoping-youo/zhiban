@@ -153,6 +153,36 @@ class ProviderContextAssemblerPresentationTest {
         assertTrue(!governed.content.contains("auto@example.com"))
     }
 
+    @Test
+    fun operationalSummariesAreVisibleWithoutRawNotificationBodies() {
+        val assembled = ProviderContextAssembler(clock = { 0L }, personalization = { null }).assembleMessages(
+            input = DecodedInput(text = "今天先做什么"),
+            query = QueryAssemblyContext(
+                QueryContext(IntentLabel.GENERAL_WORK, 0.0, emptyList(), null, emptyList()),
+                ContextRetrievalResult(emptyList(), 0, emptyList(), 0),
+            ),
+            session = SessionAssemblyContext(
+                memories = emptyList(),
+                summary = null,
+                recentTurns = emptyList(),
+                feedback = emptyList(),
+                operational = ProviderOperationalContext(
+                    notificationInsights = listOf("10:00 客户回访"),
+                    crmOpportunities = listOf("续约机会｜NEGOTIATION｜70%"),
+                    todaySchedules = listOf("14:00 方案评审｜PENDING"),
+                ),
+            ),
+            activatedSkills = emptyList(),
+            maxContextTokens = 4_096,
+        )
+
+        val operational = assembled.messages.filter { it.provenance.sourceType == "operational_context" }
+        assertEquals(3, operational.size)
+        assertTrue(operational.any { it.content.contains("客户回访") })
+        assertTrue(operational.any { it.content.contains("续约机会") })
+        assertTrue(operational.any { it.content.contains("方案评审") })
+    }
+
     private fun requestFrom(assembled: AssembledModelContext) = ModelRequest(
         requestId = "request-history",
         channel = OutboundChannel.LLM_INFERENCE,

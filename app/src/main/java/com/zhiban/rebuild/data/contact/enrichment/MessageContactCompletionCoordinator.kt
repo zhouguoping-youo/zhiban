@@ -336,12 +336,16 @@ internal val COMPLETION_FIELD_NAMES = listOf(
     MessageContactFieldKinds.COMPANY to "company",
     MessageContactFieldKinds.TITLE to "title",
     MessageContactFieldKinds.PHONE to "phone",
+    "EMAIL" to "email",
+    "WECHAT" to "wechatId",
 )
 
 internal fun contactField(contact: ContactEntity, kindOrName: String): String? = when (kindOrName) {
     MessageContactFieldKinds.COMPANY, "company" -> contact.company?.takeIf(String::isNotBlank)
     MessageContactFieldKinds.TITLE, "title" -> contact.title?.takeIf(String::isNotBlank)
     MessageContactFieldKinds.PHONE, "phone" -> contact.phone?.takeIf(String::isNotBlank)
+    "EMAIL", "email" -> contact.email?.takeIf(String::isNotBlank)
+    "WECHAT", "wechatId" -> contact.wechatId?.takeIf(String::isNotBlank)
     else -> null
 }
 

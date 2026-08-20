@@ -88,7 +88,7 @@ class ContactCompletionLoopTest {
         assertEquals(ContactCompletionStatus.AWAITING_REPLY, awaiting.status)
         val sentAt = awaiting.sentAtEpochMs!!
 
-        // 4) 对方回复(Phase 5):晚于发出的 1:1 来消息 → 抽字段、落候选、转 RESPONSE_RECEIVED。
+        // 4) 对方回复(Phase 5):确定性手机号达到 0.9，直接可撤销自动写并转 RESPONSE_RECEIVED。
         insertIncomingReply(contactId, "我电话13800138000", postedAt = sentAt + 1_000)
         coordinator.processOnce()
         val responded = dao.findById(draft.requestId)!!
@@ -96,9 +96,9 @@ class ContactCompletionLoopTest {
         val candidate = database.contactKnowledgeDao().findEnrichmentCandidate(responded.responseCandidateId!!)!!
         assertEquals("COMMUNICATION_METHOD", candidate.fieldKind)
         assertEquals("contact-completion-outreach", candidate.providerId)
+        assertEquals("APPROVED", candidate.status)
 
-        // 5) 用户确认入档(Phase 6):fill-only 只补空——phone 写入,既有公司/职责不动。
-        assertTrue(contacts.applyContactEnrichmentCandidate(candidate))
+        // 5) fill-only 自动写只补空——phone 写入,既有公司/职责不动。
         val filled = database.contactDao().findById(contactId)!!
         assertEquals("13800138000", filled.phone)
         assertEquals("星河科技有限公司", filled.company)
@@ -122,37 +122,23 @@ class ContactCompletionLoopTest {
         assertEquals(ContactCompletionStatus.DRAFTED, database.contactCompletionRequestDao().findById(draft.requestId)!!.status)
     }
 
-    @Test fun reOutreachAfterExpiryOverwritesStaleCandidateAndAdvances() = runBlocking {
+    @Test fun deterministicReplyIsIdempotentAfterAutomaticCompletion() = runBlocking {
         val dao = database.contactCompletionRequestDao()
-
-        // 1) 建档(同主闭环):唯缺 phone。
         val contactId = contacts.saveUserContact(
             contactId = null, displayName = "王五", phone = null, wechatId = "wx-wangwu",
             company = "司", title = "职", tag = null, note = null, email = "w@e.c", responsibilities = "责",
         )
-        // 2) 第一轮:触达→确认→回复→RESPONSE_RECEIVED,候选 PENDING 但用户一直没处理。
         val first = repository.prepareOutreach(contactId)!!
         assertTrue(repository.confirmAndHandoff(first.requestId, first.draftText))
         val sentAt1 = dao.findById(first.requestId)!!.sentAtEpochMs!!
         insertIncomingReply(contactId, "我电话13900139000", postedAt = sentAt1 + 1_000)
         coordinator.processOnce()
         assertEquals(ContactCompletionStatus.RESPONSE_RECEIVED, dao.findById(first.requestId)!!.status)
-
-        // 3) 请求 7 天过期(候选仍 PENDING)→ 同一字段集再次触达,确定性 requestId 复用、旧行被 REPLACE。
-        dao.markStatus(first.requestId, ContactCompletionStatus.EXPIRED, System.currentTimeMillis())
-        val second = repository.prepareOutreach(contactId)!!
-        assertEquals(first.requestId, second.requestId)
-        assertTrue(repository.confirmAndHandoff(second.requestId, second.draftText))
-        val sentAt2 = dao.findById(second.requestId)!!.sentAtEpochMs!!
-
-        // 4) 二次回复带新值:旧 PENDING 候选必须被覆盖、状态推进 RESPONSE_RECEIVED,不卡 AWAITING。
-        insertIncomingReply(contactId, "我电话13700137000", postedAt = sentAt2 + 1_000)
         coordinator.processOnce()
-        val responded = dao.findById(second.requestId)!!
-        assertEquals(ContactCompletionStatus.RESPONSE_RECEIVED, responded.status)
-        val candidate = database.contactKnowledgeDao().findEnrichmentCandidate(responded.responseCandidateId!!)!!
-        assertTrue(candidate.proposedValueJson.contains("13700137000"))
-        assertTrue(!candidate.proposedValueJson.contains("13900139000"))
+
+        assertEquals("13900139000", database.contactDao().findById(contactId)!!.phone)
+        val candidate = database.contactKnowledgeDao().findEnrichmentCandidate("cc-${first.requestId}-COMMUNICATION_METHOD")!!
+        assertEquals("APPROVED", candidate.status)
     }
 
     private suspend fun insertIncomingReply(contactId: String, body: String, postedAt: Long) {

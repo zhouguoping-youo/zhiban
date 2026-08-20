@@ -1,5 +1,7 @@
 package com.zhiban.rebuild.runtime.wakeup
 
+import com.zhiban.rebuild.data.config.WakeupQuietHours
+import com.zhiban.rebuild.data.config.WakeupThrottleState
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import java.time.Instant
 import java.time.LocalDateTime
@@ -50,7 +52,8 @@ class WakeupDeciderTest {
         hasOpenCrmOpportunity: Boolean = false,
         nowEpochMs: Long = noon,
         throttle: WakeupThrottle = WakeupThrottle(),
-    ) = WakeupDecider.decide(candidate, hasOpenCrmOpportunity, nowEpochMs, throttle)
+        quietHours: WakeupQuietHours = WakeupQuietHours(),
+    ) = WakeupDecider.decide(candidate, hasOpenCrmOpportunity, nowEpochMs, throttle, quietHours)
 
     // ---- 四条件唤醒 ----
 
@@ -219,6 +222,27 @@ class WakeupDeciderTest {
         // 一小时后恢复
         val late = candidate(body = "在吗", linkedContactId = "ct-late", identityDriftJson = "{}")
         assertTrue(decide(late, throttle = throttle, nowEpochMs = noon + 61 * 60 * 1_000) is WakeupDecision.Wake)
+    }
+
+    @Test
+    fun `节流状态跨实例恢复`() {
+        var persisted = WakeupThrottleState()
+        val first = WakeupThrottle(stateLoader = { persisted }, stateSaver = { persisted = it })
+        assertTrue(first.tryAcquire("ct-1", noon))
+
+        val afterRestart = WakeupThrottle(stateLoader = { persisted }, stateSaver = { persisted = it })
+        assertFalse(afterRestart.tryAcquire("ct-1", noon + 10 * 60 * 1_000))
+    }
+
+    @Test
+    fun `自定义免打扰时间由设置控制`() {
+        val candidate = candidate(body = "在吗", linkedContactId = "ct-1", identityDriftJson = "{}")
+        val daytimeQuiet = WakeupQuietHours(enabled = true, startHour = 11, endHour = 13)
+        assertEquals(
+            WakeupDecision.Skip("night_quiet_hours"),
+            decide(candidate, quietHours = daytimeQuiet),
+        )
+        assertTrue(decide(candidate, quietHours = daytimeQuiet.copy(enabled = false)) is WakeupDecision.Wake)
     }
 
     // ---- 纯函数 ----

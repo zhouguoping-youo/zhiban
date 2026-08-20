@@ -1,7 +1,10 @@
 package com.zhiban.rebuild.runtime.wakeup
 
+import com.zhiban.rebuild.data.config.WakeupQuietHours
+import com.zhiban.rebuild.data.config.WakeupThrottleState
 import com.zhiban.rebuild.data.notification.MessagePlatformCapabilities
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
+import com.zhiban.rebuild.foundation.sha256
 import java.time.LocalTime
 
 /**
@@ -39,9 +42,15 @@ internal object WakeupDecider {
         "来吃饭", "到公司", "来公司", "到我公司", "来单位", "到单位",
     )
 
-    fun decide(candidate: NotificationCandidateEntity, hasOpenCrmOpportunity: Boolean, nowEpochMs: Long, throttle: WakeupThrottle): WakeupDecision {
+    fun decide(
+        candidate: NotificationCandidateEntity,
+        hasOpenCrmOpportunity: Boolean,
+        nowEpochMs: Long,
+        throttle: WakeupThrottle,
+        quietHours: WakeupQuietHours = WakeupQuietHours(),
+    ): WakeupDecision {
         if (!candidate.incomingAndCapable()) return WakeupDecision.Skip("platform_not_wakeup_capable")
-        if (isNight(nowEpochMs)) return WakeupDecision.Skip("night_quiet_hours")
+        if (isQuietHour(nowEpochMs, quietHours)) return WakeupDecision.Skip("night_quiet_hours")
 
         val body = candidate.body.orEmpty()
         if (body.isBlank()) return WakeupDecision.Skip("empty_body")
@@ -89,13 +98,15 @@ internal object WakeupDecider {
     internal fun looksLikeUnscheduledIntent(body: String): Boolean = (TIME_WORDS.any(body::contains) || DAY_NUMBER_PATTERN.containsMatchIn(body)) &&
         (ACTION_WORDS.any(body::contains) || PRIVATE_INVITE_ANCHORS.any(body::contains))
 
-    private fun isNight(nowEpochMs: Long): Boolean {
+    private fun isQuietHour(nowEpochMs: Long, quietHours: WakeupQuietHours): Boolean {
+        if (!quietHours.enabled || quietHours.startHour == quietHours.endHour) return false
         val hour = LocalTime.ofInstant(java.time.Instant.ofEpochMilli(nowEpochMs), java.time.ZoneId.systemDefault()).hour
-        return hour >= QUIET_HOURS_START || hour < QUIET_HOURS_END
+        return if (quietHours.startHour < quietHours.endHour) {
+            hour in quietHours.startHour until quietHours.endHour
+        } else {
+            hour >= quietHours.startHour || hour < quietHours.endHour
+        }
     }
-
-    private const val QUIET_HOURS_START = 23
-    private const val QUIET_HOURS_END = 7
 }
 
 sealed interface WakeupDecision {
@@ -108,19 +119,24 @@ internal class WakeupThrottle(
     private val perContactWindowMs: Long = 30L * 60 * 1_000,
     private val globalWindowMs: Long = 60L * 60 * 1_000,
     private val globalLimit: Int = 8,
+    stateLoader: () -> WakeupThrottleState = { WakeupThrottleState() },
+    private val stateSaver: (WakeupThrottleState) -> Unit = {},
 ) {
-    private val lastWakePerContact = HashMap<String, Long>()
-    private val globalWakes = ArrayDeque<Long>()
+    private val initial = stateLoader()
+    private val lastWakePerContact = HashMap(initial.contactWakes)
+    private val globalWakes = ArrayDeque(initial.globalWakes.sorted())
 
     @Synchronized
     fun tryAcquire(contactKey: String, nowEpochMs: Long): Boolean {
-        lastWakePerContact[contactKey]?.let { last ->
+        val persistedKey = sha256(contactKey)
+        lastWakePerContact[persistedKey]?.let { last ->
             if (nowEpochMs - last < perContactWindowMs) return false
         }
         while (globalWakes.isNotEmpty() && nowEpochMs - globalWakes.first() >= globalWindowMs) globalWakes.removeFirst()
         if (globalWakes.size >= globalLimit) return false
-        lastWakePerContact[contactKey] = nowEpochMs
+        lastWakePerContact[persistedKey] = nowEpochMs
         globalWakes.addLast(nowEpochMs)
+        stateSaver(WakeupThrottleState(lastWakePerContact.toMap(), globalWakes.toList()))
         return true
     }
 }

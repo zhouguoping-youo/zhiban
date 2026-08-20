@@ -128,6 +128,7 @@ internal data class SessionAssemblyContext(
     val summary: String?,
     val recentTurns: List<com.zhiban.rebuild.data.store.RuntimeConversationTurnEntity>,
     val feedback: List<String>,
+    val operational: ProviderOperationalContext = ProviderOperationalContext(),
 )
 
 /** Executes only the provider portion of a Runtime v2 run. It never exposes credential material. */
@@ -143,6 +144,7 @@ internal class ProviderContextAssembler(private val clock: () -> Long, private v
             addAll(systemContextBlocks(input, activatedSkills))
             addAll(retrievalContextBlocks(query.query, query.retrieval))
             addAll(sessionContextBlocks(session.summary, session.recentTurns, session.memories, session.feedback))
+            addAll(operationalContextBlocks(session.operational))
             add(
                 ContextBlock(
                     "input",
@@ -331,6 +333,28 @@ internal class ProviderContextAssembler(private val clock: () -> Long, private v
                 ),
             )
         }
+    }
+
+    private fun operationalContextBlocks(context: ProviderOperationalContext): List<ContextBlock> = buildList {
+        addOperationalBlock("notification-insights", "近期消息判断", context.notificationInsights)
+        addOperationalBlock("crm-overview", "进行中的个人 CRM 机会", context.crmOpportunities)
+        addOperationalBlock("today-schedules", "今日日程", context.todaySchedules)
+    }
+
+    private fun MutableList<ContextBlock>.addOperationalBlock(id: String, label: String, values: List<String>) {
+        if (values.isEmpty()) return
+        val content = "$label：\n${values.joinToString("\n") { "- $it" }}"
+        add(
+            ContextBlock(
+                id,
+                ContextLayer.CONTEXT,
+                content,
+                TrustLevel.TRUSTED_APP,
+                Sensitivity.PERSONAL,
+                cost(content),
+                provenance("operational_context", id, content),
+            ),
+        )
     }
 
     private fun blocksToMessages(included: List<ContextBlock>, conversationRoles: Map<String, String>): List<ModelMessage> {
