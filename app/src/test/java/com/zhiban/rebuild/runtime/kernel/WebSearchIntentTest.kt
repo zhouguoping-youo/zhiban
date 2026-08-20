@@ -17,6 +17,13 @@ class WebSearchIntentTest {
         assertFalse(shouldForceWebSearch("搜索我的长期记忆"))
     }
 
+    @Test fun nativeSearchRequiresExplicitPublicIntentWithoutDirectIdentifiers() {
+        assertTrue(isSafePublicWebSearchIntent("联网搜索今天北京天气"))
+        assertFalse(isSafePublicWebSearchIntent("今天北京天气怎么样"))
+        assertFalse(isSafePublicWebSearchIntent("联网搜索手机号 13800000000 的公开资料"))
+        assertFalse(isSafePublicWebSearchIntent("Search the web for zhang@example.com"))
+    }
+
     @Test fun stablePreferencesUseAutomaticMemoryButOneTimeTasksDoNot() {
         assertTrue(shouldForceMemoryUpsert("记住我喜欢先看结论"))
         assertTrue(shouldForceMemoryUpsert("Remember that I prefer concise answers"))

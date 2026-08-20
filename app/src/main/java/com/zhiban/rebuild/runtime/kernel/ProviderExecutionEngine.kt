@@ -755,7 +755,9 @@ internal class ProviderExecutionEngine(
         val attemptId = ready.attemptId
         val profile = ready.profile
         val allowedTools = toolAllowlist(activatedSkills)
-        val forcedCanonicalTool = selectForcedCanonicalTool(
+        val nativeWebSearchAllowed =
+            "web_search" in capability.features && webSearchOptIn() && isSafePublicWebSearchIntent(input.text)
+        val selectedForcedTool = selectForcedCanonicalTool(
             ForcedToolSelection(
                 calendarCreateIntent = queryContext.intentLabel == com.zhiban.rebuild.runtime.context.IntentLabel.CALENDAR_CREATE,
                 input = input.text,
@@ -764,6 +766,9 @@ internal class ProviderExecutionEngine(
                 enabled = toolEnabled,
             ),
         )
+        val forcedCanonicalTool = selectedForcedTool.takeUnless {
+            it == WebSearchToolBinding.TOOL_NAME && nativeWebSearchAllowed
+        }
         val forcedToolName = forcedCanonicalTool?.let(capabilityRouter::providerName)
         val toolRestriction = forcedCanonicalTool?.let(::setOf) ?: allowedTools
         val request = ModelRequest(
@@ -777,7 +782,7 @@ internal class ProviderExecutionEngine(
             } else {
                 null
             },
-            allowWebSearch = forcedToolName == null && "web_search" in capability.features && webSearchOptIn(),
+            allowWebSearch = forcedToolName == null && nativeWebSearchAllowed,
             attachments = input.attachments.map { attachment ->
                 com.zhiban.rebuild.provider.ModelAttachment(
                     attachment.attachmentId, attachment.kind, attachment.mimeType, attachment.byteLength,

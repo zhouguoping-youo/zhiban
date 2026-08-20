@@ -14,6 +14,7 @@ import com.zhiban.rebuild.provider.ModelEvent
 import com.zhiban.rebuild.provider.ModelMessage
 import com.zhiban.rebuild.provider.ModelRequest
 import com.zhiban.rebuild.provider.OutboundChannel
+import com.zhiban.rebuild.provider.OutboundPiiDetector
 import com.zhiban.rebuild.provider.OutboundProvenance
 import com.zhiban.rebuild.provider.OutboundPurpose
 import com.zhiban.rebuild.provider.OutboundSensitivity
@@ -462,6 +463,9 @@ internal fun shouldForceWebSearch(input: String): Boolean {
     return EXPLICIT_WEB_SEARCH_PATTERNS.any(normalized::contains)
 }
 
+internal fun isSafePublicWebSearchIntent(input: String): Boolean = shouldForceWebSearch(input) &&
+    !OutboundPiiDetector.containsDirectIdentifier(input)
+
 internal fun shouldForceMemoryUpsert(input: String): Boolean {
     val normalized = input.trim().lowercase()
     if (ONE_TIME_MEMORY_PATTERNS.any(normalized::contains)) return false
@@ -480,7 +484,7 @@ internal data class ForcedToolSelection(
 internal fun selectForcedCanonicalTool(selection: ForcedToolSelection): String? {
     val candidate = when {
         selection.calendarCreateIntent -> CALENDAR_CREATE_TOOL
-        shouldForceWebSearch(selection.input) -> WEB_SEARCH_TOOL
+        isSafePublicWebSearchIntent(selection.input) -> WEB_SEARCH_TOOL
         shouldForceMemoryUpsert(selection.input) -> MEMORY_UPSERT_TOOL
         else -> return null
     }

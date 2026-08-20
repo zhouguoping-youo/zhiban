@@ -275,7 +275,7 @@ class RuntimeInputProcessorTest {
         assertTrue(database.runtimeEventDao().listByRunId("r-vision").none { it.payloadJson.contains("cache://") })
     }
 
-    @Test fun nativeWebSearchFollowsOptInPolicy() = runBlocking {
+    @Test fun nativeWebSearchRequiresOptInExplicitIntentAndSafePublicQuery() = runBlocking {
         val requests = mutableListOf<ModelRequest>()
         val provider = object : ProviderAdapter {
             override suspend fun probe(profile: ProviderProfile) = capability(profile).copy(features = setOf("stream", "tools", "web_search"))
@@ -296,7 +296,7 @@ class RuntimeInputProcessorTest {
         awaitRunStatus("r-web-off", "SUCCEEDED")
         assertFalse("policy off must keep native web search off", requests.last().allowWebSearch)
 
-        // Policy on (the production default): a web_search-capable model gets native web search.
+        // Opt-in alone is insufficient for a normal request without explicit public-search intent.
         val stagedOn = RoomTextInputGateway(database, { true }, { now }).stage("今天有什么新闻")
         RoomRuntimeGateways(database, "test") { now++ }.accept(
             RuntimeUiCommand.Start("s-web-on", stagedOn.inputRef, "c-web-on", "a-web-on", 0, "chat", "r-web-on"),
@@ -311,7 +311,39 @@ class RuntimeInputProcessorTest {
             config = ProviderEngineConfig(webSearchOptIn = { true }),
         ).processNext()
         awaitRunStatus("r-web-on", "SUCCEEDED")
-        assertTrue("policy on should enable native web search", requests.last().allowWebSearch)
+        assertFalse("implicit request must keep native web search off", requests.last().allowWebSearch)
+
+        val stagedExplicit = RoomTextInputGateway(database, { true }, { now }).stage("联网搜索今天北京天气")
+        RoomRuntimeGateways(database, "test") { now++ }.accept(
+            RuntimeUiCommand.Start("s-web-explicit", stagedExplicit.inputRef, "c-web-explicit", "a-web-explicit", 0, "chat", "r-web-explicit"),
+        )
+        KernelCommandProcessor(
+            database,
+            "processor",
+            { true },
+            { now++ },
+            provider = provider,
+            profiles = fixedProfileStore(),
+            config = ProviderEngineConfig(webSearchOptIn = { true }),
+        ).processNext()
+        awaitRunStatus("r-web-explicit", "SUCCEEDED")
+        assertTrue("explicit public request should enable native web search", requests.last().allowWebSearch)
+
+        val stagedSensitive = RoomTextInputGateway(database, { true }, { now }).stage("联网搜索手机号 13800000000 的公开资料")
+        RoomRuntimeGateways(database, "test") { now++ }.accept(
+            RuntimeUiCommand.Start("s-web-sensitive", stagedSensitive.inputRef, "c-web-sensitive", "a-web-sensitive", 0, "chat", "r-web-sensitive"),
+        )
+        KernelCommandProcessor(
+            database,
+            "processor",
+            { true },
+            { now++ },
+            provider = provider,
+            profiles = fixedProfileStore(),
+            config = ProviderEngineConfig(webSearchOptIn = { true }),
+        ).processNext()
+        awaitRunStatus("r-web-sensitive", "SUCCEEDED")
+        assertFalse("direct identifiers must keep native web search off", requests.last().allowWebSearch)
     }
 
     @Test fun providerAuthenticationFailureIsFinalAndPersistsOnlySafeCode() = runBlocking {
