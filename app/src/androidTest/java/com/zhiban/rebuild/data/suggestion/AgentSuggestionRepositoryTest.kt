@@ -258,6 +258,36 @@ class AgentSuggestionRepositoryTest {
         assertEquals(60, registeredReminders.single().third)
     }
 
+    @Test fun scheduleWriteMismatchRollsBackAndRecordsVerificationAudit() = runBlocking {
+        database.contactDao().insert(contact())
+        database.openHelper.writableDatabase.execSQL(
+            """
+            CREATE TRIGGER corrupt_schedule_after_insert
+            AFTER INSERT ON schedules
+            BEGIN
+                UPDATE schedules SET title = '被触发器篡改' WHERE id = NEW.id;
+            END
+            """.trimIndent(),
+        )
+        repository.insert(
+            suggestion(
+                "s-sched-corrupt",
+                contactId = "contact-1",
+                execActionType = "SCHEDULE",
+                startAtEpochMs = 1_000_000_000L,
+            ),
+        )
+
+        assertFalse(repository.accept("s-sched-corrupt", chosenContactId = "contact-1", nowEpochMs = 1L))
+        assertEquals(AgentSuggestionStatus.PENDING, database.agentSuggestionDao().find("s-sched-corrupt")?.status)
+        assertEquals(0, database.scheduleDao().count())
+        assertNotNull(
+            database.toolAuditDao().findByIdempotencyKey(
+                "write-verification-failure:schedule-suggestion:s-sched-corrupt",
+            ),
+        )
+    }
+
     @Test fun scheduleWithoutParticipantRemainsPendingAndWritesNothing() = runBlocking {
         val dao = database.agentSuggestionDao()
         repository.insert(
