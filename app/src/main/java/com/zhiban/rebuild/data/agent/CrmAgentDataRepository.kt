@@ -150,9 +150,9 @@ internal class CrmAgentDataRepository(private val database: AgentDatabase) {
     ) == 1
 
     /**
-     * Suggests logging a follow-up CALL activity after a call with a contact who has an open
-     * opportunity. Suggestion-only (user confirms before anything is written). Returns true when a
-     * suggestion was created; false when the contact has no open opportunity or one is already pending.
+     * Suggests a follow-up after a resolved contact call. Open opportunities receive the existing
+     * CRM activity suggestion; other contacts receive a contact-scoped lightweight suggestion.
+     * Nothing is written to the activity ledger until the user accepts an opportunity-scoped item.
      */
     suspend fun suggestCallFollowUpActivity(
         contactId: String,
@@ -164,23 +164,36 @@ internal class CrmAgentDataRepository(private val database: AgentDatabase) {
         if (database.crmDao().countSuggestionsByEvidence(CrmSuggestionType.CALL_FOLLOW_UP, evidenceRefsJson) > 0) {
             return@withTransaction false
         }
-        val opportunity = database.crmDao().findOpenOpportunityByContact(contactId) ?: return@withTransaction false
-        if (database.crmDao().hasPendingSuggestionOfType(opportunity.opportunityId, CrmSuggestionType.CALL_FOLLOW_UP)) {
+        val contact = database.contactDao().findById(contactId) ?: return@withTransaction false
+        val opportunity = database.crmDao().findOpenOpportunityByContact(contactId)
+        val alreadyPending = if (opportunity != null) {
+            database.crmDao().hasPendingSuggestionOfType(opportunity.opportunityId, CrmSuggestionType.CALL_FOLLOW_UP)
+        } else {
+            database.crmDao().hasPendingSuggestionOfTypeForContact(contactId, CrmSuggestionType.CALL_FOLLOW_UP)
+        }
+        if (alreadyPending) {
             return@withTransaction false
         }
         if (CALL_FOLLOW_UP_CONFIDENCE < SUGGESTION_MIN_CONFIDENCE) return@withTransaction false
-        val contact = database.contactDao().findById(contactId)
-        val name = contact?.displayName ?: opportunity.accountNameSnapshot
+        val name = contact.displayName
         database.crmDao().upsertSuggestions(
             listOf(
                 CrmAgentSuggestionEntity(
                     suggestionId = "sug-${UUID.randomUUID()}",
-                    opportunityId = opportunity.opportunityId,
+                    opportunityId = opportunity?.opportunityId,
                     contactId = contactId,
                     suggestionType = CrmSuggestionType.CALL_FOLLOW_UP,
-                    title = "记录通话跟进",
-                    summary = "刚和$name 通话 ${formatCallDuration(durationSeconds)}，要不要记一条跟进记录？",
-                    rationale = "通话后及时记录跟进有助于推进「${opportunity.title}」".take(500),
+                    title = if (opportunity == null) "补充通话要点" else "记录通话跟进",
+                    summary = if (opportunity == null) {
+                        "刚和$name 通话 ${formatCallDuration(durationSeconds)}，要不要补充通话要点？"
+                    } else {
+                        "刚和$name 通话 ${formatCallDuration(durationSeconds)}，要不要记一条跟进记录？"
+                    },
+                    rationale = if (opportunity == null) {
+                        "留下简短要点，之后查找这次沟通时更准确"
+                    } else {
+                        "通话后及时记录跟进有助于推进「${opportunity.title}」"
+                    }.take(500),
                     evidenceRefsJson = evidenceRefsJson,
                     confidence = CALL_FOLLOW_UP_CONFIDENCE,
                     proposedActionJson = null,
@@ -238,14 +251,23 @@ internal class CrmAgentDataRepository(private val database: AgentDatabase) {
 
     /**
      * Accepts a pending call-follow-up suggestion: writes the CALL activity (undoable via ChangeLog)
-     * and marks the suggestion accepted in one transaction. Returns false when the suggestion is
-     * missing, no longer pending, or has no live opportunity.
+     * and marks the suggestion accepted in one transaction. Contact-scoped lightweight suggestions
+     * only acknowledge the recommendation because they do not belong to a CRM opportunity.
      */
     suspend fun acceptCallFollowUpSuggestion(suggestionId: String, nowEpochMs: Long = System.currentTimeMillis()): Boolean = database.withTransaction {
         val suggestion = database.crmDao().findSuggestion(suggestionId) ?: return@withTransaction false
         if (suggestion.status != CrmSuggestionStatus.PENDING) return@withTransaction false
         if (suggestion.suggestionType != CrmSuggestionType.CALL_FOLLOW_UP) return@withTransaction false
-        val opportunityId = suggestion.opportunityId ?: return@withTransaction false
+        val opportunityId = suggestion.opportunityId
+        if (opportunityId == null) {
+            if (suggestion.contactId == null) return@withTransaction false
+            return@withTransaction database.crmDao().transitionSuggestionStatus(
+                suggestionId,
+                CrmSuggestionStatus.PENDING,
+                CrmSuggestionStatus.ACCEPTED,
+                nowEpochMs,
+            ) == 1
+        }
         val opportunity = database.crmDao().findOpportunity(opportunityId) ?: return@withTransaction false
         val activity = CrmActivityEntity(
             activityId = "act-${UUID.randomUUID()}",

@@ -100,14 +100,19 @@ class CrmAgentSuggestionChainTest {
         assertTrue(suggestion.evidenceRefsJson.contains("call-1"))
     }
 
-    @Test fun noCallFollowUpWhenContactHasNoOpenOpportunity() = runBlocking {
+    @Test fun contactScopedCallFollowUpIsSuggestedWithoutOpenOpportunity() = runBlocking {
         db.contactDao().insert(contact("c1", "联系人"))
         db.crmDao().insertOpportunity(opportunity("o1", "c1", status = CrmRecordStatus.WON))
 
         val created = repo.suggestCallFollowUpActivity("c1", "call-1", 600, nowEpochMs = 1_000L)
 
-        assertTrue(!created)
-        assertEquals(0, db.crmDao().observePendingSuggestions(0.0).first().size)
+        assertTrue(created)
+        val suggestion = db.crmDao().observePendingSuggestions(0.0).first().single()
+        assertNull(suggestion.opportunityId)
+        assertEquals("c1", suggestion.contactId)
+        assertEquals("补充通话要点", suggestion.title)
+        assertTrue(repo.acceptCallFollowUpSuggestion(suggestion.suggestionId, nowEpochMs = 2_000L))
+        assertEquals(CrmSuggestionStatus.ACCEPTED, db.crmDao().findSuggestion(suggestion.suggestionId)?.status)
     }
 
     @Test fun callFollowUpDeduplicatedPerOpportunity() = runBlocking {

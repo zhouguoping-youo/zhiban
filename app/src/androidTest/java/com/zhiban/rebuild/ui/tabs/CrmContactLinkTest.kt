@@ -125,12 +125,14 @@ class CrmContactLinkTest {
         assertEquals(CrmSuggestionStatus.PENDING, pending.first().status)
     }
 
-    @Test fun suggestCallFollowUpIsSkippedWithoutOpenOpportunity() = runBlocking {
+    @Test fun suggestCallFollowUpFallsBackToContactScopeWithoutOpenOpportunity() = runBlocking {
         insertContact("c1")
         insertOpportunity("o1", "c1", status = CrmRecordStatus.WON) // no OPEN opportunity
 
-        assertTrue(!repository.suggestCallFollowUpActivity("c1", "call-1", 60, 10))
-        assertEquals(0, database.crmDao().observePendingSuggestions(0.0).first().size)
+        assertTrue(repository.suggestCallFollowUpActivity("c1", "call-1", 60, 10))
+        val suggestion = database.crmDao().observePendingSuggestions(0.0).first().single()
+        assertEquals(null, suggestion.opportunityId)
+        assertEquals("c1", suggestion.contactId)
     }
 
     @Test fun suggestCallFollowUpDoesNotDuplicatePendingSuggestion() = runBlocking {
