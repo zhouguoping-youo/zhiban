@@ -94,6 +94,17 @@ interface ContactDao {
     suspend fun findByNormalizedName(normalizedName: String): ContactEntity?
 
     @Query(
+        """SELECT * FROM contacts
+           WHERE normalizedName = :normalizedName
+             AND deletedAtEpochMs IS NULL
+             AND contactId NOT IN (
+                 SELECT sourceContactId FROM contact_merge_links WHERE undoneAtEpochMs IS NULL
+             )
+           ORDER BY updatedAtEpochMs DESC""",
+    )
+    suspend fun findActiveByNormalizedName(normalizedName: String): List<ContactEntity>
+
+    @Query(
         """SELECT COUNT(*) FROM contacts
            WHERE normalizedName = :normalizedName
              AND deletedAtEpochMs IS NULL

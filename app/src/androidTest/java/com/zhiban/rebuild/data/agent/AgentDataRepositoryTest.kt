@@ -8,6 +8,7 @@ import com.zhiban.rebuild.data.autowrite.AutoWriteRepository
 import com.zhiban.rebuild.data.autowrite.canonicalChangeDigest
 import com.zhiban.rebuild.data.autowrite.insertVisibleAutoWrite
 import com.zhiban.rebuild.data.calendar.SystemCalendarEvent
+import com.zhiban.rebuild.data.contact.ContactAliasEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.ContactImportantDateEntity
 import com.zhiban.rebuild.data.contact.ContactMergeLinkEntity
@@ -1115,7 +1116,7 @@ class AgentDataRepositoryTest {
     }
 
     @Test
-    fun uniqueExactNameAutomaticallyLinksMessageAndKeepsUndoReceipt() = runBlocking {
+    fun uniqueExactNameSuggestsContactWithoutAutomaticWrite() = runBlocking {
         val now = System.currentTimeMillis()
         val contactId = repository.saveUserContact(
             null, "唯一联系人", null, null, null, null, null, null, nowEpochMs = now,
@@ -1137,18 +1138,12 @@ class AgentDataRepositoryTest {
             ),
         )
 
-        assertTrue(repository.observeNotificationCandidates().first().isEmpty())
-        val fact = repository.observeContactFacts(contactId).first().single()
-        assertEquals("INTERACTION_SUMMARY", fact.factType)
-        val receipt = database.changeLogDao().observeAutoWriteReceipts().first().single()
-        assertEquals(0.99, receipt.confidence ?: 0.0, 0.0)
-        assertTrue(
-            AutoWriteRepository(
-                database,
-                context,
-                com.zhiban.rebuild.runtime.governance.ChangeUndoApplierImpl(database),
-            ).undo(receipt.changeId, now + 1_000L),
-        )
+        val pending = repository.observeNotificationCandidates().first().single()
+        assertEquals(contactId, pending.suggestedContactId)
+        assertEquals(0.75, pending.suggestedContactConfidence, 0.0)
+        assertNull(pending.linkedContactId)
+        assertTrue(repository.observeContactFacts(contactId).first().isEmpty())
+        assertTrue(database.changeLogDao().observeAutoWriteReceipts().first().isEmpty())
     }
 
     @Test
@@ -1183,7 +1178,8 @@ class AgentDataRepositoryTest {
     fun explicitHighConfidenceMessageAutomaticallyCreatesReversibleSchedule() = runBlocking {
         val now = System.currentTimeMillis()
         val start = now + 24 * 60 * 60_000L
-        repository.saveUserContact(null, "王敏", null, null, null, null, null, null, now)
+        val contactId = repository.saveUserContact(null, "王敏", null, null, null, null, null, null, now)
+        repository.addContactPlatformIdentity(contactId, "FEISHU", "王敏", nowEpochMs = now)
 
         repository.stageNotificationCandidate(
             NotificationCandidateEntity(
@@ -1289,6 +1285,73 @@ class AgentDataRepositoryTest {
     }
 
     @Test
+    fun contactAttributionUsesDistinctConfidenceTiers() = runBlocking {
+        database.contactDao().insert(testContact("alias-contact", "张三", "", "", 1))
+        database.contactIdentityDao().upsertAlias(
+            ContactAliasEntity(
+                aliasId = "alias-1",
+                contactId = "alias-contact",
+                alias = "老张",
+                normalizedAlias = "老张",
+                aliasType = "USER",
+                source = "USER",
+                userConfirmed = true,
+                createdAtEpochMs = 1,
+            ),
+        )
+        repository.stageNotificationCandidate(incomingCandidate("alias-candidate", "老张", 10))
+        val alias = requireNotNull(database.notificationCandidateDao().find("alias-candidate"))
+        assertEquals("alias-contact", alias.suggestedContactId)
+        assertEquals(0.9, alias.suggestedContactConfidence, 0.0)
+        assertNull(alias.linkedContactId)
+
+        database.contactDao().insert(testContact("name-contact", "李四", "", "", 2))
+        repository.stageNotificationCandidate(incomingCandidate("name-candidate", "李四", 20))
+        val name = requireNotNull(database.notificationCandidateDao().find("name-candidate"))
+        assertEquals("name-contact", name.suggestedContactId)
+        assertEquals(0.75, name.suggestedContactConfidence, 0.0)
+        assertNull(name.linkedContactId)
+    }
+
+    @Test
+    fun sameNameUsesPriorResolvedConversationAsConfirmationSuggestion() = runBlocking {
+        database.contactDao().insert(testContact("zhang-a", "张伟", "", "", 1))
+        database.contactDao().insert(testContact("zhang-b", "张伟", "", "", 2))
+        database.notificationCandidateDao().upsert(
+            incomingCandidate("prior", "张伟", 10).copy(linkedContactId = "zhang-b", status = "CONFIRMED"),
+        )
+
+        repository.stageNotificationCandidate(incomingCandidate("current", "张伟", 20))
+
+        val current = requireNotNull(database.notificationCandidateDao().find("current"))
+        assertEquals("zhang-b", current.suggestedContactId)
+        assertEquals(0.7, current.suggestedContactConfidence, 0.0)
+        assertNull(current.linkedContactId)
+    }
+
+    @Test
+    fun sameNameUsesUniqueCompanyMentionButRejectsConflictingEvidence() = runBlocking {
+        database.contactDao().insert(testContact("zhang-a", "张伟", "", "", 1).copy(company = "甲辰科技有限公司"))
+        database.contactDao().insert(testContact("zhang-b", "张伟", "", "", 2).copy(company = "乙方贸易有限公司"))
+        repository.stageNotificationCandidate(
+            incomingCandidate("company-match", "张伟", 20).copy(body = "我是甲辰科技有限公司的张伟"),
+        )
+        val company = requireNotNull(database.notificationCandidateDao().find("company-match"))
+        assertEquals("zhang-a", company.suggestedContactId)
+        assertEquals(0.7, company.suggestedContactConfidence, 0.0)
+
+        database.notificationCandidateDao().upsert(
+            incomingCandidate("prior-conflict", "张伟", 30).copy(linkedContactId = "zhang-b", status = "CONFIRMED"),
+        )
+        repository.stageNotificationCandidate(
+            incomingCandidate("conflict", "张伟", 40).copy(body = "甲辰科技有限公司的项目有更新"),
+        )
+        val conflict = requireNotNull(database.notificationCandidateDao().find("conflict"))
+        assertNull(conflict.suggestedContactId)
+        assertEquals(0.0, conflict.suggestedContactConfidence, 0.0)
+    }
+
+    @Test
     fun legacyGenericSmsCandidatesAreRemovedFromRelationshipInbox() = runBlocking {
         val now = System.currentTimeMillis()
         repository.stageNotificationCandidate(
@@ -1327,6 +1390,7 @@ class AgentDataRepositoryTest {
         val contactId = repository.saveUserContact(
             null, "王敏", null, null, null, null, null, null, nowEpochMs = 1_000L,
         )
+        repository.addContactPlatformIdentity(contactId, "FEISHU", "王敏", nowEpochMs = 1_000L)
         repository.stageNotificationCandidate(
             NotificationCandidateEntity(
                 candidateId = "notification-schedule",
@@ -1642,7 +1706,7 @@ class AgentDataRepositoryTest {
 
     @Test
     fun driftHintIsNotSetWhenNoOlderConfirmedIdentityExists() = runBlocking {
-        // 没有旧确认身份时,第三级命中照常自动关联(自愈),不打漂移标记。
+        // 没有旧确认身份时,第三级命中只建议、不自动关联,也不打漂移标记。
         val contactId = repository.saveUserContact(null, "李建国", null, null, null, null, null, null, 1_000L)
         repository.stageNotificationCandidate(
             NotificationCandidateEntity(
@@ -1661,7 +1725,9 @@ class AgentDataRepositoryTest {
 
         val staged = requireNotNull(database.notificationCandidateDao().find("no-drift-1"))
         assertNull(staged.identityDriftJson)
-        assertEquals(contactId, staged.linkedContactId)
+        assertEquals(contactId, staged.suggestedContactId)
+        assertEquals(0.75, staged.suggestedContactConfidence, 0.0)
+        assertNull(staged.linkedContactId)
     }
 
     @Test
@@ -1778,6 +1844,20 @@ class AgentDataRepositoryTest {
         deletedAtEpochMs = null,
         createdAtEpochMs = createdAtEpochMs,
         updatedAtEpochMs = createdAtEpochMs,
+    )
+
+    private fun incomingCandidate(id: String, sender: String, postedAtEpochMs: Long) = NotificationCandidateEntity(
+        candidateId = id,
+        sourceKey = "source-$id",
+        packageName = "com.tencent.mobileqq",
+        appLabel = "QQ",
+        title = sender,
+        body = "收到",
+        postedAtEpochMs = postedAtEpochMs,
+        platform = "QQ",
+        conversationTitle = sender,
+        senderName = sender,
+        direction = "INCOMING",
     )
 
     private fun systemContact(

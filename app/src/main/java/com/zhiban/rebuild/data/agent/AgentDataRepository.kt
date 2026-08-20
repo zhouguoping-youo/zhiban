@@ -453,12 +453,11 @@ class AgentDataRepository internal constructor(
         if (candidate.suggestedContactId != null) return candidate
         val sender = candidate.senderName?.trim()?.takeIf(String::isNotBlank) ?: return candidate
         val normalized = normalizeIdentityValue(sender)
-        var driftJson: String? = null
-        val (contact, confidence) = if (candidate.platform == "SMS") {
+        val attribution = if (candidate.platform == "SMS") {
             normalizeContactPhone(sender)?.let { phone ->
                 daos.contactKnowledgeDao.findContactByMethod("PHONE", phone)
                     ?: daos.contactDao.findByPhone(phone)
-            }?.let { it to 1.0 }
+            }?.let { ContactAttribution(it, EXACT_IDENTITY_CONFIDENCE) }
                 ?: return candidate
         } else if (candidate.isGroupChat) {
             val sourceIdentityId = communicationSourceIdentityId(candidate, normalized) ?: return candidate
@@ -466,31 +465,60 @@ class AgentDataRepository internal constructor(
                 ?.takeIf { it.resolutionStatus == "RESOLVED" }
                 ?.personId
                 ?.let { daos.contactDao.findById(it) }
-                ?.let { it to 1.0 }
+                ?.let { ContactAttribution(it, EXACT_IDENTITY_CONFIDENCE) }
                 ?: return candidate
         } else {
-            daos.contactIdentityDao.findContactByPlatformHandle(candidate.platform, normalized)?.let { it to 1.0 }
-                ?: daos.contactIdentityDao.findContactByAlias(normalized)?.takeIf {
-                    daos.contactIdentityDao.countConfirmedContactsByAlias(normalized) == 1
-                }?.let { it to AUTO_LINK_CONFIDENCE }
-                ?: daos.contactDao.findByNormalizedName(normalized)?.takeIf {
-                    daos.contactDao.countActiveByNormalizedName(normalized) == 1
-                }?.let { contact ->
-                    // 第三级命中:名字恰好等于联系人名,但该联系人已有同平台的确认 handle 且与当前
-                    // 不同——大概率是用户改了微信备注。只打提示标记,写身份仍须用户显式确认。
-                    driftJson = detectIdentityDrift(
-                        platform = candidate.platform,
-                        currentNormalizedHandle = normalized,
-                        confirmedIdentities = daos.contactIdentityDao.platformIdentities(contact.contactId),
-                    )?.toJson()
-                    contact to AUTO_LINK_CONFIDENCE
-                }
-                ?: return candidate
+            resolveDirectMessageContact(candidate, normalized) ?: return candidate
         }
         return candidate.copy(
-            suggestedContactId = contact.contactId,
-            suggestedContactConfidence = confidence,
-            identityDriftJson = driftJson,
+            suggestedContactId = attribution.contact.contactId,
+            suggestedContactConfidence = attribution.confidence,
+            identityDriftJson = attribution.identityDriftJson,
+        )
+    }
+
+    private suspend fun resolveDirectMessageContact(candidate: NotificationCandidateEntity, normalizedSender: String): ContactAttribution? {
+        daos.contactIdentityDao.findContactByPlatformHandle(candidate.platform, normalizedSender)?.let {
+            return ContactAttribution(it, EXACT_IDENTITY_CONFIDENCE)
+        }
+        daos.contactIdentityDao.findContactByAlias(normalizedSender)?.takeIf {
+            daos.contactIdentityDao.countConfirmedContactsByAlias(normalizedSender) == 1
+        }?.let { return ContactAttribution(it, UNIQUE_ALIAS_CONFIDENCE) }
+
+        val nameMatches = daos.contactDao.findActiveByNormalizedName(normalizedSender)
+        if (nameMatches.size == 1) {
+            val contact = nameMatches.single()
+            val drift = detectIdentityDrift(
+                platform = candidate.platform,
+                currentNormalizedHandle = normalizedSender,
+                confirmedIdentities = daos.contactIdentityDao.platformIdentities(contact.contactId),
+            )?.toJson()
+            return ContactAttribution(contact, UNIQUE_NAME_CONFIDENCE, drift)
+        }
+        return disambiguateSameName(candidate, nameMatches)
+    }
+
+    private suspend fun disambiguateSameName(candidate: NotificationCandidateEntity, matches: List<ContactEntity>): ContactAttribution? {
+        if (matches.size < 2) return null
+        val eligibleIds = matches.mapTo(HashSet(), ContactEntity::contactId)
+        val conversationTitle = candidate.conversationTitle?.takeIf(String::isNotBlank)
+        val historyMatch = conversationTitle?.let { title ->
+            daos.notificationCandidateDao.resolvedContactHistory(
+                candidate.platform,
+                title,
+                candidate.postedAtEpochMs,
+                SAME_NAME_HISTORY_LIMIT,
+            ).distinct().singleOrNull()?.takeIf(eligibleIds::contains)
+        }
+        val companyMatch = companyMentionMatch(candidate.body, matches)?.contactId
+        val resolvedId = when {
+            historyMatch != null && companyMatch != null && historyMatch != companyMatch -> null
+            companyMatch != null -> companyMatch
+            else -> historyMatch
+        } ?: return null
+        return ContactAttribution(
+            contact = matches.first { it.contactId == resolvedId },
+            confidence = SAME_NAME_EVIDENCE_CONFIDENCE,
         )
     }
 
@@ -1167,5 +1195,23 @@ class AgentDataRepository internal constructor(
         const val NOTIFICATION_EVIDENCE_PREFIX = "notification-evidence:"
         const val AUTO_LINK_CONFIDENCE = 0.99
         const val AUTO_SCHEDULE_CONFIDENCE = 0.98
+        const val EXACT_IDENTITY_CONFIDENCE = 1.0
+        const val UNIQUE_ALIAS_CONFIDENCE = 0.9
+        const val UNIQUE_NAME_CONFIDENCE = 0.75
+        const val SAME_NAME_EVIDENCE_CONFIDENCE = 0.7
+        const val SAME_NAME_HISTORY_LIMIT = 20
     }
 }
+
+private data class ContactAttribution(val contact: ContactEntity, val confidence: Double, val identityDriftJson: String? = null)
+
+private fun companyMentionMatch(body: String?, contacts: List<ContactEntity>): ContactEntity? {
+    val compactBody = body?.identityComparableText()?.takeIf(String::isNotBlank) ?: return null
+    return contacts.filter { contact ->
+        contact.company?.identityComparableText()
+            ?.takeIf { it.length >= 3 }
+            ?.let(compactBody::contains) == true
+    }.singleOrNull()
+}
+
+private fun String.identityComparableText(): String = lowercase().filter(Char::isLetterOrDigit)

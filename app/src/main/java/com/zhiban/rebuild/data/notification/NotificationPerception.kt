@@ -143,6 +143,16 @@ interface NotificationCandidateDao {
     suspend fun threadMessages(platform: String, conversationTitle: String, sinceEpochMs: Long, limit: Int): List<NotificationCandidateEntity>
 
     @Query(
+        """SELECT linkedContactId FROM notification_candidates
+           WHERE platform = :platform
+             AND conversationTitle = :conversationTitle
+             AND linkedContactId IS NOT NULL
+             AND postedAtEpochMs < :beforeEpochMs
+           ORDER BY postedAtEpochMs DESC LIMIT :limit""",
+    )
+    suspend fun resolvedContactHistory(platform: String, conversationTitle: String, beforeEpochMs: Long, limit: Int): List<String>
+
+    @Query(
         """SELECT * FROM notification_candidates
            WHERE direction = 'INCOMING' AND platform = :platform AND postedAtEpochMs > :sinceEpochMs
              AND (linkedContactId IS NOT NULL OR suggestedContactId IS NOT NULL)
