@@ -12,6 +12,7 @@ data class MemoryPolicy(
     val temporaryModeEnabled: Boolean = false,
 )
 data class FeedbackPolicy(val useHumanFeedback: Boolean = true, val allowPreferenceImprovement: Boolean = true)
+data class SilenceContactThresholds(val customerDays: Int = 30, val familyOrCloseFriendDays: Int = 14, val generalDays: Int = 60)
 data class PreferenceImprovementSuggestion(val id: String, val title: String, val description: String)
 enum class ExecutionPreference(val label: String, val runtimeLevel: String) {
     FAST("快速", "快速"),
@@ -69,6 +70,22 @@ class AgentControlStore internal constructor(context: Context, prefsName: String
 
     fun saveWebSearchOptIn(enabled: Boolean) {
         check(store.edit().putBoolean("web_search_opt_in", enabled).commit())
+    }
+
+    fun silenceContactThresholds() = SilenceContactThresholds(
+        customerDays = store.getInt("silence_customer_days", 30).coerceIn(1, 365),
+        familyOrCloseFriendDays = store.getInt("silence_family_close_days", 14).coerceIn(1, 365),
+        generalDays = store.getInt("silence_general_days", 60).coerceIn(1, 365),
+    )
+
+    fun saveSilenceContactThresholds(value: SilenceContactThresholds) {
+        check(
+            store.edit()
+                .putInt("silence_customer_days", value.customerDays.coerceIn(1, 365))
+                .putInt("silence_family_close_days", value.familyOrCloseFriendDays.coerceIn(1, 365))
+                .putInt("silence_general_days", value.generalDays.coerceIn(1, 365))
+                .commit(),
+        )
     }
 
     // AI 回复建议：全局总开关（默认开）+ 按联系人"不再建议"。

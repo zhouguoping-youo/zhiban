@@ -437,6 +437,22 @@ interface RelationshipEdgeDao {
     suspend fun touching(contactIds: List<String>, limit: Int): List<RelationshipEdgeEntity>
 
     @Query(
+        """SELECT edgeId,
+        COALESCE((SELECT canonicalContactId FROM contact_merge_links WHERE sourceContactId = fromContactId AND undoneAtEpochMs IS NULL), fromContactId) AS fromContactId,
+        COALESCE((SELECT canonicalContactId FROM contact_merge_links WHERE sourceContactId = toContactId AND undoneAtEpochMs IS NULL), toContactId) AS toContactId,
+        relationType, evidenceDigest, evidenceRefsJson, confidence, userConfirmed, skillId,
+        status, createdAtEpochMs, updatedAtEpochMs
+        FROM relationship_edges WHERE status = 'ACTIVE' AND (
+          (COALESCE((SELECT canonicalContactId FROM contact_merge_links WHERE sourceContactId = fromContactId AND undoneAtEpochMs IS NULL), fromContactId) = 'user:self'
+           AND COALESCE((SELECT canonicalContactId FROM contact_merge_links WHERE sourceContactId = toContactId AND undoneAtEpochMs IS NULL), toContactId) IN (:contactIds))
+          OR
+          (COALESCE((SELECT canonicalContactId FROM contact_merge_links WHERE sourceContactId = toContactId AND undoneAtEpochMs IS NULL), toContactId) = 'user:self'
+           AND COALESCE((SELECT canonicalContactId FROM contact_merge_links WHERE sourceContactId = fromContactId AND undoneAtEpochMs IS NULL), fromContactId) IN (:contactIds))
+        ) ORDER BY userConfirmed DESC, confidence DESC, updatedAtEpochMs DESC""",
+    )
+    suspend fun ownerRelationships(contactIds: List<String>): List<RelationshipEdgeEntity>
+
+    @Query(
         """SELECT contactId, displayName, phone, email, wechatId, company, title, note FROM contacts
         WHERE deletedAtEpochMs IS NULL AND contactId IN (:contactIds)
         AND contactId NOT IN (SELECT sourceContactId FROM contact_merge_links WHERE undoneAtEpochMs IS NULL)""",

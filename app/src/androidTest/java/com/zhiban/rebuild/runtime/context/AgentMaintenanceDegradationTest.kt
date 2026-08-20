@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.config.AgentControlStore
+import com.zhiban.rebuild.data.interaction.SilentContactSuggestionScanner
 import com.zhiban.rebuild.data.suggestion.AgentSuggestionNotifier
 import java.util.concurrent.CancellationException
 import kotlinx.coroutines.test.runTest
@@ -54,6 +55,12 @@ class AgentMaintenanceDegradationTest {
     private fun coordinator(gateway: EmbeddingGateway): AgentMaintenanceCoordinator {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val controls = AgentControlStore(context, "maintenance_test_${System.nanoTime()}")
-        return AgentMaintenanceCoordinator(database, gateway, AgentSuggestionNotifier(context, controls))
+        val notifier = AgentSuggestionNotifier(context, controls)
+        return AgentMaintenanceCoordinator(
+            database,
+            gateway,
+            notifier,
+            SilentContactSuggestionScanner(database, controls, notifier),
+        )
     }
 }
