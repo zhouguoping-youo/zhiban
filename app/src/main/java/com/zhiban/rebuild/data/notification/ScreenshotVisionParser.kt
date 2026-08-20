@@ -63,6 +63,16 @@ internal class ScreenshotVisionParser @Inject constructor(
                         purpose = OutboundPurpose.SYSTEM_INSTRUCTION,
                         provenance = OutboundProvenance("screenshot_vision", "schema"),
                     ),
+                    // The OpenAI-compatible adapter attaches image parts to the last user
+                    // message. Keep this instruction fixed and public; never echo OCR or image
+                    // contents into the text channel.
+                    ModelMessage(
+                        role = "user",
+                        content = "请分析这张用户主动分享的截图，并按要求返回 JSON。",
+                        sensitivity = OutboundSensitivity.PUBLIC,
+                        purpose = OutboundPurpose.SYSTEM_INSTRUCTION,
+                        provenance = OutboundProvenance("screenshot_vision", "request"),
+                    ),
                 ),
                 capability = capability,
                 maxTokens = minOf(MAX_OUTPUT_TOKENS, capability.maxOutputTokens),
