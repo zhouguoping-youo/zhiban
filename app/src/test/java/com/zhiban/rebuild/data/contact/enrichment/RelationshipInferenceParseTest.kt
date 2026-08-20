@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.data.contact.enrichment
 
+import com.zhiban.rebuild.runtime.personalization.UserProfile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -8,6 +9,27 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RelationshipInferenceParseTest {
+
+    @Test
+    fun `owner background contains current company and occupations`() {
+        val background = UserProfile(
+            name = "周国平",
+            preferredName = "老周",
+            company = "平凯星辰（北京）科技有限公司",
+            occupations = setOf("销售经理", "湖北湖南区域"),
+        ).toRelationshipInferenceBackground()
+
+        assertTrue(background.contains("公司全称=平凯星辰（北京）科技有限公司"))
+        assertTrue(background.contains("销售经理"))
+    }
+
+    @Test
+    fun `classmate is accepted by relationship schema`() {
+        val inferred = parseInferredRelationship(
+            """{"relationType":"CLASSMATE","confidence":0.88,"evidence":"大学同班"}""",
+        )
+        assertEquals("CLASSMATE", inferred?.relationType)
+    }
     @Test
     fun parsesCleanInferenceJson() {
         val inferred = parseInferredRelationship(

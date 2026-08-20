@@ -11,6 +11,7 @@ import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.data.facts.FactEntity
 import com.zhiban.rebuild.runtime.governance.ChangeUndoApplierImpl
 import com.zhiban.rebuild.runtime.personalization.UserProfileStore
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -141,9 +142,31 @@ class RelationshipInferenceCoordinatorTest {
         assertEquals(1, database.contactKnowledgeDao().observePendingEnrichment("c1").first().size)
     }
 
-    private fun coordinator(inferred: InferredRelationship?) = RelationshipInferenceCoordinator(
+    @Test
+    fun addedInteractionCreatesNewEvidenceVersionAndSupersedesPendingSuggestion() = runBlocking {
+        database.contactDao().insert(contact("c1", "张三", null))
+        database.factDao().upsert(interaction("c1", "微信互动 · 最近聊了近况"))
+        val inference = AtomicReference(InferredRelationship("FRIEND", 0.7, "互动偏闲聊"))
+        val coordinator = coordinator { inference.get() }
+
+        coordinator.processOnce()
+        val first = database.contactKnowledgeDao().observePendingEnrichment("c1").first().single()
+
+        inference.set(InferredRelationship("CLASSMATE", 0.7, "新增证据提到同班"))
+        database.factDao().upsert(interaction("c1", "微信互动 · 新增一条中性证据"))
+        coordinator.processOnce()
+
+        val second = database.contactKnowledgeDao().observePendingEnrichment("c1").first().single()
+        assertTrue(second.candidateId != first.candidateId)
+        assertTrue(second.proposedValueJson.contains("CLASSMATE"))
+        assertEquals("SUPERSEDED", database.contactKnowledgeDao().findEnrichmentCandidate(first.candidateId)?.status)
+    }
+
+    private fun coordinator(inferred: InferredRelationship?) = coordinator { inferred }
+
+    private fun coordinator(infer: () -> InferredRelationship?) = RelationshipInferenceCoordinator(
         database,
-        RelationshipTypeExtraction { _, _, _ -> inferred },
+        RelationshipTypeExtraction { _, _, _ -> infer() },
         UserProfileStore(
             context,
             "test-profile-${System.currentTimeMillis()}",

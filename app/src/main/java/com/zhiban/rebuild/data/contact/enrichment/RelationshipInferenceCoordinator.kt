@@ -181,11 +181,13 @@ internal class RelationshipInferenceCoordinator @Inject constructor(
             .mapTo(hashSetOf()) { it.toContactId.takeIf { id -> id != RelationshipPersonIds.SELF } ?: it.fromContactId }
         val interactions = database.factDao().observeRecentInteractions(nowEpochMs, MAX_FACTS).first()
         interactions.groupBy { it.contactId }.forEach { (contactId, facts) ->
-            val idempotencyKey = sha256("relation-infer:$contactId")
             if (contactId == null || contactId in existing || contactId in ownerIds) return@forEach
+            val evidenceFacts = facts.take(5)
+            val evidenceVersion = relationshipEvidenceVersion(evidenceFacts.map { "${it.factId}:${it.updatedAtEpochMs}" })
+            val idempotencyKey = sha256("relation-infer:$contactId:$evidenceVersion")
             if (database.changeLogDao().findByIdempotencyKey(idempotencyKey) != null) return@forEach
             val contact = database.contactDao().findRawById(contactId) ?: return@forEach
-            val evidence = facts.take(5).joinToString(" · ") { it.textContent }
+            val evidence = evidenceFacts.joinToString(" · ") { it.textContent }
             // 本地规则启发式优先（零 LLM）：未配置 provider 时 LLM 推断直接返回 null，
             // 图谱永远只剩「有联系 · 来自消息互动」。规则给出保守归类后：
             // ≥AUTO_APPLY_CONFIDENCE 直接自动写可撤销边，否则落建议卡（与 LLM 同一处理分支）。
@@ -203,7 +205,7 @@ internal class RelationshipInferenceCoordinator @Inject constructor(
                     relationType = inferred.relationType,
                     confidence = inferred.confidence,
                     evidence = inferred.evidence,
-                    evidenceRefs = facts.map { it.factId }.take(5),
+                    evidenceRefs = evidenceFacts.map { it.factId },
                     idempotencyKey = idempotencyKey,
                     nowEpochMs = nowEpochMs,
                 )
@@ -211,7 +213,7 @@ internal class RelationshipInferenceCoordinator @Inject constructor(
                 // 已付过 LLM:打终态标记防重复付费;建议卡走智能完善闭环。
                 database.changeLogDao().insert(
                     com.zhiban.rebuild.data.autowrite.ChangeLogEntity(
-                        changeId = changeIdFor(sha256("relation-checked:$contactId")),
+                        changeId = changeIdFor(idempotencyKey),
                         runtimeRunId = null,
                         toolName = "contact.relationship.processed",
                         idempotencyKey = idempotencyKey,
@@ -227,7 +229,7 @@ internal class RelationshipInferenceCoordinator @Inject constructor(
                         originType = "SYSTEM_PERCEPTION",
                     ),
                 )
-                stageSuggestion(contactId, inferred, nowEpochMs)
+                stageSuggestion(contactId, inferred, evidenceVersion, nowEpochMs)
             }
         }
     }
@@ -297,27 +299,37 @@ internal class RelationshipInferenceCoordinator @Inject constructor(
         }
     }
 
-    private suspend fun stageSuggestion(contactId: String, inferred: InferredRelationship, nowEpochMs: Long) {
-        database.contactKnowledgeDao().insertEnrichmentCandidateIfAbsent(
-            ContactEnrichmentCandidateEntity(
-                candidateId = "relation-$contactId-${inferred.relationType.lowercase()}",
+    private suspend fun stageSuggestion(contactId: String, inferred: InferredRelationship, evidenceVersion: String, nowEpochMs: Long) {
+        val candidateId = "relation-$contactId-${inferred.relationType.lowercase()}-${evidenceVersion.take(12)}"
+        database.withTransaction {
+            database.contactKnowledgeDao().supersedePendingEnrichment(
                 contactId = contactId,
-                providerId = "relationship-inference",
+                providerId = RELATIONSHIP_PROVIDER_ID,
                 fieldKind = RELATIONSHIP_FIELD_KIND,
-                proposedValueJson = buildJsonObject {
-                    put("relationType", inferred.relationType)
-                    put("relationLabel", RelationshipTaxonomy.find(inferred.relationType)?.displayName ?: inferred.relationType)
-                    put("evidence", inferred.evidence.take(120))
-                }.toString(),
-                sourceRef = "互动推断",
-                confidence = inferred.confidence,
-                status = "PENDING",
-                observedAtEpochMs = nowEpochMs,
-                expiresAtEpochMs = nowEpochMs + SUGGESTION_TTL_MS,
-                createdAtEpochMs = nowEpochMs,
-                updatedAtEpochMs = nowEpochMs,
-            ),
-        )
+                replacementCandidateId = candidateId,
+                nowEpochMs = nowEpochMs,
+            )
+            database.contactKnowledgeDao().insertEnrichmentCandidateIfAbsent(
+                ContactEnrichmentCandidateEntity(
+                    candidateId = candidateId,
+                    contactId = contactId,
+                    providerId = RELATIONSHIP_PROVIDER_ID,
+                    fieldKind = RELATIONSHIP_FIELD_KIND,
+                    proposedValueJson = buildJsonObject {
+                        put("relationType", inferred.relationType)
+                        put("relationLabel", RelationshipTaxonomy.find(inferred.relationType)?.displayName ?: inferred.relationType)
+                        put("evidence", inferred.evidence.take(120))
+                    }.toString(),
+                    sourceRef = "互动推断",
+                    confidence = inferred.confidence,
+                    status = "PENDING",
+                    observedAtEpochMs = nowEpochMs,
+                    expiresAtEpochMs = nowEpochMs + SUGGESTION_TTL_MS,
+                    createdAtEpochMs = nowEpochMs,
+                    updatedAtEpochMs = nowEpochMs,
+                ),
+            )
+        }
     }
 
     internal companion object {
@@ -328,7 +340,8 @@ internal class RelationshipInferenceCoordinator @Inject constructor(
         const val SUGGESTION_TTL_MS = 7L * 24 * 60 * 60 * 1_000
         const val AUTO_APPLY_CONFIDENCE = 0.85
         const val RELATIONSHIP_FIELD_KIND = "RELATIONSHIP"
-        val INFERABLE_RELATION_TYPES = setOf("COLLEAGUE", "CUSTOMER", "SUPPLIER", "FRIEND", "FAMILY")
+        const val RELATIONSHIP_PROVIDER_ID = "relationship-inference"
+        val INFERABLE_RELATION_TYPES = setOf("COLLEAGUE", "CUSTOMER", "SUPPLIER", "FRIEND", "FAMILY", "CLASSMATE")
     }
 }
 
@@ -337,11 +350,14 @@ internal fun canonicalRelationshipDigest(edge: RelationshipEdgeEntity): String =
     "${edge.fromContactId}|${edge.toContactId}|${edge.relationType}|${edge.status}",
 )
 
+internal fun relationshipEvidenceVersion(evidenceRefs: List<String>): String = sha256(evidenceRefs.sorted().joinToString("|"))
+
 /** 关系类型 LLM 抽取:从互动摘要推断对方与用户的关系,response_format 约束 JSON。 */
 @Singleton
 internal class RelationshipTypeExtractor @Inject constructor(
     private val provider: com.zhiban.rebuild.provider.ProviderAdapter,
     private val profileStore: com.zhiban.rebuild.provider.ProviderProfileStore,
+    private val userProfileStore: UserProfileStore,
 ) : RelationshipTypeExtraction {
     override suspend fun infer(requestId: String, contactName: String, evidence: String): InferredRelationship? {
         val profile = profileStore.load() ?: return null
@@ -365,6 +381,7 @@ internal class RelationshipTypeExtractor @Inject constructor(
     ): InferredRelationship? {
         val output = StringBuilder()
         var final = false
+        val ownerBackground = userProfileStore.profile.value.toRelationshipInferenceBackground()
         provider.stream(
             com.zhiban.rebuild.provider.ModelRequest(
                 requestId = "$requestId-attempt-$attempt",
@@ -380,7 +397,7 @@ internal class RelationshipTypeExtractor @Inject constructor(
                     ),
                     com.zhiban.rebuild.provider.ModelMessage(
                         "user",
-                        "联系人：$contactName\n互动证据：$evidence\n请推断关系。",
+                        "用户自身背景：$ownerBackground\n联系人：$contactName\n互动证据：$evidence\n请推断关系。",
                         com.zhiban.rebuild.provider.OutboundSensitivity.PERSONAL,
                         com.zhiban.rebuild.provider.OutboundPurpose.AUTO_RETRIEVED,
                         com.zhiban.rebuild.provider.OutboundProvenance("interaction_evidence", "$requestId-attempt-$attempt"),
@@ -471,10 +488,18 @@ internal fun matchOwnerContactIds(profile: com.zhiban.rebuild.runtime.personaliz
     return (byPhone + byWechat + byName).mapTo(hashSetOf()) { it.contactId }
 }
 
+internal fun com.zhiban.rebuild.runtime.personalization.UserProfile.toRelationshipInferenceBackground(): String = buildString {
+    append("姓名=").append(name.trim().ifBlank { "未填写" })
+    append("；称呼=").append(preferredName.trim().ifBlank { "未填写" })
+    append("；公司全称=").append(company.trim().ifBlank { "未填写" })
+    append("；职业=").append(occupations.sorted().joinToString("、").ifBlank { "未填写" })
+}.take(300)
+
 private val SYSTEM_PROMPT = """
 你是知伴的关系推断助手。给定联系人名称和互动证据（来自微信等消息的摘要），推断这个人与用户最可能的关系类型。
 规则：
-- relationType 只能是 COLLEAGUE(同事)、CUSTOMER(客户)、SUPPLIER(供应商)、FRIEND(朋友)、FAMILY(家人) 之一；
+- relationType 只能是 COLLEAGUE(同事)、CUSTOMER(客户)、SUPPLIER(供应商)、FRIEND(朋友)、FAMILY(家人)、CLASSMATE(同学) 之一；
+- 「老师/导师/教授/学生」属于师生角色，不得推断为 CLASSMATE；当前类型不足时给低置信度；
 - 只基于证据推断，证据不足或判断不了时 confidence 给 0.5 以下；
 - confidence 表示把握：证据明确 0.85-1.0；模糊 0.5-0.8；
 - evidence 用一句话说明依据（中文）；
@@ -488,7 +513,7 @@ private val RELATION_SCHEMA = """
   "schema": {
     "type": "object",
     "properties": {
-      "relationType": {"type": "string", "enum": ["COLLEAGUE", "CUSTOMER", "SUPPLIER", "FRIEND", "FAMILY"]},
+      "relationType": {"type": "string", "enum": ["COLLEAGUE", "CUSTOMER", "SUPPLIER", "FRIEND", "FAMILY", "CLASSMATE"]},
       "confidence": {"type": "number"},
       "evidence": {"type": "string"}
     },

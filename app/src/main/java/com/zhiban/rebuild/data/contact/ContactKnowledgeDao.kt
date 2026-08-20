@@ -225,6 +225,13 @@ interface ContactKnowledgeDao {
     suspend fun resolveEnrichmentCandidate(candidateId: String, status: String, nowEpochMs: Long): Int
 
     @Query(
+        """UPDATE contact_enrichment_candidates SET status = 'SUPERSEDED', updatedAtEpochMs = :nowEpochMs
+        WHERE contactId = :contactId AND providerId = :providerId AND fieldKind = :fieldKind
+        AND status = 'PENDING' AND candidateId != :replacementCandidateId""",
+    )
+    suspend fun supersedePendingEnrichment(contactId: String, providerId: String, fieldKind: String, replacementCandidateId: String, nowEpochMs: Long): Int
+
+    @Query(
         "DELETE FROM contact_enrichment_candidates WHERE expiresAtEpochMs IS NOT NULL AND expiresAtEpochMs <= :nowEpochMs",
     )
     suspend fun purgeExpiredEnrichment(nowEpochMs: Long): Int

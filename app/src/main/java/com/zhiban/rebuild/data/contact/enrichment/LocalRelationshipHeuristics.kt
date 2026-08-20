@@ -50,9 +50,18 @@ internal object LocalRelationshipHeuristics {
 
     /** 同学/校友信号。 */
     private val CLASSMATE_TERMS = listOf(
-        "同学", "校友", "学校", "毕业", "班级", "班主任", "同桌", "宿舍",
-        "老师", "教授", "导师",
+        "同学",
+        "校友",
+        "学校",
+        "毕业",
+        "班级",
+        "班主任",
+        "同桌",
+        "宿舍",
     )
+
+    /** 师生角色不是同学证据；当前关系枚举未覆盖时交给 LLM 保守判断。 */
+    private val EDUCATION_ROLE_TERMS = listOf("老师", "教授", "导师", "教练", "学生")
 
     /** 同事信号：公司/单位/部门/开会等共事语义。 */
     private val COLLEAGUE_TERMS = listOf(
@@ -96,12 +105,14 @@ internal object LocalRelationshipHeuristics {
                 evidence = if (isCustomer) "互动出现商务往来词（报价/合同/对接等）" else "互动出现供货/物流词",
             )
         }
-        // 同学/老师信号 0.88。
+        // 师生角色不能降级成同学；缺少明确师生关系枚举时不做本地猜测。
+        if (EDUCATION_ROLE_TERMS.any { corpus.contains(it) }) return null
+        // 同学/校友信号 0.88。
         if (CLASSMATE_TERMS.any { corpus.contains(it) }) {
             return InferredRelationship(
                 relationType = "CLASSMATE",
                 confidence = 0.88,
-                evidence = "互动出现同学/学校/师生词",
+                evidence = "互动出现同学/校友/班级词",
             )
         }
         // 同事信号：联系人公司字段与本人公司一致的强同事边由 applyCompanyColleagueEdges 处理；

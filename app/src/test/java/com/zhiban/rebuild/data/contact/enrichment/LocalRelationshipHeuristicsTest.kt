@@ -62,6 +62,13 @@ class LocalRelationshipHeuristicsTest {
     }
 
     @Test
+    fun `老师导师教授不再误判为同学`() {
+        listOf("老师您好", "请导师审阅", "教授明天有课").forEach { evidence ->
+            assertNull(LocalRelationshipHeuristics.infer(contact(), evidence))
+        }
+    }
+
+    @Test
     fun `共事语义推断为同事但置信低于自动写阈值`() {
         val result = LocalRelationshipHeuristics.infer(contact(), "明天下午部门开会，周报记得交")
         assertNotNull(result)
