@@ -28,7 +28,7 @@ class AgentSuggestionRepository @Inject internal constructor(
     private val reminderRegistrar: ScheduleReminderRegistrar,
     private val notifier: AgentSuggestionNotifier,
 ) {
-    fun observeSuggestions(limit: Int = 100) = database.agentSuggestionDao().observeRecent(limit)
+    fun observeSuggestions(limit: Int = 50, offset: Int = 0) = database.agentSuggestionDao().observeRecent(limit, offset)
 
     fun observePendingCount() = database.agentSuggestionDao().observePendingCount()
 

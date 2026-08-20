@@ -54,22 +54,30 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Instant
 import java.time.ZoneId
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-data class AgentSuggestionUiState(val suggestions: List<AgentSuggestionEntity> = emptyList())
+data class AgentSuggestionUiState(val suggestions: List<AgentSuggestionEntity> = emptyList(), val hasMore: Boolean = false)
 
 /**
  * 智能建议中心 ViewModel：事件唤醒 LLM 判断后的产出在此统一到达用户。
  * "接受"表示认可该判断（已由 agent 执行的动作见自动整理收据，此处仅做意图确认），"忽略"静默关闭。
  */
 @HiltViewModel
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class AgentSuggestionViewModel @Inject constructor(private val repository: AgentSuggestionRepository) : ViewModel() {
-    val state: StateFlow<AgentSuggestionUiState> = repository.observeSuggestions()
-        .map { AgentSuggestionUiState(it) }
+    private val loadedLimit = MutableStateFlow(PAGE_SIZE)
+    val state: StateFlow<AgentSuggestionUiState> = loadedLimit
+        .flatMapLatest { limit ->
+            repository.observeSuggestions(limit + 1).map { rows ->
+                AgentSuggestionUiState(rows.take(limit), hasMore = rows.size > limit)
+            }
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AgentSuggestionUiState())
 
     val pendingCount: StateFlow<Int> = repository.observePendingCount()
@@ -92,6 +100,14 @@ class AgentSuggestionViewModel @Inject constructor(private val repository: Agent
     fun dismiss(suggestionId: String, onResult: (Boolean) -> Unit = {}) {
         viewModelScope.launch { onResult(repository.dismiss(suggestionId)) }
     }
+
+    fun loadMore() {
+        loadedLimit.value += PAGE_SIZE
+    }
+
+    private companion object {
+        const val PAGE_SIZE = 50
+    }
 }
 
 @Composable
@@ -104,6 +120,7 @@ fun AgentSuggestionPage(onBack: () -> Unit, viewModel: AgentSuggestionViewModel 
         onDismiss = viewModel::dismiss,
         onLoadCompletionDraft = viewModel::completionDraft,
         onCompleteAndHandoff = viewModel::completeAndHandoff,
+        onLoadMore = viewModel::loadMore,
     )
 }
 
@@ -115,6 +132,7 @@ internal fun AgentSuggestionContent(
     onDismiss: (String, (Boolean) -> Unit) -> Unit,
     onLoadCompletionDraft: (String, (ContactCompletionDraft?) -> Unit) -> Unit,
     onCompleteAndHandoff: (String, String, (Boolean) -> Unit) -> Unit,
+    onLoadMore: () -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -174,6 +192,16 @@ internal fun AgentSuggestionContent(
                         onLoadCompletionDraft = onLoadCompletionDraft,
                         onCompleteAndHandoff = onCompleteAndHandoff,
                     )
+                    if (state.hasMore) {
+                        item(key = "load-more") {
+                            TextButton(
+                                onClick = onLoadMore,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                            ) {
+                                Text("查看更多")
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -113,8 +113,8 @@ interface AgentSuggestionDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(suggestion: AgentSuggestionEntity): Long
 
-    @Query("SELECT * FROM agent_suggestions ORDER BY createdAtEpochMs DESC LIMIT :limit")
-    fun observeRecent(limit: Int = 100): Flow<List<AgentSuggestionEntity>>
+    @Query("SELECT * FROM agent_suggestions ORDER BY createdAtEpochMs DESC LIMIT :limit OFFSET :offset")
+    fun observeRecent(limit: Int = 100, offset: Int = 0): Flow<List<AgentSuggestionEntity>>
 
     @Query("SELECT COUNT(*) FROM agent_suggestions WHERE status = 'PENDING'")
     fun observePendingCount(): Flow<Int>
@@ -124,6 +124,12 @@ interface AgentSuggestionDao {
 
     @Query("SELECT * FROM agent_suggestions WHERE suggestionId = :suggestionId")
     suspend fun find(suggestionId: String): AgentSuggestionEntity?
+
+    @Query(
+        "SELECT * FROM agent_suggestions WHERE status = 'PENDING' AND execActionType = 'SCHEDULE' " +
+            "AND startAtEpochMs BETWEEN :nowEpochMs AND :beforeEpochMs ORDER BY startAtEpochMs",
+    )
+    suspend fun imminentSchedules(nowEpochMs: Long, beforeEpochMs: Long): List<AgentSuggestionEntity>
 
     @Query(
         "UPDATE agent_suggestions SET status = :status, updatedAtEpochMs = :nowEpochMs " +
@@ -136,6 +142,13 @@ interface AgentSuggestionDao {
             "WHERE suggestionId = :suggestionId AND status = 'PENDING'",
     )
     suspend fun markScheduleCreated(suggestionId: String, planId: String, nowEpochMs: Long): Int
+
+    @Query(
+        "UPDATE agent_suggestions SET status = 'DISMISSED', updatedAtEpochMs = :nowEpochMs WHERE status = 'PENDING' AND (" +
+            "(execActionType = 'SCHEDULE' AND startAtEpochMs < :nowEpochMs) OR " +
+            "((execActionType IS NULL OR execActionType != 'SCHEDULE' OR startAtEpochMs IS NULL) AND createdAtEpochMs < :cutoffEpochMs))",
+    )
+    suspend fun expirePending(cutoffEpochMs: Long, nowEpochMs: Long): Int
 
     @Query("DELETE FROM agent_suggestions WHERE status != 'PENDING' AND createdAtEpochMs < :beforeEpochMs")
     suspend fun pruneSettledBefore(beforeEpochMs: Long): Int

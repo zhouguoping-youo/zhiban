@@ -112,6 +112,46 @@ class AgentSuggestionRepositoryTest {
         assertEquals(1, database.agentSuggestionDao().observePendingCount().first())
     }
 
+    @Test fun pendingSuggestionsExpireWithScheduleAwareLifecycle() = runBlocking {
+        val now = 10L * 24 * 60 * 60 * 1_000
+        val old = now - 8L * 24 * 60 * 60 * 1_000
+        database.agentSuggestionDao().insert(suggestion("general-old").copy(createdAtEpochMs = old, updatedAtEpochMs = old))
+        database.agentSuggestionDao().insert(
+            suggestion("schedule-future").copy(
+                createdAtEpochMs = old,
+                updatedAtEpochMs = old,
+                execActionType = "SCHEDULE",
+                startAtEpochMs = now + 60 * 60_000L,
+            ),
+        )
+        database.agentSuggestionDao().insert(
+            suggestion("schedule-past").copy(
+                execActionType = "SCHEDULE",
+                startAtEpochMs = now - 1L,
+            ),
+        )
+
+        assertEquals(2, database.agentSuggestionDao().expirePending(now - 7L * 24 * 60 * 60 * 1_000, now))
+        assertEquals(AgentSuggestionStatus.DISMISSED, database.agentSuggestionDao().find("general-old")?.status)
+        assertEquals(AgentSuggestionStatus.PENDING, database.agentSuggestionDao().find("schedule-future")?.status)
+        assertEquals(AgentSuggestionStatus.DISMISSED, database.agentSuggestionDao().find("schedule-past")?.status)
+        assertEquals(
+            listOf("schedule-future"),
+            database.agentSuggestionDao().imminentSchedules(now, now + 24L * 60 * 60 * 1_000).map { it.suggestionId },
+        )
+    }
+
+    @Test fun suggestionsCanBeReadInStablePages() = runBlocking {
+        repeat(5) { index ->
+            database.agentSuggestionDao().insert(
+                suggestion("page-$index", dedupeKey = "page-$index").copy(createdAtEpochMs = index.toLong()),
+            )
+        }
+
+        assertEquals(listOf("page-4", "page-3"), database.agentSuggestionDao().observeRecent(2, 0).first().map { it.suggestionId })
+        assertEquals(listOf("page-2", "page-1"), database.agentSuggestionDao().observeRecent(2, 2).first().map { it.suggestionId })
+    }
+
     // ---- pruneSettled：只清「非 PENDING 且超期」 ----
 
     @Test fun pruneKeepsPendingAndRecentSuggestions() = runBlocking {

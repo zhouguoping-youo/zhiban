@@ -31,14 +31,23 @@ class AgentSuggestionNotifier @Inject constructor(@ApplicationContext private va
         ) {
             return
         }
-        val manager = context.getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "知伴建议", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "提醒你查看知伴的新判断"
-                lockscreenVisibility = Notification.VISIBILITY_PRIVATE
-            },
-        )
-        post(buildNotification(pendingCount))
+        context.getSystemService(NotificationManager::class.java).createNotificationChannel(suggestionChannel())
+        post(NOTIFICATION_ID, buildNotification("知伴有 $pendingCount 条新判断", pendingCount))
+    }
+
+    fun publishScheduleEscalation(suggestions: List<AgentSuggestionEntity>, nowEpochMs: Long = System.currentTimeMillis()) {
+        val visibleCount = suggestions.count { suggestion ->
+            val contactId = suggestion.contactId
+            contactId == null || (!controls.isReplyOptedOut(contactId) && !controls.isCompletionOptedOut(contactId))
+        }
+        if (visibleCount <= 0 || !canPublish(null, nowEpochMs)) return
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        context.getSystemService(NotificationManager::class.java).createNotificationChannel(suggestionChannel())
+        post(ESCALATION_NOTIFICATION_ID, buildNotification("有 $visibleCount 条临近日程待确认", visibleCount))
     }
 
     private fun canPublish(contactId: String?, nowEpochMs: Long): Boolean {
@@ -50,7 +59,12 @@ class AgentSuggestionNotifier @Inject constructor(@ApplicationContext private va
         )
     }
 
-    private fun buildNotification(pendingCount: Int): Notification {
+    private fun suggestionChannel() = NotificationChannel(CHANNEL_ID, "知伴建议", NotificationManager.IMPORTANCE_DEFAULT).apply {
+        description = "提醒你查看知伴的新判断"
+        lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+    }
+
+    private fun buildNotification(title: String, pendingCount: Int): Notification {
         val openIntent = Intent(context, MainActivity::class.java)
             .putExtra(EXTRA_OPEN_SUGGESTIONS, true)
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
@@ -67,7 +81,7 @@ class AgentSuggestionNotifier @Inject constructor(@ApplicationContext private va
             .build()
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_agent_conversations)
-            .setContentTitle("知伴有 $pendingCount 条新判断")
+            .setContentTitle(title)
             .setContentText("点击查看并决定下一步")
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
@@ -79,8 +93,8 @@ class AgentSuggestionNotifier @Inject constructor(@ApplicationContext private va
     }
 
     @SuppressLint("MissingPermission")
-    private fun post(notification: Notification) {
-        NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
+    private fun post(notificationId: Int, notification: Notification) {
+        NotificationManagerCompat.from(context).notify(notificationId, notification)
     }
 
     companion object {
@@ -88,6 +102,7 @@ class AgentSuggestionNotifier @Inject constructor(@ApplicationContext private va
         internal const val PUBLIC_TEXT = "知伴有新的建议"
         private const val CHANNEL_ID = "agent_suggestions"
         private const val NOTIFICATION_ID = 0xA63
+        private const val ESCALATION_NOTIFICATION_ID = 0xA64
         private const val REQUEST_CODE = 0xA63
     }
 }

@@ -3,6 +3,7 @@ package com.zhiban.rebuild.runtime.context
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.CrmAgentDataRepository
 import com.zhiban.rebuild.data.facts.FactIndex
+import com.zhiban.rebuild.data.suggestion.AgentSuggestionNotifier
 import com.zhiban.rebuild.runtime.memory.RoomMemoryGate
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -18,12 +19,17 @@ data class AgentMaintenanceResult(
     val crmSuggestionsExpired: Int,
     val enrichmentExpired: Int,
     val notificationExpired: Int = 0,
+    val agentSuggestionsExpired: Int = 0,
     val degradationReasons: Set<String> = emptySet(),
 )
 
 /** Idempotent cold-start maintenance for Agent-owned context and memory projections. */
 @Singleton
-internal class AgentMaintenanceCoordinator @Inject constructor(private val database: AgentDatabase, private val embeddingGateway: EmbeddingGateway) {
+internal class AgentMaintenanceCoordinator @Inject constructor(
+    private val database: AgentDatabase,
+    private val embeddingGateway: EmbeddingGateway,
+    private val suggestionNotifier: AgentSuggestionNotifier,
+) {
     suspend fun run(nowEpochMs: Long = System.currentTimeMillis()): AgentMaintenanceResult {
         val facts = FactIndex(database)
         var deleted = 0
@@ -54,6 +60,11 @@ internal class AgentMaintenanceCoordinator @Inject constructor(private val datab
         // 夹带 30 天前的批量 DELETE,每条通知的事务更短)。
         val notificationExpired = database.notificationCandidateDao()
             .clearExpiredOrDismissed(nowEpochMs - 30L * 24 * 60 * 60 * 1_000)
+        val agentSuggestionsExpired = database.agentSuggestionDao()
+            .expirePending(nowEpochMs - AGENT_SUGGESTION_TTL_MS, nowEpochMs)
+        val imminentSchedules = database.agentSuggestionDao()
+            .imminentSchedules(nowEpochMs, nowEpochMs + SCHEDULE_ESCALATION_WINDOW_MS)
+        suggestionNotifier.publishScheduleEscalation(imminentSchedules, nowEpochMs)
         // One bounded batch per startup; retrieval remains FTS-only until every active fact is rebuilt.
         val degradationReasons = try {
             EmbeddingIndex(database, embeddingGateway) { nowEpochMs }.backfillBatch(32)
@@ -64,16 +75,17 @@ internal class AgentMaintenanceCoordinator @Inject constructor(private val datab
             setOf(EMBEDDING_BACKFILL_FAILURE)
         }
         return AgentMaintenanceResult(
-            deleted,
-            dormant,
-            expiredAudits,
-            changeUndoExpired,
-            oldChangesDeleted,
-            factFtsRebuilt,
-            crmSuggestionsExpired,
-            enrichmentExpired,
-            notificationExpired,
-            degradationReasons,
+            expiredFactsDeleted = deleted,
+            memoriesDormant = dormant,
+            expiredAuditsDeleted = expiredAudits,
+            changeUndoExpired = changeUndoExpired,
+            oldChangesDeleted = oldChangesDeleted,
+            factFtsRebuilt = factFtsRebuilt,
+            crmSuggestionsExpired = crmSuggestionsExpired,
+            enrichmentExpired = enrichmentExpired,
+            notificationExpired = notificationExpired,
+            agentSuggestionsExpired = agentSuggestionsExpired,
+            degradationReasons = degradationReasons,
         )
     }
 
@@ -83,5 +95,7 @@ internal class AgentMaintenanceCoordinator @Inject constructor(private val datab
         const val CHANGE_LOG_RETENTION_MS = 365L * 24 * 60 * 60 * 1_000
         const val MAINTENANCE_BATCH_SIZE = 256
         const val EMBEDDING_BACKFILL_FAILURE = "embedding_backfill:failure"
+        const val AGENT_SUGGESTION_TTL_MS = 7L * 24 * 60 * 60 * 1_000
+        const val SCHEDULE_ESCALATION_WINDOW_MS = 24L * 60 * 60 * 1_000
     }
 }
