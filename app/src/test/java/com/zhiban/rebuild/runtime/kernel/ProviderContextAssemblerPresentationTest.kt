@@ -19,7 +19,7 @@ class ProviderContextAssemblerPresentationTest {
     @Test
     fun systemPolicyHidesImplementationDetailsUnlessTheUserAsks() {
         val result = ProviderContextAssembler(clock = { 0L }, personalization = { null }).assembleMessages(
-            input = DecodedInput(text = "今天有什么安排", mode = "Work"),
+            input = DecodedInput(text = "今天有什么安排"),
             query = QueryAssemblyContext(
                 QueryContext(IntentLabel.CALENDAR_QUERY, 1.0, emptyList(), null, emptyList()),
                 ContextRetrievalResult(emptyList(), 0, emptyList(), 0),
@@ -52,7 +52,7 @@ class ProviderContextAssemblerPresentationTest {
     fun currentUserInputIsNeverOmittedWhenSessionContextFillsBudget() {
         val currentInput = "请根据刚才的信息安排明晚八点的日程".repeat(30)
         val result = ProviderContextAssembler(clock = { 0L }, personalization = { null }).assembleMessages(
-            input = DecodedInput(text = currentInput, mode = "Work"),
+            input = DecodedInput(text = currentInput),
             query = QueryAssemblyContext(
                 QueryContext(IntentLabel.CALENDAR_CREATE, 1.0, emptyList(), null, emptyList()),
                 ContextRetrievalResult(emptyList(), 0, emptyList(), 0),
@@ -130,11 +130,10 @@ class ProviderContextAssemblerPresentationTest {
         val assembled = ProviderContextAssembler(clock = { 0L }, personalization = { null }).assembleMessages(
             input = DecodedInput(
                 text = "联系人回复：电话13800000000，邮箱auto@example.com",
-                mode = "Work",
                 origin = InputOrigin.AUTO_RETRIEVED,
             ),
             query = QueryAssemblyContext(
-                QueryContext(IntentLabel.GENERAL_CHAT, 0.0, emptyList(), null, emptyList()),
+                QueryContext(IntentLabel.GENERAL_WORK, 0.0, emptyList(), null, emptyList()),
                 ContextRetrievalResult(emptyList(), 0, emptyList(), 0),
             ),
             session = SessionAssemblyContext(emptyList(), null, emptyList(), emptyList()),
@@ -165,9 +164,9 @@ class ProviderContextAssemblerPresentationTest {
 
     private fun assembleWithHistory(history: List<RuntimeConversationTurnEntity>) =
         ProviderContextAssembler(clock = { 0L }, personalization = { null }).assembleMessages(
-            input = DecodedInput(text = "接着上面说", mode = "Chat"),
+            input = DecodedInput(text = "接着上面说"),
             query = QueryAssemblyContext(
-                QueryContext(IntentLabel.GENERAL_CHAT, 0.0, emptyList(), null, emptyList()),
+                QueryContext(IntentLabel.GENERAL_WORK, 0.0, emptyList(), null, emptyList()),
                 ContextRetrievalResult(emptyList(), 0, emptyList(), 0),
             ),
             session = SessionAssemblyContext(

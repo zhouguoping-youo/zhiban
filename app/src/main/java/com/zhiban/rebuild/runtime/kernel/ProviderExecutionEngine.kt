@@ -591,14 +591,14 @@ internal class ProviderExecutionEngine(
         val startedAt = clock()
         var degraded = false
         val context = withTimeoutOrNull(ENTITY_EXTRACTION_TIMEOUT_MS) {
-            perceptionPipeline.perceive(input.text, input.mode)
-        } ?: perceptionPipeline.fallback(input.text, input.mode).also { degraded = true }
+            perceptionPipeline.perceive(input.text)
+        } ?: perceptionPipeline.fallback(input.text).also { degraded = true }
         return PerceptionResult(context, (clock() - startedAt).coerceAtLeast(0), degraded)
     }
 
     internal suspend fun perceiveForObservation(input: DecodedInput): QueryContext = withTimeoutOrNull(ENTITY_EXTRACTION_TIMEOUT_MS) {
-        perceptionPipeline.perceive(input.text, input.mode)
-    } ?: perceptionPipeline.fallback(input.text, input.mode)
+        perceptionPipeline.perceive(input.text)
+    } ?: perceptionPipeline.fallback(input.text)
 
     internal suspend fun selectProfile(input: DecodedInput, dynamicConfig: com.zhiban.rebuild.runtime.config.AgentDynamicConfig): ProviderProfile {
         val stored = profiles.load() ?: throw ProviderFailure("PROVIDER_NOT_CONFIGURED", retryable = false)
@@ -663,8 +663,8 @@ internal class ProviderExecutionEngine(
         val input = decodeInput(rawInput)
         val perception = perceiveForRun(input)
         val config = dynamicConfig()
-        val activatedSkills = activatedSkillsFor(input, perception.context, config, skillSpecs(), toolCatalog.names(), toolEnabled)
-        val localCalendarTool = if (input.mode != "Work" || input.attachments.isNotEmpty()) {
+        val activatedSkills = activatedSkillsFor(perception.context, config, skillSpecs(), toolCatalog.names(), toolEnabled)
+        val localCalendarTool = if (input.attachments.isNotEmpty()) {
             null
         } else if (
             perception.context.intentLabel == com.zhiban.rebuild.runtime.context.IntentLabel.CALENDAR_CREATE &&
@@ -757,7 +757,6 @@ internal class ProviderExecutionEngine(
         val allowedTools = toolAllowlist(activatedSkills)
         val forcedCanonicalTool = selectForcedCanonicalTool(
             ForcedToolSelection(
-                workMode = input.mode == "Work",
                 calendarCreateIntent = queryContext.intentLabel == com.zhiban.rebuild.runtime.context.IntentLabel.CALENDAR_CREATE,
                 input = input.text,
                 availableTools = capabilityRouter.canonicalNames(),
@@ -773,7 +772,7 @@ internal class ProviderExecutionEngine(
             profile = profile,
             messages = assembledMessages.messages, capability = capability,
             maxTokens = minOf(DEFAULT_MAX_OUTPUT_TOKENS, capability.maxOutputTokens),
-            toolsJson = if (input.mode == "Work" && "tools" in capability.features) {
+            toolsJson = if ("tools" in capability.features) {
                 capabilityRouter.providerToolsJson(toolRestriction)
             } else {
                 null
@@ -1002,14 +1001,6 @@ internal class ProviderExecutionEngine(
             RuntimeRunStatus.OBSERVING.name,
         )
         const val ENTITY_EXTRACTION_TIMEOUT_MS = 50L
-        const val WORK_SYSTEM_PROMPT =
-            "你是知伴 Work Agent。需要创建日程时必须调用 calendar.schedule.create；" +
-                "用户明确说“提醒我”时应设置 reminderMinutesBefore，未说明提前量时默认 10。" +
-                "用户要求发短信、微信、QQ、飞书、Lark、企业微信或钉钉消息时，" +
-                "必须调用 communication.message.compose，并准确填写平台、收件人和完整正文；" +
-                "该工具只打开目标应用，仍需用户完成最后发送，绝不能声称已发送或已送达。" +
-                "不得声称已执行未调用的操作。"
-        const val CHAT_SYSTEM_PROMPT = "你是知伴。回答应准确、克制；不得声称执行了未发生的外部操作。"
         val SAFE_FAILURE_CODES = setOf(
             "AUTHENTICATION_FAILED", "TIMEOUT", "RATE_LIMITED", "PROVIDER_UNAVAILABLE", "TLS_VERIFICATION_FAILED",
             "PROVIDER_REJECTED", "MODEL_NOT_AVAILABLE", "CAPABILITY_EXPIRED",

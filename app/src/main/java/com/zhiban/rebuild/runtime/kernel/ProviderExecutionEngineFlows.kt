@@ -272,9 +272,6 @@ internal suspend fun ProviderExecutionEngine.routeReActToolCall(
         throw ProviderFailure("INVALID_TOOL_CALL", retryable = false)
     }
     requireSkillAllowsTool(safeEvent.name, context.activatedSkills)
-    if (input.mode != "Work") {
-        throw ProviderFailure("INVALID_TOOL_CALL", retryable = false)
-    }
     val revision = store.projectionSnapshot(ids.sessionId, "ui").currentRevision
     val toolRequest =
         RuntimeToolCallRequest(
@@ -517,7 +514,7 @@ internal suspend fun ProviderExecutionEngine.prepareObservationContext(ids: RunI
     val input = decodeInput(rawInput)
     val queryContext = perceiveForObservation(input)
     val config = dynamicConfig()
-    val activatedSkills = activatedSkillsFor(input, queryContext, config, skillSpecs(), toolCatalog.names(), toolEnabled)
+    val activatedSkills = activatedSkillsFor(queryContext, config, skillSpecs(), toolCatalog.names(), toolEnabled)
     val profile = selectProfile(input, config)
     val policy = memoryPolicy()
     val initialRetrieval = runSuspendCatching {

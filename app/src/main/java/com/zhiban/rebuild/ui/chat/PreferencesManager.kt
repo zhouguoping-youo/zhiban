@@ -28,7 +28,6 @@ class PreferencesManager @Inject constructor(@ApplicationContext private val con
     private val systemPromptKey = stringPreferencesKey("system_prompt")
     private val activeAgentRunIdKey = stringPreferencesKey("active_agent_run_id")
     private val activeRuntimeSessionIdKey = stringPreferencesKey("active_runtime_session_id")
-    private val agentModeKey = stringPreferencesKey("active_agent_mode")
 
     private val dataStore = context.dataStore
 
@@ -103,14 +102,6 @@ class PreferencesManager @Inject constructor(@ApplicationContext private val con
 
     suspend fun saveActiveRuntimeSessionId(sessionId: String) {
         dataStore.edit { it[activeRuntimeSessionIdKey] = sessionId }
-    }
-
-    suspend fun getAgentMode(): String = dataStore.data
-        .map { it[agentModeKey]?.takeIf { mode -> mode == "Work" } ?: "Chat" }
-        .first()
-
-    suspend fun saveAgentMode(mode: String) {
-        dataStore.edit { it[agentModeKey] = if (mode == "Work") "Work" else "Chat" }
     }
 
     suspend fun saveNonSecretModelSettings(model: String, systemPrompt: String) {

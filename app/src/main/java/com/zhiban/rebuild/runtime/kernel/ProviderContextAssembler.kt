@@ -173,12 +173,11 @@ internal class ProviderContextAssembler(private val clock: () -> Long, private v
     private fun cost(content: String) = (content.length / 3 + 1).coerceAtLeast(1)
 
     private fun systemContextBlocks(input: DecodedInput, activatedSkills: List<SkillActivation>): List<ContextBlock> = buildList {
-        val planning = PlanningStrategySelector.select(input.mode, input.level)
-        val basePolicy = if (input.mode == "Work") WORK_SYSTEM_PROMPT else CHAT_SYSTEM_PROMPT
+        val planning = PlanningStrategySelector.select(input.level)
         val localNow = Instant.ofEpochMilli(clock())
             .atZone(ZoneId.systemDefault())
             .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss XXX"))
-        val policy = "$basePolicy 当前设备本地时间=$localNow；“今天、明天、本周”等相对时间必须以此为准，不得反问用户当前日期。规划策略=${planning.strategy.name}。${planning.instruction}"
+        val policy = "$WORK_SYSTEM_PROMPT 当前设备本地时间=$localNow；“今天、明天、本周”等相对时间必须以此为准，不得反问用户当前日期。规划策略=${planning.strategy.name}。${planning.instruction}"
         add(
             ContextBlock(
                 "policy",
@@ -410,7 +409,7 @@ internal class ProviderContextAssembler(private val clock: () -> Long, private v
         const val DEFAULT_MAX_OUTPUT_TOKENS = 2_048
         val CONVERSATION_ROLES = setOf("user", "assistant")
         const val WORK_SYSTEM_PROMPT =
-            "你是知伴 Work Agent。需要创建日程时必须调用 calendar.schedule.create；" +
+            "你是知伴 Coworker。需要创建日程时必须调用 calendar.schedule.create；" +
                 "用户明确说‘提醒我’时应设置 reminderMinutesBefore，未说明提前量时默认 10。" +
                 "用户要求整理、更新或核实联系人库时，先调用 contact.maintenance.list 读取真实待维护项；" +
                 "联系人整理结果中 totalContactCount 才是全库人数，returnedCount 只是当前返回页，绝不能把页数说成总人数；" +
@@ -435,9 +434,6 @@ internal class ProviderContextAssembler(private val clock: () -> Long, private v
                 "必须调用 communication.message.compose，并准确填写平台、收件人和完整正文；" +
                 "该工具只打开目标应用，仍需用户完成最后发送，绝不能声称已发送或已送达。" +
                 "不得声称已执行未调用的操作。" +
-                "答复先给结论，只保留必要信息；不要展示工具名、内部状态、检索条数或实现说明，除非用户明确询问。"
-        const val CHAT_SYSTEM_PROMPT =
-            "你是知伴。回答应准确、克制；不得声称执行了未发生的外部操作。" +
                 "答复先给结论，只保留必要信息；不要展示工具名、内部状态、检索条数或实现说明，除非用户明确询问。"
     }
 }

@@ -31,10 +31,10 @@ class CalendarTimeResolutionTest {
     @Test fun exactUserPhraseResolvesTomorrowAt10pmWithAConcreteTitle() {
         val reportedNow = LocalDateTime.of(2026, 8, 14, 8, 0).atZone(zone).toInstant().toEpochMilli()
         val text = "让agent创建一个 明晚10点与委内瑞拉客户会议的日程提醒"
-        val queryContext = extractor.extract(text, "Work", reportedNow)
+        val queryContext = extractor.extract(text, reportedNow)
 
         val toolCall = requireNotNull(
-            deterministicCalendarToolCall(DecodedInput(text, "Work"), queryContext, reportedNow),
+            deterministicCalendarToolCall(DecodedInput(text), queryContext, reportedNow),
         )
 
         assertEquals(
@@ -47,14 +47,14 @@ class CalendarTimeResolutionTest {
     }
 
     @Test fun deterministicFallbackComputesLocalTomorrow3pm() {
-        val queryContext = extractor.extract("明天下午3点和张总开会", "Work", now)
-        val toolCall = deterministicCalendarToolCall(DecodedInput("明天下午3点和张总开会", "Work"), queryContext)
+        val queryContext = extractor.extract("明天下午3点和张总开会", now)
+        val toolCall = deterministicCalendarToolCall(DecodedInput("明天下午3点和张总开会"), queryContext)
         assertNotNull("deterministic path should produce a tool call", toolCall)
         assertEquals(expectedTomorrow3pm, toolCall!!.startAt())
     }
 
     @Test fun normalizeOverridesWrongProviderEpochWithLocalTomorrow3pm() {
-        val queryContext = extractor.extract("明天下午3点和张总开会", "Work", now)
+        val queryContext = extractor.extract("明天下午3点和张总开会", now)
         // Provider returns tomorrow 03:00 (AM/PM confusion). The local override must correct it to 15:00.
         val wrongModelValue = LocalDateTime.of(2026, 8, 8, 3, 0).atZone(zone).toInstant().toEpochMilli()
         val modelCall = ModelEvent.ToolCall(
@@ -63,25 +63,25 @@ class CalendarTimeResolutionTest {
             name = SchedulePlanValidator.TOOL_NAME,
             argumentsJson = """{"title":"和张总开会","startAtEpochMs":$wrongModelValue,"durationMinutes":60}""",
         )
-        val normalized = normalizeCalendarToolCall({ it }, modelCall, DecodedInput("明天下午3点和张总开会", "Work"), queryContext)
+        val normalized = normalizeCalendarToolCall({ it }, modelCall, DecodedInput("明天下午3点和张总开会"), queryContext)
         assertEquals(expectedTomorrow3pm, normalized.startAt())
     }
 
     @Test fun normalizeKeepsCorrectProviderEpoch() {
-        val queryContext = extractor.extract("明天下午3点和张总开会", "Work", now)
+        val queryContext = extractor.extract("明天下午3点和张总开会", now)
         val modelCall = ModelEvent.ToolCall(
             ordinal = 0L,
             providerCallId = "call-1",
             name = SchedulePlanValidator.TOOL_NAME,
             argumentsJson = """{"title":"和张总开会","startAtEpochMs":$expectedTomorrow3pm,"durationMinutes":60}""",
         )
-        val normalized = normalizeCalendarToolCall({ it }, modelCall, DecodedInput("明天下午3点和张总开会", "Work"), queryContext)
+        val normalized = normalizeCalendarToolCall({ it }, modelCall, DecodedInput("明天下午3点和张总开会"), queryContext)
         assertEquals(expectedTomorrow3pm, normalized.startAt())
     }
 
     @Test fun normalizeReplacesGenericModelTitleWithTheUsersActualTask() {
         val text = "提醒我明天晚上8点接孩子"
-        val queryContext = extractor.extract(text, "Work", now)
+        val queryContext = extractor.extract(text, now)
         val modelCall = ModelEvent.ToolCall(
             ordinal = 0L,
             providerCallId = "call-generic-title",
@@ -90,14 +90,14 @@ class CalendarTimeResolutionTest {
                 """{"title":"日程安排","startAtEpochMs":$expectedTomorrow3pm,"durationMinutes":60}""",
         )
 
-        val normalized = normalizeCalendarToolCall({ it }, modelCall, DecodedInput(text, "Work"), queryContext, now)
+        val normalized = normalizeCalendarToolCall({ it }, modelCall, DecodedInput(text), queryContext, now)
 
         assertEquals("接孩子", normalized.title())
     }
 
     @Test fun normalizeReplacesGenericReminderTitleAfterSanitization() {
         val text = "提醒我明天晚上8点接孩子"
-        val queryContext = extractor.extract(text, "Work", now)
+        val queryContext = extractor.extract(text, now)
         val modelCall = ModelEvent.ToolCall(
             ordinal = 0L,
             providerCallId = "call-reminder-title",
@@ -106,52 +106,52 @@ class CalendarTimeResolutionTest {
                 """{"title":"提醒事项","startAtEpochMs":$expectedTomorrow3pm,"durationMinutes":60}""",
         )
 
-        val normalized = normalizeCalendarToolCall({ it }, modelCall, DecodedInput(text, "Work"), queryContext, now)
+        val normalized = normalizeCalendarToolCall({ it }, modelCall, DecodedInput(text), queryContext, now)
 
         assertEquals("接孩子", normalized.title())
     }
 
     @Test fun deterministicTitleKeepsTheCounterpartyRelationshipNatural() {
         val text = "明天下午3点和张总开武汉项目复盘会"
-        val queryContext = extractor.extract(text, "Work", now)
+        val queryContext = extractor.extract(text, now)
 
-        val toolCall = requireNotNull(deterministicCalendarToolCall(DecodedInput(text, "Work"), queryContext, now))
+        val toolCall = requireNotNull(deterministicCalendarToolCall(DecodedInput(text), queryContext, now))
 
         assertEquals("和张总开武汉项目复盘会", toolCall.title())
     }
 
     @Test fun deterministicTitleDoesNotMistakeAPlaceStartingWithHeForAPerson() {
         val text = "明天下午3点在和平饭店开会"
-        val queryContext = extractor.extract(text, "Work", now)
+        val queryContext = extractor.extract(text, now)
 
-        val toolCall = requireNotNull(deterministicCalendarToolCall(DecodedInput(text, "Work"), queryContext, now))
+        val toolCall = requireNotNull(deterministicCalendarToolCall(DecodedInput(text), queryContext, now))
 
         assertEquals("在和平饭店开会", toolCall.title())
     }
 
     @Test fun deterministicTitleKeepsTheConcreteObjectAndAction() {
         val text = "明天晚上7点给王经理发送武汉医院项目最终报价单"
-        val queryContext = extractor.extract(text, "Work", now)
+        val queryContext = extractor.extract(text, now)
 
-        val toolCall = requireNotNull(deterministicCalendarToolCall(DecodedInput(text, "Work"), queryContext, now))
+        val toolCall = requireNotNull(deterministicCalendarToolCall(DecodedInput(text), queryContext, now))
 
         assertEquals("给王经理发送武汉医院项目最终报价单", toolCall.title())
     }
 
     @Test fun deterministicCalendarCallHonorsExplicitDurationInsteadOfInventingOne() {
         val text = "明晚10点与委内瑞拉客户开会，时长90分钟"
-        val queryContext = extractor.extract(text, "Work", now)
+        val queryContext = extractor.extract(text, now)
 
-        val toolCall = requireNotNull(deterministicCalendarToolCall(DecodedInput(text, "Work"), queryContext, now))
+        val toolCall = requireNotNull(deterministicCalendarToolCall(DecodedInput(text), queryContext, now))
 
         assertEquals(90, toolCall.intArgument("durationMinutes"))
     }
 
     @Test fun naturalChineseTimeDurationIsNotMistakenForA60MinuteDefault() {
         val text = "帮我安排明天晚上10点与委内瑞拉的客户的视频会议，时间30分钟，提前10分钟提醒我"
-        val queryContext = extractor.extract(text, "Work", now)
+        val queryContext = extractor.extract(text, now)
 
-        val toolCall = requireNotNull(deterministicCalendarToolCall(DecodedInput(text, "Work"), queryContext, now))
+        val toolCall = requireNotNull(deterministicCalendarToolCall(DecodedInput(text), queryContext, now))
 
         assertEquals(30, toolCall.intArgument("durationMinutes"))
         assertEquals(10, toolCall.intArgument("reminderMinutesBefore"))
@@ -159,9 +159,9 @@ class CalendarTimeResolutionTest {
 
     @Test fun deterministicCalendarCallKeepsAnExplicitCustomReminderOffset() {
         val text = "明天晚上8点复盘，提前15分钟提醒我"
-        val queryContext = extractor.extract(text, "Work", now)
+        val queryContext = extractor.extract(text, now)
 
-        val toolCall = requireNotNull(deterministicCalendarToolCall(DecodedInput(text, "Work"), queryContext, now))
+        val toolCall = requireNotNull(deterministicCalendarToolCall(DecodedInput(text), queryContext, now))
 
         assertEquals(15, toolCall.intArgument("reminderMinutesBefore"))
     }
@@ -169,10 +169,10 @@ class CalendarTimeResolutionTest {
     @Test fun exactConflictQuestionBuildsAReadOnlyCheckForTomorrowAt10pm() {
         val reportedNow = LocalDateTime.of(2026, 8, 14, 8, 0).atZone(zone).toInstant().toEpochMilli()
         val text = "明天有晚上10点的会议冲突吗"
-        val queryContext = extractor.extract(text, "Work", reportedNow)
+        val queryContext = extractor.extract(text, reportedNow)
 
         val toolCall = requireNotNull(
-            deterministicCalendarConflictToolCall(DecodedInput(text, "Work"), queryContext, reportedNow),
+            deterministicCalendarConflictToolCall(DecodedInput(text), queryContext, reportedNow),
         )
 
         assertEquals("calendar.schedule.conflicts", toolCall.name)
@@ -185,16 +185,16 @@ class CalendarTimeResolutionTest {
 
     @Test fun unsupportedExplicitDurationDoesNotTakeTheDeterministicPath() {
         val text = "明晚10点与委内瑞拉客户开会，持续到谈完为止"
-        val queryContext = extractor.extract(text, "Work", now)
+        val queryContext = extractor.extract(text, now)
 
-        assertEquals(null, deterministicCalendarToolCall(DecodedInput(text, "Work"), queryContext, now))
+        assertEquals(null, deterministicCalendarToolCall(DecodedInput(text), queryContext, now))
     }
 
     @Test fun deterministicCalendarCallKeepsEnglishTitledNameAndExcludesReminderClause() {
         val text = "Create a calendar schedule tomorrow at 4 PM titled Resume Confirmation Test with reminder 10 minutes before"
-        val queryContext = extractor.extract(text, "Work", now)
+        val queryContext = extractor.extract(text, now)
 
-        val toolCall = requireNotNull(deterministicCalendarToolCall(DecodedInput(text, "Work"), queryContext, now))
+        val toolCall = requireNotNull(deterministicCalendarToolCall(DecodedInput(text), queryContext, now))
         val arguments = Json.parseToJsonElement(toolCall.argumentsJson).jsonObject
 
         assertEquals("Resume Confirmation Test", arguments.getValue("title").jsonPrimitive.content)

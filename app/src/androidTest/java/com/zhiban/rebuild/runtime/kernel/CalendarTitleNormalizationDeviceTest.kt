@@ -21,7 +21,7 @@ class CalendarTitleNormalizationDeviceTest {
 
     @Test fun genericProviderTitleFallsBackToTheConcreteUserTask() {
         val text = "提醒我明天晚上8点接孩子"
-        val context = extractor.extract(text, "Work", now)
+        val context = extractor.extract(text, now)
         val event = ModelEvent.ToolCall(
             ordinal = 0L,
             providerCallId = "device-generic-title",
@@ -29,7 +29,7 @@ class CalendarTitleNormalizationDeviceTest {
             argumentsJson = """{"title":"提醒事项","startAtEpochMs":1,"durationMinutes":60}""",
         )
 
-        val normalized = normalizeCalendarToolCall({ it }, event, DecodedInput(text, "Work"), context, now)
+        val normalized = normalizeCalendarToolCall({ it }, event, DecodedInput(text), context, now)
 
         assertEquals("接孩子", normalized.title())
     }
@@ -41,8 +41,8 @@ class CalendarTitleNormalizationDeviceTest {
     }
 
     private fun deterministicTitle(text: String): String {
-        val context = extractor.extract(text, "Work", now)
-        return requireNotNull(deterministicCalendarToolCall(DecodedInput(text, "Work"), context, now)).title()
+        val context = extractor.extract(text, now)
+        return requireNotNull(deterministicCalendarToolCall(DecodedInput(text), context, now)).title()
     }
 
     private fun ModelEvent.ToolCall.title(): String = Json.parseToJsonElement(argumentsJson).jsonObject.getValue("title").jsonPrimitive.content

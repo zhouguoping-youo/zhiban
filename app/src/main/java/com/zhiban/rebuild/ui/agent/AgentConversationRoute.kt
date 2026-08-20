@@ -52,7 +52,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun AgentConversationRoute(
     initialDraft: String = "",
-    initialMode: String = "Chat",
     onBackToHome: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     onManagePlugins: () -> Unit = {},
@@ -468,9 +467,8 @@ fun AgentConversationRoute(
         }
     }
 
-    LaunchedEffect(initialDraft, initialMode) { viewModel.initialize(initialDraft, initialMode) }
+    LaunchedEffect(initialDraft) { viewModel.initialize(initialDraft) }
     val selectedModel by viewModel.selectedModel.collectAsStateWithLifecycle()
-    val selectedMode by viewModel.selectedMode.collectAsStateWithLifecycle()
     val availableModels by viewModel.availableModels.collectAsStateWithLifecycle()
     val selectedLevel by viewModel.selectedLevel.collectAsStateWithLifecycle()
     val conversationHistory by viewModel.conversationHistory.collectAsStateWithLifecycle()
@@ -507,7 +505,6 @@ fun AgentConversationRoute(
                 .mapNotNull { it.sourceUri }
             viewModel.plan(
                 message,
-                mode = selectedMode,
                 attachmentContentRefs = attachmentRefs,
                 onAccepted = {
                     attachmentRefs.forEach { ref -> capturedFiles.remove(ref)?.delete() }

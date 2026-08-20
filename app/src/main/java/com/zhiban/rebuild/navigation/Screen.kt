@@ -34,19 +34,16 @@ import kotlinx.serialization.Serializable
 
 @Serializable data object Profile
 
-@Serializable data class AssistantChat(
-    val draft: String = "",
-    val openAttachment: Boolean = false,
-    val startVoice: Boolean = false,
-    val returnTarget: String = "CALENDAR",
-    val workContext: Boolean = false,
-)
+@Serializable
+data class AssistantChat(val draft: String = "", val openAttachment: Boolean = false, val startVoice: Boolean = false, val returnTarget: String = RETURN)
 
 @Serializable data object ModelConfig
 
 @Serializable data object AgentSettings
 
 @Serializable data object DebugAcceptance
+
+private const val RETURN = "CALENDAR"
 
 @Serializable data class AgentVisualPrototype(val state: String = "empty")
 

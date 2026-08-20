@@ -5,15 +5,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SkillActivatorTest {
-    @Test fun activatesOnlyInWorkWhenRequiredToolsAreAvailable() {
+    @Test fun activatesOnlyWhenRequiredToolsAreAvailable() {
         val activator = SkillActivator()
-        assertTrue(activator.activate("CALENDAR_CREATE", "Chat", setOf("calendar.schedule.search")).isEmpty())
-        assertTrue(activator.activate("CALENDAR_CREATE", "Work", emptySet()).isEmpty())
+        assertTrue(activator.activate("CALENDAR_CREATE", emptySet()).isEmpty())
         assertEquals(
             "calendar_coordination",
             activator.activate(
                 "CALENDAR_CREATE",
-                "Work",
                 setOf("calendar.schedule.search"),
             ).single().skillId,
         )
@@ -21,7 +19,7 @@ class SkillActivatorTest {
 
     @Test fun contactIntelligenceActivatesForGeneralWorkWithItsGovernedToolchain() {
         val spec = BuiltInSkills.all.single { it.id == "contact_relationship" }
-        val activation = SkillActivator().activate("GENERAL_WORK", "Work", spec.requiredTools)
+        val activation = SkillActivator().activate("GENERAL_WORK", spec.requiredTools)
 
         assertEquals("contact_relationship", activation.single().skillId)
         assertEquals(3, activation.single().version)
@@ -33,7 +31,7 @@ class SkillActivatorTest {
     @Test fun salesCrmActivatesOnlyWithItsGovernedDataAndCommunicationTools() {
         val spec = BuiltInSkills.all.single { it.id == "sales_crm" }
 
-        val activation = SkillActivator().activate("SALES_CRM", "Work", spec.requiredTools)
+        val activation = SkillActivator().activate("SALES_CRM", spec.requiredTools)
 
         assertEquals("sales_crm", activation.single().skillId)
         assertEquals(3, activation.single().version)
@@ -57,7 +55,7 @@ class SkillActivatorTest {
     @Test fun personalLifeActivatesWithRelationshipsCalendarAndConfirmedCommunication() {
         val spec = BuiltInSkills.all.single { it.id == "personal_life" }
 
-        val activation = SkillActivator().activate("PERSONAL_LIFE", "Work", spec.requiredTools).single()
+        val activation = SkillActivator().activate("PERSONAL_LIFE", spec.requiredTools).single()
 
         assertEquals("personal_life", activation.skillId)
         assertTrue("relationship.getEvidence" in activation.requiredTools)
@@ -68,7 +66,7 @@ class SkillActivatorTest {
     @Test fun socialPlanningActivatesWithRelationshipsCalendarAndConfirmedCommunication() {
         val spec = BuiltInSkills.all.single { it.id == "social_planning" }
 
-        val activation = SkillActivator().activate("SOCIAL_PLANNING", "Work", spec.requiredTools).single()
+        val activation = SkillActivator().activate("SOCIAL_PLANNING", spec.requiredTools).single()
 
         assertEquals("social_planning", activation.skillId)
         assertTrue("relationship.getEvidence" in activation.requiredTools)

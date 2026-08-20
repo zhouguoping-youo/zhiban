@@ -6,8 +6,8 @@ import com.zhiban.rebuild.foundation.runSuspendCatching
 import kotlinx.serialization.json.Json
 
 internal interface PerceptionGateway {
-    suspend fun perceive(text: String, mode: String): QueryContext
-    fun fallback(text: String, mode: String): QueryContext
+    suspend fun perceive(text: String): QueryContext
+    fun fallback(text: String): QueryContext
 }
 
 internal class RoomPerceptionPipeline(
@@ -15,7 +15,7 @@ internal class RoomPerceptionPipeline(
     private val clock: () -> Long = System::currentTimeMillis,
     private val extractor: LocalEntityExtractor = LocalEntityExtractor(),
 ) : PerceptionGateway {
-    override suspend fun perceive(text: String, mode: String): QueryContext {
+    override suspend fun perceive(text: String): QueryContext {
         val contacts = database.contactDao().findMentionedCandidates(text)
         val dictionary = contacts.map { contact ->
             val role = database.contactDao().roles(contact.contactId).firstOrNull()
@@ -29,8 +29,8 @@ internal class RoomPerceptionPipeline(
                 skillId = role?.skillId,
             )
         }
-        return extractor.extract(text, mode, clock(), dictionary)
+        return extractor.extract(text, clock(), dictionary)
     }
 
-    override fun fallback(text: String, mode: String): QueryContext = extractor.extract(text, mode, clock())
+    override fun fallback(text: String): QueryContext = extractor.extract(text, clock())
 }

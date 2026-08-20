@@ -244,7 +244,7 @@ class RuntimeInputProcessorTest {
     }
 
     @Test fun verifiedImageMetadataFlowsFromRuntimeEnvelopeIntoProviderRequest() = runBlocking {
-        val input = """{"schemaVersion":1,"text":"描述图片","mode":"Chat","attachments":[{"attachmentId":"image-1","kind":"IMAGE","mimeType":"image/png","byteLength":8,"sha256Digest":"${"a".repeat(
+        val input = """{"schemaVersion":1,"text":"描述图片","mode":"Work","attachments":[{"attachmentId":"image-1","kind":"IMAGE","mimeType":"image/png","byteLength":8,"sha256Digest":"${"a".repeat(
             64,
         )}","contentRef":"cache://zbi_999999_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.bin","expiresAtEpochMs":999999}]}"""
         val staged = RoomTextInputGateway(database, { true }, { now }).stage(input)
@@ -1381,7 +1381,7 @@ class RuntimeInputProcessorTest {
             ),
         )
         val staged = RoomTextInputGateway(database, { true }, { now }).stage(
-            """{"schemaVersion":1,"text":"张三 李四 公司","mode":"Chat","model":"M2.7"}""",
+            """{"schemaVersion":1,"text":"张三 李四 公司","mode":"Work","model":"M2.7"}""",
         )
         RoomRuntimeGateways(database, "test") { now++ }.accept(
             RuntimeUiCommand.Start("s-rerank", staged.inputRef, "c-rerank", "a-rerank", 0, "chat", "r-rerank"),
@@ -1441,7 +1441,7 @@ class RuntimeInputProcessorTest {
             ),
         )
         val staged = RoomTextInputGateway(database, { true }, { now }).stage(
-            """{"schemaVersion":1,"text":"张三 李四 公司","mode":"Chat","model":"M2.7"}""",
+            """{"schemaVersion":1,"text":"张三 李四 公司","mode":"Work","model":"M2.7"}""",
         )
         RoomRuntimeGateways(database, "test") { now++ }.accept(
             RuntimeUiCommand.Start(
@@ -3023,7 +3023,7 @@ class RuntimeInputProcessorTest {
         // read-gate must still force the calendar read so the answer is grounded, not hallucinated.
         now = 1_800_000_000_000L
         val input = RoomTextInputGateway(database, { true }, { now }).stage(
-            """{"schemaVersion":1,"text":"今天有什么日程","mode":"chat","model":"M2.7"}""",
+            """{"schemaVersion":1,"text":"今天有什么日程","mode":"Work","model":"M2.7"}""",
         )
         RoomRuntimeGateways(database, "test") { now++ }.accept(
             RuntimeUiCommand.Start("s-zero-read", input.inputRef, "c-zero-read", "a-zero-read", 0, "chat", "r-zero-read"),
@@ -3357,11 +3357,11 @@ class RuntimeInputProcessorTest {
         }
         val fallbackExtractor = LocalEntityExtractor()
         val stalledPerception = object : PerceptionGateway {
-            override suspend fun perceive(text: String, mode: String): QueryContext {
+            override suspend fun perceive(text: String): QueryContext {
                 delay(500)
-                return fallback(text, mode)
+                return fallback(text)
             }
-            override fun fallback(text: String, mode: String) = fallbackExtractor.extract(text, mode, now)
+            override fun fallback(text: String) = fallbackExtractor.extract(text, now)
         }
         val engine = com.zhiban.rebuild.runtime.kernel.ProviderExecutionEngine(
             database,
@@ -3379,7 +3379,7 @@ class RuntimeInputProcessorTest {
         assertEquals("SUCCEEDED", database.runtimeRunDao().find("r-perception-timeout")?.status)
         val event = database.runtimeEventDao().latestByType("r-perception-timeout", "PerceptionCompleted")!!
         assertTrue(event.payloadJson.contains("\"degraded\":true"))
-        assertTrue(event.payloadJson.contains("GENERAL_CHAT"))
+        assertTrue(event.payloadJson.contains("GENERAL_WORK"))
         assertTrue(requests.single().messages.any { it.content.contains("source=local_perception") })
     }
 

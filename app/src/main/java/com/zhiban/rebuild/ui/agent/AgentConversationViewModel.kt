@@ -81,7 +81,7 @@ class AgentConversationViewModel @Inject constructor(
             emptyList(),
         )
 
-    fun initialize(initialDraft: String, initialMode: String = "Chat") {
+    fun initialize(initialDraft: String) {
         if (initialized) {
             viewModelScope.launch {
                 _cloudAsrAvailability.value = voice.cloudAsrGateway.availability()
@@ -100,8 +100,6 @@ class AgentConversationViewModel @Inject constructor(
                 // internally whenever an image or PDF is attached.
                 _availableModels.value = listOf(preset.defaultModel)
                 _selectedModel.value = preset.defaultModel
-                // 问问为单一 coworker 模式，恒为 Work；initialMode 入参保留兼容但不再生效。
-                _selectedMode.value = AGENT_RUNTIME_MODE
                 _cloudAsrAvailability.value = voice.cloudAsrGateway.availability()
                 val sessionId = if (initialDraft.isNotBlank()) {
                     UUID.randomUUID().toString()
@@ -111,7 +109,7 @@ class AgentConversationViewModel @Inject constructor(
                         ?: UUID.randomUUID().toString()
                 }
                 activateSession(sessionId)
-                if (initialDraft.isNotBlank()) v2Backend?.plan(initialDraft, AGENT_RUNTIME_MODE)
+                if (initialDraft.isNotBlank()) v2Backend?.plan(initialDraft)
             }.onFailure { showSubmissionFailure(AgentConversationStage.FAILED_RETRYABLE, "对话初始化失败，请稍后重试。") }
         }
     }
@@ -225,10 +223,10 @@ class AgentConversationViewModel @Inject constructor(
         }
     }
 
-    fun plan(input: String, mode: String = AGENT_RUNTIME_MODE, attachmentContentRefs: List<String> = emptyList(), onAccepted: () -> Unit = {}) {
+    fun plan(input: String, attachmentContentRefs: List<String> = emptyList(), onAccepted: () -> Unit = {}) {
         if (input.isBlank() || submissionInFlight) return
         // 问问是单一 coworker 模式：始终以 Work 下发，工具一直可用，写入不再因模式被屏蔽。
-        // 速度由"快速/标准/深入"级别控制（快速仍走单步直接回答），不再有 Chat/Work 的能力割裂。
+        // 速度由“快速/标准/深入”级别控制；快速仍走单步直接回答。
         submissionInFlight = true
         _uiState.update { it.copy(inputEnabled = false, safeMessage = null) }
         viewModelScope.launch {
@@ -247,7 +245,7 @@ class AgentConversationViewModel @Inject constructor(
                 }
                 if (!prepareAttachments(sessionId, attachmentContentRefs, staged)) return@launch
                 onAccepted()
-                v2Backend?.plan(input, AGENT_RUNTIME_MODE, _selectedModel.value, _selectedLevel.value, staged)
+                v2Backend?.plan(input, _selectedModel.value, _selectedLevel.value, staged)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Throwable) {
@@ -314,19 +312,12 @@ class AgentConversationViewModel @Inject constructor(
     private val _selectedModel =
         MutableStateFlow(com.zhiban.rebuild.provider.ProviderConfigurationManager.DEFAULT_MODEL)
     val selectedModel: StateFlow<String> = _selectedModel.asStateFlow()
-    private val _selectedMode = MutableStateFlow(AGENT_RUNTIME_MODE)
-    val selectedMode: StateFlow<String> = _selectedMode.asStateFlow()
     private val _availableModels = MutableStateFlow(
         listOf(com.zhiban.rebuild.provider.ProviderConfigurationManager.DEFAULT_MODEL),
     )
     val availableModels: StateFlow<List<String>> = _availableModels.asStateFlow()
     fun selectModel(model: String) {
         if (model in _availableModels.value) _selectedModel.value = model
-    }
-    fun selectMode(mode: String) {
-        val safeMode = if (mode == "Work") "Work" else "Chat"
-        _selectedMode.value = safeMode
-        viewModelScope.launch { preferencesManager.saveAgentMode(safeMode) }
     }
 
     private val _selectedLevel = MutableStateFlow(agentControls.execution().runtimeLevel)
@@ -409,8 +400,6 @@ class AgentConversationViewModel @Inject constructor(
     }
 
     companion object {
-        /** Runtime compatibility value. This is not a user-facing mode. */
-        const val AGENT_RUNTIME_MODE = "Work"
         private const val ACTIVE_SESSION_ID = "agent.runtimeSessionId"
         private const val ATTACHMENT_PREPARATION_TIMEOUT_MS = 30_000L
         private const val ATTACHMENT_PRESERVE_TIMEOUT_MS = 15_000L

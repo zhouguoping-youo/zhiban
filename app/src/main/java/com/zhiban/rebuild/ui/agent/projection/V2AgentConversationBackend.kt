@@ -56,7 +56,7 @@ class V2AgentConversationBackend(
         }
     }
 
-    fun plan(rawText: String, mode: String = "Work", model: String? = null, level: String? = null, attachments: List<AttachmentRef> = emptyList()) {
+    fun plan(rawText: String, model: String? = null, level: String? = null, attachments: List<AttachmentRef> = emptyList()) {
         val normalized = rawText.trim()
         if (normalized.isEmpty() || startInFlight) return
         startInFlight = true
@@ -71,7 +71,7 @@ class V2AgentConversationBackend(
             try {
                 runSuspendCatching {
                     withTimeoutOrNull(INPUT_START_TIMEOUT_MS) {
-                        val runtimeInput = encodeRuntimeInput(normalized, mode, model, level, attachments)
+                        val runtimeInput = encodeRuntimeInput(normalized, model, level, attachments)
                         textInputGateway.stage(runtimeInput).also { stagedRef = it.inputRef }
                             .let { controller.start(it.inputRef) }
                     } ?: throw InputStartTimeoutException()
@@ -90,31 +90,28 @@ class V2AgentConversationBackend(
         }
     }
 
-    private fun encodeRuntimeInput(text: String, mode: String, model: String?, level: String?, attachments: List<AttachmentRef>): String {
-        if (mode == "Chat" && model == null && level == null && attachments.isEmpty()) return text
-        return buildJsonObject {
-            put("schemaVersion", 1)
-            put("text", text)
-            put("mode", mode)
-            model?.let { put("model", it) }
-            level?.let { put("level", it) }
-            putJsonArray("attachments") {
-                attachments.forEach { ref ->
-                    add(
-                        buildJsonObject {
-                            put("attachmentId", ref.attachmentId)
-                            put("kind", ref.kind.name)
-                            put("mimeType", ref.mimeType)
-                            put("byteLength", ref.byteLength)
-                            put("sha256Digest", ref.sha256Digest)
-                            put("contentRef", ref.contentRef)
-                            put("expiresAtEpochMs", ref.expiresAtEpochMs)
-                        },
-                    )
-                }
+    private fun encodeRuntimeInput(text: String, model: String?, level: String?, attachments: List<AttachmentRef>): String = buildJsonObject {
+        put("schemaVersion", 1)
+        put("text", text)
+        put("mode", "Work")
+        model?.let { put("model", it) }
+        level?.let { put("level", it) }
+        putJsonArray("attachments") {
+            attachments.forEach { ref ->
+                add(
+                    buildJsonObject {
+                        put("attachmentId", ref.attachmentId)
+                        put("kind", ref.kind.name)
+                        put("mimeType", ref.mimeType)
+                        put("byteLength", ref.byteLength)
+                        put("sha256Digest", ref.sha256Digest)
+                        put("contentRef", ref.contentRef)
+                        put("expiresAtEpochMs", ref.expiresAtEpochMs)
+                    },
+                )
             }
-        }.toString()
-    }
+        }
+    }.toString()
 
     fun approve() = launchAction { controller.approve() }
     fun reject() = launchAction { controller.reject() }

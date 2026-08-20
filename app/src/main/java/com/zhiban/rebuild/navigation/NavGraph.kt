@@ -203,7 +203,6 @@ private fun ZhiBanNavContent(
             val route = entry.toRoute<AssistantChat>()
             AgentConversationRoute(
                 initialDraft = route.draft,
-                initialMode = if (route.workContext) "Work" else "Chat",
                 onManagePlugins = { navController.navigate(Skill) { launchSingleTop = true } },
                 onNavigateToSettings = { navController.navigate(ModelConfig) { launchSingleTop = true } },
                 onBackToHome = {

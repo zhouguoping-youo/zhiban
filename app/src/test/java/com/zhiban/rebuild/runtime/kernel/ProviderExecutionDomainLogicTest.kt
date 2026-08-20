@@ -26,6 +26,15 @@ class ProviderExecutionDomainLogicTest {
         )
     }
 
+    @Test
+    fun `legacy mode field cannot change the single coworker runtime`() {
+        val legacyChat = decodeInput("""{"text":"查今天日程","mode":"Chat"}""")
+        val legacyWork = decodeInput("""{"text":"查今天日程","mode":"Work"}""")
+
+        assertEquals(legacyWork, legacyChat)
+        assertEquals("查今天日程", legacyChat.text)
+    }
+
     @Test fun `assistant text streams unless a schedule plan is being forced`() {
         assertTrue(shouldStreamAssistantText(null))
         assertTrue(shouldStreamAssistantText("contact.search"))
@@ -74,12 +83,12 @@ class ProviderExecutionDomainLogicTest {
     }
 
     @Test fun `deterministic observation completion covers calendar and communication`() {
-        assertTrue(shouldCompleteObservationDeterministically("calendar.conflicts", com.zhiban.rebuild.runtime.context.IntentLabel.GENERAL_CHAT))
+        assertTrue(shouldCompleteObservationDeterministically("calendar.conflicts", com.zhiban.rebuild.runtime.context.IntentLabel.GENERAL_WORK))
         assertTrue(
-            shouldCompleteObservationDeterministically(CommunicationMessageToolBinding.TOOL_NAME, com.zhiban.rebuild.runtime.context.IntentLabel.GENERAL_CHAT),
+            shouldCompleteObservationDeterministically(CommunicationMessageToolBinding.TOOL_NAME, com.zhiban.rebuild.runtime.context.IntentLabel.GENERAL_WORK),
         )
-        assertFalse(shouldCompleteObservationDeterministically("contact.search", com.zhiban.rebuild.runtime.context.IntentLabel.GENERAL_CHAT))
-        assertFalse(shouldCompleteObservationDeterministically(SchedulePlanValidator.TOOL_NAME, com.zhiban.rebuild.runtime.context.IntentLabel.GENERAL_CHAT))
+        assertFalse(shouldCompleteObservationDeterministically("contact.search", com.zhiban.rebuild.runtime.context.IntentLabel.GENERAL_WORK))
+        assertFalse(shouldCompleteObservationDeterministically(SchedulePlanValidator.TOOL_NAME, com.zhiban.rebuild.runtime.context.IntentLabel.GENERAL_WORK))
     }
 
     @Test fun `deterministic tool summaries cover calendar and contacts`() {

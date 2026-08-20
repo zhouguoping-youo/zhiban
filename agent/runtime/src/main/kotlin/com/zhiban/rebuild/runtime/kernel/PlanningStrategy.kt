@@ -10,14 +10,9 @@ data class PlanningPolicy(val strategy: PlanningStrategy, val instruction: Strin
 
 /** Converts the user-facing execution preference into an explicit, testable planning policy. */
 object PlanningStrategySelector {
-    fun select(mode: String, level: String?): PlanningPolicy {
+    fun select(level: String?): PlanningPolicy {
         val normalized = level.orEmpty().trim()
         return when {
-            mode != "Work" -> PlanningPolicy(
-                PlanningStrategy.DIRECT,
-                "采用直接回答：先核对上下文，再给出清晰结论；不得虚构工具执行结果。",
-            )
-
             normalized in setOf("快速", "极速 (5.5)") -> PlanningPolicy(
                 PlanningStrategy.DIRECT,
                 "采用单步执行：只在确有必要时调用一个最匹配工具；写操作仍须用户确认。",

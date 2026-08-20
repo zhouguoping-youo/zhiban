@@ -34,7 +34,7 @@ class WebSearchIntentTest {
             "calendar.schedule.search",
         )
         fun select(input: String, calendar: Boolean = false) = selectForcedCanonicalTool(
-            ForcedToolSelection(true, calendar, input, available, null) { true },
+            ForcedToolSelection(calendar, input, available, null) { true },
         )
 
         assertTrue(select("安排明晚会议", calendar = true) == "calendar.schedule.create")

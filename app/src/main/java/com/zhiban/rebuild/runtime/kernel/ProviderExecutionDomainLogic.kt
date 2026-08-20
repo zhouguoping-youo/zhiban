@@ -149,7 +149,6 @@ private val CALENDAR_CONFLICT_QUERY_MARKERS = listOf("冲突", "撞期", "重叠
 internal fun shouldStreamAssistantText(forcedCanonicalTool: String?): Boolean = forcedCanonicalTool != SchedulePlanValidator.TOOL_NAME
 
 internal fun activatedSkillsFor(
-    input: DecodedInput,
     queryContext: QueryContext,
     config: com.zhiban.rebuild.runtime.config.AgentDynamicConfig,
     skills: List<SkillSpec>,
@@ -157,7 +156,6 @@ internal fun activatedSkillsFor(
     toolEnabled: (String) -> Boolean,
 ): List<SkillActivation> = SkillActivator(skills).activate(
     queryContext.intentLabel.name,
-    input.mode,
     toolNames.filter(toolEnabled).toSet(),
 ).filterNot { it.skillId in config.disabledSkills }
 
@@ -356,7 +354,6 @@ internal enum class InputOrigin {
 
 internal data class DecodedInput(
     val text: String,
-    val mode: String = "Chat",
     val model: String? = null,
     val level: String? = null,
     val attachments: List<DecodedAttachment> = emptyList(),
@@ -368,7 +365,6 @@ internal fun decodeInput(raw: String): DecodedInput {
     val text = value["text"]?.jsonPrimitive?.content ?: return DecodedInput(raw)
     return DecodedInput(
         text = text,
-        mode = value["mode"]?.jsonPrimitive?.content?.takeIf { it == "Work" } ?: "Chat",
         model = value["model"]?.jsonPrimitive?.content,
         level = value["level"]?.jsonPrimitive?.content,
         origin = value["origin"]?.jsonPrimitive?.content
@@ -474,7 +470,6 @@ internal fun shouldForceMemoryUpsert(input: String): Boolean {
 }
 
 internal data class ForcedToolSelection(
-    val workMode: Boolean,
     val calendarCreateIntent: Boolean,
     val input: String,
     val availableTools: Set<String>,
@@ -483,7 +478,6 @@ internal data class ForcedToolSelection(
 )
 
 internal fun selectForcedCanonicalTool(selection: ForcedToolSelection): String? {
-    if (!selection.workMode) return null
     val candidate = when {
         selection.calendarCreateIntent -> CALENDAR_CREATE_TOOL
         shouldForceWebSearch(selection.input) -> WEB_SEARCH_TOOL

@@ -29,23 +29,20 @@ class SkillActivator(private val specs: List<SkillSpec> = BuiltInSkills.all) {
         require(specs.map { it.id }.distinct().size == specs.size) { "duplicate skill id" }
     }
 
-    fun activate(intent: String, mode: String, availableTools: Set<String>): List<SkillActivation> {
-        if (mode != "Work") return emptyList()
-        return specs.asSequence()
-            .filter { intent in it.triggerIntents && availableTools.containsAll(it.requiredTools) }
-            .take(2)
-            .map {
-                SkillActivation(
-                    it.id,
-                    it.version,
-                    it.planningInstruction,
-                    it.requiredTools,
-                    it.origin,
-                    it.publisherId,
-                )
-            }
-            .toList()
-    }
+    fun activate(intent: String, availableTools: Set<String>): List<SkillActivation> = specs.asSequence()
+        .filter { intent in it.triggerIntents && availableTools.containsAll(it.requiredTools) }
+        .take(2)
+        .map {
+            SkillActivation(
+                it.id,
+                it.version,
+                it.planningInstruction,
+                it.requiredTools,
+                it.origin,
+                it.publisherId,
+            )
+        }
+        .toList()
 }
 
 object BuiltInSkills {

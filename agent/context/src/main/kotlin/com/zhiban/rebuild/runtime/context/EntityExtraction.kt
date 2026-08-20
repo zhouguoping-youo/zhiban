@@ -8,7 +8,6 @@ import java.time.ZoneId
 import java.time.temporal.TemporalAdjusters
 
 enum class IntentLabel {
-    GENERAL_CHAT,
     GENERAL_WORK,
     CALENDAR_QUERY,
     CALENDAR_CREATE,
@@ -73,7 +72,7 @@ data class QueryContext(
 }
 
 class LocalEntityExtractor(private val zoneId: ZoneId = ZoneId.systemDefault()) {
-    fun extract(text: String, mode: String, nowEpochMs: Long, dictionary: List<EntityDictionaryEntry> = emptyList()): QueryContext {
+    fun extract(text: String, nowEpochMs: Long, dictionary: List<EntityDictionaryEntry> = emptyList()): QueryContext {
         val normalized = text.trim()
         val entities = linkedMapOf<String, ExtractedEntity>()
         dictionary.forEach { entry ->
@@ -120,11 +119,11 @@ class LocalEntityExtractor(private val zoneId: ZoneId = ZoneId.systemDefault()) 
         keywords.forEach {
             entities["KEYWORD:$it"] = ExtractedEntity(ExtractedEntityType.KEYWORD, it, confidence = .85)
         }
-        val (intent, confidence) = classifyIntent(normalized, mode)
+        val (intent, confidence) = classifyIntent(normalized)
         return QueryContext(intent, confidence, entities.values.toList(), timeRange, keywords)
     }
 
-    private fun classifyIntent(text: String, mode: String): Pair<IntentLabel, Double> = when {
+    private fun classifyIntent(text: String): Pair<IntentLabel, Double> = when {
         text.containsAny("记下关系", "建立关系", "是朋友", "是同事", "是家人", "合作伙伴关系") ->
             IntentLabel.RELATIONSHIP_WRITE to RELATIONSHIP_WRITE_CONFIDENCE
 
@@ -187,18 +186,16 @@ class LocalEntityExtractor(private val zoneId: ZoneId = ZoneId.systemDefault()) 
             IntentLabel.GENERAL_WORK to GENERAL_WORK_CONFIDENCE
 
         // A future-dated wall-clock ("明晚8点健身", "后天上午10点复诊") with no explicit verb is still a
-        // schedule-creation request in Work mode — the user stated a time plus an activity. Detecting it
+        // schedule-creation request — the user stated a time plus an activity. Detecting it
         // here routes to the deterministic confirmation path instead of letting the model free-text a
         // (possibly fabricated) "已创建" reply. Queries are excluded because they carry question words.
-        mode == "Work" && hasFutureScheduleSignal(text) ->
+        hasFutureScheduleSignal(text) ->
             IntentLabel.CALENDAR_CREATE to CALENDAR_CREATE_CONFIDENCE
 
         text.containsAny("日程", "安排", "空闲", "今天有什么", "明天有什么", "会议") ->
             IntentLabel.CALENDAR_QUERY to CALENDAR_QUERY_CONFIDENCE
 
-        mode == "Work" -> IntentLabel.GENERAL_WORK to GENERAL_WORK_CONFIDENCE
-
-        else -> IntentLabel.GENERAL_CHAT to GENERAL_CHAT_CONFIDENCE
+        else -> IntentLabel.GENERAL_WORK to GENERAL_WORK_CONFIDENCE
     }
 
     private fun resolveTimeRange(text: String, nowEpochMs: Long): QueryTimeRange? {
@@ -474,4 +471,3 @@ private const val CONTACT_QUERY_CONFIDENCE = 0.88
 private const val CALENDAR_CREATE_CONFIDENCE = 0.94
 private const val CALENDAR_QUERY_CONFIDENCE = 0.86
 private const val GENERAL_WORK_CONFIDENCE = 0.65
-private const val GENERAL_CHAT_CONFIDENCE = 0.75

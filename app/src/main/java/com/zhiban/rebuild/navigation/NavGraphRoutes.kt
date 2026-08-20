@@ -85,7 +85,7 @@ internal fun NavGraphBuilder.agentSettingsRoutes(navController: NavHostControlle
             onBack = { navController.popBackStack() },
             onAsk = { draft ->
                 navController.navigate(
-                    AssistantChat(draft = draft, returnTarget = "RELATION", workContext = true),
+                    AssistantChat(draft = draft, returnTarget = "RELATION"),
                 )
             },
         )
@@ -124,7 +124,7 @@ internal fun NavGraphBuilder.featureRoutes(navController: NavHostController) {
                 navController.navigate(CrmOpportunityDetail(opportunityId))
             },
             onAskAgent = { draft ->
-                navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK", workContext = true))
+                navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK"))
             },
         )
     }
@@ -136,7 +136,7 @@ internal fun NavGraphBuilder.featureRoutes(navController: NavHostController) {
             onOpenItem = { itemId -> navController.navigate(LifeAssistantDetail(itemId)) },
             onOpenRelations = { navController.navigate(Relation) { launchSingleTop = true } },
             onAskAgent = { draft ->
-                navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK", workContext = true))
+                navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK"))
             },
         )
     }
@@ -154,7 +154,7 @@ internal fun NavGraphBuilder.featureRoutes(navController: NavHostController) {
             itemId = route.itemId,
             onBack = { navController.popBackStack() },
             onAskAgent = { draft ->
-                navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK", workContext = true))
+                navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK"))
             },
         )
     }
@@ -180,7 +180,7 @@ internal fun NavGraphBuilder.featureRoutes(navController: NavHostController) {
             planId = route.planId,
             onBack = { navController.popBackStack() },
             onAskAgent = { draft ->
-                navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK", workContext = true))
+                navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK"))
             },
         )
     }
@@ -223,7 +223,7 @@ internal fun NavGraphBuilder.featureRoutes(navController: NavHostController) {
             onOpenCalendar = { epochMs -> navController.navigate(Calendar(epochMs ?: 0L)) },
             onOpenRelation = { navController.navigate(Relation) { launchSingleTop = true } },
             onAskAgent = { draft ->
-                navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK", workContext = true))
+                navController.navigate(AssistantChat(draft = draft, returnTarget = "BACK"))
             },
         )
     }

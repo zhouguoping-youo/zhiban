@@ -15,6 +15,7 @@ class ProductionRuntimeBoundaryTest {
 
         assertFalse(parameterTypes.any { it.name == LEGACY_RUNTIME_CLASS })
         assertFalse(parameterTypes.contains(RuntimeV2FeatureFlag::class.java))
+        assertFalse(AgentConversationViewModel::class.java.declaredMethods.any { it.name == "selectMode" })
     }
 
     @Test
