@@ -78,6 +78,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
+import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.relationship.RelationshipGroup
 import com.zhiban.rebuild.relationship.RelationshipTaxonomy
 import com.zhiban.rebuild.ui.theme.LocalRelationshipGraphColors
@@ -755,6 +756,23 @@ internal fun ForceRelationshipGraphCanvas(
                         Icon(Icons.Rounded.RestartAlt, contentDescription = "重置关系图视图")
                     }
                 }
+
+                RelationshipGraphMinimap(
+                    positions = bodies,
+                    links = model.links,
+                    rootId = rootId,
+                    graphScale = graphScale,
+                    graphOffset = graphOffset,
+                    graphSize = Size(canvasSize.width.toFloat(), canvasSize.height.toFloat()),
+                    graphColors = graphColors,
+                    onClick = {
+                        onSwitchEgo?.invoke(RelationshipPersonIds.SELF)
+                        resetViewport()
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = ZhiBanSpacing.Sm, bottom = 44.dp),
+                )
 
                 Row(
                     Modifier
