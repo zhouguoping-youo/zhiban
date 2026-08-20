@@ -67,4 +67,13 @@ class AgentControlStoreTest {
         controls.saveWebSearchOptIn(false)
         assertTrue(!controls.webSearchOptIn())
     }
+
+    @Test fun smartForwardDefaultsOffAndPersistsExplicitOptIn() {
+        assertTrue(!controls.smartForwardEnabled())
+        assertTrue(!controls.smartForwardExplained())
+        controls.saveSmartForwardEnabled(true)
+        controls.markSmartForwardExplained()
+        assertTrue(controls.smartForwardEnabled())
+        assertTrue(controls.smartForwardExplained())
+    }
 }

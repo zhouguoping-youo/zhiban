@@ -161,6 +161,19 @@ class AgentControlStore internal constructor(context: Context, prefsName: String
         check(store.edit().putBoolean("contact_completion_enabled", enabled).commit())
     }
 
+    /** Experimental one-shot accessibility handoff; disabled until the user explicitly enables it. */
+    fun smartForwardEnabled(): Boolean = store.getBoolean("smart_forward_enabled", false)
+
+    fun saveSmartForwardEnabled(enabled: Boolean) {
+        check(store.edit().putBoolean("smart_forward_enabled", enabled).commit())
+    }
+
+    fun smartForwardExplained(): Boolean = store.getBoolean("smart_forward_explained", false)
+
+    fun markSmartForwardExplained() {
+        check(store.edit().putBoolean("smart_forward_explained", true).commit())
+    }
+
     // 定位读取：默认关（隐私优先——位置数据默认不出云）。开启后 location.current 才会把
     // 一次性坐标发给大模型；工具仍然只读、无后台轨迹。
     fun locationAccessEnabled(): Boolean = store.getBoolean("location_access_enabled", false)

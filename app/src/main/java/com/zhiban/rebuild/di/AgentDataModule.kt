@@ -9,6 +9,8 @@ import com.zhiban.rebuild.data.agent.AgentDatabaseEncryption
 import com.zhiban.rebuild.data.agent.AgentDatabaseKeyManager
 import com.zhiban.rebuild.data.agent.MigratingSqlCipherOpenHelperFactory
 import com.zhiban.rebuild.data.autowrite.insertVisibleAutoWrite
+import com.zhiban.rebuild.data.communication.SmartForwardController
+import com.zhiban.rebuild.data.communication.SmartForwardHandoff
 import com.zhiban.rebuild.data.config.AgentControlStore
 import com.zhiban.rebuild.data.facts.FactIndex
 import com.zhiban.rebuild.runtime.input.AndroidAttachmentContentSource
@@ -374,13 +376,19 @@ object AgentDataModule {
 
     @Provides
     @Singleton
+    internal fun provideSmartForwardHandoff(controller: SmartForwardController): SmartForwardHandoff =
+        SmartForwardHandoff { recipient, message -> controller.open(recipient, message) }
+
+    @Provides
+    @Singleton
     internal fun provideContactCompletionRepository(
         database: AgentDatabase,
         handoff: com.zhiban.rebuild.data.completion.CompletionHandoff,
+        smartForward: com.zhiban.rebuild.data.communication.SmartForwardHandoff,
         outreachGenerator: com.zhiban.rebuild.data.completion.ContactCompletionOutreachGenerator,
         controls: com.zhiban.rebuild.data.config.AgentControlStore,
     ): com.zhiban.rebuild.data.completion.ContactCompletionRepository =
-        com.zhiban.rebuild.data.completion.ContactCompletionRepository(database, handoff, outreachGenerator, controls)
+        com.zhiban.rebuild.data.completion.ContactCompletionRepository(database, handoff, outreachGenerator, controls, smartForward)
 
     @Provides
     @Singleton

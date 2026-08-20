@@ -130,6 +130,7 @@ fun PrivacySecurityPage(
     replySuggestionViewModel: ReplySuggestionSettingsViewModel = hiltViewModel(),
     completionViewModel: CompletionSettingsViewModel = hiltViewModel(),
     locationConsentViewModel: LocationConsentSettingsViewModel = hiltViewModel(),
+    smartForwardViewModel: SmartForwardSettingsViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val outboundState by outboundViewModel.state.collectAsStateWithLifecycle()
@@ -138,6 +139,8 @@ fun PrivacySecurityPage(
     val replyOptedOutContacts by replySuggestionViewModel.optedOutContacts.collectAsStateWithLifecycle()
     val completionEnabled by completionViewModel.enabled.collectAsStateWithLifecycle()
     val locationAccessEnabled by locationConsentViewModel.enabled.collectAsStateWithLifecycle()
+    val smartForwardEnabled by smartForwardViewModel.enabled.collectAsStateWithLifecycle()
+    var showSmartForwardInfo by remember { mutableStateOf(false) }
     var callLogAccessStatus by remember { mutableStateOf(CallLogAccessStatus.NOT_GRANTED) }
     var refreshVersion by remember { mutableIntStateOf(0) }
     RefreshPermissionsOnResume { refreshVersion += 1 }
@@ -332,6 +335,30 @@ fun PrivacySecurityPage(
             }
             item {
                 Text(
+                    "实验功能",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = ZhiBanTextSecondary,
+                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.Xs, vertical = ZhiBanSpacing.Sm),
+                )
+            }
+            item {
+                SettingsCard {
+                    SettingsToggleRow(
+                        title = "智能转发（实验）",
+                        subtitle = "只找会话并预填，停在发送前；找不到时使用分享面板",
+                        checked = smartForwardEnabled,
+                        onCheckedChange = { enabled ->
+                            if (enabled && !smartForwardViewModel.explained()) {
+                                showSmartForwardInfo = true
+                            } else {
+                                smartForwardViewModel.setEnabled(enabled)
+                            }
+                        },
+                    )
+                }
+            }
+            item {
+                Text(
                     "定位",
                     style = MaterialTheme.typography.labelMedium,
                     color = ZhiBanTextSecondary,
@@ -394,6 +421,24 @@ fun PrivacySecurityPage(
             }
         }
     }
+    if (showSmartForwardInfo) {
+        ZhiBanAlertDialog(
+            onDismissRequest = { showSmartForwardInfo = false },
+            shape = RoundedCornerShape(ZhiBanRadius.Dialog),
+            containerColor = ZhiBanCard,
+            title = { Text("智能转发（实验）") },
+            text = {
+                Text("知伴只会在你点击转发后，用无障碍服务查找联系人并预填草稿，绝不会替你点击发送。流程可随时返回中止，定位失败会回到分享面板。")
+            },
+            dismissButton = { TextButton(onClick = { showSmartForwardInfo = false }) { Text("暂不开启") } },
+            confirmButton = {
+                TextButton(onClick = {
+                    showSmartForwardInfo = false
+                    smartForwardViewModel.setEnabled(true)
+                }) { Text("开启") }
+            },
+        )
+    }
 }
 
 /**
@@ -430,6 +475,21 @@ class CompletionSettingsViewModel @Inject constructor(private val controls: Agen
 
     fun setEnabled(enabled: Boolean) {
         controls.saveContactCompletionEnabled(enabled)
+        mutableEnabled.value = enabled
+    }
+}
+
+/** Backs the opt-in, one-shot accessibility handoff. */
+@HiltViewModel
+class SmartForwardSettingsViewModel @Inject constructor(private val controls: AgentControlStore) : ViewModel() {
+    private val mutableEnabled = MutableStateFlow(controls.smartForwardEnabled())
+    val enabled: StateFlow<Boolean> = mutableEnabled.asStateFlow()
+
+    fun explained(): Boolean = controls.smartForwardExplained()
+
+    fun setEnabled(enabled: Boolean) {
+        controls.saveSmartForwardEnabled(enabled)
+        if (enabled) controls.markSmartForwardExplained()
         mutableEnabled.value = enabled
     }
 }

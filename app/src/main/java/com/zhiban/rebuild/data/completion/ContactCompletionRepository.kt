@@ -1,6 +1,9 @@
 package com.zhiban.rebuild.data.completion
 
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.communication.DisabledSmartForwardHandoff
+import com.zhiban.rebuild.data.communication.SmartForwardHandoff
+import com.zhiban.rebuild.data.communication.SmartForwardOutcome
 import com.zhiban.rebuild.data.config.AgentControlStore
 import com.zhiban.rebuild.data.contact.ContactProfileCompletenessEvaluator
 import com.zhiban.rebuild.data.contact.ContactProfileField
@@ -41,6 +44,7 @@ class ContactCompletionRepository internal constructor(
     private val handoff: CompletionHandoff,
     private val outreachGenerator: ContactCompletionOutreachGenerator,
     private val controls: AgentControlStore,
+    private val smartForward: SmartForwardHandoff = DisabledSmartForwardHandoff,
 ) {
     private val dao get() = database.contactCompletionRequestDao()
     private val contactDao get() = database.contactDao()
@@ -96,7 +100,15 @@ class ContactCompletionRepository internal constructor(
         val text = finalText.trim()
         if (text.isEmpty()) return false
         val contact = contactDao.findById(request.contactId) ?: return false
-        if (!handoff.openComposer(PLATFORM_WECHAT, contact.displayName, text)) return false
+        if (controls.smartForwardEnabled()) {
+            when (smartForward.openComposer(contact.displayName, text)) {
+                SmartForwardOutcome.PREFILLED -> Unit
+                SmartForwardOutcome.FALLBACK_SHARE -> if (!handoff.openComposer(PLATFORM_WECHAT, contact.displayName, text)) return false
+                SmartForwardOutcome.ABORTED -> if (!handoff.openComposer(PLATFORM_WECHAT, contact.displayName, text)) return false
+            }
+        } else if (!handoff.openComposer(PLATFORM_WECHAT, contact.displayName, text)) {
+            return false
+        }
         val now = System.currentTimeMillis()
         // markAwaiting 返回受影响行数:并发下状态可能已变(被取消/已过期),0 行=状态没转成,
         // 不能谎报已进入等待回复(P2-3)。

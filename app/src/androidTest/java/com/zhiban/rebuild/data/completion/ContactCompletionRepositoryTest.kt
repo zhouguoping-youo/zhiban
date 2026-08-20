@@ -6,6 +6,8 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.config.AgentControlStore
+import com.zhiban.rebuild.data.communication.SmartForwardHandoff
+import com.zhiban.rebuild.data.communication.SmartForwardOutcome
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.ContactPlatformIdentityEntity
 import com.zhiban.rebuild.data.contact.ContactProfileField
@@ -161,6 +163,27 @@ class ContactCompletionRepositoryTest {
         assertEquals(ContactCompletionStatus.AWAITING_REPLY, row.status)
         assertEquals(edited, row.draftText) // 行记录实际发出的文本
         assertNotNull(row.sentAtEpochMs)
+    }
+
+    @Test fun smartForwardPrefillsAndNeverCallsShareFallbackWhenItSucceeds() = runBlocking {
+        insertContact("c1", phone = null, wechatId = "wx-1")
+        val draft = repository.prepareOutreach("c1") ?: error("draft expected")
+        controls.saveSmartForwardEnabled(true)
+        val smartCalls = mutableListOf<String>()
+        val smartRepository = ContactCompletionRepository(
+            database,
+            handoff.impl,
+            generator,
+            controls,
+            SmartForwardHandoff { name, message ->
+                smartCalls += "$name:$message"
+                SmartForwardOutcome.PREFILLED
+            },
+        )
+
+        assertTrue(smartRepository.confirmAndHandoff(draft.requestId, "最终草稿"))
+        assertEquals(listOf("张三:最终草稿"), smartCalls)
+        assertEquals(0, handoff.calls)
     }
 
     @Test fun confirmAndHandoffPreservesDraftWhenWechatUnavailable() = runBlocking {

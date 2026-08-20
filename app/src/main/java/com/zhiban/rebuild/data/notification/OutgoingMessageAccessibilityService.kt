@@ -15,6 +15,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
 import com.zhiban.rebuild.data.agent.AgentDataRepository
+import com.zhiban.rebuild.data.communication.SmartForwardController
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -42,12 +43,19 @@ class OutgoingMessageAccessibilityService : AccessibilityService() {
         fun repository(): AgentDataRepository
         fun collectionPreferences(): MessageCollectionPreferences
         fun outgoingExpectationTracker(): OutgoingMessageExpectationTracker
+        fun smartForwardController(): SmartForwardController
     }
 
     private data class Draft(val text: String, val changedAtEpochMs: Long)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val handler = Handler(Looper.getMainLooper())
+    private val smartForwardPoll = object : Runnable {
+        override fun run() {
+            dependencies.smartForwardController().pollTimeout()
+            handler.postDelayed(this, SMART_FORWARD_POLL_MS)
+        }
+    }
     private val drafts = mutableMapOf<String, Draft>()
     private val screenshotOcrInFlight = mutableSetOf<String>()
     private val textRecognizer by lazy {
@@ -61,6 +69,7 @@ class OutgoingMessageAccessibilityService : AccessibilityService() {
     }
 
     override fun onServiceConnected() {
+        handler.post(smartForwardPoll)
         scope.launch {
             dependencies.collectionPreferences().outgoingCollectionEnabled.collectLatest {
                 explicitlyEnabled = it
@@ -70,6 +79,7 @@ class OutgoingMessageAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
+        if (dependencies.smartForwardController().onAccessibilityEvent(this, event)) return
         if (!explicitlyEnabled) return
         val packageName = event.packageName?.toString()?.takeIf(SocialAppCatalog::isSupported) ?: return
         when (event.eventType) {
@@ -309,6 +319,7 @@ class OutgoingMessageAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
+        dependencies.smartForwardController().abort()
         textRecognizer.close()
         scope.cancel()
         super.onDestroy()
@@ -324,6 +335,7 @@ class OutgoingMessageAccessibilityService : AccessibilityService() {
         const val MAX_DRAFT_AGE_MS = 5 * 60_000L
         const val SEND_CONFIRMATION_DELAY_MS = 550L
         const val EXPECTED_HANDOFF_DEBOUNCE_MS = 300L
+        const val SMART_FORWARD_POLL_MS = 500L
         val SEND_LABELS = setOf("发送", "send", "发出")
         val TOP_BAR_WORDS = setOf(
             "微信", "QQ", "TIM", "飞书", "Lark", "企业微信", "钉钉", "短信", "消息",
