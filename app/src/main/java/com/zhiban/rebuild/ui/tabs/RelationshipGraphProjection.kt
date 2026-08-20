@@ -42,26 +42,34 @@ internal fun projectRelationshipGraph(
     val ringByNode = peopleIds.associateWith { id ->
         relationshipGraphRing(intensityById[id]?.interactionCount ?: 0)
     }
-    if (rootId == ownerId) {
-        val nodes = validEdges.flatMapTo(linkedSetOf()) { edge ->
-            listOf(edge.fromContactId, edge.toContactId)
-        }
-        nodes += rootId
-        return RelationshipGraphProjection(
-            rootId = rootId,
-            isEgoView = false,
-            hopByNode = nodes.associateWith { if (it == rootId) 0 else 1 },
-            ringByNode = ringByNode,
-            edges = validEdges,
-        )
-    }
-
     val adjacency = buildMap<String, MutableSet<String>> {
         validEdges.forEach { edge ->
             getOrPut(edge.fromContactId) { linkedSetOf() }.add(edge.toContactId)
             getOrPut(edge.toContactId) { linkedSetOf() }.add(edge.fromContactId)
         }
     }
+    if (rootId == ownerId) {
+        val hopByNode = linkedMapOf(rootId to 0)
+        var frontier = setOf(rootId)
+        var distance = 0
+        while (frontier.isNotEmpty()) {
+            val next = frontier.flatMap { adjacency[it].orEmpty() }
+                .filter { it !in hopByNode }
+                .toSet()
+            distance += 1
+            next.forEach { hopByNode[it] = distance }
+            frontier = next
+        }
+        val connectedNodes = hopByNode.keys
+        return RelationshipGraphProjection(
+            rootId = rootId,
+            isEgoView = false,
+            hopByNode = hopByNode,
+            ringByNode = ringByNode,
+            edges = validEdges.filter { it.fromContactId in connectedNodes && it.toContactId in connectedNodes },
+        )
+    }
+
     val hopByNode = linkedMapOf(rootId to 0)
     var frontier = setOf(rootId)
     repeat(maxEgoHops.coerceAtLeast(0)) { hop ->
