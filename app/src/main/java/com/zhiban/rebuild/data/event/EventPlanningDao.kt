@@ -33,6 +33,23 @@ interface EventPlanningDao {
     @Query("SELECT * FROM event_plan_participants WHERE planId = :planId ORDER BY updatedAtEpochMs, contactId")
     suspend fun participantsForPlan(planId: String): List<EventPlanParticipantEntity>
 
+    @Query(
+        """SELECT participant.* FROM event_plan_participants participant
+        INNER JOIN event_plans eventPlan ON eventPlan.planId = participant.planId
+        WHERE eventPlan.scheduleId = :scheduleId
+        ORDER BY participant.updatedAtEpochMs, participant.contactId""",
+    )
+    suspend fun participantsForSchedule(scheduleId: String): List<EventPlanParticipantEntity>
+
+    @Query(
+        """SELECT participant.* FROM event_plan_participants participant
+        INNER JOIN event_plans eventPlan ON eventPlan.planId = participant.planId
+        INNER JOIN schedules schedule ON schedule.id = eventPlan.scheduleId
+        WHERE schedule.startAtEpochMs BETWEEN :fromEpochMs AND :toEpochMs
+        ORDER BY schedule.startAtEpochMs, participant.contactId""",
+    )
+    suspend fun participantsForScheduleRange(fromEpochMs: Long, toEpochMs: Long): List<EventPlanParticipantEntity>
+
     @Query("SELECT * FROM event_plan_participants WHERE planId = :planId AND contactId = :contactId")
     suspend fun findParticipant(planId: String, contactId: String): EventPlanParticipantEntity?
 

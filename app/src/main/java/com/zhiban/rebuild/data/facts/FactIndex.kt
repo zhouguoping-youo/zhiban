@@ -11,6 +11,8 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.withTransaction
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.interaction.InteractionSourceType
+import com.zhiban.rebuild.data.interaction.factInteraction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
 
@@ -208,6 +210,13 @@ internal class FactIndex(private val database: AgentDatabase) {
             database.embeddingVectorDao().deleteByFact(fact.factId)
         }
         database.factDao().upsert(fact)
+        database.contactInteractionDao().deleteBySource(InteractionSourceType.FACT, fact.factId)
+        val notificationProjection = fact.sourceType in setOf("OBSERVED_NOTIFICATION", "INFERRED_NOTIFICATION")
+        if (fact.factType == "INTERACTION_SUMMARY" && fact.status == "ACTIVE" && fact.contactId != null && !notificationProjection) {
+            database.contactInteractionDao().insertIgnore(
+                factInteraction(fact.factId, fact.contactId, fact.createdAtEpochMs, fact.updatedAtEpochMs),
+            )
+        }
         val sql = database.openHelper.writableDatabase
         ensureFts()
         sql.execSQL("DELETE FROM fact_fts WHERE factId = ?", arrayOf(fact.factId))
@@ -229,6 +238,7 @@ internal class FactIndex(private val database: AgentDatabase) {
     private suspend fun deleteInTransaction(factId: String): Boolean {
         ensureFts()
         database.openHelper.writableDatabase.execSQL("DELETE FROM fact_fts WHERE factId = ?", arrayOf(factId))
+        database.contactInteractionDao().deleteBySource(InteractionSourceType.FACT, factId)
         return database.factDao().delete(factId) == 1
     }
 

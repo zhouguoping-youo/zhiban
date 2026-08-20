@@ -4,6 +4,8 @@ import android.provider.CallLog
 import androidx.room.withTransaction
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.contact.normalizeContactPhone
+import com.zhiban.rebuild.data.interaction.InteractionSourceType
+import com.zhiban.rebuild.data.interaction.callInteraction
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -117,39 +119,40 @@ internal class CallLogImporter(private val database: AgentDatabase) {
             if (matches.size == 1) linked++
             if (matches.size > 1) ambiguous++
             val createdAt = existing?.createdAtEpochMs ?: nowEpochMs
-            database.callLogDao().upsertCall(
-                CallRecordEntity(
-                    callRecordId = existing?.callRecordId ?: UUID.randomUUID().toString(),
-                    source = SOURCE_ANDROID,
-                    providerRowId = row.providerRowId,
-                    rawNumber = row.number.takeIf { numberCanIdentifyPerson }?.take(128),
-                    normalizedNumber = normalized,
-                    numberPresentation = row.numberPresentation,
-                    systemType = row.systemType,
-                    direction = callDirection(row.systemType),
-                    startedAtEpochMs = row.startedAtEpochMs,
-                    durationSeconds = row.durationSeconds,
-                    lastModifiedEpochMs = row.lastModifiedEpochMs,
-                    phoneAccountId = row.phoneAccountId?.take(128),
-                    phoneAccountComponentName = row.phoneAccountComponentName?.take(256),
-                    linkedContactId = contactId,
-                    linkState = when {
-                        userLinked -> "USER_LINKED"
-                        matches.size == 1 -> "MATCHED"
-                        matches.size > 1 -> "AMBIGUOUS"
-                        else -> "UNMATCHED"
-                    },
-                    linkSource = when {
-                        userLinked -> existing?.linkSource
-                        matches.size == 1 -> "NORMALIZED_PHONE"
-                        else -> null
-                    },
-                    sourceStatus = "ACTIVE",
-                    notePromptState = existing?.notePromptState ?: "NONE",
-                    createdAtEpochMs = createdAt,
-                    updatedAtEpochMs = nowEpochMs,
-                ),
+            val call = CallRecordEntity(
+                callRecordId = existing?.callRecordId ?: UUID.randomUUID().toString(),
+                source = SOURCE_ANDROID,
+                providerRowId = row.providerRowId,
+                rawNumber = row.number.takeIf { numberCanIdentifyPerson }?.take(128),
+                normalizedNumber = normalized,
+                numberPresentation = row.numberPresentation,
+                systemType = row.systemType,
+                direction = callDirection(row.systemType),
+                startedAtEpochMs = row.startedAtEpochMs,
+                durationSeconds = row.durationSeconds,
+                lastModifiedEpochMs = row.lastModifiedEpochMs,
+                phoneAccountId = row.phoneAccountId?.take(128),
+                phoneAccountComponentName = row.phoneAccountComponentName?.take(256),
+                linkedContactId = contactId,
+                linkState = when {
+                    userLinked -> "USER_LINKED"
+                    matches.size == 1 -> "MATCHED"
+                    matches.size > 1 -> "AMBIGUOUS"
+                    else -> "UNMATCHED"
+                },
+                linkSource = when {
+                    userLinked -> existing?.linkSource
+                    matches.size == 1 -> "NORMALIZED_PHONE"
+                    else -> null
+                },
+                sourceStatus = "ACTIVE",
+                notePromptState = existing?.notePromptState ?: "NONE",
+                createdAtEpochMs = createdAt,
+                updatedAtEpochMs = nowEpochMs,
             )
+            database.callLogDao().upsertCall(call)
+            database.contactInteractionDao().deleteBySource(InteractionSourceType.CALL, call.callRecordId)
+            callInteraction(call)?.let { database.contactInteractionDao().insertIgnore(it) }
             written++
         }
         CallLogSyncResult(rows.size, written, linked, ambiguous)

@@ -50,6 +50,8 @@ import com.zhiban.rebuild.data.crm.CrmStageHistoryEntity
 import com.zhiban.rebuild.data.crm.CrmSuggestionStatus
 import com.zhiban.rebuild.data.facts.FactEntity
 import com.zhiban.rebuild.data.facts.FactIndex
+import com.zhiban.rebuild.data.interaction.InteractionSourceType
+import com.zhiban.rebuild.data.interaction.notificationInteraction
 import com.zhiban.rebuild.data.notification.MessageCollectionPreferences
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.NotificationInsightAnalyzer
@@ -170,7 +172,9 @@ class AgentDataRepository internal constructor(
         if (daos.senderMuteDao.find(candidate.platform, mutedSender) == null) return false
         transactions.runInTransaction {
             persistObservedCommunicationIdentity(candidate, nowEpochMs)
-            daos.notificationCandidateDao.upsert(candidate.copy(status = "MUTED"))
+            val mutedCandidate = candidate.copy(status = "MUTED")
+            daos.notificationCandidateDao.upsert(mutedCandidate)
+            replaceNotificationInteraction(mutedCandidate)
         }
         return true
     }
@@ -238,6 +242,7 @@ class AgentDataRepository internal constructor(
         }
         persistObservedCommunicationIdentity(enriched, nowEpochMs)
         daos.notificationCandidateDao.upsert(enriched)
+        replaceNotificationInteraction(enriched)
         // A matched contact may become a CRM lead candidate, but never a formal lead without confirmation.
         enriched.suggestedContactId?.let { matchedContactId ->
             crm.suggestNewLeadFromNotification(matchedContactId, enriched.candidateId, nowEpochMs)
@@ -334,6 +339,7 @@ class AgentDataRepository internal constructor(
                 status = candidate.completionStatus(linkedContactId = contactId),
             )
             daos.notificationCandidateDao.upsert(updated)
+            replaceNotificationInteraction(updated)
             true
         }
 
@@ -1141,9 +1147,16 @@ class AgentDataRepository internal constructor(
     suspend fun deleteContactFact(factId: String): Boolean = transactions.runInTransaction {
         val deleted = factIndex.delete(factId)
         if (deleted && factId.startsWith(NOTIFICATION_EVIDENCE_PREFIX)) {
-            daos.notificationCandidateDao.reopen(factId.removePrefix(NOTIFICATION_EVIDENCE_PREFIX))
+            val candidateId = factId.removePrefix(NOTIFICATION_EVIDENCE_PREFIX)
+            daos.notificationCandidateDao.reopen(candidateId)
+            daos.contactInteractionDao.deleteBySource(InteractionSourceType.NOTIFICATION, candidateId)
         }
         deleted
+    }
+
+    private suspend fun replaceNotificationInteraction(candidate: NotificationCandidateEntity) {
+        daos.contactInteractionDao.deleteBySource(InteractionSourceType.NOTIFICATION, candidate.candidateId)
+        notificationInteraction(candidate)?.let { daos.contactInteractionDao.insertIgnore(it) }
     }
 
     private fun String?.cleanContactField(): String? = this?.trim()?.takeIf(String::isNotEmpty)

@@ -106,6 +106,7 @@ object AgentDataModule {
                     AgentDatabase.MIGRATION_48_49,
                     AgentDatabase.MIGRATION_49_50,
                     AgentDatabase.MIGRATION_50_51,
+                    AgentDatabase.MIGRATION_51_52,
                 )
                 .addCallback(AgentDatabase.CALLBACK).build()
         }
@@ -161,6 +162,7 @@ object AgentDataModule {
         factDao = database.factDao(),
         changeLogDao = database.changeLogDao(),
         senderMuteDao = database.senderMuteDao(),
+        contactInteractionDao = database.contactInteractionDao(),
     )
 
     @Provides

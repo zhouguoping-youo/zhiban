@@ -8,6 +8,7 @@ import com.zhiban.rebuild.data.contact.ContactIdentityDao
 import com.zhiban.rebuild.data.contact.ContactIntelligenceDao
 import com.zhiban.rebuild.data.contact.ContactKnowledgeDao
 import com.zhiban.rebuild.data.facts.FactDao
+import com.zhiban.rebuild.data.interaction.ContactInteractionDao
 import com.zhiban.rebuild.data.notification.NotificationCandidateDao
 
 /**
@@ -24,6 +25,7 @@ internal data class AgentDataDaos(
     val factDao: FactDao,
     val changeLogDao: ChangeLogDao,
     val senderMuteDao: com.zhiban.rebuild.data.notification.SenderMuteDao,
+    val contactInteractionDao: ContactInteractionDao,
 )
 
 /**

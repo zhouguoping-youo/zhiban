@@ -62,6 +62,7 @@ class CallLogImporterTest {
         assertEquals("contact-1", imported.linkedContactId)
         assertEquals("13800138000", imported.normalizedNumber)
         assertEquals(61, imported.durationSeconds)
+        assertEquals(1_000L, database.contactInteractionDao().latestForContact("contact-1"))
 
         database.contactDao().insert(contact("contact-2"))
         database.contactKnowledgeDao().upsertMethods(listOf(method("contact-2", "13800138000")))
@@ -69,6 +70,7 @@ class CallLogImporterTest {
         val nowAmbiguous = database.callLogDao().findBySourceRow(CallLogImporter.SOURCE_ANDROID, 42)!!
         assertEquals("AMBIGUOUS", nowAmbiguous.linkState)
         assertEquals(null, nowAmbiguous.linkedContactId)
+        assertEquals(null, database.contactInteractionDao().latestForContact("contact-1"))
     }
 
     @Test

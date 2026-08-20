@@ -66,6 +66,7 @@ class AgentDataRepositoryTest {
                     factDao = database.factDao(),
                     changeLogDao = database.changeLogDao(),
                     senderMuteDao = database.senderMuteDao(),
+                    contactInteractionDao = database.contactInteractionDao(),
                 ),
                 transactions = RoomAgentTransactionRunner(database),
                 factIndex = FactIndex(database),
@@ -82,6 +83,64 @@ class AgentDataRepositoryTest {
 
     @After
     fun tearDown() = database.close()
+
+    @Test
+    fun linkedNotificationWritesMetadataOnlyInteractionLedger() = runBlocking {
+        database.contactDao().insert(testContact("ledger-contact", "张三", "", "", 1))
+        repository.stageNotificationCandidate(
+            NotificationCandidateEntity(
+                candidateId = "ledger-message",
+                sourceKey = "ledger-source",
+                packageName = "com.tencent.mm",
+                appLabel = "微信",
+                title = "张三",
+                body = "正文不进入互动账本",
+                postedAtEpochMs = 5_000,
+                platform = "WECHAT",
+                senderName = "张三",
+                linkedContactId = "ledger-contact",
+            ),
+        )
+
+        assertEquals(5_000L, database.contactInteractionDao().latestForContact("ledger-contact"))
+        database.openHelper.readableDatabase.query("PRAGMA table_info(contact_interactions)").use { cursor ->
+            val columns = buildSet {
+                val nameIndex = cursor.getColumnIndexOrThrow("name")
+                while (cursor.moveToNext()) add(cursor.getString(nameIndex))
+            }
+            assertFalse(columns.contains("body"))
+            assertFalse(columns.contains("textContent"))
+        }
+    }
+
+    @Test
+    fun updatedInteractionFactReplacesItsLedgerProjection() = runBlocking {
+        database.contactDao().insert(testContact("ledger-old", "旧联系人", "", "", 1))
+        database.contactDao().insert(testContact("ledger-new", "新联系人", "", "", 2))
+        val original = FactEntity(
+            factId = "ledger-fact",
+            factType = "INTERACTION_SUMMARY",
+            textContent = "正文只保存在事实表",
+            structuredDataJson = null,
+            sourceType = "CRM_ACTIVITY",
+            sourceRef = "activity-1",
+            contactId = "ledger-old",
+            skillId = null,
+            confidence = 1.0,
+            sensitivity = "PERSONAL",
+            status = "ACTIVE",
+            ttlDays = 0,
+            expiresAtEpochMs = null,
+            createdAtEpochMs = 1_000,
+            updatedAtEpochMs = 1_000,
+        )
+
+        FactIndex(database).upsert(original)
+        FactIndex(database).upsert(original.copy(contactId = "ledger-new", createdAtEpochMs = 2_000, updatedAtEpochMs = 2_000))
+
+        assertEquals(null, database.contactInteractionDao().latestForContact("ledger-old"))
+        assertEquals(2_000L, database.contactInteractionDao().latestForContact("ledger-new"))
+    }
 
     @Test
     fun contactTagIsSerializedAsJsonInsteadOfInterpolatedIntoJsonText() = runBlocking {
@@ -1000,7 +1059,7 @@ class AgentDataRepositoryTest {
     }
 
     @Test
-    fun structuredMessageSuggestsExactContactButWaitsForUserConfirmation() = runBlocking {
+    fun groupMessageWaitsForScopedIdentityConfirmationBeforeLinking() = runBlocking {
         val now = System.currentTimeMillis()
         val contactId = repository.saveUserContact(
             null, "李雷", null, null, null, null, null, null, nowEpochMs = now,
@@ -1022,13 +1081,16 @@ class AgentDataRepositoryTest {
         )
 
         val pending = repository.observeNotificationCandidates().first().single()
-        assertEquals(contactId, pending.suggestedContactId)
+        assertEquals(null, pending.suggestedContactId)
         assertEquals(0, repository.observeContactFacts(contactId).first().size)
 
         assertEquals(true, repository.confirmNotificationCandidate(pending.candidateId, contactId, now + 1_000L))
         assertEquals(0, repository.observeNotificationCandidates().first().size)
         assertEquals(1, repository.observeContactFacts(contactId).first().size)
-        assertEquals("WECHAT", repository.observeContactPlatformIdentities().first().single().platform)
+        assertEquals(0, repository.observeContactPlatformIdentities().first().size)
+        val scopedIdentity = database.contactIntelligenceDao().identitiesForPerson(contactId).single()
+        assertEquals("WECHAT", scopedIdentity.sourceType)
+        assertEquals("产品群", scopedIdentity.conversationScopeId)
 
         repository.stageNotificationCandidate(
             NotificationCandidateEntity(
@@ -1036,39 +1098,20 @@ class AgentDataRepositoryTest {
                 sourceKey = "source-followup",
                 packageName = "com.tencent.mm",
                 appLabel = "微信",
-                title = "李雷",
+                title = "产品群",
                 body = "后续资料已经补充",
                 postedAtEpochMs = now + 2_000L,
                 platform = "WECHAT",
-                conversationTitle = "李雷",
+                conversationTitle = "产品群",
                 senderName = "李雷",
+                isGroupChat = true,
             ),
         )
         assertEquals(0, repository.observeNotificationCandidates().first().size)
-        val automatic = repository.observeContactFacts(contactId).first()
-            .single { it.factType == "INTERACTION_SUMMARY" }
-        assertEquals("OBSERVED_NOTIFICATION", automatic.sourceType)
-        assertEquals(90, automatic.ttlDays)
-        val receipt = database.changeLogDao().observeAutoWriteReceipts().first().single()
-        val persistedFact = requireNotNull(database.factDao().find(automatic.factId))
-        assertEquals(canonicalChangeDigest(persistedFact), database.changeLogDao().find(receipt.changeId)?.afterDigest)
-        assertEquals(contactId, receipt.subjectContactId)
-        assertEquals("INTERACTION_SUMMARY", receipt.presentationType)
-        assertEquals("AVAILABLE", receipt.undoState)
-        val autoWriteRepository = AutoWriteRepository(
-            database,
-            context,
-            com.zhiban.rebuild.runtime.governance.ChangeUndoApplierImpl(database),
-        )
-        assertEquals(true, autoWriteRepository.undo(receipt.changeId, now + 3_000L))
-        assertEquals("CORRECTED", database.changeLogDao().findAutoWriteReceipt(receipt.changeId)?.reviewState)
-        assertEquals(0, autoWriteRepository.observeUnreviewedCount().first())
-        assertEquals(
-            0,
-            repository.observeContactFacts(contactId).first().count {
-                it.factType == "INTERACTION_SUMMARY"
-            },
-        )
+        // 群聊里的 scoped identity 只负责归因；不能把群消息伪装成一对一互动事实。
+        assertEquals(1, repository.observeContactFacts(contactId).first().size)
+        assertTrue(database.changeLogDao().observeAutoWriteReceipts().first().isEmpty())
+        assertEquals(now + 2_000L, database.contactInteractionDao().latestForContact(contactId))
     }
 
     @Test
@@ -1757,5 +1800,4 @@ class AgentDataRepositoryTest {
         title = null,
         note = null,
     )
-
 }

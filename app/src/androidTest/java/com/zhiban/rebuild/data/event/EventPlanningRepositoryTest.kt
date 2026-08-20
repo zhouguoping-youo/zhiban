@@ -45,6 +45,11 @@ class EventPlanningRepositoryTest {
         assertEquals(1, database.scheduleDao().count())
         assertNotNull(database.scheduleDao().findById(schedule.id))
         assertEquals(EventResponseStatus.GOING, repository.observeParticipants(planId).first().single().responseStatus)
+        assertEquals("contact-1", database.eventPlanningDao().participantsForSchedule(schedule.id).single().contactId)
+        assertEquals(
+            "contact-1",
+            database.eventPlanningDao().participantsForScheduleRange(schedule.startAtEpochMs - 1, schedule.startAtEpochMs + 1).single().contactId,
+        )
     }
 
     @Test fun calendarConfirmationRequiresParticipantAndRemovedParticipantCannotBeUpdated() = runBlocking {
