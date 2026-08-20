@@ -193,6 +193,13 @@ class RuntimeToolCatalog(val specs: Map<String, RuntimeToolSpec>) {
                     4,
                 ),
                 RuntimeToolSpec(
+                    "relationship.event.createIntroduction",
+                    1,
+                    RuntimeToolRisk.WRITE_CONFIRMATION_REQUIRED,
+                    """{"type":"function","function":{"name":"relationship.event.createIntroduction","description":"记录一条‘介绍认识’经历：用户、被介绍联系人和介绍人会一起写入关系时间线与图谱。必须经用户确认；只在对话或其他证据明确说出介绍人和被介绍人时调用。","parameters":{"type":"object","additionalProperties":false,"required":["subjectContactId","introducerContactId","evidenceSummary"],"properties":{"subjectContactId":{"type":"string","description":"被介绍认识的联系人 ID"},"introducerContactId":{"type":"string","description":"介绍人的联系人 ID"},"evidenceSummary":{"type":"string","minLength":1,"maxLength":1000,"description":"说明介绍关系来自哪段已授权证据，不写入原文"},"note":{"type":"string","maxLength":500},"occurredAtEpochMs":{"type":"integer"}}}}}""",
+                    4,
+                ),
+                RuntimeToolSpec(
                     "relationship.getEvidence",
                     1,
                     RuntimeToolRisk.READ_ONLY,

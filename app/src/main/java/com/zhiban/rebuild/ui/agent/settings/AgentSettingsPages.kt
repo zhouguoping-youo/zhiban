@@ -500,6 +500,7 @@ private fun toolDisplayName(name: String) = when (name) {
     "memory.search" -> "搜索长期记忆"
     "memory.delete" -> "删除长期记忆"
     "relationship.createCandidate" -> "建立联系人关系"
+    "relationship.event.createIntroduction" -> "记录介绍关系"
     "relationship.getEvidence" -> "查看关系证据"
     "relationship.search" -> "查询联系人关系"
     "communication.message.compose" -> "准备并打开消息"

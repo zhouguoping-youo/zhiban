@@ -22,6 +22,7 @@ import com.zhiban.rebuild.runtime.governance.ChangeUndoCoordinator
 import com.zhiban.rebuild.runtime.governance.ContactCreateCandidateCall
 import com.zhiban.rebuild.runtime.governance.ContactIdentityResolutionCall
 import com.zhiban.rebuild.runtime.governance.RelationshipCandidateCall
+import com.zhiban.rebuild.runtime.governance.RelationshipIntroductionCall
 import com.zhiban.rebuild.runtime.kernel.RuntimeSignal
 import com.zhiban.rebuild.runtime.kernel.RuntimeStateMachine
 import com.zhiban.rebuild.runtime.memory.RoomMemoryGate
@@ -365,6 +366,46 @@ internal class RoomApprovalStore(
             put("temporalState", call.temporalState)
             call.skillId?.let { put("skillId", it) }
             put("title", "确认联系人关系：${com.zhiban.rebuild.relationship.RelationshipTaxonomy.displayName(call.relationType)}")
+        }.toString()
+        requestToolApprovalInTransaction(
+            payload,
+            call.providerCallId,
+            sessionId,
+            runId,
+            attemptId,
+            ownerId,
+            fencingEpoch,
+            nowEpochMs,
+        )
+    }
+
+    suspend fun requestRelationshipIntroductionApproval(
+        call: RelationshipIntroductionCall,
+        sessionId: String,
+        runId: String,
+        attemptId: String,
+        ownerId: String,
+        fencingEpoch: Long,
+        nowEpochMs: Long,
+    ): Boolean = database.withTransaction {
+        val payload = buildJsonObject {
+            put("toolName", "relationship.event.createIntroduction")
+            put("providerCallId", call.providerCallId)
+            put("logicalStepId", call.logicalStepId)
+            put("proposalId", call.proposalId)
+            put("payloadRef", call.payloadRef)
+            put("revision", call.revision)
+            put("canonicalInputDigest", call.canonicalInputDigest)
+            put("idempotencyKey", call.idempotencyKey)
+            put("eventId", call.eventId)
+            put("subjectContactId", call.subjectContactId)
+            put("introducerContactId", call.introducerContactId)
+            put("subjectName", call.subjectName)
+            put("introducerName", call.introducerName)
+            put("title", call.title)
+            call.note?.let { put("note", it) }
+            call.occurredAtEpochMs?.let { put("occurredAtEpochMs", it) }
+            put("evidenceDigest", call.evidenceDigest)
         }.toString()
         requestToolApprovalInTransaction(
             payload,

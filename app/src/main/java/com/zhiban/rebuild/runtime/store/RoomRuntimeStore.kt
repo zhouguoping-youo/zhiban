@@ -29,6 +29,7 @@ import com.zhiban.rebuild.foundation.sha256
 import com.zhiban.rebuild.runtime.governance.ChangeUndoCoordinator
 import com.zhiban.rebuild.runtime.governance.ContactCreateCandidateCall
 import com.zhiban.rebuild.runtime.governance.RelationshipCandidateCall
+import com.zhiban.rebuild.runtime.governance.RelationshipIntroductionCall
 import com.zhiban.rebuild.runtime.kernel.RuntimeSignal
 import com.zhiban.rebuild.runtime.kernel.RuntimeStateMachine
 import com.zhiban.rebuild.runtime.memory.RoomMemoryGate
@@ -224,6 +225,24 @@ internal class RoomRuntimeStore(internal val database: AgentDatabase, internal v
         fencingEpoch: Long,
         nowEpochMs: Long,
     ): Boolean = approvals.requestRelationshipApproval(call, sessionId, runId, attemptId, ownerId, fencingEpoch, nowEpochMs)
+
+    suspend fun requestRelationshipIntroductionApproval(
+        call: RelationshipIntroductionCall,
+        sessionId: String,
+        runId: String,
+        attemptId: String,
+        ownerId: String,
+        fencingEpoch: Long,
+        nowEpochMs: Long,
+    ): Boolean = approvals.requestRelationshipIntroductionApproval(
+        call,
+        sessionId,
+        runId,
+        attemptId,
+        ownerId,
+        fencingEpoch,
+        nowEpochMs,
+    )
 
     suspend fun requestRemoteMcpApproval(
         payloadJson: String,

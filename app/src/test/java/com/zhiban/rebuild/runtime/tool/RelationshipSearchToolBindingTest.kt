@@ -25,11 +25,14 @@ class RelationshipSearchToolBindingTest {
         } else {
             emptyList()
         }
+        override suspend fun ownerRelationships(contactIds: List<String>) = emptyList<RelationshipEdgeEntity>()
         override suspend fun contactSummaries(contactIds: List<String>) = listOf(
             ContactSearchProjection("a", "张三", null, null, null, null, null, null),
             ContactSearchProjection("b", "李四", null, null, null, null, null, null),
         ).filter { it.contactId in contactIds }
         override suspend fun find(edgeId: String) = edge.takeIf { it.edgeId == edgeId }
+        override suspend fun findActiveBetween(firstId: String, secondId: String) =
+            edge.takeIf { setOf(firstId, secondId) == setOf(edge.fromContactId, edge.toContactId) }
         override suspend fun deleteConfirmed(edgeId: String) = if (edge.edgeId == edgeId) 1 else 0
         override suspend fun deactivateInferredEdge(edgeId: String, nowEpochMs: Long) = if (edge.edgeId == edgeId) 1 else 0
         override suspend fun deactivateForContacts(contactIds: List<String>, nowEpochMs: Long) = 0

@@ -46,6 +46,7 @@ import com.zhiban.rebuild.runtime.governance.ChangeUndoCoordinator
 import com.zhiban.rebuild.runtime.governance.ContactDomainWriter
 import com.zhiban.rebuild.runtime.governance.ContactIdentityResolutionDomainWriter
 import com.zhiban.rebuild.runtime.governance.RelationshipDomainWriter
+import com.zhiban.rebuild.runtime.governance.RelationshipEventDomainWriter
 import com.zhiban.rebuild.runtime.input.asr.PrivacyConsent
 import com.zhiban.rebuild.runtime.memory.RoomMemoryGate
 import com.zhiban.rebuild.runtime.network.NetworkQuality
@@ -85,6 +86,7 @@ import com.zhiban.rebuild.runtime.tool.MemoryUpsertDomainWriter
 import com.zhiban.rebuild.runtime.tool.MemoryUpsertToolBinding
 import com.zhiban.rebuild.runtime.tool.RelationshipCreateCandidateToolBinding
 import com.zhiban.rebuild.runtime.tool.RelationshipEvidenceToolBinding
+import com.zhiban.rebuild.runtime.tool.RelationshipIntroductionToolBinding
 import com.zhiban.rebuild.runtime.tool.RelationshipSearchToolBinding
 import com.zhiban.rebuild.runtime.tool.RemoteMcpToolBinding
 import com.zhiban.rebuild.runtime.tool.RoomCrmToolExecutor
@@ -343,6 +345,12 @@ internal class ProviderExecutionEngine(
                 toolCatalog.requireRegistered("relationship.createCandidate"),
                 store,
                 RelationshipDomainWriter(database),
+            ),
+            RelationshipIntroductionToolBinding(
+                toolCatalog.requireRegistered(RelationshipEventDomainWriter.TOOL_NAME),
+                store,
+                database.contactDao(),
+                RelationshipEventDomainWriter(database),
             ),
             RelationshipEvidenceToolBinding(
                 toolCatalog.requireRegistered("relationship.getEvidence"),

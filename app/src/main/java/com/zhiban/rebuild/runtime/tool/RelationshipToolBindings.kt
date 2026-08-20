@@ -6,9 +6,12 @@ import com.zhiban.rebuild.data.contact.RelationshipEventDao
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.foundation.RuntimeToolSpec
 import com.zhiban.rebuild.foundation.runSuspendCatching
+import com.zhiban.rebuild.foundation.sha256
 import com.zhiban.rebuild.relationship.RelationshipTaxonomy
 import com.zhiban.rebuild.runtime.governance.RelationshipCandidateCall
 import com.zhiban.rebuild.runtime.governance.RelationshipDomainWriter
+import com.zhiban.rebuild.runtime.governance.RelationshipEventDomainWriter
+import com.zhiban.rebuild.runtime.governance.RelationshipIntroductionCall
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
@@ -303,5 +306,105 @@ internal class RelationshipEvidenceToolBinding(override val spec: RuntimeToolSpe
             put("status", edge.status)
         }.toString()
         return RoutedToolResult(spec.name, request.providerCallId, safe)
+    }
+}
+
+internal class RelationshipIntroductionToolBinding(
+    override val spec: RuntimeToolSpec,
+    private val store: RoomRuntimeStore,
+    private val contacts: com.zhiban.rebuild.data.contact.ContactDao,
+    private val writer: RelationshipEventDomainWriter,
+) : RuntimeToolBinding {
+    override suspend fun requestApproval(request: RuntimeToolCallRequest, context: RuntimeToolRouteContext): Boolean {
+        val args = parseToolArgs(
+            request.argumentsJson,
+            setOf("subjectContactId", "introducerContactId", "evidenceSummary", "note", "occurredAtEpochMs"),
+        ) { throw IllegalArgumentException("INVALID_TOOL_ARGUMENTS") }
+        fun required(name: String, max: Int): String = args[name]?.jsonPrimitive?.content?.trim()
+            ?.takeIf { it.isNotBlank() && it.length <= max } ?: throw IllegalArgumentException("INVALID_TOOL_ARGUMENTS")
+        val subjectId = required("subjectContactId", 128)
+        val introducerId = required("introducerContactId", 128)
+        require(subjectId != introducerId && subjectId != RelationshipPersonIds.SELF && introducerId != RelationshipPersonIds.SELF) {
+            "INVALID_TOOL_ARGUMENTS"
+        }
+        val subject = contacts.findById(subjectId) ?: throw IllegalArgumentException("CONTACT_NOT_FOUND")
+        val introducer = contacts.findById(introducerId) ?: throw IllegalArgumentException("CONTACT_NOT_FOUND")
+        val evidence = required("evidenceSummary", 1_000)
+        val note = args["note"]?.jsonPrimitive?.content?.trim()?.takeIf { it.isNotBlank() }?.also {
+            require(it.length <= 500) { "INVALID_TOOL_ARGUMENTS" }
+        }
+        val occurredAt = args["occurredAtEpochMs"]?.jsonPrimitive?.content?.toLongOrNull()
+        val title = "${introducer.displayName}介绍我认识${subject.displayName}".take(100)
+        val digest = sha256(
+            buildJsonObject {
+                put("subjectContactId", subject.contactId)
+                put("introducerContactId", introducer.contactId)
+                put("title", title)
+                put("evidenceDigest", sha256(evidence))
+                note?.let { put("note", it) }
+                occurredAt?.let { put("occurredAtEpochMs", it) }
+            }.toString(),
+        )
+        val envelope = PlanEnvelopeFactory.create(request, context, TOOL_NAME, digest, "relationship-event-stage")
+        val call = RelationshipIntroductionCall(
+            providerCallId = request.providerCallId,
+            logicalStepId = "step-${request.providerCallId}",
+            proposalId = envelope.proposalId,
+            payloadRef = envelope.payloadRef,
+            revision = context.revision,
+            canonicalInputDigest = digest,
+            idempotencyKey = envelope.idempotencyKey,
+            eventId = "relationship-event-${sha256(envelope.idempotencyKey).take(32)}",
+            subjectContactId = subject.contactId,
+            introducerContactId = introducer.contactId,
+            subjectName = subject.displayName,
+            introducerName = introducer.displayName,
+            title = title,
+            note = note,
+            occurredAtEpochMs = occurredAt,
+            evidenceDigest = sha256(evidence),
+        )
+        return store.requestRelationshipIntroductionApproval(
+            call,
+            context.sessionId,
+            context.runId,
+            context.attemptId,
+            context.ownerId,
+            context.fencingEpoch,
+            context.nowEpochMs,
+        )
+    }
+
+    override suspend fun executeApproved(planJson: String, context: ConfirmedToolExecutionContext): RoutedToolResult {
+        val value = parseToolArgs(planJson, null) { IllegalArgumentException("INVALID_TOOL_CALL") }
+        fun required(name: String) = value[name]?.jsonPrimitive?.content ?: error("INVALID_TOOL_CALL")
+        val call = RelationshipIntroductionCall(
+            providerCallId = required("providerCallId"),
+            logicalStepId = required("logicalStepId"),
+            proposalId = required("proposalId"),
+            payloadRef = required("payloadRef"),
+            revision = required("revision").toLong(),
+            canonicalInputDigest = required("canonicalInputDigest"),
+            idempotencyKey = required("idempotencyKey"),
+            eventId = required("eventId"),
+            subjectContactId = required("subjectContactId"),
+            introducerContactId = required("introducerContactId"),
+            subjectName = required("subjectName"),
+            introducerName = required("introducerName"),
+            title = required("title"),
+            note = value["note"]?.jsonPrimitive?.content,
+            occurredAtEpochMs = value["occurredAtEpochMs"]?.jsonPrimitive?.content?.toLongOrNull(),
+            evidenceDigest = required("evidenceDigest"),
+        )
+        val result = writer.execute(
+            context,
+            call,
+            ToolConfirmation(call.proposalId, call.payloadRef, call.revision, call.canonicalInputDigest),
+        )
+        return RoutedToolResult(spec.name, call.providerCallId, result.safeResultJson)
+    }
+
+    private companion object {
+        const val TOOL_NAME = RelationshipEventDomainWriter.TOOL_NAME
     }
 }

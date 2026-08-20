@@ -55,6 +55,8 @@ internal class ChangeUndoCoordinator(private val database: AgentDatabase) {
 
         "relationship.createCandidate" -> undoRelationshipCandidate(change, nowEpochMs)
 
+        RelationshipEventDomainWriter.TOOL_NAME -> database.relationshipEventDao().deleteConfirmed(change.targetId) == 1
+
         ContactProfileDomainWriter.TOOL_NAME -> restoreContactProfile(change, nowEpochMs)
 
         ContactIdentityResolutionDomainWriter.TOOL_NAME -> undoSourceIdentityResolution(change, nowEpochMs)
