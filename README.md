@@ -33,6 +33,9 @@ agent/mcp/            MCP 集成
 agent/memory/         记忆子系统
 agent/runtime/        Agent 运行时
 agent/feature-ask/    “问问”功能模块
+server/                联系人企业信息补全服务
+config/                Detekt 等代码质量规则
+scripts/               工程质量度量脚本
 ```
 
 ## 本地开发
@@ -60,16 +63,15 @@ ZHIBAN_RELEASE_KEY_ALIAS
 ZHIBAN_RELEASE_KEY_PASSWORD
 ```
 
-详细方式见 [发布签名说明](docs/release-signing.md)。
+签名资产必须放在仓库外；仓库不接受 API Key、签名文件、密码、IDE 状态、构建产物或本地测试报告。
 
-## 文档
+## 提交要求
 
-- [产品定义](PRODUCT.md)
-- [知伴开发手册](docs/知伴开发手册.md)
-- [知伴代码规范](docs/知伴代码规范.md)
-- [代码质量基线](docs/代码质量基线.md)
-- [通话采集设计](docs/通话采集设计.md)
-- [低风险自动写入与回滚设计](docs/低风险自动写入与回滚设计.md)
+- 提交前运行 `./gradlew check`，功能变更必须有对应测试。
+- 多表写入必须使用同一 Room 事务。
+- 协程取消必须继续向上抛出，不能被通用异常处理吞掉。
+- 所有模型、MCP 和网络出站数据必须经过隐私策略与凭据脱敏。
+- 对外发送等不可撤销操作必须由用户最终确认。
 
 ## 边界说明
 

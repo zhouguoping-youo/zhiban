@@ -434,7 +434,7 @@ class CompletionSettingsViewModel @Inject constructor(private val controls: Agen
     }
 }
 
-/** Backs the "定位" settings block: 定位读取 consent, default off (AGENTS.md 位置数据默认不出云). */
+/** Backs the "定位" settings block: location consent is off by default and data stays local. */
 @HiltViewModel
 class LocationConsentSettingsViewModel @Inject constructor(private val controls: AgentControlStore) : ViewModel() {
     private val mutableEnabled = MutableStateFlow(controls.locationAccessEnabled())

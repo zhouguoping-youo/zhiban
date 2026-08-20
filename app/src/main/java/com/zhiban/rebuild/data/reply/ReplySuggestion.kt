@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.Flow
  * incoming message yields a GROUP of 2–3 rows (same candidateId, draftIndex 0..2); the card shows the
  * group and forward/dismiss act on the whole group. Status is deliberately per-row but transitioned
  * together. The user always presses send in WeChat themselves — a draft never becomes a sent message
- * without that human act (PRODUCT.md 外部联系与不可逆动作必须由用户最终确认).
+ * without that human act; external and irreversible actions always require final user confirmation.
  */
 @Entity(
     tableName = "reply_suggestions",

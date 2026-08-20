@@ -19,7 +19,7 @@ data class LocationSnapshot(val latitude: Double, val longitude: Double, val acc
 
 /**
  * Reads the device's own location, one shot at a time. There is intentionally no watch/tracking
- * method — ZhiBan never collects a background trajectory (PRODUCT.md 克制采集). The contract lives in
+ * method — ZhiBan never collects a background trajectory. The contract lives in
  * agent:provider beside WebSearchGateway so it stays pure JVM and mockable; the Android implementation
  * lives in the app module.
  */

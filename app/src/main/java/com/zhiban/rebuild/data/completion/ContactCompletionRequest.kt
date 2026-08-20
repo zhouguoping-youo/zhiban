@@ -15,8 +15,9 @@ import kotlinx.coroutines.flow.Flow
 /**
  * One proactive "请补全资料" outreach to a contact. The agent drafts a short WeChat message asking for the
  * contact's missing profile fields; the user reviews the draft, then is handed off to WeChat where they pick
- * the contact and press send themselves — 知伴 never sends on the user's behalf (PRODUCT.md 外部联系与不可逆动作
- * 必须由用户最终确认). The row then tracks the lifecycle: AWAITING_REPLY until the contact's next 1:1 incoming
+ * the contact and press send themselves — 知伴 never sends on the user's behalf. External and irreversible
+ * actions require final user confirmation. The row then tracks the lifecycle: AWAITING_REPLY until the
+ * contact's next 1:1 incoming
  * message is parsed into enrichment candidates (RESPONSE_RECEIVED), then COMPLETED once those candidates are
  * resolved, or EXPIRED/CANCELLED. At most one active (DRAFTED/AWAITING_REPLY/RESPONSE_RECEIVED) request per
  * contact is allowed so overlapping asks can't confuse response attribution.
