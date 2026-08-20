@@ -355,12 +355,24 @@ internal fun contactProjectionMismatchFields(actual: ContactSyncProjection, expe
 }
 
 internal fun ContactSyncProjection.includingRawContactValues(raw: SystemRawContactSnapshot): ContactSyncProjection = copy(
+    displayName = raw.dataRows
+        .firstOrNull { it.mimeType == ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE }
+        ?.value ?: displayName,
     phones = phones + raw.dataRows
         .filter { it.mimeType == ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE }
         .mapNotNull(SystemContactDataRowSnapshot::value),
     emails = emails + raw.dataRows
         .filter { it.mimeType == ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE }
         .mapNotNull(SystemContactDataRowSnapshot::value),
+    company = raw.dataRows
+        .firstOrNull { it.mimeType == ContactsContract.CommonDataKinds.Organization.CONTENT_ITEM_TYPE }
+        ?.value ?: company,
+    title = raw.dataRows
+        .firstOrNull { it.mimeType == ContactsContract.CommonDataKinds.Organization.CONTENT_ITEM_TYPE }
+        ?.secondaryValue ?: title,
+    note = raw.dataRows
+        .firstOrNull { it.mimeType == ContactsContract.CommonDataKinds.Note.CONTENT_ITEM_TYPE }
+        ?.value ?: note,
 ).canonical()
 
 internal fun ContactSyncProjection.containsExpected(expected: ContactSyncProjection): Boolean {

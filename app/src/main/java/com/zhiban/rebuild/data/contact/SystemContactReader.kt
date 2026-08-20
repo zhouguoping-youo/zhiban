@@ -48,7 +48,7 @@ data class SystemContactOrganization(
     val officeLocation: String?,
 )
 
-data class SystemContactDataRowSnapshot(val rowId: Long, val mimeType: String, val value: String?, val isReadOnly: Boolean)
+data class SystemContactDataRowSnapshot(val rowId: Long, val mimeType: String, val value: String?, val isReadOnly: Boolean, val secondaryValue: String? = null)
 
 data class SystemRawContactSnapshot(
     val rawContactId: Long,
@@ -138,6 +138,7 @@ class SystemContactReader @Inject constructor(@ApplicationContext private val co
                         mimeType = cursor.string(ContactsContract.Data.MIMETYPE).orEmpty(),
                         value = cursor.string(ContactsContract.Data.DATA1)?.take(500),
                         isReadOnly = false,
+                        secondaryValue = cursor.string(ContactsContract.Data.DATA4)?.take(500),
                     )
                 }
             }
@@ -238,6 +239,7 @@ class SystemContactReader @Inject constructor(@ApplicationContext private val co
             // Row mutations are additionally guarded by the authoritative raw-contact flag below.
             // Some OEM providers do not expose Data.IS_READ_ONLY on Data.CONTENT_URI consistently.
             isReadOnly = false,
+            secondaryValue = cursor.string(ContactsContract.Data.DATA4)?.take(500),
         )
     }
 
