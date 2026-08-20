@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.runtime.wakeup
 
+import com.zhiban.rebuild.data.notification.MessagePlatformCapabilities
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import java.time.LocalTime
 
@@ -39,7 +40,7 @@ internal object WakeupDecider {
     )
 
     fun decide(candidate: NotificationCandidateEntity, hasOpenCrmOpportunity: Boolean, nowEpochMs: Long, throttle: WakeupThrottle): WakeupDecision {
-        if (!candidate.incomingAndWechat()) return WakeupDecision.Skip("not_incoming_wechat")
+        if (!candidate.incomingAndCapable()) return WakeupDecision.Skip("platform_not_wakeup_capable")
         if (isNight(nowEpochMs)) return WakeupDecision.Skip("night_quiet_hours")
 
         val body = candidate.body.orEmpty()
@@ -73,7 +74,8 @@ internal object WakeupDecider {
             else -> null
         }
 
-    private fun NotificationCandidateEntity.incomingAndWechat(): Boolean = direction == "INCOMING" && platform == "WECHAT"
+    private fun NotificationCandidateEntity.incomingAndCapable(): Boolean =
+        direction == "INCOMING" && MessagePlatformCapabilities.forPlatform(platform).proactiveWakeup
 
     /** 身份自述：手机号、或"我是XXX"+ 公司线索、或正文出现"这是我的名片/联系方式"。 */
     internal fun looksLikeIdentitySelfDescription(body: String): Boolean {

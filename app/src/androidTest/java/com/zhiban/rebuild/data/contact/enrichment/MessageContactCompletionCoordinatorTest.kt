@@ -57,7 +57,7 @@ class MessageContactCompletionCoordinatorTest {
         )
     }
 
-    private fun linkedCandidate(id: String, body: String) = NotificationCandidateEntity(
+    private fun linkedCandidate(id: String, body: String, platform: String = "WECHAT") = NotificationCandidateEntity(
         candidateId = id,
         sourceKey = "source-$id",
         packageName = "com.tencent.mm",
@@ -65,7 +65,7 @@ class MessageContactCompletionCoordinatorTest {
         title = "周国平",
         body = body,
         postedAtEpochMs = System.currentTimeMillis(),
-        platform = "WECHAT",
+        platform = platform,
         conversationTitle = "周国平",
         senderName = "周国平",
         linkedContactId = "contact-1",
@@ -121,6 +121,25 @@ class MessageContactCompletionCoordinatorTest {
         ).processOnce()
         assertEquals(1, database.changeLogDao().observeAutoWriteReceipts().first().size)
         assertEquals("平凯星辰（北京）科技有限公司武汉分公司", database.contactDao().findRawById("contact-1")?.company)
+    }
+
+    @Test
+    fun qqAndWeWorkSelfIntroductionsAreExtractedWithCorrectSource() = runBlocking {
+        listOf("QQ" to "QQ 消息", "WEWORK" to "企业微信消息").forEachIndexed { index, (platform, source) ->
+            val contactId = "contact-${index + 1}"
+            database.contactDao().insert(contact().copy(contactId = contactId, displayName = "联系人${index + 1}"))
+            database.notificationCandidateDao().upsert(
+                linkedCandidate("msg-$platform", "我是联系人，公司是示例科技", platform)
+                    .copy(linkedContactId = contactId),
+            )
+            coordinator(
+                ExtractedContactField(MessageContactFieldKinds.COMPANY, "示例科技有限公司", 0.7),
+            ).processOnce()
+
+            val suggestions = database.contactKnowledgeDao().observePendingEnrichment(contactId).first()
+            assertEquals(1, suggestions.size)
+            assertEquals(source, suggestions.single().sourceRef)
+        }
     }
 
     @Test

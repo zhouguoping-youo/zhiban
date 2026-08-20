@@ -107,9 +107,9 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         lifecycleScope.launch { callLogSyncCoordinator.syncNow() }
-        // T2: foreground sweep — catch any WeChat message that arrived while the app was backgrounded
+        // T2: foreground sweep — catch capable-platform messages that arrived while the app was backgrounded
         // (e.g. the listener was briefly suspended). Cheap, debounced and conflated in the coordinator.
-        replySuggestionCoordinator.onIncomingWechatActivity()
+        replySuggestionCoordinator.onIncomingActivity()
         // 同一前台兜底也喂补全闭环:后台期间收到的"请补全资料"回复在此被补扫。
         contactCompletionCoordinator.onIncomingWechatActivity()
     }

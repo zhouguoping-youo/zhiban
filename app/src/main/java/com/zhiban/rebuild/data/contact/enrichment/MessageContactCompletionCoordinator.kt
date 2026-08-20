@@ -14,6 +14,7 @@ import com.zhiban.rebuild.data.common.ConflatedDebouncedTrigger
 import com.zhiban.rebuild.data.completion.ContactCompletionRepository
 import com.zhiban.rebuild.data.contact.ContactEnrichmentCandidateEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
+import com.zhiban.rebuild.data.notification.MessagePlatformCapabilities
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.suggestion.AgentSuggestionCodecs
 import com.zhiban.rebuild.data.suggestion.AgentSuggestionEntity
@@ -36,7 +37,7 @@ import kotlinx.serialization.json.put
 
 /**
  * 消息正文 → 联系人资料补全(用户拍板的口径:agent 有把握的自动写,拿不准的出建议卡)。
- * 触发后扫描最近 24h 已关联的微信来消息,本地廉价闸门过滤后付 LLM 抽取对方自述的
+ * 触发后扫描最近 24h 已关联且结构成熟的平台来消息,本地廉价闸门过滤后付 LLM 抽取对方自述的
  * 公司/职位/手机号;字段空缺才写、绝不覆盖已有值。高置信(≥0.85)走可撤销自动写
  * (REVERSIBLE_AUTO_WRITE + 收据),低置信落「智能完善」候选卡,确认后由既有闭环写入。
  * 幂等(每条消息只处理一次)且尽力而为,任何失败只记日志、不打断消息感知。
@@ -56,8 +57,8 @@ internal class MessageContactCompletionCoordinator @Inject constructor(
         action = ::processOnce,
     )
 
-    /** 廉价非阻塞信号(与回复建议同模式):微信来消息后由感知管线触发。 */
-    fun onIncomingWechatActivity() {
+    /** 廉价非阻塞信号(与回复建议同模式):受支持平台来消息后由感知管线触发。 */
+    fun onIncomingActivity() {
         trigger.signal()
     }
 
@@ -66,23 +67,29 @@ internal class MessageContactCompletionCoordinator @Inject constructor(
             val now = System.currentTimeMillis()
             // 游标式分页扫描:24h 窗口内消息可能远超一页,固定 LIMIT 会把旧消息的补全请求永久漏掉。
             // 处理幂等(幂等键),重复扫描无害。
-            var cursor = now - CANDIDATE_WINDOW_MS
-            var page: List<NotificationCandidateEntity>
-            do {
-                page = database.notificationCandidateDao()
-                    .incomingAttributedAfter(WECHAT_PLATFORM, now - CANDIDATE_WINDOW_MS, cursor, SCAN_PAGE_SIZE)
-                page.forEach { candidate ->
-                    runSuspendCatching { processCandidate(candidate, now) }
-                        .onFailure { failure ->
-                            if (failure is CancellationException) throw failure
-                            Log.w(TAG, "completion:candidate_failure", failure)
-                        }
-                }
-                val lastEpoch = page.lastOrNull()?.postedAtEpochMs
-                if (lastEpoch == null || lastEpoch <= cursor) break // 防同毫秒多条消息导致游标不前进的死循环
-                cursor = lastEpoch
-            } while (page.size == SCAN_PAGE_SIZE)
+            MessagePlatformCapabilities.profileExtractionPlatforms.forEach { platform ->
+                scanPlatform(platform, now)
+            }
         }
+    }
+
+    private suspend fun scanPlatform(platform: String, nowEpochMs: Long) {
+        var cursor = nowEpochMs - CANDIDATE_WINDOW_MS
+        var page: List<NotificationCandidateEntity>
+        do {
+            page = database.notificationCandidateDao()
+                .incomingAttributedAfter(platform, nowEpochMs - CANDIDATE_WINDOW_MS, cursor, SCAN_PAGE_SIZE)
+            page.forEach { candidate ->
+                runSuspendCatching { processCandidate(candidate, nowEpochMs) }
+                    .onFailure { failure ->
+                        if (failure is CancellationException) throw failure
+                        Log.w(TAG, "completion:candidate_failure", failure)
+                    }
+            }
+            val lastEpoch = page.lastOrNull()?.postedAtEpochMs
+            if (lastEpoch == null || lastEpoch <= cursor) break
+            cursor = lastEpoch
+        } while (page.size == SCAN_PAGE_SIZE)
     }
 
     private suspend fun processCandidate(candidate: NotificationCandidateEntity, nowEpochMs: Long) {
@@ -146,6 +153,7 @@ internal class MessageContactCompletionCoordinator @Inject constructor(
      * 幂等边界：建议已存在（含已忽略）不再重复起草；insert 幂等冲突时撤掉刚起草的请求，不留孤儿。
      */
     private suspend fun maybeStageCompletionSuggestion(contactId: String, candidate: NotificationCandidateEntity, nowEpochMs: Long) {
+        if (!MessagePlatformCapabilities.forPlatform(candidate.platform).completionReplyTracking) return
         val suggestionId = completionSuggestionId(contactId)
         if (database.agentSuggestionDao().find(suggestionId) != null) return
         val draft = try {
@@ -273,7 +281,7 @@ internal class MessageContactCompletionCoordinator @Inject constructor(
                         MessageContactFieldKinds.PHONE -> put("phone", field.value)
                     }
                 }.toString(),
-                sourceRef = "微信消息",
+                sourceRef = messageSourceLabel(candidate.platform),
                 confidence = field.confidence,
                 status = "PENDING",
                 observedAtEpochMs = candidate.postedAtEpochMs,
@@ -286,7 +294,6 @@ internal class MessageContactCompletionCoordinator @Inject constructor(
 
     private companion object {
         const val TAG = "MessageContactCompletion"
-        const val WECHAT_PLATFORM = "WECHAT"
         const val TRIGGER_DEBOUNCE_MS = 2_500L
         const val CANDIDATE_WINDOW_MS = 24 * 60 * 60 * 1_000L
         const val SCAN_PAGE_SIZE = 50
@@ -352,4 +359,11 @@ internal fun enrichmentFieldKind(kind: String): String = when (kind) {
     MessageContactFieldKinds.TITLE -> "EMPLOYMENT"
     MessageContactFieldKinds.PHONE -> "COMMUNICATION_METHOD"
     else -> kind
+}
+
+internal fun messageSourceLabel(platform: String): String = when (platform) {
+    "WECHAT" -> "微信消息"
+    "QQ" -> "QQ 消息"
+    "WEWORK" -> "企业微信消息"
+    else -> "消息"
 }

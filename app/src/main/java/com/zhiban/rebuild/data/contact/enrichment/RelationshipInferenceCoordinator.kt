@@ -65,7 +65,7 @@ internal class RelationshipInferenceCoordinator @Inject constructor(
         action = ::processOnce,
     )
 
-    fun onIncomingWechatActivity() {
+    fun onIncomingActivity() {
         trigger.signal()
     }
 

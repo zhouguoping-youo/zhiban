@@ -62,6 +62,19 @@ class ReplySuggestionCoordinatorTest {
         assertEquals(1, generator.calls)
     }
 
+    @Test fun generatesForQqAndWeWorkPlatforms() = runBlocking {
+        insertContact("contact-1", "张三")
+        insertContact("contact-2", "李四")
+        insertIncoming("cand-qq", conversationTitle = "张三", contactId = "contact-1", platform = "QQ")
+        insertIncoming("cand-wework", conversationTitle = "李四", contactId = "contact-2", platform = "WEWORK")
+
+        coordinator.processOnce()
+
+        assertEquals(2, database.replySuggestionDao().findByCandidateId("cand-qq").size)
+        assertEquals(2, database.replySuggestionDao().findByCandidateId("cand-wework").size)
+        assertEquals(2, generator.calls)
+    }
+
     @Test fun dedupesPerCandidateAcrossRuns() = runBlocking {
         insertContact("contact-1", "张三")
         insertIncoming("cand-1")
@@ -208,6 +221,7 @@ class ReplySuggestionCoordinatorTest {
         contactId: String? = "contact-1",
         confidence: Double = 0.9,
         postedAt: Long = System.currentTimeMillis(),
+        platform: String = "WECHAT",
     ) {
         database.notificationCandidateDao().upsert(
             NotificationCandidateEntity(
@@ -218,7 +232,7 @@ class ReplySuggestionCoordinatorTest {
                 title = conversationTitle,
                 body = body,
                 postedAtEpochMs = postedAt,
-                platform = "WECHAT",
+                platform = platform,
                 conversationTitle = conversationTitle,
                 senderName = conversationTitle,
                 direction = "INCOMING",

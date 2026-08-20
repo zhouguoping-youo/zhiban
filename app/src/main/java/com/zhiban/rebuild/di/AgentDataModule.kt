@@ -145,10 +145,10 @@ object AgentDataModule {
                 schedule.reminderMinutesBefore,
             )
         },
-        replySuggestionSink = replySuggestionCoordinator::onIncomingWechatActivity,
+        replySuggestionSink = replySuggestionCoordinator::onIncomingActivity,
         contactCompletionSink = contactCompletionCoordinator::onIncomingWechatActivity,
-        messageContactCompletionSink = messageContactCompletionCoordinator::onIncomingWechatActivity,
-        relationshipInferenceSink = relationshipInferenceCoordinator::onIncomingWechatActivity,
+        messageContactCompletionSink = messageContactCompletionCoordinator::onIncomingActivity,
+        relationshipInferenceSink = relationshipInferenceCoordinator::onIncomingActivity,
         agentWakeupSink = agentWakeupCoordinator::onCandidateProcessed,
     )
 

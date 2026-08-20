@@ -122,15 +122,23 @@ class WakeupDeciderTest {
     // ---- 跳过 ----
 
     @Test
-    fun `非微信平台跳过`() {
+    fun `未开放平台跳过`() {
         val d = decide(candidate(body = "我是周国平 13476110061", platform = "SMS"))
-        assertEquals(WakeupDecision.Skip("not_incoming_wechat"), d)
+        assertEquals(WakeupDecision.Skip("platform_not_wakeup_capable"), d)
     }
 
     @Test
     fun `非入站方向跳过`() {
         val d = decide(candidate(body = "我是周国平 13476110061", direction = "OUTGOING"))
-        assertEquals(WakeupDecision.Skip("not_incoming_wechat"), d)
+        assertEquals(WakeupDecision.Skip("platform_not_wakeup_capable"), d)
+    }
+
+    @Test
+    fun `QQ和企业微信可触发主动判断`() {
+        listOf("QQ", "WEWORK").forEach { platform ->
+            val decision = decide(candidate(body = "我是周国平 13476110061", platform = platform))
+            assertTrue("$platform should wake", decision is WakeupDecision.Wake)
+        }
     }
 
     @Test

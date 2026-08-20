@@ -4,6 +4,7 @@ import android.util.Log
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.common.ConflatedDebouncedTrigger
 import com.zhiban.rebuild.data.config.AgentControlStore
+import com.zhiban.rebuild.data.notification.MessagePlatformCapabilities
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.SensitiveMessageFilter
 import com.zhiban.rebuild.foundation.runSuspendCatching
@@ -14,9 +15,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * Orchestrates reply-suggestion generation. Trigger-driven (a new WeChat message, or app foreground as a
+ * Orchestrates reply-suggestion generation. Trigger-driven (a capable-platform message, or app foreground as a
  * fallback sweep), conflated and debounced so a
- * burst of messages collapses into one pass. Each pass scans the last 24h of attributed incoming WeChat
+ * burst of messages collapses into one pass. Each pass scans the last 24h of attributed incoming
  * candidates, gates them through the free [ReplyWorthinessAnalyzer], and only then pays for drafting.
  * Idempotent (per-candidate and per-thread dedupe) and best-effort: any failure is swallowed so a
  * suggestion hiccup never breaks message staging.
@@ -35,8 +36,8 @@ internal class ReplySuggestionCoordinator @Inject constructor(
         action = ::processOnce,
     )
 
-    /** Cheap, non-blocking signal that a WeChat message arrived (T1) or the app came to the foreground (T2). */
-    fun onIncomingWechatActivity() {
+    /** Cheap, non-blocking signal that a capable-platform message arrived or the app came foreground. */
+    fun onIncomingActivity() {
         trigger.signal()
     }
 
@@ -47,8 +48,13 @@ internal class ReplySuggestionCoordinator @Inject constructor(
             // completed the send in WeChat and the accessibility service has since captured the OUTGOING.
             confirmForwardedReplies(now)
             if (!controls.replySuggestionsEnabled()) return
-            database.notificationCandidateDao()
-                .recentIncomingAttributed(WECHAT_PLATFORM, now - CANDIDATE_WINDOW_MS, CANDIDATE_LIMIT)
+            MessagePlatformCapabilities.replySuggestionPlatforms
+                .flatMap { platform ->
+                    database.notificationCandidateDao()
+                        .recentIncomingAttributed(platform, now - CANDIDATE_WINDOW_MS, CANDIDATE_LIMIT)
+                }
+                .sortedByDescending(NotificationCandidateEntity::postedAtEpochMs)
+                .take(CANDIDATE_LIMIT)
                 .forEach { candidate ->
                     runSuspendCatching { processCandidate(candidate) }
                         .onFailure { failure ->
@@ -145,7 +151,6 @@ internal class ReplySuggestionCoordinator @Inject constructor(
 
     private companion object {
         const val TAG = "ReplySuggestion"
-        const val WECHAT_PLATFORM = "WECHAT"
         const val CANDIDATE_LIMIT = 20
         const val CONTEXT_MESSAGES = 10
         const val THREAD_QUERY_LIMIT = 50

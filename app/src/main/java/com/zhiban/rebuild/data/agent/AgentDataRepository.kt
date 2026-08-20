@@ -53,6 +53,7 @@ import com.zhiban.rebuild.data.facts.FactIndex
 import com.zhiban.rebuild.data.interaction.InteractionSourceType
 import com.zhiban.rebuild.data.interaction.notificationInteraction
 import com.zhiban.rebuild.data.notification.MessageCollectionPreferences
+import com.zhiban.rebuild.data.notification.MessagePlatformCapabilities
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.NotificationInsightAnalyzer
 import com.zhiban.rebuild.data.notification.ScheduleInsight
@@ -146,23 +147,24 @@ class AgentDataRepository internal constructor(
         if (stageMutedSenderIfNeeded(withSender, nowEpochMs)) return
         val automaticSchedule = transactions.runInTransaction { stageUnmutedCandidate(withSender, nowEpochMs) }
         automaticSchedule?.let(scheduleReminderSink::replace)
-        // T1: a fresh incoming WeChat message may warrant an AI reply suggestion. Fired outside the
+        // T1: a fresh incoming supported-platform message may warrant downstream agent work. Fired outside the
         // transaction so the coordinator reads the committed candidate; the coordinator re-gates on
         // attribution and reply-worthiness, so this is only a cheap "go look" nudge. 被静默的
         // 发送者已在上方提前返回,不会触发任何下游提示。
-        if (candidate.direction == "INCOMING" && candidate.platform == "WECHAT") {
-            replySuggestionSink()
+        if (candidate.direction == "INCOMING") {
+            val capabilities = MessagePlatformCapabilities.forPlatform(candidate.platform)
+            if (capabilities.replySuggestions) replySuggestionSink()
             // 同一触发也喂补全闭环:这条来消息可能是某个"请补全资料"请求的回复。协调器自行再核对
-            // 群聊/归因/时机,这里只是廉价的"去看看"。
-            contactCompletionSink()
+            // 群聊/归因/时机,这里只是廉价的"去看看"。目前外发补全只走微信,因此回复追踪仍限微信。
+            if (capabilities.completionReplyTracking) contactCompletionSink()
             // 消息正文 → 联系人资料补全(高置信自动写/低置信建议卡):协调器再核对关联与字段空缺。
-            messageContactCompletionSink()
+            if (capabilities.profileExtraction) messageContactCompletionSink()
             // 关系图谱自动补全(同公司同事/LLM 关系类型推断):协调器再核对已有边与幂等键。
-            relationshipInferenceSink()
+            if (capabilities.relationshipInference) relationshipInferenceSink()
             // 事件驱动唤醒:规则层处理完毕后,把候选交给唤醒决策器——规则裁决不了的
             // 复杂场景(陌生人自述/备注漂移/未落日程的待办/跨源 CRM 信号)自动唤醒
             // LLM 在无 UI 会话里综合判断,产出落建议中心。
-            agentWakeupSink(candidate.candidateId)
+            if (capabilities.proactiveWakeup) agentWakeupSink(candidate.candidateId)
         }
     }
 
