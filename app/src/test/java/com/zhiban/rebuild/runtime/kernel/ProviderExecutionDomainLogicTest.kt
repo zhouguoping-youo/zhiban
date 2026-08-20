@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.runtime.kernel
 
+import com.zhiban.rebuild.provider.CapabilitySnapshot
 import com.zhiban.rebuild.runtime.tool.CommunicationMessageToolBinding
 import com.zhiban.rebuild.runtime.tool.SchedulePlanValidator
 import org.junit.Assert.assertEquals
@@ -33,6 +34,27 @@ class ProviderExecutionDomainLogicTest {
 
         assertEquals(legacyWork, legacyChat)
         assertEquals("查今天日程", legacyChat.text)
+    }
+
+    @Test
+    fun `response schema is internal only and requires provider capability`() {
+        val schema = """{"name":"test","schema":{"type":"object"}}"""
+        val automatic = decodeInput("""{"text":"后台判断","origin":"AUTO_RETRIEVED","responseJsonSchema":${jsonString(schema)}}""")
+        val user = decodeInput("""{"text":"用户输入","responseJsonSchema":${jsonString(schema)}}""")
+        val capable = CapabilitySnapshot(
+            "digest",
+            setOf("TEXT"),
+            setOf("json_schema"),
+            8_000,
+            2_048,
+            0L,
+            Long.MAX_VALUE,
+        )
+        val incapable = capable.copy(features = emptySet())
+
+        assertEquals(schema, responseJsonSchema(automatic, capable))
+        assertNull(responseJsonSchema(automatic, incapable))
+        assertNull(user.responseJsonSchema)
     }
 
     @Test fun `assistant text streams unless a schedule plan is being forced`() {
@@ -98,3 +120,5 @@ class ProviderExecutionDomainLogicTest {
         assertEquals("联系人总数：5 人。", deterministicToolSummary("contact.maintenance.list", """{"totalContactCount":5}"""))
     }
 }
+
+private fun jsonString(value: String): String = kotlinx.serialization.json.JsonPrimitive(value).toString()

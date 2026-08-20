@@ -793,6 +793,7 @@ internal class ProviderExecutionEngine(
                 )
             },
             forcedToolName = forcedToolName,
+            jsonSchema = responseJsonSchema(input, capability),
         )
         return PreparedReActRequest(request, forcedCanonicalTool, capability)
     }

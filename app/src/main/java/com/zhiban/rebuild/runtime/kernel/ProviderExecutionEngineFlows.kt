@@ -611,6 +611,7 @@ internal suspend fun ProviderExecutionEngine.buildObservationRequest(
         ),
         capability = capability,
         maxTokens = minOf(DEFAULT_MAX_OUTPUT_TOKENS, capability.maxOutputTokens),
+        jsonSchema = responseJsonSchema(input, capability),
         toolsJson = capabilityRouter.providerToolsJson(observationTools).takeIf {
             "tools" in
                 capability.features

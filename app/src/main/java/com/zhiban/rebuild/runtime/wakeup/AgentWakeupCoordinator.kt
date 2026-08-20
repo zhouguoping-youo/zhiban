@@ -130,7 +130,8 @@ internal class AgentWakeupCoordinator @Inject constructor(
         appendLine("1. 这条消息是否需要用户跟进？给出一条不超过 150 字的简短建议，说明下一步做什么。")
         appendLine("2. 消息里如果有可以安全自动完成的事（例如补充联系人资料、记录备忘），可以直接执行可撤销操作。")
         appendLine("3. 拿不准的事情只给建议；不要编造事实，不要猜测未提供的信息，不要执行需要用户确认的写操作。")
-        append("只输出判断和建议本身，保持简洁。")
+        appendLine("请严格按指定 JSON schema 输出，不要输出 Markdown 或额外解释。")
+        append("日程时间字段只提取消息原文中的表达，不要自行换算日期；最终时间由本地规则校验归一。")
     }
 
     private fun encodeRuntimeInput(text: String): String = buildJsonObject {
@@ -138,10 +139,12 @@ internal class AgentWakeupCoordinator @Inject constructor(
         put("text", text)
         put("mode", "Work")
         put("origin", "AUTO_RETRIEVED")
+        put("responseJsonSchema", WakeupStructuredOutputCodec.RESPONSE_SCHEMA)
     }.toString()
 
     private suspend fun persistSuggestion(candidateId: String, decision: WakeupDecision.Wake, result: HeadlessAgentSession.HeadlessResult) {
-        val body = resolveSuggestionBody(result)
+        val structured = WakeupStructuredOutputCodec.decode(result.assistantText)
+        val body = resolveSuggestionBody(result, structured)
         if (body.isBlank()) {
             Log.i(TAG, "wakeup:skip_empty_result candidate=$candidateId status=${result.finalStatus} failure=${result.failureCode}")
             return
@@ -158,15 +161,17 @@ internal class AgentWakeupCoordinator @Inject constructor(
         Log.i(
             TAG,
             "wakeup:suggestion_saved candidate=$candidateId reason=${decision.reason} " +
-                "status=${result.finalStatus} exec=${if (intent.canCreateSchedule) "SCHEDULE" else "none"}",
+                "status=${result.finalStatus} modelIntent=${structured?.intent ?: "fallback"} " +
+                "confidence=${structured?.confidence ?: 0.0} exec=${if (intent.canCreateSchedule) "SCHEDULE" else "none"}",
         )
     }
 
-    private fun resolveSuggestionBody(result: HeadlessAgentSession.HeadlessResult): String = result.assistantText.trim().ifBlank {
-        result.pendingApprovalTitle
-            ?.let { "知伴刚才会话中有一项操作需要你确认（$it），已为你保留，未自动执行。" }
-            .orEmpty()
-    }
+    private fun resolveSuggestionBody(result: HeadlessAgentSession.HeadlessResult, structured: WakeupStructuredOutput?): String =
+        structured?.suggestion ?: result.assistantText.trim().ifBlank {
+            result.pendingApprovalTitle
+                ?.let { "知伴刚才会话中有一项操作需要你确认（$it），已为你保留，未自动执行。" }
+                .orEmpty()
+        }
 
     private suspend fun extractEventIntent(
         candidate: com.zhiban.rebuild.data.notification.NotificationCandidateEntity?,

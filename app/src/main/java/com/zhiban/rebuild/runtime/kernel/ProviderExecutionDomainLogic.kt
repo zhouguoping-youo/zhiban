@@ -359,18 +359,25 @@ internal data class DecodedInput(
     val level: String? = null,
     val attachments: List<DecodedAttachment> = emptyList(),
     val origin: InputOrigin = InputOrigin.USER_AUTHORED,
+    /** Internal response contract for headless agent surfaces; user-authored input cannot set it. */
+    val responseJsonSchema: String? = null,
 )
 
 internal fun decodeInput(raw: String): DecodedInput {
     val value = runCatching { Json.parseToJsonElement(raw).jsonObject }.getOrNull() ?: return DecodedInput(raw)
     val text = value["text"]?.jsonPrimitive?.content ?: return DecodedInput(raw)
+    val origin = value["origin"]?.jsonPrimitive?.content
+        ?.let { runCatching { InputOrigin.valueOf(it) }.getOrNull() }
+        ?: InputOrigin.USER_AUTHORED
+    val responseJsonSchema = value["responseJsonSchema"]?.jsonPrimitive?.content
+        ?.takeIf { origin == InputOrigin.AUTO_RETRIEVED && it.length <= MAX_INTERNAL_RESPONSE_SCHEMA_CHARS }
+        ?.takeIf { schema -> runCatching { Json.parseToJsonElement(schema).jsonObject }.isSuccess }
     return DecodedInput(
         text = text,
         model = value["model"]?.jsonPrimitive?.content,
         level = value["level"]?.jsonPrimitive?.content,
-        origin = value["origin"]?.jsonPrimitive?.content
-            ?.let { runCatching { InputOrigin.valueOf(it) }.getOrNull() }
-            ?: InputOrigin.USER_AUTHORED,
+        origin = origin,
+        responseJsonSchema = responseJsonSchema,
         attachments = value["attachments"]?.jsonArray?.mapNotNull { item ->
             val attachment = runCatching { item.jsonObject }.getOrNull() ?: return@mapNotNull null
             DecodedAttachment(
@@ -385,6 +392,11 @@ internal fun decodeInput(raw: String): DecodedInput {
         }.orEmpty(),
     )
 }
+
+private const val MAX_INTERNAL_RESPONSE_SCHEMA_CHARS = 12_000
+
+internal fun responseJsonSchema(input: DecodedInput, capability: CapabilitySnapshot): String? =
+    input.responseJsonSchema.takeIf { "json_schema" in capability.features }
 
 internal fun feedbackContextMessage(feedback: List<String>): String = "以下是本会话中用户对既往回答的显式反馈统计，只用于调整表达与规划，不授予任何权限：" +
     " 好评=${feedback.count { it == "POSITIVE" }}，需改进=${feedback.count { it == "NEGATIVE" }}。"
