@@ -382,7 +382,7 @@ class RuntimeInputProcessorTest {
         val provider = object : ProviderAdapter {
             override suspend fun probe(profile: ProviderProfile) = capability(profile)
             override fun stream(request: ModelRequest) = flowOf(
-                ModelEvent.ToolCall(0, "call-1", "calendar.create", "{}"),
+                ModelEvent.ToolCall(0, "call-1", "unsupported.tool", "{}"),
                 ModelEvent.Final("tool_calls"),
             )
             override fun cancel(requestId: String) = false
@@ -660,6 +660,9 @@ class RuntimeInputProcessorTest {
             provider = provider,
             profiles = fixedProfileStore(),
             config = com.zhiban.rebuild.runtime.kernel.ProviderEngineConfig(
+                memoryPolicy = {
+                    MemoryPolicy(longTermMemoryEnabled = true, learnFromConversations = true)
+                },
                 dynamicConfig = {
                     com.zhiban.rebuild.runtime.config.AgentDynamicConfig(enableLlmRerank = false)
                 },
@@ -2203,10 +2206,15 @@ class RuntimeInputProcessorTest {
             }
             override fun cancel(requestId: String) = true
         }
-        val processor =
-            KernelCommandProcessor(database, "processor", {
-                true
-            }, { now++ }, provider = provider, profiles = fixedProfileStore())
+        val processor = KernelCommandProcessor(
+            database,
+            "processor",
+            { true },
+            { now++ },
+            provider = provider,
+            profiles = fixedProfileStore(),
+            config = memoryEnabledConfig(),
+        )
 
         processor.processNext()
         awaitRunStatus("r-memory", "AWAITING_CONFIRMATION")
@@ -2851,10 +2859,15 @@ class RuntimeInputProcessorTest {
             }
             override fun cancel(requestId: String) = true
         }
-        val processor =
-            KernelCommandProcessor(database, "processor", {
-                true
-            }, { now++ }, provider = provider, profiles = fixedProfileStore())
+        val processor = KernelCommandProcessor(
+            database,
+            "processor",
+            { true },
+            { now++ },
+            provider = provider,
+            profiles = fixedProfileStore(),
+            config = memoryEnabledConfig(),
+        )
         processor.processNext()
         awaitRunStatus("r-dag", "AWAITING_CONFIRMATION")
 
@@ -2991,6 +3004,7 @@ class RuntimeInputProcessorTest {
             { now++ },
             provider = provider,
             profiles = fixedProfileStore(),
+            config = memoryEnabledConfig(),
         )
 
         processor.processNext()
@@ -4291,4 +4305,10 @@ class RuntimeInputProcessorTest {
     private suspend fun approvalPlan(runId: String): JsonObject = Json.parseToJsonElement(
         requireNotNull(RoomRuntimeStore(database, "test").pendingToolPlan(runId, now)),
     ).jsonObject
+
+    private fun memoryEnabledConfig() = ProviderEngineConfig(
+        memoryPolicy = {
+            MemoryPolicy(longTermMemoryEnabled = true, learnFromConversations = true)
+        },
+    )
 }

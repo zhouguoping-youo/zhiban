@@ -95,6 +95,7 @@ import com.zhiban.rebuild.runtime.tool.ScheduleCreateToolCall
 import com.zhiban.rebuild.runtime.tool.SchedulePlanValidator
 import com.zhiban.rebuild.runtime.tool.ToolConfirmation
 import com.zhiban.rebuild.runtime.tool.ToolDisposition
+import com.zhiban.rebuild.runtime.tool.ToolPolicyRejectedException
 import com.zhiban.rebuild.runtime.tool.WebSearchToolBinding
 import com.zhiban.rebuild.runtime.tool.canonicalMemoryDigest
 import com.zhiban.rebuild.runtime.tool.canonicalMemoryIdempotencyKey
@@ -237,7 +238,7 @@ internal suspend fun ProviderExecutionEngine.handleReActToolCall(
     forcedCanonicalTool: String?,
     ids: RunIdentifiers,
 ): ReActStreamOutcome {
-    val canonicalToolName = capabilityRouter.canonicalName(event.name)
+    val canonicalToolName = requireRegisteredToolName(event.name)
     return try {
         routeReActToolCall(context, event, forcedCanonicalTool, ids)
     } catch (failure: Throwable) {
@@ -637,7 +638,7 @@ internal suspend fun ProviderExecutionEngine.handleObservationToolCall(
     event: ModelEvent.ToolCall,
     correctionToolName: String?,
 ): ReActStreamOutcome {
-    val canonicalToolName = capabilityRouter.canonicalName(event.name)
+    val canonicalToolName = requireRegisteredToolName(event.name)
     if (correctionToolName != null && canonicalToolName != correctionToolName) {
         throw ProviderFailure("INVALID_TOOL_CALL", false)
     }
@@ -662,6 +663,12 @@ internal suspend fun ProviderExecutionEngine.handleObservationToolCall(
             )
         }
     }
+}
+
+private fun ProviderExecutionEngine.requireRegisteredToolName(name: String): String = try {
+    capabilityRouter.canonicalName(name)
+} catch (_: ToolPolicyRejectedException) {
+    throw ProviderFailure("INVALID_TOOL_CALL", retryable = false)
 }
 
 internal suspend fun ProviderExecutionEngine.routeObservationToolCall(
