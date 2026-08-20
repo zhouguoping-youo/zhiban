@@ -122,7 +122,12 @@ internal data class ForceGraphLink(
 
 internal data class ForceGraphModel(val nodes: List<ForceGraphNode>, val links: List<ForceGraphLink>)
 
-internal data class ForceBody(var position: Offset, var velocity: Offset = Offset.Zero, var dragged: Boolean = false)
+internal data class ForceBody(
+    var position: Offset,
+    var velocity: Offset = Offset.Zero,
+    var dragged: Boolean = false,
+    val ring: RelationshipGraphRing = RelationshipGraphRing.UNKNOWN,
+)
 
 internal fun buildForceGraphModel(
     rootId: String,
@@ -181,27 +186,47 @@ internal fun buildForceGraphModel(
 
 private fun normalizeCompanyKey(company: String): String = company.trim().lowercase()
 
-internal fun seedForceBodies(nodeIds: List<String>, rootId: String, width: Float, height: Float): Map<String, ForceBody> {
+internal fun seedForceBodies(
+    nodeIds: List<String>,
+    rootId: String,
+    width: Float,
+    height: Float,
+    ringByNode: Map<String, RelationshipGraphRing> = emptyMap(),
+): Map<String, ForceBody> {
     val center = Offset(width / 2f, height / 2f)
     val radius = min(width, height) * 0.28f
     val neighborIds = nodeIds.filterNot { it == rootId }
+    val ringOrdinals = neighborIds.groupingBy { ringByNode[it] ?: RelationshipGraphRing.UNKNOWN }.eachCount()
+    val ringOffsets = ringOrdinals.keys.associateWith { ring ->
+        neighborIds.takeWhile { (ringByNode[it] ?: RelationshipGraphRing.UNKNOWN) != ring }.size
+    }
     return nodeIds.associateWith { id ->
         val position = if (id == rootId) {
             center
         } else {
             val ordinal = neighborIds.indexOf(id).coerceAtLeast(0)
-            val angle = if (neighborIds.size == 2) {
-                -5.0 * PI / 6.0 + ordinal * (2.0 * PI / 3.0)
-            } else {
-                -PI / 2.0 + ordinal * (2.0 * PI / max(1, neighborIds.size))
+            val ring = ringByNode[id] ?: RelationshipGraphRing.UNKNOWN
+            val ringIds = neighborIds.filter { (ringByNode[it] ?: RelationshipGraphRing.UNKNOWN) == ring }
+            val ringOrdinal = ringIds.indexOf(id).coerceAtLeast(0)
+            val ringRadius = when (ring) {
+                RelationshipGraphRing.INNER -> radius * 0.68f
+                RelationshipGraphRing.MIDDLE -> radius * 1.12f
+                RelationshipGraphRing.OUTER -> radius * 1.48f
+                RelationshipGraphRing.UNKNOWN -> radius
             }
-            val jitter = ((id.hashCode().toLong() and 0xffffL) / 65535f - 0.5f) * radius * 0.3f
+            val angle = if (ringIds.size == 2) {
+                -5.0 * PI / 6.0 + ringOrdinal * (2.0 * PI / 3.0)
+            } else {
+                val phase = (ringOffsets[ring] ?: ordinal) * 0.34
+                -PI / 2.0 + phase + ringOrdinal * (2.0 * PI / max(1, ringIds.size))
+            }
+            val jitter = ((id.hashCode().toLong() and 0xffffL) / 65535f - 0.5f) * radius * 0.08f
             Offset(
-                center.x + (radius + jitter) * cos(angle).toFloat(),
-                center.y + (radius - jitter) * sin(angle).toFloat(),
+                center.x + (ringRadius + jitter) * cos(angle).toFloat(),
+                center.y + (ringRadius - jitter) * sin(angle).toFloat(),
             )
         }
-        ForceBody(position)
+        ForceBody(position, ring = ringByNode[id] ?: RelationshipGraphRing.UNKNOWN)
     }
 }
 
@@ -259,7 +284,20 @@ internal fun advanceForceSimulation(
             return@forEach
         }
         val centering = (center - body.position) * if (id == rootId) 0.0048f else 0.0015f
-        val acceleration = forces.getValue(id) + centering
+        val ringForce = if (id == rootId || body.ring == RelationshipGraphRing.UNKNOWN) {
+            Offset.Zero
+        } else {
+            val offset = body.position - center
+            val currentRadius = offset.getDistance().coerceAtLeast(1f)
+            val targetRadius = when (body.ring) {
+                RelationshipGraphRing.INNER -> min(width, height) * 0.19f
+                RelationshipGraphRing.MIDDLE -> min(width, height) * 0.31f
+                RelationshipGraphRing.OUTER -> min(width, height) * 0.42f
+                RelationshipGraphRing.UNKNOWN -> currentRadius
+            }
+            offset / currentRadius * ((targetRadius - currentRadius) * 0.008f)
+        }
+        val acceleration = forces.getValue(id) + centering + ringForce
         body.velocity = (body.velocity + acceleration * timeScale) * 0.86f
         val next = body.position + body.velocity * timeScale
         body.position = Offset(
@@ -281,6 +319,7 @@ internal fun ForceRelationshipGraphCanvas(
     val model = remember(rootId, peopleById, edges, presentationById) {
         buildForceGraphModel(rootId, peopleById, edges, presentationById)
     }
+    val nodeById = remember(model.nodes) { model.nodes.associateBy(ForceGraphNode::id) }
     if (model.nodes.size < 2) return
 
     val density = LocalDensity.current
@@ -362,6 +401,7 @@ internal fun ForceRelationshipGraphCanvas(
                     rootId = rootId,
                     width = canvasSize.width.toFloat(),
                     height = canvasSize.height.toFloat(),
+                    ringByNode = model.nodes.associate { it.id to it.presentation.ring },
                 ),
             )
         }
@@ -480,19 +520,27 @@ internal fun ForceRelationshipGraphCanvas(
                 ) {
                     @Suppress("UNUSED_VARIABLE")
                     val redraw = frameTick
+                    val viewportPadding = 72.dp.toPx()
+                    fun visible(point: Offset): Boolean = point.x in -viewportPadding..(size.width + viewportPadding) &&
+                        point.y in -viewportPadding..(size.height + viewportPadding)
                     model.links.forEach { link ->
                         val from = bodies[link.fromId]?.position?.let(::screenPosition) ?: return@forEach
                         val to = bodies[link.toId]?.position?.let(::screenPosition) ?: return@forEach
+                        if (!visible(from) && !visible(to)) return@forEach
+                        val edgeOpacity = min(
+                            nodeById[link.fromId]?.presentation?.opacity ?: 1f,
+                            nodeById[link.toId]?.presentation?.opacity ?: 1f,
+                        )
                         drawLine(
                             color = if (link.evidenceLabel != null) {
-                                graphColors.sharedCompany.copy(alpha = 0.58f)
+                                graphColors.sharedCompany.copy(alpha = 0.58f * edgeOpacity)
                             } else {
                                 lineColor.copy(
                                     alpha = when {
                                         link.isInferred -> 0.28f
                                         link.isHistorical -> 0.34f
                                         else -> 0.48f
-                                    },
+                                    } * edgeOpacity,
                                 )
                             },
                             start = from,
@@ -549,12 +597,13 @@ internal fun ForceRelationshipGraphCanvas(
                             (if (node.kind == ForceGraphNodeKind.FOCUS) 31.dp else 25.dp).toPx()
                         } * graphScale.coerceIn(0.85f, 1.35f)
                         val color = nodeColor(node.kind, graphColors)
+                        val nodeOpacity = node.presentation.opacity
                         if (node.kind == ForceGraphNodeKind.FOCUS || selected) {
-                            drawCircle(color.copy(alpha = 0.13f), visualRadius * 1.48f, center)
+                            drawCircle(color.copy(alpha = 0.13f * nodeOpacity), visualRadius * 1.48f, center)
                         }
-                        drawCircle(color, visualRadius, center)
+                        drawCircle(color.copy(alpha = nodeOpacity), visualRadius, center)
                         drawCircle(
-                            graphColors.nodeRing.copy(alpha = 0.62f),
+                            graphColors.nodeRing.copy(alpha = 0.62f * nodeOpacity),
                             visualRadius * 0.86f,
                             center,
                             style = Stroke(width = 1.4f * densityValue),
@@ -594,12 +643,14 @@ internal fun ForceRelationshipGraphCanvas(
                                 size.height - nameHeight / 2f - 4.dp.toPx(),
                             ),
                         )
-                        drawRoundRect(
-                            color = canvasSurface.copy(alpha = 0.94f),
-                            topLeft = Offset(safeLabelCenter.x - nameWidth / 2f, safeLabelCenter.y - nameHeight / 2f),
-                            size = Size(nameWidth, nameHeight),
-                            cornerRadius = CornerRadius(nameHeight / 2f),
-                        )
+                        if (node.presentation.showLabel) {
+                            drawRoundRect(
+                                color = canvasSurface.copy(alpha = 0.94f * nodeOpacity),
+                                topLeft = Offset(safeLabelCenter.x - nameWidth / 2f, safeLabelCenter.y - nameHeight / 2f),
+                                size = Size(nameWidth, nameHeight),
+                                cornerRadius = CornerRadius(nameHeight / 2f),
+                            )
+                        }
                         drawIntoCanvas { canvas ->
                             val paint = android.graphics.Paint().apply {
                                 isAntiAlias = true
@@ -618,12 +669,14 @@ internal fun ForceRelationshipGraphCanvas(
                                 center.y - (paint.ascent() + paint.descent()) / 2f,
                                 paint,
                             )
-                            canvas.nativeCanvas.drawText(
-                                clippedName,
-                                safeLabelCenter.x,
-                                safeLabelCenter.y - (labelPaint.ascent() + labelPaint.descent()) / 2f,
-                                labelPaint,
-                            )
+                            if (node.presentation.showLabel) {
+                                canvas.nativeCanvas.drawText(
+                                    clippedName,
+                                    safeLabelCenter.x,
+                                    safeLabelCenter.y - (labelPaint.ascent() + labelPaint.descent()) / 2f,
+                                    labelPaint,
+                                )
+                            }
                         }
                     }
                 }

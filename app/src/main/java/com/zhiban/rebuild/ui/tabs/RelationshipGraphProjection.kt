@@ -91,8 +91,19 @@ internal fun relationshipGraphRing(interactionCount: Int): RelationshipGraphRing
 
 internal fun relationshipGraphPresentation(projection: RelationshipGraphProjection): Map<String, ForceGraphNodePresentation> =
     projection.hopByNode.mapValues { (id, hop) ->
-        if (!projection.isEgoView || hop <= 1) {
-            ForceGraphNodePresentation(hopDistance = hop, ring = projection.ringByNode[id] ?: RelationshipGraphRing.UNKNOWN)
+        if (projection.isEgoView && id == RelationshipPersonIds.SELF) {
+            ForceGraphNodePresentation(
+                hopDistance = hop,
+                opacity = 0.15f,
+                showLabel = false,
+                isBackground = true,
+                ring = projection.ringByNode[id] ?: RelationshipGraphRing.UNKNOWN,
+            )
+        } else if (!projection.isEgoView || hop <= 1) {
+            ForceGraphNodePresentation(
+                hopDistance = hop,
+                ring = projection.ringByNode[id] ?: RelationshipGraphRing.UNKNOWN,
+            )
         } else {
             ForceGraphNodePresentation(
                 hopDistance = hop,
@@ -102,8 +113,10 @@ internal fun relationshipGraphPresentation(projection: RelationshipGraphProjecti
             )
         }
     }.toMutableMap().apply {
-        this[projection.rootId] = ForceGraphNodePresentation(
-            hopDistance = 0,
-            ring = projection.ringByNode[projection.rootId] ?: RelationshipGraphRing.UNKNOWN,
-        )
+        if (!(projection.isEgoView && projection.rootId == RelationshipPersonIds.SELF)) {
+            this[projection.rootId] = ForceGraphNodePresentation(
+                hopDistance = 0,
+                ring = projection.ringByNode[projection.rootId] ?: RelationshipGraphRing.UNKNOWN,
+            )
+        }
     }

@@ -124,6 +124,8 @@ class ForceRelationshipGraphTest {
         assertEquals(setOf("root-a", "a-b", "b-c"), projection.edges.map { it.edgeId }.toSet())
         assertEquals(0.40f, relationshipGraphPresentation(projection).getValue("c").opacity)
         assertTrue(relationshipGraphPresentation(projection).getValue("c").showLabel.not())
+        assertEquals(0.15f, relationshipGraphPresentation(projection).getValue(RelationshipPersonIds.SELF).opacity)
+        assertTrue(relationshipGraphPresentation(projection).getValue(RelationshipPersonIds.SELF).showLabel.not())
     }
 
     @Test

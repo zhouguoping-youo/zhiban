@@ -245,7 +245,6 @@ internal fun RelationshipGraphState(
             .filter { it != graphRootId }
             .distinct()
             .sortedBy { peopleById[it]?.displayName.orEmpty() }
-            .take(24)
     }
     val graphNodeIds = remember(graphNeighborIds, graphRootId) { graphNeighborIds.toSet() + graphRootId }
     val visibleEdgesForGraph = remember(graphEdges, graphNodeIds) {
@@ -256,7 +255,11 @@ internal fun RelationshipGraphState(
                 "${ordered[0]}::${ordered[1]}::${edge.relationType}"
             }
     }
-    val hiddenGraphNodesCount = (graphRelatedIds.size - graphNeighborIds.size).coerceAtLeast(0)
+    val hiddenGraphNodesCount = if (graphProjection.isEgoView) {
+        (graphRelatedIds.size - graphNeighborIds.size).coerceAtLeast(0)
+    } else {
+        0
+    }
     fun switchEgo(nextId: String) {
         if (nextId !in peopleById || nextId == rootId) return
         val existingIndex = viewPath.indexOf(nextId)
