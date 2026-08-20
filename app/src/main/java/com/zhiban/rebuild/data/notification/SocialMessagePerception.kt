@@ -4,13 +4,9 @@ import android.app.Notification
 import android.os.Build
 import android.os.Bundle
 import android.os.Parcelable
+import com.zhiban.rebuild.data.suggestion.ScheduleTimeParser
 import java.security.MessageDigest
-import java.time.DayOfWeek
-import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalTime
 import java.time.ZoneId
-import java.time.temporal.TemporalAdjusters
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.doubleOrNull
@@ -164,9 +160,14 @@ object NotificationInsightAnalyzer {
         if (normalized.isBlank() || !hasSchedulingIntent(normalized) || negativeWords.any(normalized::contains)) {
             return NotificationInsights()
         }
-        val date = resolveDate(normalized, postedAtEpochMs, zoneId) ?: return NotificationInsights()
-        val time = resolveTime(normalized) ?: return NotificationInsights()
-        val start = date.atTime(time).atZone(zoneId).toInstant().toEpochMilli()
+        val time = ScheduleTimeParser.resolve(
+            text = normalized,
+            nowEpochMs = postedAtEpochMs,
+            zoneId = zoneId,
+            allowTimeOnly = false,
+            defaultTimeForDate = false,
+        ) ?: return NotificationInsights()
+        val start = time.dateTime.atZone(zoneId).toInstant().toEpochMilli()
         if (start < postedAtEpochMs - 5 * 60_000L) return NotificationInsights()
         val source = senderName ?: conversationTitle
         val title = cleanScheduleTitle(normalized, source).ifBlank { "待确认安排" }
@@ -464,84 +465,8 @@ object NotificationInsightAnalyzer {
         """^\s*([A-Za-z0-9_\-·\u4e00-\u9fff]{1,30})\s*[，,、:：]\s*(.+)$""",
     )
 
-    private fun resolveDate(text: String, nowEpochMs: Long, zoneId: ZoneId): LocalDate? {
-        val today = Instant.ofEpochMilli(nowEpochMs).atZone(zoneId).toLocalDate()
-        if ("今天" in text) return today
-        if ("后天" in text) return today.plusDays(2)
-        if ("明天" in text) return today.plusDays(1)
-        ABSOLUTE_DATE.find(text)?.let { match ->
-            val month = match.groupValues[1].toIntOrNull() ?: return@let
-            val day = match.groupValues[2].toIntOrNull() ?: return@let
-            return runCatching {
-                var value = LocalDate.of(today.year, month, day)
-                if (value.isBefore(today.minusDays(1))) value = value.plusYears(1)
-                value
-            }.getOrNull()
-        }
-        WEEKDAY.find(text)?.let { match ->
-            val target = chineseWeekday(match.groupValues[1]) ?: return@let
-            var value = today.with(TemporalAdjusters.nextOrSame(target))
-            if (value == today && ("下周" in text || "下星期" in text)) value = value.plusWeeks(1)
-            return value
-        }
-        return null
-    }
-
-    private fun resolveTime(text: String): LocalTime? {
-        val match = CLOCK.find(text) ?: return null
-        val upDownPrefix = match.groupValues[1]
-        val marker = match.groupValues[2]
-        val rawHour = match.groupValues[3].toIntOrNull()
-            ?: chineseNumber(match.groupValues[3])
-            ?: return null
-        val minute = when {
-            match.groupValues[4].isNotBlank() -> match.groupValues[4].toIntOrNull() ?: return null
-            match.groupValues[5] == "半" -> 30
-            else -> 0
-        }
-        if (rawHour !in 0..23 || minute !in 0..59) return null
-        val hour = when {
-            upDownPrefix == "下" && rawHour in 1..11 -> rawHour + 12
-            marker in setOf("下午", "晚上", "中午") && rawHour in 1..11 -> rawHour + 12
-            marker == "凌晨" && rawHour == 12 -> 0
-            else -> rawHour
-        }
-        return runCatching { LocalTime.of(hour, minute) }.getOrNull()
-    }
-
-    private fun chineseNumber(value: String): Int? = when (value) {
-        "零" -> 0
-        "一" -> 1
-        "二", "两" -> 2
-        "三" -> 3
-        "四" -> 4
-        "五" -> 5
-        "六" -> 6
-        "七" -> 7
-        "八" -> 8
-        "九" -> 9
-        "十" -> 10
-        "十一" -> 11
-        "十二" -> 12
-        else -> null
-    }
-
-    private fun chineseWeekday(value: String): DayOfWeek? = when (value) {
-        "一" -> DayOfWeek.MONDAY
-        "二" -> DayOfWeek.TUESDAY
-        "三" -> DayOfWeek.WEDNESDAY
-        "四" -> DayOfWeek.THURSDAY
-        "五" -> DayOfWeek.FRIDAY
-        "六" -> DayOfWeek.SATURDAY
-        "日", "天" -> DayOfWeek.SUNDAY
-        else -> null
-    }
-
     private val ABSOLUTE_DATE = Regex("""(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]""")
     private val WEEKDAY = Regex("""(?:本周|这周|下周|星期|周|下星期)\s*([一二三四五六日天])""")
-    private val CLOCK = Regex(
-        """([上中下])?\s*(凌晨|早上|上午|中午|下午|晚上|傍晚)?\s*([0-2]?\d|零|一|二|两|三|四|五|六|七|八|九|十|十一|十二)\s*(?:[:：\s]*(\d{1,2})?\s*分?|点\s*(半|[0-5]?\d|[零一二三四五六七八九十]{1,3})?)""",
-    )
     private val LEADING_TEMPORAL_PREFIX = Regex(
         """^\s*(?:(?:今天|明天|后天|前天|本周|下周|下星期|周[一二三四五六日天]|星期[一二三四五六日天])\s*)?(?:(?:[上下]?(?:上午|中午|下午|晚上|早上|凌晨|傍晚)\s*)?)(?:[上中下]\s*)?(?:[0-2]?\d|[零一二三四五六七八九十]{1,3})\s*(?:[:：]\s*\d{1,2}|点(?:\s*(?:半|[0-5]?\d|[零一二三四五六七八九十]{1,3})?)\s*)(?:\s*分?)\s*[,，:：.]?\s*""",
     )

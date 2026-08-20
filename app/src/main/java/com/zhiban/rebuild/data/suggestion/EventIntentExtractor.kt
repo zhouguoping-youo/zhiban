@@ -1,13 +1,10 @@
 package com.zhiban.rebuild.data.suggestion
 
-import java.time.DayOfWeek
 import java.time.LocalDateTime
-import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import java.time.temporal.TemporalAdjusters
 import kotlin.math.asin
 import kotlin.math.cos
 import kotlin.math.sin
@@ -81,34 +78,6 @@ object EventIntentExtractor {
         val canCreateSchedule: Boolean get() = hasScheduleIntent && startAtEpochMs != null
     }
 
-    private val DAY_WORD_OFFSET = mapOf(
-        "今天" to 0L,
-        "今晚" to 0L,
-        "明天" to 1L,
-        "明早" to 1L,
-        "明晚" to 1L,
-        "后天" to 2L,
-        "大后天" to 3L,
-    )
-    private val WEEKDAY_WORDS = mapOf(
-        "一" to DayOfWeek.MONDAY,
-        "二" to DayOfWeek.TUESDAY,
-        "三" to DayOfWeek.WEDNESDAY,
-        "四" to DayOfWeek.THURSDAY,
-        "五" to DayOfWeek.FRIDAY,
-        "六" to DayOfWeek.SATURDAY,
-        "日" to DayOfWeek.SUNDAY,
-        "天" to DayOfWeek.SUNDAY,
-    )
-    private val DAY_PERIOD_OFFSET = mapOf(
-        "凌晨" to 0,
-        "早上" to 0,
-        "上午" to 0,
-        "中午" to 12,
-        "下午" to 12,
-        "晚上" to 12,
-        "今晚" to 12,
-    )
     private val PLACE_PREFIXES = listOf("我家", "家里", "我们", "公司", "单位", "这边", "那儿", "那里")
     private val PLACE_SUFFIXES = listOf(
         "云城", "家园", "小区", "大厦", "广场", "中心", "路", "街", "苑", "城", "湾", "园", "府",
@@ -118,21 +87,6 @@ object EventIntentExtractor {
         "有限公司", "股份有限公司", "集团", "科技", "医药", "医疗", "信息", "电子", "软件", "网络",
         "生物", "能源", "实业", "控股", "研究院", "医院",
     )
-
-    private val HOUR_MINUTE_PATTERN = Regex("(\\d{1,2})[:：](\\d{1,2})")
-    private val HOUR_HALF_PATTERN = Regex("(\\d{1,2})\\s*点\\s*半")
-
-    // 数字+点：前有量词（有/共/这/那/几/多）或后有量词（个/条/项/要）时是数量不是时间（如「有3点要安排」）。
-    // 注意:集合不能含「上」——「早上9点」「晚上8点」的数字前正是"上",加进去会把最常用的时间表达误伤成数量。
-    private val HOUR_FULL_PATTERN = Regex("(?<!\\d)(?<![有共这那几多])(\\d{1,2})\\s*点(?:\\s*(\\d{1,2})\\s*分)?(?![个条项点要\\d])")
-    private val NEXT_WEEKDAY_PATTERN = Regex("下(?:周|星期)?([一二三四五六日天])")
-    private val THIS_WEEKDAY_PATTERN = Regex("(?:周|星期)([一二三四五六日天])")
-
-    /** 时段词或数字时间形态（用于「只有时间、无日期词」时判定存在时间锚点）。 */
-    private val TIME_OF_DAY_PATTERN = Regex("(?:凌晨|早上|上午|中午|下午|晚上|傍晚|\\d{1,2}[:：]\\d{1,2}|\\d{1,2}\\s*点(?:\\s*半|\\s*\\d{1,2}\\s*分)?)")
-
-    /** 数字时间形态提示（「X点」或「X:X」）；解析失败时宁可无时间意图，不默认 9:00 造成错误日程。 */
-    private val NUMERIC_TIME_HINT = Regex("\\d{1,2}\\s*[:：点]")
 
     /** 与时间词共现的日程动作词（「现在下午3点了」无动作词 → 不建日程）。 */
     private val TIME_ACTION_WORD_PATTERN = Regex("(?:见|来|去|到|走|出发|开会|拜访|接|等|安排|约|碰|见?面)")
@@ -176,12 +130,27 @@ object EventIntentExtractor {
         contacts: List<ContactCandidate> = emptyList(),
         departure: DepartureContext? = null,
         pickupCoordinate: PickupContext? = null,
+        authoritativeStartAtEpochMs: Long? = null,
+        authoritativeDurationMinutes: Int? = null,
+        authoritativeTitle: String? = null,
     ): EventIntent {
         val text = body.trim()
         if (text.isBlank()) return EventIntent(hasScheduleIntent = false)
 
         val now = ZonedDateTime.ofInstant(java.time.Instant.ofEpochMilli(nowEpochMs), zoneId)
-        val start = parseStartTime(text, now)
+        val timeResolution = authoritativeStartAtEpochMs?.let { startAt ->
+            ScheduleTimeParser.Resolution(
+                dateTime = LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(startAt), zoneId),
+                explicitDate = true,
+                explicitTime = true,
+            )
+        } ?: ScheduleTimeParser.resolve(
+            text = text,
+            now = now,
+            allowTimeOnly = TIME_ACTION_WORD_PATTERN.containsMatchIn(text),
+            defaultTimeForDate = true,
+        )
+        val start = timeResolution?.dateTime
         val pickupLocation = extractPickupLocation(text)
         val company = extractCompany(text)
         val companyFull = resolveCompanyFull(company, knownCompanies)
@@ -234,7 +203,11 @@ object EventIntentExtractor {
         val visitAction = company?.let { "拜访$it" }
         val actions = listOfNotNull(pickupAction, visitAction)
             .joinToString(if (pickupAction != null && visitAction != null) " → " else " · ")
-        val title = buildTitle(timeDescription, actions)
+        val title = if (actions.isBlank() && !authoritativeTitle.isNullOrBlank()) {
+            authoritativeTitle.trim().take(60)
+        } else {
+            buildTitle(timeDescription, actions)
+        }
         val note = buildNote(
             timeDescription = timeDescription,
             pickupLocation = pickupLocation,
@@ -250,7 +223,8 @@ object EventIntentExtractor {
             hasScheduleIntent = hasScheduleAnchor,
             startAtEpochMs = start?.atZone(zoneId)?.toEpochSecond()?.times(1_000),
             timeDescription = timeDescription,
-            durationMinutes = if (company != null) VISIT_DURATION_MINUTES else DEFAULT_DURATION_MINUTES,
+            durationMinutes = authoritativeDurationMinutes
+                ?: if (company != null) VISIT_DURATION_MINUTES else DEFAULT_DURATION_MINUTES,
             location = visitLocation ?: pickupLocation,
             pickupLocation = pickupLocation,
             visitLocation = visitLocation,
@@ -265,79 +239,6 @@ object EventIntentExtractor {
             title = title,
             note = note,
         )
-    }
-
-    // ---- 时间解析 ----
-
-    private fun parseStartTime(text: String, now: ZonedDateTime): LocalDateTime? {
-        val dayWord = DAY_WORD_OFFSET.entries.firstOrNull { (word, _) -> text.contains(word) }
-        val nextWeekday = NEXT_WEEKDAY_PATTERN.find(text)
-        val thisWeekday = THIS_WEEKDAY_PATTERN.find(text)
-
-        val targetDate: java.time.LocalDate = when {
-            dayWord != null -> now.toLocalDate().plusDays(dayWord.value)
-
-            nextWeekday != null -> {
-                val dow = WEEKDAY_WORDS[nextWeekday.groupValues[1]] ?: return null
-                now.toLocalDate().with(TemporalAdjusters.next(dow))
-            }
-
-            thisWeekday != null -> {
-                val dow = WEEKDAY_WORDS[thisWeekday.groupValues[1]] ?: return null
-                // 当天说「周三」应指今天（nextOrSame），用 next() 会无谓偏移 7 天。
-                now.toLocalDate().with(TemporalAdjusters.nextOrSame(dow))
-            }
-
-            // 只有时间词没有日期词（如「下午3点见」）：默认今天，已过当前时刻则顺延明天。
-            TIME_OF_DAY_PATTERN.containsMatchIn(text) && TIME_ACTION_WORD_PATTERN.containsMatchIn(text) -> {
-                val time = parseTimeOfDay(text) ?: return null
-                val candidate = java.time.LocalDateTime.of(now.toLocalDate(), time)
-                if (candidate.isAfter(now.toLocalDateTime())) now.toLocalDate() else now.toLocalDate().plusDays(1)
-            }
-
-            else -> return null
-        }
-
-        val timeOfDay = parseTimeOfDay(text)
-        val localTime = timeOfDay ?: run {
-            // 文本里明确出现「X点/X:X」数字时间但解析失败 → 不静默兜底 9:00。
-            // 否则用户说「9点30分」一旦解析漏配,会被悄悄建成 9:00 的错误日程。
-            if (NUMERIC_TIME_HINT.containsMatchIn(text)) return null
-            LocalTime.of(9, 0) // 只说了哪天，默认上午 9 点
-        }
-        return LocalDateTime.of(targetDate, localTime)
-    }
-
-    private fun parseTimeOfDay(text: String): LocalTime? {
-        val period = DAY_PERIOD_OFFSET.entries.firstOrNull { (word, _) -> text.contains(word) }
-        val periodOffset = period?.value ?: 0
-
-        HOUR_MINUTE_PATTERN.find(text)?.let { m ->
-            val hour = m.groupValues[1].toInt().coerceIn(0, 23)
-            val minute = m.groupValues[2].toInt().coerceIn(0, 59)
-            return shiftAfternoon(hour, minute, periodOffset)
-        }
-        HOUR_HALF_PATTERN.find(text)?.let { m ->
-            val hour = m.groupValues[1].toInt().coerceIn(0, 23)
-            return shiftAfternoon(hour, 30, periodOffset)
-        }
-        HOUR_FULL_PATTERN.find(text)?.let { m ->
-            val hour = m.groupValues[1].toInt().coerceIn(0, 23)
-            val minute = m.groupValues[2].takeIf(String::isNotBlank)?.toInt()?.coerceIn(0, 59) ?: 0
-            return shiftAfternoon(hour, minute, periodOffset)
-        }
-        return null
-    }
-
-    private fun shiftAfternoon(hour: Int, minute: Int, periodOffset: Int): LocalTime? {
-        var h = hour
-        if (periodOffset == 12 && h in 1..11) h += 12 // 下午/晚上 1-11 点
-        if (periodOffset == 0 && h == 12) h = 0 // 上午 12 点 = 凌晨 0 点（罕见，保守处理）
-        return try {
-            LocalTime.of(h, minute)
-        } catch (_: Exception) {
-            null
-        }
     }
 
     private fun describeTime(dt: LocalDateTime, now: ZonedDateTime): String {

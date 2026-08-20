@@ -178,6 +178,20 @@ class SocialMessagePerceptionTest {
     }
 
     @Test
+    fun dayNumberScheduleUsesSharedDeterministicTimeParser() {
+        val insights = NotificationInsightAnalyzer.analyze(
+            text = "8月5号晚上8点开项目复盘会",
+            senderName = "张三",
+            conversationTitle = "张三",
+            postedAtEpochMs = now,
+            zoneId = zone,
+        )
+
+        val expected = LocalDate.of(2026, 8, 5).atTime(20, 0).atZone(zone).toInstant().toEpochMilli()
+        assertEquals(expected, insights.schedule?.startAtEpochMs)
+    }
+
+    @Test
     fun contractDeadlineWithoutSchedulingIntentIsNotMistakenForAnAppointment() {
         val insights = NotificationInsightAnalyzer.analyze(
             text = "明天下午3点这个合约到期",
@@ -272,10 +286,12 @@ class SocialMessagePerceptionTest {
     }
 
     @Test
-    fun resolveWeekdayPhrasesKeepNextOrSameWhenNextWeekPrefixAppearsInContext() {
+    fun weekdayPhrasesWithoutAnExplicitTimeDoNotGuessAClockValue() {
         val today = LocalDate.of(2026, 7, 29).atTime(11, 0).atZone(zone).toInstant().toEpochMilli()
-        assertScheduleDate("周一说下周三开会", LocalDate.of(2026, 8, 3), today)
-        assertScheduleDate("周四说下周周二开会", LocalDate.of(2026, 7, 30), today)
+        listOf("周一说下周三开会", "周四说下周周二开会").forEach { text ->
+            val insight = NotificationInsightAnalyzer.analyze(text, "张三", "张三", today, zone).schedule
+            assertNull(text, insight)
+        }
     }
 
     @Test

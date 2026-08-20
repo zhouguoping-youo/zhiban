@@ -99,6 +99,66 @@ class EventIntentExtractorTest {
     }
 
     @Test
+    fun `大后天必须优先于后天解析`() {
+        val intent = EventIntentExtractor.extract("大后天晚上8点开会", "周国平", knownCompanies, nowEpochMs, zone)
+        val expected = ZonedDateTime.of(2026, 8, 22, 20, 0, 0, 0, zone).toInstant().toEpochMilli()
+        assertEquals(expected, intent.startAtEpochMs)
+    }
+
+    @Test
+    fun `明晚必须解析为明天晚上`() {
+        val intent = EventIntentExtractor.extract("明晚8点见面", "周国平", knownCompanies, nowEpochMs, zone)
+        val expected = ZonedDateTime.of(2026, 8, 20, 20, 0, 0, 0, zone).toInstant().toEpochMilli()
+        assertEquals(expected, intent.startAtEpochMs)
+    }
+
+    @Test
+    fun `日号和月日使用同一日期出口`() {
+        val dayOnly = EventIntentExtractor.extract("28号下午3点开会", "周国平", knownCompanies, nowEpochMs, zone)
+        val monthDay = EventIntentExtractor.extract("9月2日晚上7点见面", "周国平", knownCompanies, nowEpochMs, zone)
+        val expectedDayOnly = ZonedDateTime.of(2026, 8, 28, 15, 0, 0, 0, zone).toInstant().toEpochMilli()
+        val expectedMonthDay = ZonedDateTime.of(2026, 9, 2, 19, 0, 0, 0, zone).toInstant().toEpochMilli()
+        assertEquals(expectedDayOnly, dayOnly.startAtEpochMs)
+        assertEquals(expectedMonthDay, monthDay.startAtEpochMs)
+    }
+
+    @Test
+    fun `裸十二点保持正午而非午夜`() {
+        val eleven = ZonedDateTime.of(2026, 8, 19, 11, 0, 0, 0, zone).toInstant().toEpochMilli()
+        val intent = EventIntentExtractor.extract("12点开会", "周国平", knownCompanies, eleven, zone)
+        val expected = ZonedDateTime.of(2026, 8, 19, 12, 0, 0, 0, zone).toInstant().toEpochMilli()
+        assertEquals(expected, intent.startAtEpochMs)
+    }
+
+    @Test
+    fun `非法时分明确失败而不强压为合法时间`() {
+        val invalidHour = EventIntentExtractor.extract("明天25点开会", "周国平", knownCompanies, nowEpochMs, zone)
+        val invalidMinute = EventIntentExtractor.extract("明天99:99开会", "周国平", knownCompanies, nowEpochMs, zone)
+        assertFalse(invalidHour.hasScheduleIntent)
+        assertNull(invalidHour.startAtEpochMs)
+        assertFalse(invalidMinute.hasScheduleIntent)
+        assertNull(invalidMinute.startAtEpochMs)
+    }
+
+    @Test
+    fun `已有日程洞察时间优先于正文再次解析`() {
+        val authoritative = ZonedDateTime.of(2026, 8, 25, 18, 30, 0, 0, zone).toInstant().toEpochMilli()
+        val intent = EventIntentExtractor.extract(
+            body = "28号99点开会",
+            contactName = "周国平",
+            knownCompanies = knownCompanies,
+            nowEpochMs = nowEpochMs,
+            zoneId = zone,
+            authoritativeStartAtEpochMs = authoritative,
+            authoritativeDurationMinutes = 45,
+            authoritativeTitle = "项目复盘会",
+        )
+        assertEquals(authoritative, intent.startAtEpochMs)
+        assertEquals(45, intent.durationMinutes)
+        assertEquals("项目复盘会", intent.title)
+    }
+
+    @Test
     fun `仅时间词加动作词_默认今天`() {
         // now=12:00，14:00 未过 → 今天 14:00
         val body = "下午2点见个面"

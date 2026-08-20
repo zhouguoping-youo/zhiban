@@ -2,6 +2,7 @@ package com.zhiban.rebuild.runtime.wakeup
 
 import android.util.Log
 import com.zhiban.rebuild.data.agent.AgentDatabase
+import com.zhiban.rebuild.data.notification.ScheduleInsight
 import com.zhiban.rebuild.data.suggestion.AgentSuggestionCodecs
 import com.zhiban.rebuild.data.suggestion.AgentSuggestionEntity
 import com.zhiban.rebuild.data.suggestion.AgentSuggestionRepository
@@ -179,6 +180,7 @@ internal class AgentWakeupCoordinator @Inject constructor(
             ?.let { database.contactDao().findById(it)?.displayName }
             ?: sender
         val context = loadExtractorContext(decision.contactId)
+        val authoritativeInsight = candidate?.let(ScheduleInsight::from)
         return EventIntentExtractor.extract(
             body = candidate?.body.orEmpty(),
             contactName = contactName,
@@ -188,6 +190,9 @@ internal class AgentWakeupCoordinator @Inject constructor(
             contacts = context.contacts,
             departure = context.departure,
             pickupCoordinate = context.pickupCoordinate,
+            authoritativeStartAtEpochMs = authoritativeInsight?.startAtEpochMs,
+            authoritativeDurationMinutes = authoritativeInsight?.durationMinutes,
+            authoritativeTitle = authoritativeInsight?.title,
         )
     }
 
