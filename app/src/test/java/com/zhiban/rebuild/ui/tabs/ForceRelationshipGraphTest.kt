@@ -180,6 +180,20 @@ class ForceRelationshipGraphTest {
         assertEquals("同事 · 推测", relationshipGraphEdgeCaption(link))
     }
 
+    @Test
+    fun `large graphs avoid quadratic repulsion and remain finite`() {
+        val bodies = seedForceBodies(
+            nodeIds = (0 until 500).map { "node-$it" },
+            rootId = "node-0",
+            width = 800f,
+            height = 600f,
+        ).toMutableMap()
+
+        assertEquals(0L, estimateForcePairCount(500))
+        advanceForceSimulation(bodies, emptyList(), "node-0", 800f, 600f, 1f, 1f)
+        assertTrue(bodies.values.all { it.position.x.isFinite() && it.position.y.isFinite() })
+    }
+
     private fun edge(id: String, from: String, to: String, type: String, confidence: Double, confirmed: Boolean) = RelationshipEdgeEntity(
         edgeId = id,
         fromContactId = from,

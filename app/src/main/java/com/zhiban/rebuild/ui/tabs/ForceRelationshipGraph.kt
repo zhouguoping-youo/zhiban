@@ -100,6 +100,10 @@ private val WorkRelations = RelationshipTaxonomy.selectableDefinitions
 
 internal enum class ForceGraphNodeKind { FOCUS, CONTACT, WORK }
 
+internal const val FORCE_PAIRWISE_NODE_LIMIT = 160
+
+private data class GraphPaintKey(val color: Int, val textSize: Float, val bold: Boolean)
+
 internal data class ForceGraphNode(
     val id: String,
     val name: String,
@@ -230,6 +234,37 @@ internal fun seedForceBodies(
     }
 }
 
+internal fun estimateForcePairCount(nodeCount: Int): Long = if (nodeCount <= FORCE_PAIRWISE_NODE_LIMIT) {
+    nodeCount.toLong() * (nodeCount - 1L) / 2L
+} else {
+    0L
+}
+
+private data class RepulsionState(val ids: List<String>, val bodies: Map<String, ForceBody>, val forces: MutableMap<String, Offset>, val repulsion: Float)
+
+private fun applyPairwiseRepulsion(state: RepulsionState) {
+    val ids = state.ids
+    val bodies = state.bodies
+    val forces = state.forces
+    for (firstIndex in 0 until ids.lastIndex) {
+        for (secondIndex in firstIndex + 1 until ids.size) {
+            val first = bodies.getValue(ids[firstIndex])
+            val second = bodies.getValue(ids[secondIndex])
+            var delta = second.position - first.position
+            var distance = hypot(delta.x, delta.y)
+            if (distance < 1f) {
+                delta = Offset(if (firstIndex % 2 == 0) 1f else -1f, 0.5f)
+                distance = hypot(delta.x, delta.y)
+            }
+            val direction = delta / distance
+            val magnitude = state.repulsion / max(distance * distance, 64f)
+            val push = direction * magnitude
+            forces[ids[firstIndex]] = forces.getValue(ids[firstIndex]) - push
+            forces[ids[secondIndex]] = forces.getValue(ids[secondIndex]) + push
+        }
+    }
+}
+
 internal fun advanceForceSimulation(
     bodies: MutableMap<String, ForceBody>,
     links: List<ForceGraphLink>,
@@ -245,22 +280,8 @@ internal fun advanceForceSimulation(
     val repulsion = 8_200f * density * density
     val desiredLength = 106f * density
 
-    for (firstIndex in 0 until ids.lastIndex) {
-        for (secondIndex in firstIndex + 1 until ids.size) {
-            val first = bodies.getValue(ids[firstIndex])
-            val second = bodies.getValue(ids[secondIndex])
-            var delta = second.position - first.position
-            var distance = hypot(delta.x, delta.y)
-            if (distance < 1f) {
-                delta = Offset(if (firstIndex % 2 == 0) 1f else -1f, 0.5f)
-                distance = hypot(delta.x, delta.y)
-            }
-            val direction = delta / distance
-            val magnitude = repulsion / max(distance * distance, 64f)
-            val push = direction * magnitude
-            forces[ids[firstIndex]] = forces.getValue(ids[firstIndex]) - push
-            forces[ids[secondIndex]] = forces.getValue(ids[secondIndex]) + push
-        }
+    if (ids.size <= FORCE_PAIRWISE_NODE_LIMIT) {
+        applyPairwiseRepulsion(RepulsionState(ids, bodies, forces, repulsion))
     }
 
     links.forEach { link ->
@@ -338,6 +359,7 @@ internal fun ForceRelationshipGraphCanvas(
     var simulationPulse by remember { mutableIntStateOf(0) }
     var viewportAnimationJob by remember { mutableStateOf<Job?>(null) }
     val scope = rememberCoroutineScope()
+    val textPaintCache = remember { mutableMapOf<GraphPaintKey, android.graphics.Paint>() }
     val touchSlop = with(density) { 8.dp.toPx() }
     val hitRadius = with(density) { 28.dp.toPx() }
 
@@ -407,7 +429,8 @@ internal fun ForceRelationshipGraphCanvas(
         }
         var previousFrame = 0L
         var calmFrames = 0
-        while (isActive && calmFrames < 120) {
+        var frameCount = 0
+        while (isActive && calmFrames < 120 && frameCount < 300) {
             withFrameNanos { frameNanos ->
                 val elapsed = if (previousFrame == 0L) {
                     1f
@@ -426,6 +449,7 @@ internal fun ForceRelationshipGraphCanvas(
                 )
                 val speed = bodies.values.maxOfOrNull { hypot(it.velocity.x, it.velocity.y) } ?: 0f
                 calmFrames = if (speed < 0.025f) calmFrames + 1 else 0
+                frameCount += 1
                 frameTick += 1
             }
         }
@@ -512,7 +536,7 @@ internal fun ForceRelationshipGraphCanvas(
                                 if (!pinching && !nodeDragging && activeNodeId != null) {
                                     selectedNodeId = activeNodeId
                                     focusNode(activeNodeId)
-                                } else if (nodeDragging) {
+                                } else if (nodeDragging && model.nodes.size <= FORCE_PAIRWISE_NODE_LIMIT) {
                                     simulationPulse += 1
                                 }
                             }
@@ -571,21 +595,27 @@ internal fun ForceRelationshipGraphCanvas(
                                 cornerRadius = CornerRadius(labelHeight / 2f),
                             )
                             drawIntoCanvas { canvas ->
-                                val paint = android.graphics.Paint().apply {
-                                    isAntiAlias = true
-                                    this.color = if (link.evidenceLabel != null) {
-                                        graphColors.sharedCompany.toArgb()
-                                    } else {
-                                        labelColor.toArgb()
-                                    }
-                                    textAlign = android.graphics.Paint.Align.CENTER
-                                    textSize = 10.sp.toPx()
-                                    typeface =
-                                        android.graphics.Typeface.create(
+                                val paint = textPaintCache.getOrPut(
+                                    GraphPaintKey(
+                                        color = if (link.evidenceLabel != null) {
+                                            graphColors.sharedCompany.toArgb()
+                                        } else {
+                                            labelColor.toArgb()
+                                        },
+                                        textSize = 10.sp.toPx(),
+                                        bold = true,
+                                    ),
+                                ) {
+                                    android.graphics.Paint().apply {
+                                        isAntiAlias = true
+                                        textAlign = android.graphics.Paint.Align.CENTER
+                                        textSize = 10.sp.toPx()
+                                        typeface = android.graphics.Typeface.create(
                                             android.graphics.Typeface.DEFAULT,
                                             android.graphics.Typeface.BOLD,
                                         )
-                                }
+                                    }
+                                }.also { it.color = if (link.evidenceLabel != null) graphColors.sharedCompany.toArgb() else labelColor.toArgb() }
                                 canvas.nativeCanvas.drawText(
                                     relationshipText,
                                     center.x,
@@ -598,6 +628,7 @@ internal fun ForceRelationshipGraphCanvas(
 
                     model.nodes.forEach { node ->
                         val center = bodies[node.id]?.position?.let(::screenPosition) ?: return@forEach
+                        if (!visible(center)) return@forEach
                         val selected = node.id == selectedNodeId
                         val visualRadius = with(density) {
                             (if (node.kind == ForceGraphNodeKind.FOCUS) 31.dp else 25.dp).toPx()
@@ -626,17 +657,19 @@ internal fun ForceRelationshipGraphCanvas(
                         }
                         val labelCenter = center + outward * (visualRadius + 17.dp.toPx())
                         val clippedName = if (node.name.length > 8) node.name.take(7) + "…" else node.name
-                        val labelPaint = android.graphics.Paint().apply {
-                            isAntiAlias = true
-                            this.color = labelColor.toArgb()
-                            textAlign = android.graphics.Paint.Align.CENTER
-                            textSize = 12.sp.toPx()
-                            typeface =
-                                android.graphics.Typeface.create(
+                        val labelPaint = textPaintCache.getOrPut(
+                            GraphPaintKey(labelColor.toArgb(), 12.sp.toPx(), true),
+                        ) {
+                            android.graphics.Paint().apply {
+                                isAntiAlias = true
+                                textAlign = android.graphics.Paint.Align.CENTER
+                                textSize = 12.sp.toPx()
+                                typeface = android.graphics.Typeface.create(
                                     android.graphics.Typeface.DEFAULT,
                                     android.graphics.Typeface.BOLD,
                                 )
-                        }
+                            }
+                        }.also { it.color = labelColor.toArgb() }
                         val nameWidth = labelPaint.measureText(clippedName) + 10.dp.toPx()
                         val nameHeight = 20.dp.toPx()
                         val safeLabelCenter = Offset(
