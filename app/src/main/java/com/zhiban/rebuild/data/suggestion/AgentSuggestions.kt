@@ -34,6 +34,7 @@ object AgentSuggestionType {
     const val WAKEUP_IDENTITY = "WAKEUP_IDENTITY"
     const val SILENT_CONTACTS = "SILENT_CONTACTS"
     const val UNOBSERVED_REPLY = "UNOBSERVED_REPLY"
+    const val SCHEDULE_ADVANCE_CONFIRMATION = "SCHEDULE_ADVANCE_CONFIRMATION"
 
     /** 联系人资料不完整 + 有互动 → 一键转发补全（关联 contact_completion_requests）。 */
     const val WAKEUP_COMPLETION = "WAKEUP_COMPLETION"

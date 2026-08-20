@@ -52,6 +52,19 @@ class ScheduleReminderValidationTest {
         assertEquals("schedule-1", data.getString(ScheduleReminderWorker.KEY_SCHEDULE_ID))
     }
 
+    @Test fun advanceCheckRunsAtThreeDayBoundaryAndSkipsSchedulesUnderOneDayAway() {
+        val day = 24L * 60 * 60 * 1_000
+
+        assertEquals(2L * day, advanceCheckDelayMillis(startAtEpochMs = 5L * day, nowEpochMs = 0L))
+        assertEquals(0L, advanceCheckDelayMillis(startAtEpochMs = 2L * day, nowEpochMs = 0L))
+        assertEquals(0L, advanceCheckDelayMillis(startAtEpochMs = day, nowEpochMs = 0L))
+        assertEquals(null, advanceCheckDelayMillis(startAtEpochMs = day - 1L, nowEpochMs = 0L))
+        assertEquals(
+            setOf("scheduleId", "startAtEpochMs"),
+            advanceCheckWorkData("schedule-1", 5L * day).keyValueMap.keys,
+        )
+    }
+
     @Test fun deletedOrRescheduledWorkerSnapshotNeverDispatchesNotification() = runTest {
         var dispatchCount = 0
         val deleted = runIfReminderCurrent("schedule-1", 10_000L, 15, { null }) { dispatchCount++ }

@@ -22,6 +22,7 @@ class ScheduleReminderScheduler @Inject constructor(@ApplicationContext private 
 
     fun replace(scheduleId: String, startAtEpochMs: Long, reminderMinutesBefore: Int?, nowEpochMs: Long) {
         val manager = WorkManager.getInstance(context)
+        replaceAdvanceCheck(manager, scheduleId, startAtEpochMs, nowEpochMs)
         val uniqueName = uniqueName(scheduleId)
         if (reminderMinutesBefore == null) {
             manager.cancelUniqueWork(uniqueName)
@@ -41,13 +42,31 @@ class ScheduleReminderScheduler @Inject constructor(@ApplicationContext private 
     }
 
     fun cancel(scheduleId: String) {
-        WorkManager.getInstance(context).cancelUniqueWork(uniqueName(scheduleId))
+        val manager = WorkManager.getInstance(context)
+        manager.cancelUniqueWork(uniqueName(scheduleId))
+        manager.cancelUniqueWork(advanceUniqueName(scheduleId))
     }
 
     internal fun uniqueName(scheduleId: String) = "schedule-reminder-$scheduleId"
 
+    internal fun advanceUniqueName(scheduleId: String) = "schedule-advance-check-$scheduleId"
+
+    private fun replaceAdvanceCheck(manager: WorkManager, scheduleId: String, startAtEpochMs: Long, nowEpochMs: Long) {
+        val delayMillis = advanceCheckDelayMillis(startAtEpochMs, nowEpochMs) ?: run {
+            manager.cancelUniqueWork(advanceUniqueName(scheduleId))
+            return
+        }
+        val request = OneTimeWorkRequestBuilder<ScheduleAdvanceSuggestionWorker>()
+            .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
+            .setInputData(advanceCheckWorkData(scheduleId, startAtEpochMs))
+            .addTag(ADVANCE_TAG)
+            .build()
+        manager.enqueueUniqueWork(advanceUniqueName(scheduleId), ExistingWorkPolicy.REPLACE, request)
+    }
+
     companion object {
         const val TAG = "zhiban-schedule-reminder"
+        const val ADVANCE_TAG = "zhiban-schedule-advance-check"
     }
 }
 
@@ -73,3 +92,16 @@ internal fun reminderDelayMillis(startAtEpochMs: Long, reminderMinutesBefore: In
     val triggerAtEpochMs = startAtEpochMs - reminderMinutesBefore * 60_000L
     return (triggerAtEpochMs - nowEpochMs).coerceAtLeast(0L)
 }
+
+internal fun advanceCheckWorkData(scheduleId: String, startAtEpochMs: Long): Data = Data.Builder()
+    .putString(ScheduleAdvanceSuggestionWorker.KEY_SCHEDULE_ID, scheduleId)
+    .putLong(ScheduleAdvanceSuggestionWorker.KEY_START_AT, startAtEpochMs)
+    .build()
+
+internal fun advanceCheckDelayMillis(startAtEpochMs: Long, nowEpochMs: Long): Long? {
+    if (startAtEpochMs < nowEpochMs + DAY_MS) return null
+    return (startAtEpochMs - ADVANCE_WINDOW_MS - nowEpochMs).coerceAtLeast(0L)
+}
+
+private const val DAY_MS = 24L * 60 * 60 * 1_000
+private const val ADVANCE_WINDOW_MS = 3L * DAY_MS
