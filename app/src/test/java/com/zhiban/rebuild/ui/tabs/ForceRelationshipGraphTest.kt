@@ -3,6 +3,7 @@ package com.zhiban.rebuild.ui.tabs
 import androidx.compose.ui.geometry.Offset
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipPersonIds
+import com.zhiban.rebuild.data.interaction.ContactInteractionIntensity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -141,6 +142,27 @@ class ForceRelationshipGraphTest {
         assertEquals(edges, projection.edges)
         assertEquals(setOf("a", "b", "c"), projection.hopByNode.keys - RelationshipPersonIds.SELF)
         assertTrue(projection.isEgoView.not())
+    }
+
+    @Test
+    fun `interaction intensity maps contacts to Dunbar rings`() {
+        assertEquals(RelationshipGraphRing.INNER, relationshipGraphRing(8))
+        assertEquals(RelationshipGraphRing.MIDDLE, relationshipGraphRing(3))
+        assertEquals(RelationshipGraphRing.OUTER, relationshipGraphRing(1))
+        assertEquals(RelationshipGraphRing.UNKNOWN, relationshipGraphRing(0))
+    }
+
+    @Test
+    fun `projection carries interaction ring without changing persisted edges`() {
+        val projection = projectRelationshipGraph(
+            rootId = RelationshipPersonIds.SELF,
+            peopleIds = setOf(RelationshipPersonIds.SELF, "a"),
+            edges = listOf(edge("self-a", RelationshipPersonIds.SELF, "a", "COLLEAGUE", 1.0, true)),
+            interactionIntensity = listOf(ContactInteractionIntensity("a", 9, 100L)),
+        )
+
+        assertEquals(RelationshipGraphRing.INNER, projection.ringByNode.getValue("a"))
+        assertEquals(1, projection.edges.size)
     }
 
     private fun edge(id: String, from: String, to: String, type: String, confidence: Double, confirmed: Boolean) = RelationshipEdgeEntity(

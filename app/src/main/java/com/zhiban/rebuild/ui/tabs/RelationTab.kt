@@ -573,6 +573,7 @@ fun RelationTab(
                             historicalEdges = historyRelationships,
                             currentOwnerEmployment = currentOwnerEmployment,
                             ownerEmploymentHistoryCount = ownerEmploymentHistoryCount,
+                            interactionIntensity = page.interactionIntensity,
                             events = relationshipEvents,
                             canAddRelationship = contacts.isNotEmpty(),
                             activeFilter = tag.takeUnless { it == "全部" } ?: query.takeIf(String::isNotBlank),

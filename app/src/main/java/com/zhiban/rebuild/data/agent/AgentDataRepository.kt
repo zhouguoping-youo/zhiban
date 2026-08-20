@@ -50,6 +50,7 @@ import com.zhiban.rebuild.data.crm.CrmStageHistoryEntity
 import com.zhiban.rebuild.data.crm.CrmSuggestionStatus
 import com.zhiban.rebuild.data.facts.FactEntity
 import com.zhiban.rebuild.data.facts.FactIndex
+import com.zhiban.rebuild.data.interaction.ContactInteractionIntensity
 import com.zhiban.rebuild.data.interaction.InteractionSourceType
 import com.zhiban.rebuild.data.interaction.notificationInteraction
 import com.zhiban.rebuild.data.notification.MessageCollectionPreferences
@@ -133,6 +134,9 @@ class AgentDataRepository internal constructor(
 
     /** 关系图谱互动边与关系推断共用的互动摘要快照。 */
     fun observeRecentInteractionSummaries(limit: Int = 100): Flow<List<FactEntity>> = daos.factDao.observeRecentInteractions(System.currentTimeMillis(), limit)
+
+    fun observeInteractionIntensity(sinceEpochMs: Long): Flow<List<ContactInteractionIntensity>> =
+        daos.contactInteractionDao.observeIntensitySince(sinceEpochMs)
 
     /** 关系推断协调器的启动扫掠(同公司同事边/互动推断),关系页打开时补一次。 */
     fun sweepRelationshipInference() = relationshipInferenceSink()

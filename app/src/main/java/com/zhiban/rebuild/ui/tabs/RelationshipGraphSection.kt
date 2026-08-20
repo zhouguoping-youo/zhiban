@@ -116,6 +116,7 @@ import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.data.contact.SystemContactCandidate
 import com.zhiban.rebuild.data.contact.SystemContactWriteIntent
 import com.zhiban.rebuild.data.facts.FactEntity
+import com.zhiban.rebuild.data.interaction.ContactInteractionIntensity
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.OutgoingMessageAccessibilityService
 import com.zhiban.rebuild.data.notification.ScheduleInsight
@@ -164,6 +165,7 @@ internal fun RelationshipGraphState(
     historicalEdges: List<RelationshipEdgeEntity> = emptyList(),
     currentOwnerEmployment: PersonEmploymentEpisodeEntity? = null,
     ownerEmploymentHistoryCount: Int = 0,
+    interactionIntensity: List<ContactInteractionIntensity> = emptyList(),
     events: List<RelationshipEventWithParticipants>,
     canAddRelationship: Boolean,
     activeFilter: String?,
@@ -215,8 +217,13 @@ internal fun RelationshipGraphState(
     val visibleEdges = remember(allValidEdges, rootId) {
         allValidEdges.filter { it.fromContactId == rootId || it.toContactId == rootId }
     }
-    val graphProjection = remember(rootId, allValidEdges, peopleById) {
-        projectRelationshipGraph(rootId, peopleById.keys, allValidEdges)
+    val graphProjection = remember(rootId, allValidEdges, peopleById, interactionIntensity) {
+        projectRelationshipGraph(
+            rootId = rootId,
+            peopleIds = peopleById.keys,
+            edges = allValidEdges,
+            interactionIntensity = interactionIntensity,
+        )
     }
     val displayedEdges = graphProjection.edges
     val root = peopleById.getValue(rootId)

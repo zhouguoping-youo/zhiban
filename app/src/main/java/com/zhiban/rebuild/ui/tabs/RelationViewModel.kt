@@ -36,6 +36,7 @@ import com.zhiban.rebuild.data.contact.enrichment.CompanyEnrichmentRefresher
 import com.zhiban.rebuild.data.contact.normalizeContactPhone
 import com.zhiban.rebuild.data.crm.CrmOpportunityEntity
 import com.zhiban.rebuild.data.facts.FactEntity
+import com.zhiban.rebuild.data.interaction.ContactInteractionIntensity
 import com.zhiban.rebuild.data.notification.MessageCollectionPreferences
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.reply.ReplySuggestionRepository
@@ -89,6 +90,7 @@ data class RelationPageSnapshot(
     val enabledMessagePlatforms: Set<String> = MessageCollectionPreferences.DEFAULT_PLATFORMS,
     val outgoingMessageCollectionEnabled: Boolean = false,
     val recentInteractions: List<FactEntity> = emptyList(),
+    val interactionIntensity: List<ContactInteractionIntensity> = emptyList(),
 )
 
 private data class RelationInboxSnapshot(
@@ -98,6 +100,7 @@ private data class RelationInboxSnapshot(
     val importState: ContactImportUiState,
     val cloudAsrAvailability: CloudAsrAvailability,
     val recentInteractions: List<FactEntity>,
+    val interactionIntensity: List<ContactInteractionIntensity>,
 )
 
 private const val PLATFORM_WECHAT = "WECHAT"
@@ -159,6 +162,9 @@ class RelationViewModel @Inject constructor(
         repository.observeUnresolvedSourceIdentities()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val recentInteractions: StateFlow<List<FactEntity>> = repository.observeRecentInteractionSummaries(100)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    private val interactionIntensity: StateFlow<List<ContactInteractionIntensity>> = repository
+        .observeInteractionIntensity(System.currentTimeMillis() - 90L * 24L * 60L * 60L * 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val mergeSuggestions: StateFlow<List<ContactMergeSuggestion>> = combine(
         repository.observeRawContacts(),
@@ -270,12 +276,14 @@ class RelationViewModel @Inject constructor(
             Triple(ownerContactLinks, temporalEmployments, maintenanceOverview)
         },
         combine(
-            combine(recentInteractions, cloudAsrAvailability) { recentInteractions, cloudAsr -> recentInteractions to cloudAsr },
+            combine(recentInteractions, interactionIntensity, cloudAsrAvailability) { recentInteractions, intensity, cloudAsr ->
+                Triple(recentInteractions, intensity, cloudAsr)
+            },
             unresolvedSourceIdentities,
             notificationCandidates,
             pendingCallNotes,
             importState,
-        ) { (recentInteractions, cloudAsr), unresolvedSourceIdentities, notificationCandidates, pendingCallNotes, importState ->
+        ) { (recentInteractions, interactionIntensity, cloudAsr), unresolvedSourceIdentities, notificationCandidates, pendingCallNotes, importState ->
             RelationInboxSnapshot(
                 unresolvedSourceIdentities,
                 notificationCandidates,
@@ -283,6 +291,7 @@ class RelationViewModel @Inject constructor(
                 importState,
                 cloudAsr,
                 recentInteractions,
+                interactionIntensity,
             )
         },
         combine(enabledMessagePlatforms, outgoingMessageCollectionEnabled) { enabled, outgoing -> enabled to outgoing },
@@ -299,6 +308,7 @@ class RelationViewModel @Inject constructor(
             enabledMessagePlatforms = collection.first,
             outgoingMessageCollectionEnabled = collection.second,
             recentInteractions = inbox.recentInteractions,
+            interactionIntensity = inbox.interactionIntensity,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RelationPageSnapshot())
 

@@ -11,6 +11,7 @@ import androidx.room.Query
 import com.zhiban.rebuild.data.calllog.CallRecordEntity
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
+import kotlinx.coroutines.flow.Flow
 
 object InteractionSourceType {
     const val FACT = "FACT"
@@ -53,6 +54,8 @@ data class ContactInteractionEntity(
 )
 
 data class ContactInteractionRecency(val contactId: String, val lastInteractionAtEpochMs: Long?, val silenceDays: Long?)
+
+data class ContactInteractionIntensity(val contactId: String, val interactionCount: Int, val lastInteractionAtEpochMs: Long?)
 
 data class UnobservedReplyFollowUp(val contactId: String, val displayName: String, val outgoingSourceId: String, val outgoingAtEpochMs: Long)
 
@@ -99,6 +102,24 @@ interface ContactInteractionDao {
         LIMIT :limit OFFSET :offset""",
     )
     suspend fun contactRecencyPage(nowEpochMs: Long, limit: Int, offset: Int): List<ContactInteractionRecency>
+
+    @Query(
+        """SELECT COALESCE(
+            (SELECT canonicalContactId FROM contact_merge_links
+             WHERE sourceContactId = interaction.contactId AND undoneAtEpochMs IS NULL),
+            interaction.contactId
+        ) AS contactId,
+        COUNT(*) AS interactionCount,
+        MAX(interaction.occurredAtEpochMs) AS lastInteractionAtEpochMs
+        FROM contact_interactions interaction
+        WHERE interaction.occurredAtEpochMs >= :sinceEpochMs
+        GROUP BY COALESCE(
+            (SELECT canonicalContactId FROM contact_merge_links
+             WHERE sourceContactId = interaction.contactId AND undoneAtEpochMs IS NULL),
+            interaction.contactId
+        )""",
+    )
+    fun observeIntensitySince(sinceEpochMs: Long): Flow<List<ContactInteractionIntensity>>
 
     @Query(
         """SELECT contact.contactId AS contactId, contact.displayName AS displayName,
