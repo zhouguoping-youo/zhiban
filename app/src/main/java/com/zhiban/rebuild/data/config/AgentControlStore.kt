@@ -7,8 +7,8 @@ import javax.inject.Singleton
 
 data class MemoryPolicy(
     val sessionMemoryEnabled: Boolean = true,
-    val longTermMemoryEnabled: Boolean = true,
-    val learnFromConversations: Boolean = true,
+    val longTermMemoryEnabled: Boolean = false,
+    val learnFromConversations: Boolean = false,
     val temporaryModeEnabled: Boolean = false,
 )
 data class FeedbackPolicy(val useHumanFeedback: Boolean = true, val allowPreferenceImprovement: Boolean = true)
@@ -27,8 +27,8 @@ class AgentControlStore internal constructor(context: Context, prefsName: String
     private val store = context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
     fun memory() = MemoryPolicy(
         sessionMemoryEnabled = store.getBoolean("session_memory", true),
-        longTermMemoryEnabled = store.getBoolean("long_term_memory", true),
-        learnFromConversations = store.getBoolean("learn_from_conversations", true),
+        longTermMemoryEnabled = store.getBoolean("long_term_memory", false),
+        learnFromConversations = store.getBoolean("learn_from_conversations", false),
         temporaryModeEnabled = store.getBoolean("temporary_memory_mode", false),
     )
     fun saveMemory(value: MemoryPolicy) {
@@ -45,7 +45,7 @@ class AgentControlStore internal constructor(context: Context, prefsName: String
         if (!isToolEnabled(name)) return false
         val policy = memory()
         return name !in setOf("memory.remember", "memory.upsert") ||
-            (policy.learnFromConversations && !policy.temporaryModeEnabled)
+            (policy.longTermMemoryEnabled && policy.learnFromConversations && !policy.temporaryModeEnabled)
     }
     fun feedback() = FeedbackPolicy(store.getBoolean("human_feedback", true), store.getBoolean("preference_improvement", true))
     fun saveFeedback(value: FeedbackPolicy) {

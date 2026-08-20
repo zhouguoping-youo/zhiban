@@ -7,6 +7,7 @@ import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.memory.StagedMemoryCandidateEntity
 import com.zhiban.rebuild.data.store.RuntimeEventEntity
 import com.zhiban.rebuild.data.store.RuntimeToolExecutionEntity
+import com.zhiban.rebuild.provider.ProviderFailure
 import com.zhiban.rebuild.provider.SecretRedactor
 import com.zhiban.rebuild.runtime.context.attemptRetrieval
 import com.zhiban.rebuild.runtime.input.asr.PrivacyConsent
@@ -27,7 +28,7 @@ internal class RoomMemoryToolExecutor(
     // Per派单 C+ (SOUL.md boundary 7): user data write requires explicit
     // privacy consent before any Room mutation. The gate is a lambda so
     // tests can drive it without a real consent store.
-    private val privacyConsent: () -> PrivacyConsent = { PrivacyConsent.Granted },
+    private val privacyConsent: () -> PrivacyConsent = { PrivacyConsent.NotGranted },
     // Per派单 C+: approval payload is sanitized via the existing
     // SecretRedactor before parsing. The redaction is best-effort: known
     // secrets (bearer tokens, api keys) are masked before any inner
@@ -146,22 +147,11 @@ private fun memorySafeResult(memoryId: String) = buildJsonObject {
 internal data class ApprovedMemoryRecallResult(val items: List<String>, val degradationReasons: List<String> = emptyList())
 
 /**
- * Boundary violation raised by [RoomMemoryToolExecutor] when the runtime
- * consent gate refuses a user data write. Per SOUL.md boundary 7 we must
- * stop the write and surface the reason to the caller so the UI can
- * prompt the user rather than silently persisting.
- */
-class ToolExecutionException(message: String) : Exception(message)
-
-/**
- * Pure-JVM boundary check. Per派单 C+ (SOUL.md boundary 7) `memory.remember`
- * is a user data write; we must refuse it when the runtime has not
- * recorded `PrivacyConsent.Granted`. The check is extracted from
- * [RoomMemoryToolExecutor] so it can be unit-tested without standing
- * up a Room database.
+ * Shared boundary check for durable memory writes. It is deliberately outside the executors so
+ * both the legacy confirmed path and the reversible upsert path enforce the same user consent.
  */
 internal fun checkMemoryToolConsent(consent: PrivacyConsent) {
     if (consent != PrivacyConsent.Granted) {
-        throw ToolExecutionException("CONSENT_REQUIRED")
+        throw ProviderFailure("MEMORY_CONSENT_REQUIRED", retryable = false)
     }
 }

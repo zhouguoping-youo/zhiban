@@ -46,6 +46,7 @@ import com.zhiban.rebuild.runtime.governance.ChangeUndoCoordinator
 import com.zhiban.rebuild.runtime.governance.ContactDomainWriter
 import com.zhiban.rebuild.runtime.governance.ContactIdentityResolutionDomainWriter
 import com.zhiban.rebuild.runtime.governance.RelationshipDomainWriter
+import com.zhiban.rebuild.runtime.input.asr.PrivacyConsent
 import com.zhiban.rebuild.runtime.memory.RoomMemoryGate
 import com.zhiban.rebuild.runtime.network.NetworkQuality
 import com.zhiban.rebuild.runtime.spi.RuntimeRunStatus
@@ -240,7 +241,10 @@ internal class ProviderExecutionEngine(
         externalConflicts = externalCalendarConflicts,
         onScheduleSaved = onScheduleSaved,
     )
-    private val memoryExecutor = RoomMemoryToolExecutor({ database }, clock)
+    private val memoryWriteConsent = {
+        if (memoryPolicy().longTermMemoryEnabled) PrivacyConsent.Granted else PrivacyConsent.NotGranted
+    }
+    private val memoryExecutor = RoomMemoryToolExecutor({ database }, clock, memoryWriteConsent)
     private val crmExecutor = RoomCrmToolExecutor(database, store)
     private val perceptionPipeline: PerceptionGateway = perception ?: RoomPerceptionPipeline(database, clock)
     internal val retrievalPipeline = RoomContextRetrievalPipeline(
@@ -283,7 +287,7 @@ internal class ProviderExecutionEngine(
             MemoryUpsertToolBinding(
                 toolCatalog.requireRegistered(MemoryUpsertToolBinding.TOOL_NAME),
                 store,
-                MemoryUpsertDomainWriter(database, store),
+                MemoryUpsertDomainWriter(database, store, memoryWriteConsent),
             ),
             MemorySearchToolBinding(toolCatalog.requireRegistered("memory.search"), RoomMemoryGate(database, clock)),
             MemoryDeleteToolBinding(toolCatalog.requireRegistered("memory.delete"), store),
@@ -1021,6 +1025,7 @@ internal class ProviderExecutionEngine(
             "INSUFFICIENT_QUOTA", "INPUT_SENSITIVE", "OUTPUT_SENSITIVE", "INVALID_REQUEST",
             // 定位读取未开启(默认关):告诉用户去哪开,而不是给个兜底失败文案。
             "LOCATION_CONSENT_REQUIRED",
+            "MEMORY_CONSENT_REQUIRED",
         )
         val ENGLISH_CALLED_TITLE = Regex(
             """\bcalled\s+(.+?)(?=,\s*remind\b|,\s*with\b|[.!?]\s*$|$)""",

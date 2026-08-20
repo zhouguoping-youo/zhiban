@@ -91,6 +91,7 @@ object AgentProjectionUiMapper {
         safeFailureCode == "INVALID_TOOL_CALL" -> "AI 没有生成可安全执行的操作，请换一种说法重新发送。"
         safeFailureCode == "TARGET_APP_UNAVAILABLE" -> "没有找到目标消息应用，或该应用暂时无法打开。请确认已安装并登录后重试。"
         safeFailureCode == "LOCATION_CONSENT_REQUIRED" -> "定位读取还没开启，请到“设置 → 隐私与安全 → 定位”打开开关后再试。"
+        safeFailureCode == "MEMORY_CONSENT_REQUIRED" -> "长期记忆尚未开启，请到“我的 → 智能体设置 → 记忆”开启后重试。"
         safeFailureCode != null -> "大模型暂时无法完成请求，请稍后重试。"
         else -> null
     }

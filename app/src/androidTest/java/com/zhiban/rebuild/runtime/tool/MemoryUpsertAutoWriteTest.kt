@@ -7,6 +7,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.autowrite.AutoWriteRepository
 import com.zhiban.rebuild.data.store.RuntimeAttemptEntity
+import com.zhiban.rebuild.provider.ProviderFailure
+import com.zhiban.rebuild.runtime.input.asr.PrivacyConsent
 import com.zhiban.rebuild.runtime.kernel.PersistentRuntimeKernel
 import com.zhiban.rebuild.runtime.kernel.RuntimeSignal
 import com.zhiban.rebuild.runtime.store.RoomRuntimeStore
@@ -43,7 +45,7 @@ class MemoryUpsertAutoWriteTest {
         val route = routeContext()
         val plan = plan(route)
 
-        val result = MemoryUpsertDomainWriter(database, store).executeAuto(plan, route)
+        val result = MemoryUpsertDomainWriter(database, store) { PrivacyConsent.Granted }.executeAuto(plan, route)
 
         assertEquals(
             listOf("回答时先给结论"),
@@ -71,7 +73,7 @@ class MemoryUpsertAutoWriteTest {
         val binding = MemoryUpsertToolBinding(
             RuntimeToolCatalog.production().requireRegistered(MemoryUpsertToolBinding.TOOL_NAME),
             store,
-            MemoryUpsertDomainWriter(database, store),
+            MemoryUpsertDomainWriter(database, store) { PrivacyConsent.Granted },
         )
 
         val lowConfidence = binding.reversibleWriteReadiness(request(0.8, "回答时先给结论"), route)
@@ -81,6 +83,19 @@ class MemoryUpsertAutoWriteTest {
         assertEquals("auto_write:evidence_insufficient", lowConfidence.reasonCode())
         assertFalse(directIdentifier.ready)
         assertEquals("auto_write:policy_rejected", directIdentifier.reasonCode())
+    }
+
+    @Test
+    fun missingConsentRejectsAutoWriteWithoutPersistingMemoryOrAudit() = runBlocking {
+        val route = routeContext()
+        val failure = runCatching {
+            MemoryUpsertDomainWriter(database, store).executeAuto(plan(route), route)
+        }.exceptionOrNull()
+
+        assertTrue(failure is ProviderFailure)
+        assertEquals("MEMORY_CONSENT_REQUIRED", (failure as ProviderFailure).code)
+        assertTrue(database.memoryPersistenceDao().recall(RoomMemoryToolExecutor.GLOBAL_NAMESPACE, 100).isEmpty())
+        assertTrue(database.changeLogDao().listByRun(route.runId).isEmpty())
     }
 
     private fun request(confidence: Double, content: String) = RuntimeToolCallRequest(

@@ -12,6 +12,7 @@ import com.zhiban.rebuild.foundation.RuntimeToolRisk
 import com.zhiban.rebuild.foundation.RuntimeToolSpec
 import com.zhiban.rebuild.provider.OutboundPiiDetector
 import com.zhiban.rebuild.provider.ProviderFailure
+import com.zhiban.rebuild.runtime.input.asr.PrivacyConsent
 import com.zhiban.rebuild.runtime.memory.MemoryAtomicStore
 import com.zhiban.rebuild.runtime.memory.MemoryUpsertRequest
 import com.zhiban.rebuild.runtime.store.ApprovedToolExecutionRequest
@@ -142,44 +143,54 @@ internal class MemoryUpsertToolBinding(override val spec: RuntimeToolSpec, priva
     }
 }
 
-internal class MemoryUpsertDomainWriter(private val database: AgentDatabase, private val store: RoomRuntimeStore) {
-    suspend fun executeAuto(plan: JsonObject, context: RuntimeToolRouteContext): RoutedToolResult = database.withTransaction {
-        val result = mutate(plan, context.nowEpochMs, auto = true, runtimeRunId = context.runId)
-        store.completeReadOnlyTool(
-            context.runId,
-            plan.requiredText("providerCallId"),
-            MemoryUpsertToolBinding.TOOL_NAME,
-            1,
-            plan.requiredText("canonicalInputDigest"),
-            result.safeResultJson,
-            context.ownerId,
-            context.fencingEpoch,
-            context.nowEpochMs,
-        )
-        result
-    }
-
-    suspend fun executeApproved(plan: JsonObject, context: ConfirmedToolExecutionContext): RoutedToolResult = database.withTransaction {
-        val approval = database.runtimeEventDao().latestByType(context.runId, "ApprovalRequested")
-            ?: throw ToolPolicyRejectedException("memory approval is missing")
-        require(approval.payloadJson.contains(plan.requiredText("proposalId")))
-        val result = mutate(plan, context.nowEpochMs, auto = false, runtimeRunId = context.runId)
-        store.completeApprovedRemoteTool(
-            ApprovedToolExecutionRequest(
+internal class MemoryUpsertDomainWriter(
+    private val database: AgentDatabase,
+    private val store: RoomRuntimeStore,
+    private val privacyConsent: () -> PrivacyConsent = { PrivacyConsent.NotGranted },
+) {
+    suspend fun executeAuto(plan: JsonObject, context: RuntimeToolRouteContext): RoutedToolResult {
+        checkMemoryToolConsent(privacyConsent())
+        return database.withTransaction {
+            val result = mutate(plan, context.nowEpochMs, auto = true, runtimeRunId = context.runId)
+            store.completeReadOnlyTool(
                 context.runId,
                 plan.requiredText("providerCallId"),
-                plan.requiredText("logicalStepId"),
                 MemoryUpsertToolBinding.TOOL_NAME,
                 1,
                 plan.requiredText("canonicalInputDigest"),
-                plan.requiredText("idempotencyKey"),
                 result.safeResultJson,
                 context.ownerId,
                 context.fencingEpoch,
                 context.nowEpochMs,
-            ),
-        )
-        result
+            )
+            result
+        }
+    }
+
+    suspend fun executeApproved(plan: JsonObject, context: ConfirmedToolExecutionContext): RoutedToolResult {
+        checkMemoryToolConsent(privacyConsent())
+        return database.withTransaction {
+            val approval = database.runtimeEventDao().latestByType(context.runId, "ApprovalRequested")
+                ?: throw ToolPolicyRejectedException("memory approval is missing")
+            require(approval.payloadJson.contains(plan.requiredText("proposalId")))
+            val result = mutate(plan, context.nowEpochMs, auto = false, runtimeRunId = context.runId)
+            store.completeApprovedRemoteTool(
+                ApprovedToolExecutionRequest(
+                    context.runId,
+                    plan.requiredText("providerCallId"),
+                    plan.requiredText("logicalStepId"),
+                    MemoryUpsertToolBinding.TOOL_NAME,
+                    1,
+                    plan.requiredText("canonicalInputDigest"),
+                    plan.requiredText("idempotencyKey"),
+                    result.safeResultJson,
+                    context.ownerId,
+                    context.fencingEpoch,
+                    context.nowEpochMs,
+                ),
+            )
+            result
+        }
     }
 
     private suspend fun mutate(plan: JsonObject, now: Long, auto: Boolean, runtimeRunId: String): RoutedToolResult {

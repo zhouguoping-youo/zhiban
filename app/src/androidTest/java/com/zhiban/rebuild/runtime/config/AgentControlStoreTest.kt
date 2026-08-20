@@ -4,6 +4,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.config.AgentControlStore
 import com.zhiban.rebuild.data.config.ExecutionPreference
+import com.zhiban.rebuild.data.config.MemoryPolicy
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -42,6 +43,21 @@ class AgentControlStoreTest {
         assertTrue(!controls.isToolEnabled("memory.search"))
         controls.saveToolEnabled("memory.search", true)
         assertTrue(controls.isToolEnabled("memory.search"))
+    }
+
+    @Test fun memoryWritesDefaultOffAndRequireExplicitLongTermLearningConsent() {
+        val defaults = controls.memory()
+        assertTrue(!defaults.longTermMemoryEnabled)
+        assertTrue(!defaults.learnFromConversations)
+        assertTrue(!controls.isToolAvailable("memory.remember"))
+        assertTrue(!controls.isToolAvailable("memory.upsert"))
+
+        controls.saveMemory(defaults.copy(longTermMemoryEnabled = true))
+        assertTrue(!controls.isToolAvailable("memory.upsert"))
+
+        controls.saveMemory(MemoryPolicy(longTermMemoryEnabled = true, learnFromConversations = true))
+        assertTrue(controls.isToolAvailable("memory.remember"))
+        assertTrue(controls.isToolAvailable("memory.upsert"))
     }
 
     @Test fun webSearchDefaultsOnAndOptOutPersists() {
