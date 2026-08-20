@@ -181,6 +181,13 @@ class ForceRelationshipGraphTest {
     }
 
     @Test
+    fun `same node taps inside gesture window switch ego`() {
+        assertTrue(isRelationshipGraphDoubleTap("contact", "contact", 1_000L, 1_200L))
+        assertTrue(isRelationshipGraphDoubleTap("contact", "other", 1_000L, 1_200L).not())
+        assertTrue(isRelationshipGraphDoubleTap("contact", "contact", 1_000L, 1_400L).not())
+    }
+
+    @Test
     fun `large graphs avoid quadratic repulsion and remain finite`() {
         val bodies = seedForceBodies(
             nodeIds = (0 until 500).map { "node-$it" },

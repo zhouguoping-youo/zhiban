@@ -1,5 +1,6 @@
 package com.zhiban.rebuild.ui.tabs
 
+import android.os.SystemClock
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
@@ -356,6 +357,8 @@ internal fun ForceRelationshipGraphCanvas(
     var graphScale by remember(rootId) { mutableFloatStateOf(1f) }
     var graphOffset by remember(rootId) { mutableStateOf(Offset.Zero) }
     var selectedNodeId by remember { mutableStateOf<String?>(null) }
+    var lastTapNodeId by remember { mutableStateOf<String?>(null) }
+    var lastTapAtEpochMs by remember { mutableStateOf(0L) }
     var simulationPulse by remember { mutableIntStateOf(0) }
     var viewportAnimationJob by remember { mutableStateOf<Job?>(null) }
     val scope = rememberCoroutineScope()
@@ -497,7 +500,9 @@ internal fun ForceRelationshipGraphCanvas(
                                     ?.key
                                 var movedDistance = 0f
                                 var nodeDragging = false
+                                var longPressed = false
                                 var pinching = false
+                                val downAtEpochMs = SystemClock.uptimeMillis()
                                 var hasPressedPointers: Boolean
                                 do {
                                     val event = awaitPointerEvent(pass = PointerEventPass.Initial)
@@ -518,6 +523,12 @@ internal fun ForceRelationshipGraphCanvas(
                                         val change = pressed.first()
                                         val delta = change.position - change.previousPosition
                                         movedDistance += hypot(delta.x, delta.y)
+                                        if (activeNodeId != null && !nodeDragging && !longPressed &&
+                                            SystemClock.uptimeMillis() - downAtEpochMs >= 500L
+                                        ) {
+                                            longPressed = true
+                                            nodeDragging = true
+                                        }
                                         if (activeNodeId != null && (nodeDragging || movedDistance > touchSlop)) {
                                             nodeDragging = true
                                             bodies[activeNodeId]?.let { body ->
@@ -533,9 +544,18 @@ internal fun ForceRelationshipGraphCanvas(
                                     }
                                 } while (hasPressedPointers)
                                 activeNodeId?.let { bodies[it]?.dragged = false }
-                                if (!pinching && !nodeDragging && activeNodeId != null) {
+                                if (!pinching && !nodeDragging && !longPressed && activeNodeId != null) {
                                     selectedNodeId = activeNodeId
                                     focusNode(activeNodeId)
+                                    val now = SystemClock.uptimeMillis()
+                                    if (isRelationshipGraphDoubleTap(lastTapNodeId, activeNodeId, lastTapAtEpochMs, now)) {
+                                        lastTapNodeId = null
+                                        lastTapAtEpochMs = 0L
+                                        onSwitchEgo?.invoke(activeNodeId)
+                                    } else {
+                                        lastTapNodeId = activeNodeId
+                                        lastTapAtEpochMs = now
+                                    }
                                 } else if (nodeDragging && model.nodes.size <= FORCE_PAIRWISE_NODE_LIMIT) {
                                     simulationPulse += 1
                                 }
@@ -752,7 +772,7 @@ internal fun ForceRelationshipGraphCanvas(
                         modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.primary,
                     )
-                    Text("点节点查看 · 拖动画布 · 双指缩放", style = MaterialTheme.typography.labelSmall)
+                    Text("单击详情 · 双击切换视角 · 长按拖动 · 双指缩放", style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
