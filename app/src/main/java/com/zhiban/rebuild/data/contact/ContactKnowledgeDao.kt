@@ -167,6 +167,19 @@ interface ContactKnowledgeDao {
     fun observeAllImportantDates(): Flow<List<ContactImportantDateProjection>>
 
     @Query(
+        """SELECT date.dateId, canonical.contactId, canonical.displayName, date.kind, date.year,
+           date.month, date.day, date.source, date.evidenceRef, date.userConfirmed, date.updatedAtEpochMs
+           FROM contact_important_dates date
+           INNER JOIN contacts source ON source.contactId = date.contactId
+           LEFT JOIN contact_merge_links link
+             ON link.sourceContactId = source.contactId AND link.undoneAtEpochMs IS NULL
+           INNER JOIN contacts canonical ON canonical.contactId = COALESCE(link.canonicalContactId, source.contactId)
+           WHERE canonical.deletedAtEpochMs IS NULL
+           ORDER BY date.userConfirmed DESC, date.updatedAtEpochMs DESC""",
+    )
+    suspend fun listAllImportantDates(): List<ContactImportantDateProjection>
+
+    @Query(
         """SELECT * FROM contact_facets WHERE contactId = :contactId OR contactId IN (
         SELECT sourceContactId FROM contact_merge_links WHERE canonicalContactId = :contactId AND undoneAtEpochMs IS NULL
     ) ORDER BY dimension, userConfirmed DESC, value""",

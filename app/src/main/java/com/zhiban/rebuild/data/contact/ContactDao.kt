@@ -473,6 +473,13 @@ interface RelationshipEdgeDao {
     @Query("SELECT * FROM relationship_edges WHERE edgeId = :edgeId")
     suspend fun find(edgeId: String): RelationshipEdgeEntity?
 
+    @Query(
+        "SELECT * FROM relationship_edges WHERE status = 'ACTIVE' AND " +
+            "((fromContactId = :firstId AND toContactId = :secondId) OR " +
+            "(fromContactId = :secondId AND toContactId = :firstId)) LIMIT 1",
+    )
+    suspend fun findActiveBetween(firstId: String, secondId: String): RelationshipEdgeEntity?
+
     @Query("DELETE FROM relationship_edges WHERE edgeId = :edgeId AND userConfirmed = 1")
     suspend fun deleteConfirmed(edgeId: String): Int
 

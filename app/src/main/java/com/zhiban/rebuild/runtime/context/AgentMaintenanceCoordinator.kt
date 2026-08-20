@@ -2,10 +2,12 @@ package com.zhiban.rebuild.runtime.context
 
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.CrmAgentDataRepository
+import com.zhiban.rebuild.data.contact.CommonGroupRelationshipScanner
 import com.zhiban.rebuild.data.facts.FactIndex
 import com.zhiban.rebuild.data.interaction.SilentContactSuggestionScanner
 import com.zhiban.rebuild.data.interaction.UnobservedReplySuggestionScanner
 import com.zhiban.rebuild.data.suggestion.AgentSuggestionNotifier
+import com.zhiban.rebuild.data.suggestion.ImportantDateSuggestionScanner
 import com.zhiban.rebuild.runtime.memory.RoomMemoryGate
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -24,6 +26,10 @@ data class AgentMaintenanceResult(
     val agentSuggestionsExpired: Int = 0,
     val silenceSuggestionsCreated: Int = 0,
     val unobservedReplySuggestionsCreated: Int = 0,
+    val importantDateSuggestionsCreated: Int = 0,
+    val commonGroupEdgesCreated: Int = 0,
+    val retiredLegacyRunsDeleted: Int = 0,
+    val retiredLegacyMemoriesDeleted: Int = 0,
     val degradationReasons: Set<String> = emptySet(),
 )
 
@@ -35,6 +41,8 @@ internal class AgentMaintenanceCoordinator @Inject constructor(
     private val suggestionNotifier: AgentSuggestionNotifier,
     private val silentContactScanner: SilentContactSuggestionScanner,
     private val unobservedReplyScanner: UnobservedReplySuggestionScanner,
+    private val importantDateScanner: ImportantDateSuggestionScanner,
+    private val commonGroupScanner: CommonGroupRelationshipScanner,
 ) {
     suspend fun run(nowEpochMs: Long = System.currentTimeMillis()): AgentMaintenanceResult {
         val facts = FactIndex(database)
@@ -73,6 +81,19 @@ internal class AgentMaintenanceCoordinator @Inject constructor(
         suggestionNotifier.publishScheduleEscalation(imminentSchedules, nowEpochMs)
         val silenceSuggestionsCreated = if (silentContactScanner.scan(nowEpochMs)) 1 else 0
         val unobservedReplySuggestionsCreated = unobservedReplyScanner.scan(nowEpochMs)
+        val importantDateSuggestionsCreated = importantDateScanner.scan(nowEpochMs)
+        val commonGroupEdgesCreated = commonGroupScanner.scan(nowEpochMs)
+        val retirementCutoff = nowEpochMs - LEGACY_DATA_RETENTION_MS
+        var retiredLegacyRunsDeleted = 0
+        do {
+            val batch = database.agentRunDao().deleteRetiredBefore(retirementCutoff, nowEpochMs, MAINTENANCE_BATCH_SIZE)
+            retiredLegacyRunsDeleted += batch
+        } while (batch == MAINTENANCE_BATCH_SIZE)
+        var retiredLegacyMemoriesDeleted = 0
+        do {
+            val batch = database.memoryDao().deleteOrphanedRunSummariesBefore(retirementCutoff, MAINTENANCE_BATCH_SIZE)
+            retiredLegacyMemoriesDeleted += batch
+        } while (batch == MAINTENANCE_BATCH_SIZE)
         // One provider-batched chunk per startup. 128 records closes large-library backlogs
         // four times faster than the old 32-row cycle without exceeding the 256-input API cap.
         val degradationReasons = try {
@@ -96,6 +117,10 @@ internal class AgentMaintenanceCoordinator @Inject constructor(
             agentSuggestionsExpired = agentSuggestionsExpired,
             silenceSuggestionsCreated = silenceSuggestionsCreated,
             unobservedReplySuggestionsCreated = unobservedReplySuggestionsCreated,
+            importantDateSuggestionsCreated = importantDateSuggestionsCreated,
+            commonGroupEdgesCreated = commonGroupEdgesCreated,
+            retiredLegacyRunsDeleted = retiredLegacyRunsDeleted,
+            retiredLegacyMemoriesDeleted = retiredLegacyMemoriesDeleted,
             degradationReasons = degradationReasons,
         )
     }
@@ -109,5 +134,6 @@ internal class AgentMaintenanceCoordinator @Inject constructor(
         const val EMBEDDING_BACKFILL_BATCH_SIZE = 128
         const val AGENT_SUGGESTION_TTL_MS = 7L * 24 * 60 * 60 * 1_000
         const val SCHEDULE_ESCALATION_WINDOW_MS = 24L * 60 * 60 * 1_000
+        const val LEGACY_DATA_RETENTION_MS = 180L * 24 * 60 * 60 * 1_000
     }
 }

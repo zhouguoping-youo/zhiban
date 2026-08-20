@@ -38,9 +38,17 @@ class AgentSuggestionRepository @Inject internal constructor(
      * 那会整行覆盖，破坏已流转的 PENDING→ACCEPTED/DISMISSED 状态。
      */
     suspend fun insert(suggestion: AgentSuggestionEntity): Boolean {
-        val inserted = database.agentSuggestionDao().insert(suggestion) != -1L
+        val dao = database.agentSuggestionDao()
+        val feedback = dao.feedbackStats(
+            suggestion.type,
+            suggestion.contactId,
+            suggestion.createdAtEpochMs - SUGGESTION_FEEDBACK_WINDOW_MS,
+        )
+        val adjustment = SuggestionFeedbackPolicy.adjustment(feedback)
+        val prepared = suggestion.copy(priorityScore = adjustment.adjustedPriority(suggestion.priorityScore))
+        val inserted = dao.insert(prepared) != -1L
         if (inserted) {
-            notifier.publish(database.agentSuggestionDao().pendingCount(), suggestion.contactId)
+            notifier.publish(dao.pendingCount(), prepared.contactId)
         }
         return inserted
     }

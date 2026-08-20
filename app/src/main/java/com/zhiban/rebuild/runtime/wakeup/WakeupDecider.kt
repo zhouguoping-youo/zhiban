@@ -4,6 +4,7 @@ import com.zhiban.rebuild.data.config.WakeupQuietHours
 import com.zhiban.rebuild.data.config.WakeupThrottleState
 import com.zhiban.rebuild.data.notification.MessagePlatformCapabilities
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
+import com.zhiban.rebuild.data.suggestion.SuggestionFeedbackAdjustment
 import com.zhiban.rebuild.foundation.sha256
 import java.time.LocalTime
 
@@ -48,6 +49,18 @@ internal object WakeupDecider {
         nowEpochMs: Long,
         throttle: WakeupThrottle,
         quietHours: WakeupQuietHours = WakeupQuietHours(),
+        feedback: SuggestionFeedbackAdjustment = SuggestionFeedbackAdjustment(),
+    ): WakeupDecision {
+        val classified = classify(candidate, hasOpenCrmOpportunity, nowEpochMs, quietHours)
+        if (classified !is WakeupDecision.Wake) return classified
+        return applyThrottle(candidate, classified, nowEpochMs, throttle, feedback)
+    }
+
+    fun classify(
+        candidate: NotificationCandidateEntity,
+        hasOpenCrmOpportunity: Boolean,
+        nowEpochMs: Long,
+        quietHours: WakeupQuietHours = WakeupQuietHours(),
     ): WakeupDecision {
         if (!candidate.incomingAndCapable()) return WakeupDecision.Skip("platform_not_wakeup_capable")
         if (isQuietHour(nowEpochMs, quietHours)) return WakeupDecision.Skip("night_quiet_hours")
@@ -59,9 +72,22 @@ internal object WakeupDecider {
         val reason = resolveWakeReason(candidate, body, linkedContactId, hasOpenCrmOpportunity)
             ?: return WakeupDecision.Skip("rules_sufficient")
 
-        val throttleKey = linkedContactId ?: "unlinked:${candidate.senderName ?: candidate.conversationTitle ?: "unknown"}"
-        if (!throttle.tryAcquire(throttleKey, nowEpochMs)) return WakeupDecision.Skip("throttled")
         return WakeupDecision.Wake(reason, linkedContactId)
+    }
+
+    fun applyThrottle(
+        candidate: NotificationCandidateEntity,
+        decision: WakeupDecision.Wake,
+        nowEpochMs: Long,
+        throttle: WakeupThrottle,
+        feedback: SuggestionFeedbackAdjustment = SuggestionFeedbackAdjustment(),
+    ): WakeupDecision {
+        val linkedContactId = decision.contactId
+        val throttleKey = linkedContactId ?: "unlinked:${candidate.senderName ?: candidate.conversationTitle ?: "unknown"}"
+        if (!throttle.tryAcquire(throttleKey, nowEpochMs, feedback.throttleWindowPercent)) {
+            return WakeupDecision.Skip("throttled")
+        }
+        return decision
     }
 
     private fun resolveWakeReason(candidate: NotificationCandidateEntity, body: String, linkedContactId: String?, hasOpenCrmOpportunity: Boolean): String? =
@@ -114,7 +140,7 @@ sealed interface WakeupDecision {
     data class Skip(val reason: String) : WakeupDecision
 }
 
-/** 进程内节流状态：同联系人 30 分钟 + 全局每小时 8 次。进程重启即清零，可接受（唤醒是尽力而为的增值路径）。 */
+/** 唤醒节流：同联系人默认 30 分钟、全局每小时 8 次；状态由调用方持久化，反馈可动态调整联系人窗口。 */
 internal class WakeupThrottle(
     private val perContactWindowMs: Long = 30L * 60 * 1_000,
     private val globalWindowMs: Long = 60L * 60 * 1_000,
@@ -127,10 +153,11 @@ internal class WakeupThrottle(
     private val globalWakes = ArrayDeque(initial.globalWakes.sorted())
 
     @Synchronized
-    fun tryAcquire(contactKey: String, nowEpochMs: Long): Boolean {
+    fun tryAcquire(contactKey: String, nowEpochMs: Long, windowPercent: Int = 100): Boolean {
         val persistedKey = sha256(contactKey)
+        val effectiveWindowMs = perContactWindowMs * windowPercent.coerceIn(25, 1_200) / 100
         lastWakePerContact[persistedKey]?.let { last ->
-            if (nowEpochMs - last < perContactWindowMs) return false
+            if (nowEpochMs - last < effectiveWindowMs) return false
         }
         while (globalWakes.isNotEmpty() && nowEpochMs - globalWakes.first() >= globalWindowMs) globalWakes.removeFirst()
         if (globalWakes.size >= globalLimit) return false

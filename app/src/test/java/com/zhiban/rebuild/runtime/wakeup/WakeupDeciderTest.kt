@@ -3,6 +3,7 @@ package com.zhiban.rebuild.runtime.wakeup
 import com.zhiban.rebuild.data.config.WakeupQuietHours
 import com.zhiban.rebuild.data.config.WakeupThrottleState
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
+import com.zhiban.rebuild.data.suggestion.SuggestionFeedbackAdjustment
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -53,7 +54,8 @@ class WakeupDeciderTest {
         nowEpochMs: Long = noon,
         throttle: WakeupThrottle = WakeupThrottle(),
         quietHours: WakeupQuietHours = WakeupQuietHours(),
-    ) = WakeupDecider.decide(candidate, hasOpenCrmOpportunity, nowEpochMs, throttle, quietHours)
+        feedback: SuggestionFeedbackAdjustment = SuggestionFeedbackAdjustment(),
+    ) = WakeupDecider.decide(candidate, hasOpenCrmOpportunity, nowEpochMs, throttle, quietHours, feedback)
 
     // ---- 四条件唤醒 ----
 
@@ -232,6 +234,19 @@ class WakeupDeciderTest {
 
         val afterRestart = WakeupThrottle(stateLoader = { persisted }, stateSaver = { persisted = it })
         assertFalse(afterRestart.tryAcquire("ct-1", noon + 10 * 60 * 1_000))
+    }
+
+    @Test
+    fun `连续忽略把同类型联系人唤醒窗口延长四倍`() {
+        val throttle = WakeupThrottle()
+        val c = candidate(body = "在吗", linkedContactId = "ct-1", identityDriftJson = "{}")
+        val downranked = SuggestionFeedbackAdjustment(priorityDelta = -20, throttleWindowPercent = 400)
+        assertTrue(decide(c, throttle = throttle, feedback = downranked) is WakeupDecision.Wake)
+        assertEquals(
+            WakeupDecision.Skip("throttled"),
+            decide(c, throttle = throttle, feedback = downranked, nowEpochMs = noon + 60 * 60 * 1_000),
+        )
+        assertTrue(decide(c, throttle = throttle, feedback = downranked, nowEpochMs = noon + 121 * 60 * 1_000) is WakeupDecision.Wake)
     }
 
     @Test

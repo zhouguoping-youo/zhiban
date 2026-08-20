@@ -39,6 +39,19 @@ interface ContactIntelligenceDao {
     @Query("SELECT * FROM group_membership_episodes WHERE groupId = :groupId AND status = 'ACTIVE'")
     suspend fun membershipsForGroup(groupId: String): List<GroupMembershipEpisodeEntity>
 
+    @Query(
+        """SELECT membership.groupId AS groupId, person.canonicalContactId AS contactId
+           FROM group_membership_episodes membership
+           INNER JOIN source_identities identity ON identity.sourceIdentityId = membership.sourceIdentityId
+           INNER JOIN persons person ON person.personId = identity.personId
+           INNER JOIN contacts contact ON contact.contactId = person.canonicalContactId
+           WHERE membership.status = 'ACTIVE' AND identity.resolutionStatus = 'RESOLVED'
+             AND person.status = 'ACTIVE' AND contact.deletedAtEpochMs IS NULL
+           ORDER BY membership.groupId, person.canonicalContactId
+           LIMIT :limit""",
+    )
+    suspend fun resolvedGroupMemberships(limit: Int): List<ResolvedGroupMembershipProjection>
+
     @Upsert
     suspend fun upsertGroupMembership(value: GroupMembershipEpisodeEntity)
 
@@ -208,3 +221,5 @@ interface ContactIntelligenceDao {
     @Query("UPDATE contact_sync_operations SET state = :state, undoneAtEpochMs = :undoneAt WHERE operationId = :operationId")
     suspend fun updateSyncOperationState(operationId: String, state: String, undoneAt: Long?): Int
 }
+
+data class ResolvedGroupMembershipProjection(val groupId: String, val contactId: String)

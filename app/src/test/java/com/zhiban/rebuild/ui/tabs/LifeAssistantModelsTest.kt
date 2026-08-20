@@ -1,6 +1,7 @@
 package com.zhiban.rebuild.ui.tabs
 
 import com.zhiban.rebuild.data.contact.ContactImportantDateProjection
+import com.zhiban.rebuild.data.contact.nextImportantDateOccurrence
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.NotificationInsights
 import com.zhiban.rebuild.data.notification.ScheduleInsight
@@ -17,15 +18,15 @@ class LifeAssistantModelsTest {
     @Test fun nextOccurrenceKeepsTodayAndMovesPastDatesToNextYear() {
         val today = LocalDate.of(2026, 8, 10)
 
-        assertEquals(today, nextAnnualOccurrence(8, 10, today))
-        assertEquals(LocalDate.of(2027, 8, 9), nextAnnualOccurrence(8, 9, today))
-        assertNull(nextAnnualOccurrence(13, 1, today))
+        assertEquals(today, nextImportantDateOccurrence(8, 10, today))
+        assertEquals(LocalDate.of(2027, 8, 9), nextImportantDateOccurrence(8, 9, today))
+        assertNull(nextImportantDateOccurrence(13, 1, today))
     }
 
     @Test fun leapDayUsesLastValidDayInNonLeapYear() {
         assertEquals(
             LocalDate.of(2027, 2, 28),
-            nextAnnualOccurrence(2, 29, LocalDate.of(2026, 3, 1)),
+            nextImportantDateOccurrence(2, 29, LocalDate.of(2026, 3, 1)),
         )
     }
 

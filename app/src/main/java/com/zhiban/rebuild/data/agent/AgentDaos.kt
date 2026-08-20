@@ -118,6 +118,13 @@ interface AgentRunDao {
 
     @Query("SELECT id FROM agent_runs WHERE expiresAtEpochMs IS NOT NULL AND expiresAtEpochMs <= :nowEpochMs")
     suspend fun findExpiredIds(nowEpochMs: Long): List<String>
+
+    @Query(
+        "DELETE FROM agent_runs WHERE id IN (SELECT id FROM agent_runs " +
+            "WHERE updatedAtEpochMs < :cutoffEpochMs AND (expiresAtEpochMs IS NULL OR expiresAtEpochMs <= :nowEpochMs) " +
+            "ORDER BY updatedAtEpochMs LIMIT :limit)",
+    )
+    suspend fun deleteRetiredBefore(cutoffEpochMs: Long, nowEpochMs: Long, limit: Int): Int
 }
 
 @Dao
@@ -145,6 +152,12 @@ interface MemoryDao {
 
     @Query("DELETE FROM memories WHERE sourceRunId = :runId AND kind = 'RUN_SUMMARY'")
     suspend fun deleteRunSummaries(runId: String): Int
+
+    @Query(
+        "DELETE FROM memories WHERE id IN (SELECT id FROM memories WHERE kind = 'RUN_SUMMARY' " +
+            "AND sourceRunId IS NULL AND createdAtEpochMs < :cutoffEpochMs ORDER BY createdAtEpochMs LIMIT :limit)",
+    )
+    suspend fun deleteOrphanedRunSummariesBefore(cutoffEpochMs: Long, limit: Int): Int
 }
 
 @Dao

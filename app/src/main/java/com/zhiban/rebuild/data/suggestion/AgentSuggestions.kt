@@ -35,6 +35,7 @@ object AgentSuggestionType {
     const val SILENT_CONTACTS = "SILENT_CONTACTS"
     const val UNOBSERVED_REPLY = "UNOBSERVED_REPLY"
     const val SCHEDULE_ADVANCE_CONFIRMATION = "SCHEDULE_ADVANCE_CONFIRMATION"
+    const val IMPORTANT_DATE_REMINDER = "IMPORTANT_DATE_REMINDER"
 
     /** 联系人资料不完整 + 有互动 → 一键转发补全（关联 contact_completion_requests）。 */
     const val WAKEUP_COMPLETION = "WAKEUP_COMPLETION"
@@ -52,6 +53,7 @@ object AgentSuggestionType {
         Index("status"),
         Index("createdAtEpochMs"),
         Index("contactId"),
+        Index(value = ["status", "priorityScore"]),
     ],
 )
 data class AgentSuggestionEntity(
@@ -109,14 +111,22 @@ data class AgentSuggestionEntity(
     val forwardMessage: String? = null,
     /** 本轮要问的字段名 JSON 数组（ContactProfileField.name），供卡片渲染 chips。 */
     val missingFieldsJson: String? = null,
+    /** 反馈学习后的展示优先级。50 为中性，值越大越靠前；不包含用户原文。 */
+    val priorityScore: Int = DEFAULT_SUGGESTION_PRIORITY,
 )
+
+data class AgentSuggestionFeedbackStats(val acceptedCount: Int, val dismissedCount: Int)
 
 @Dao
 interface AgentSuggestionDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(suggestion: AgentSuggestionEntity): Long
 
-    @Query("SELECT * FROM agent_suggestions ORDER BY createdAtEpochMs DESC LIMIT :limit OFFSET :offset")
+    @Query(
+        "SELECT * FROM agent_suggestions ORDER BY " +
+            "CASE WHEN status = 'PENDING' THEN 0 ELSE 1 END, priorityScore DESC, createdAtEpochMs DESC " +
+            "LIMIT :limit OFFSET :offset",
+    )
     fun observeRecent(limit: Int = 100, offset: Int = 0): Flow<List<AgentSuggestionEntity>>
 
     @Query("SELECT COUNT(*) FROM agent_suggestions WHERE status = 'PENDING'")
@@ -133,6 +143,17 @@ interface AgentSuggestionDao {
             "ORDER BY createdAtEpochMs DESC LIMIT :limit",
     )
     suspend fun pendingForContact(contactId: String, limit: Int): List<AgentSuggestionEntity>
+
+    @Query(
+        """SELECT
+           COALESCE(SUM(CASE WHEN status = 'ACCEPTED' THEN 1 ELSE 0 END), 0) AS acceptedCount,
+           COALESCE(SUM(CASE WHEN status = 'DISMISSED' THEN 1 ELSE 0 END), 0) AS dismissedCount
+           FROM agent_suggestions
+           WHERE type = :type AND updatedAtEpochMs >= :sinceEpochMs
+             AND ((:contactId IS NULL AND contactId IS NULL) OR contactId = :contactId)
+             AND status IN ('ACCEPTED', 'DISMISSED')""",
+    )
+    suspend fun feedbackStats(type: String, contactId: String?, sinceEpochMs: Long): AgentSuggestionFeedbackStats
 
     @Query(
         "SELECT * FROM agent_suggestions WHERE status = 'PENDING' AND execActionType = 'SCHEDULE' " +
@@ -162,6 +183,8 @@ interface AgentSuggestionDao {
     @Query("DELETE FROM agent_suggestions WHERE status != 'PENDING' AND createdAtEpochMs < :beforeEpochMs")
     suspend fun pruneSettledBefore(beforeEpochMs: Long): Int
 }
+
+internal const val DEFAULT_SUGGESTION_PRIORITY = 50
 
 /** 对接人候选的 JSON 编解码（存储于 agent_suggestions.contactCandidatesJson）。 */
 object AgentSuggestionCodecs {

@@ -38,6 +38,18 @@ internal object AgentDatabaseMigrations52Plus {
         }
     }
 
+    val MIGRATION_52_53 = object : Migration(52, 53) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("DROP INDEX IF EXISTS `index_plan_runs_single_active_per_definition`")
+            db.execSQL("DROP INDEX IF EXISTS `index_contacts_active_deleted`")
+            db.execSQL("ALTER TABLE `agent_suggestions` ADD COLUMN `priorityScore` INTEGER NOT NULL DEFAULT 50")
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_agent_suggestions_status_priorityScore` " +
+                    "ON `agent_suggestions` (`status`, `priorityScore`)",
+            )
+        }
+    }
+
     private fun backfillFacts(db: SupportSQLiteDatabase) {
         db.execSQL(
             """INSERT OR IGNORE INTO contact_interactions

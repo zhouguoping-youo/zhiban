@@ -1,11 +1,12 @@
 package com.zhiban.rebuild.ui.tabs
 
 import com.zhiban.rebuild.data.contact.ContactImportantDateProjection
+import com.zhiban.rebuild.data.contact.importantDateDisplayLabel
+import com.zhiban.rebuild.data.contact.nextImportantDateOccurrence
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.ScheduleInsight
 import java.time.Instant
 import java.time.LocalDate
-import java.time.YearMonth
 import java.time.ZoneId
 
 enum class LifeAssistantItemKind { COMMITMENT, IMPORTANT_DATE }
@@ -41,11 +42,11 @@ internal fun buildLifeAssistantItems(
 ): List<LifeAssistantItem> {
     val today = Instant.ofEpochMilli(nowEpochMs).atZone(zoneId).toLocalDate()
     val dateItems = importantDates.distinctBy { it.contactId to it.kind }.mapNotNull { date ->
-        val occurrence = nextAnnualOccurrence(date.month, date.day, today) ?: return@mapNotNull null
+        val occurrence = nextImportantDateOccurrence(date.month, date.day, today) ?: return@mapNotNull null
         LifeAssistantItem(
             id = "date:${date.dateId}:${occurrence.year}",
             kind = LifeAssistantItemKind.IMPORTANT_DATE,
-            title = "${date.displayName}的${importantDateLabel(date.kind)}",
+            title = "${date.displayName}的${importantDateDisplayLabel(date.kind)}",
             contactId = date.contactId,
             contactName = date.displayName,
             eventAtEpochMs = occurrence.atStartOfDay(zoneId).toInstant().toEpochMilli(),
@@ -77,22 +78,6 @@ internal fun buildLifeAssistantItems(
         )
     }
     return (commitmentItems + dateItems).sortedBy(LifeAssistantItem::eventAtEpochMs)
-}
-
-internal fun nextAnnualOccurrence(month: Int, day: Int, today: LocalDate): LocalDate? {
-    if (month !in 1..12 || day !in 1..31) return null
-    fun occurrence(year: Int): LocalDate {
-        val safeDay = day.coerceAtMost(YearMonth.of(year, month).lengthOfMonth())
-        return LocalDate.of(year, month, safeDay)
-    }
-    val thisYear = occurrence(today.year)
-    return if (thisYear.isBefore(today)) occurrence(today.year + 1) else thisYear
-}
-
-internal fun importantDateLabel(kind: String): String = when (kind.uppercase()) {
-    "BIRTHDAY" -> "生日"
-    "ANNIVERSARY" -> "纪念日"
-    else -> "重要日子"
 }
 
 private const val FIVE_MINUTES_MS = 5 * 60_000L

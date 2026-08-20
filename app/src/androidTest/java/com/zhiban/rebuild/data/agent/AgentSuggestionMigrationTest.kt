@@ -89,4 +89,30 @@ class AgentSuggestionMigrationTest {
             }
         }
     }
+
+    @Test
+    fun migration52To53AddsNeutralPriorityAndPreservesSuggestions() {
+        val name = "agent-suggestion-52-53.db"
+        helper.createDatabase(name, 52).use { db ->
+            db.execSQL(
+                """INSERT INTO agent_suggestions
+                    (suggestionId,type,title,body,contactId,candidateId,sourceEvent,dedupeKey,status,
+                    createdAtEpochMs,updatedAtEpochMs,execActionType,scheduleTitle,startAtEpochMs,
+                    durationMinutes,location,companyFull,confirmNotes,planId,pickupLocation,visitLocation,
+                    visitLocationSource,contactCandidatesJson,departAtEpochMs,travelNote,completionRequestId,
+                    forwardMessage,missingFieldsJson)
+                    VALUES ('suggestion-1','WAKEUP_GENERAL','旧建议','旧正文',NULL,NULL,'NOTIFICATION',
+                    'old-dedupe','PENDING',1,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,
+                    NULL,NULL,NULL,NULL,NULL)""",
+            )
+        }
+
+        helper.runMigrationsAndValidate(name, 53, true, AgentDatabase.MIGRATION_52_53).use { db ->
+            db.query("SELECT title, priorityScore FROM agent_suggestions WHERE suggestionId='suggestion-1'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("旧建议", cursor.getString(0))
+                assertEquals(50, cursor.getInt(1))
+            }
+        }
+    }
 }

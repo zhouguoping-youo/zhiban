@@ -12,8 +12,11 @@ import com.zhiban.rebuild.data.completion.ContactCompletionStatus
 import com.zhiban.rebuild.data.completion.FakeOutreachGenerator
 import com.zhiban.rebuild.data.config.AgentControlStore
 import com.zhiban.rebuild.data.contact.ContactEntity
+import com.zhiban.rebuild.data.contact.ContactImportantDateEntity
 import com.zhiban.rebuild.data.contact.ContactProfileField
 import com.zhiban.rebuild.data.event.EventPlanStatus
+import java.time.LocalDateTime
+import java.time.ZoneId
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -110,6 +113,51 @@ class AgentSuggestionRepositoryTest {
         repository.insert(suggestion("s-2"))
         repository.accept("s-1", nowEpochMs = 2L)
         assertEquals(1, database.agentSuggestionDao().observePendingCount().first())
+    }
+
+    @Test fun repeatedDismissalsDownrankNextSuggestionForSameTypeAndContact() = runBlocking {
+        repeat(3) { index ->
+            val id = "dismissed-$index"
+            repository.insert(suggestion(id, contactId = "contact-1", createdAt = 1_000L + index))
+            assertTrue(repository.dismiss(id, nowEpochMs = 2_000L + index))
+        }
+
+        repository.insert(suggestion("next", contactId = "contact-1", createdAt = 3_000L))
+
+        assertEquals(30, database.agentSuggestionDao().find("next")?.priorityScore)
+        assertEquals(
+            AgentSuggestionFeedbackStats(0, 3),
+            database.agentSuggestionDao().feedbackStats(AgentSuggestionType.WAKEUP_SCHEDULE, "contact-1", 0L),
+        )
+    }
+
+    @Test fun importantDateWithinSevenDaysCreatesOneAnnualReminder() = runBlocking {
+        database.contactDao().insert(contact())
+        database.contactKnowledgeDao().upsertImportantDate(
+            ContactImportantDateEntity(
+                dateId = "birthday-1",
+                contactId = "contact-1",
+                kind = "BIRTHDAY",
+                year = 1990,
+                month = 8,
+                day = 25,
+                source = "USER",
+                evidenceRef = null,
+                userConfirmed = true,
+                createdAtEpochMs = 1L,
+                updatedAtEpochMs = 1L,
+            ),
+        )
+        val zone = ZoneId.of("Asia/Shanghai")
+        val now = LocalDateTime.of(2026, 8, 20, 9, 0).atZone(zone).toInstant().toEpochMilli()
+        val scanner = ImportantDateSuggestionScanner(database, repository)
+
+        assertEquals(1, scanner.scan(now, zone))
+        assertEquals(0, scanner.scan(now, zone))
+        val reminder = database.agentSuggestionDao().find("important-date:birthday-1:2026")
+        assertEquals(AgentSuggestionType.IMPORTANT_DATE_REMINDER, reminder?.type)
+        assertEquals("李雷的生日还有5天", reminder?.title)
+        assertEquals(65, reminder?.priorityScore)
     }
 
     @Test fun pendingSuggestionsExpireWithScheduleAwareLifecycle() = runBlocking {

@@ -10,6 +10,8 @@ import com.zhiban.rebuild.data.suggestion.AgentSuggestionRepository
 import com.zhiban.rebuild.data.suggestion.AgentSuggestionStatus
 import com.zhiban.rebuild.data.suggestion.AgentSuggestionType
 import com.zhiban.rebuild.data.suggestion.EventIntentExtractor
+import com.zhiban.rebuild.data.suggestion.SUGGESTION_FEEDBACK_WINDOW_MS
+import com.zhiban.rebuild.data.suggestion.SuggestionFeedbackPolicy
 import com.zhiban.rebuild.foundation.runSuspendCatching
 import com.zhiban.rebuild.runtime.spi.RuntimeRunStatus
 import com.zhiban.rebuild.runtime.spi.RuntimeUiClient
@@ -87,13 +89,29 @@ internal class AgentWakeupCoordinator @Inject constructor(
             val contactId = candidate.linkedContactId ?: candidate.suggestedContactId
             val hasOpenCrmOpportunity = contactId != null &&
                 database.crmDao().findOpenOpportunityByContact(contactId) != null
-            val decision = WakeupDecider.decide(
+            val nowEpochMs = System.currentTimeMillis()
+            val classified = WakeupDecider.classify(
                 candidate,
                 hasOpenCrmOpportunity,
-                System.currentTimeMillis(),
-                throttle,
+                nowEpochMs,
                 controls.wakeupQuietHours(),
             )
+            val decision = if (classified is WakeupDecision.Wake) {
+                val stats = database.agentSuggestionDao().feedbackStats(
+                    suggestionType(classified.reason),
+                    classified.contactId,
+                    nowEpochMs - SUGGESTION_FEEDBACK_WINDOW_MS,
+                )
+                WakeupDecider.applyThrottle(
+                    candidate,
+                    classified,
+                    nowEpochMs,
+                    throttle,
+                    SuggestionFeedbackPolicy.adjustment(stats),
+                )
+            } else {
+                classified
+            }
             Log.d(
                 TAG,
                 "wakeup:decide candidate=$candidateId contact=$contactId drift=${candidate.identityDriftJson != null} schedule=${candidate.createdScheduleId} decision=$decision",
