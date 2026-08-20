@@ -65,12 +65,42 @@ private fun createContactIntelligencePart1Sub1(db: SupportSQLiteDatabase) {
     db.execSQL(CREATE_CONTACT_INTELLIGENCE_TABLE_3)
 }
 
-private fun createContactIntelligencePart1(db: SupportSQLiteDatabase) {
-    createContactIntelligencePart1Sub1(db)
+private fun createContactIntelligenceCoreIndices(db: SupportSQLiteDatabase) {
+    createIndices(
+        db,
+        "persons",
+        "canonicalContactId" to true,
+        "kind" to false,
+        "status" to false,
+    )
+    createIndices(
+        db,
+        "source_identities",
+        "personId" to false,
+        "sourceType,accountScope,stableExternalId" to false,
+        "sourceType,conversationScopeId,normalizedHandle" to false,
+        "resolutionStatus" to false,
+        "lastObservedAtEpochMs" to false,
+    )
+    createIndices(
+        db,
+        "identity_claims",
+        "personId" to false,
+        "sourceIdentityId" to false,
+        "personId,fieldType,status" to false,
+        "fieldType,normalizedValue" to false,
+        "verificationState" to false,
+        "validToEpochMs" to false,
+    )
 }
 
 internal fun createContactIntelligenceTables(db: SupportSQLiteDatabase) {
-    createContactIntelligencePart1(db)
+    createContactIntelligencePart1Sub1(db)
+    createContactIntelligenceCoreIndices(db)
+    createEmploymentEpisodeTable(db)
+    createRelationshipEpisodeTable(db)
+    createGroupTables(db)
+    createAndroidSyncTables(db)
 }
 
 internal fun createEmploymentEpisodeTable(db: SupportSQLiteDatabase) {
