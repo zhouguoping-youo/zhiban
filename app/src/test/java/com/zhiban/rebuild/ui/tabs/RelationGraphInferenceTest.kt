@@ -174,4 +174,37 @@ class RelationGraphInferenceTest {
         assertTrue(edges.all(RelationshipEdgeEntity::isInferredEvidenceRelationship))
         assertTrue(edges.any { it.fromContactId == "huang" && it.toContactId == "ding" })
     }
+
+    @Test
+    fun `duplicate visible relationship rows collapse and confirmed edge wins`() {
+        val inferred = RelationshipEdgeEntity(
+            edgeId = "inferred",
+            fromContactId = RelationshipPersonIds.SELF,
+            toContactId = "ding",
+            relationType = "COLLEAGUE",
+            evidenceDigest = "来自推断",
+            evidenceRefsJson = "[]",
+            confidence = 0.99,
+            userConfirmed = false,
+            skillId = null,
+            status = "INFERRED_COMPANY",
+            createdAtEpochMs = 2L,
+            updatedAtEpochMs = 2L,
+        )
+        val confirmed = inferred.copy(
+            edgeId = "confirmed",
+            evidenceDigest = "用户确认",
+            userConfirmed = true,
+            status = "ACTIVE",
+            updatedAtEpochMs = 1L,
+        )
+
+        val visible = mergeCurrentAndHistoricalRelationships(
+            current = listOf(inferred, confirmed),
+            historical = emptyList(),
+        )
+
+        assertEquals(1, visible.size)
+        assertEquals("confirmed", visible.single().edgeId)
+    }
 }

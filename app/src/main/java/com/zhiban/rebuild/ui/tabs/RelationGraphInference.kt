@@ -210,8 +210,32 @@ internal fun mergeCurrentAndHistoricalRelationships(
     current: List<RelationshipEdgeEntity>,
     historical: List<RelationshipEdgeEntity>,
 ): List<RelationshipEdgeEntity> {
-    val currentKeys = current.mapTo(hashSetOf(), ::relationshipIdentityKey)
-    return current + historical.filterNot { relationshipIdentityKey(it) in currentKeys }
+    val deduplicatedCurrent = deduplicateRelationshipEdges(current)
+    val currentKeys = deduplicatedCurrent.mapTo(hashSetOf(), ::relationshipIdentityKey)
+    return deduplicatedCurrent + deduplicateRelationshipEdges(
+        historical.filterNot { relationshipIdentityKey(it) in currentKeys },
+    )
+}
+
+/** Keeps one visible row per person pair and relationship type, preferring stronger evidence. */
+internal fun deduplicateRelationshipEdges(edges: List<RelationshipEdgeEntity>): List<RelationshipEdgeEntity> {
+    val selected = linkedMapOf<String, RelationshipEdgeEntity>()
+    edges.forEach { edge ->
+        val key = relationshipIdentityKey(edge)
+        val current = selected[key]
+        if (current == null || edge outranks current) selected[key] = edge
+    }
+    return selected.values.toList()
+}
+
+private infix fun RelationshipEdgeEntity.outranks(other: RelationshipEdgeEntity): Boolean {
+    val confirmationScore = userConfirmed.compareTo(other.userConfirmed)
+    if (confirmationScore != 0) return confirmationScore > 0
+    val statusScore = (status == "ACTIVE").compareTo(other.status == "ACTIVE")
+    if (statusScore != 0) return statusScore > 0
+    val confidenceScore = confidence.compareTo(other.confidence)
+    if (confidenceScore != 0) return confidenceScore > 0
+    return updatedAtEpochMs > other.updatedAtEpochMs
 }
 
 internal fun relationshipGraphEdgesForRoot(rootId: String, edges: List<RelationshipEdgeEntity>): List<RelationshipEdgeEntity> = edges.filter {
