@@ -158,5 +158,4 @@ class MemoryUpsertAutoWriteTest {
             30,
         )
     }
-
 }

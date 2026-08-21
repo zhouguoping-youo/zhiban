@@ -238,6 +238,7 @@ class CrmContactLinkTest {
 
     @Test fun contactDetailUsesCompactHierarchyAndKeepsActionsReachable() {
         var edited = false
+        var asked = false
         val contact = ContactEntity(
             "c1", "丁波", "丁波", "13800000000", null, "wx-dingbo", "甲公司", "售前", "[]", "[]", null,
             null, "USER", null, 1, 1,
@@ -272,7 +273,7 @@ class CrmContactLinkTest {
                     onRejectEnrichment = {},
                     onSaveToPhone = {},
                     onCall = {},
-                    onAsk = {},
+                    onAsk = { asked = true },
                 )
             }
         }
@@ -288,7 +289,14 @@ class CrmContactLinkTest {
         compose.onNodeWithText("暂无已关联的通话记录").assertDoesNotExist()
 
         compose.onNodeWithTag("contact-detail-content")
-            .performScrollToNode(hasTestTag("contact-detail-sync"))
+            .performScrollToNode(hasTestTag("contact-detail-next-step"))
+        compose.onNodeWithTag("contact-detail-next-step").performClick()
+        assertTrue(asked)
+
+        compose.onNodeWithTag("contact-detail-content")
+            .performScrollToNode(hasTestTag("contact-detail-more-toggle"))
+        compose.onNodeWithTag("contact-detail-more-toggle").performClick()
+        compose.onNodeWithTag("contact-detail-content").performScrollToNode(hasTestTag("contact-detail-sync"))
         compose.onNodeWithTag("contact-detail-sync").assertIsDisplayed()
         compose.onNodeWithText("同步到手机通讯录").assertIsDisplayed()
         compose.onNodeWithText("写入前可预览").assertIsDisplayed()

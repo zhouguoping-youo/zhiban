@@ -51,6 +51,9 @@ class V2AgentConversationBackend(
                 val mapped = AgentProjectionUiMapper.map(projection)
                 mutableUiState.value = mapped.copy(
                     userMessage = mapped.userMessage ?: previous.userMessage,
+                    plan = mapped.plan ?: previous.plan.takeIf {
+                        mapped.stage == AgentConversationStage.SUCCEEDED
+                    },
                 )
             }
         }

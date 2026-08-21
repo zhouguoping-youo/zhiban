@@ -115,6 +115,7 @@ fun AgentConversationScreen(
     // route user to OS app-details page (AppSettingsOpener).
     onOpenAppSettings: () -> Unit = {},
     onBackToHome: () -> Unit = {},
+    onOpenCalendar: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     onManagePlugins: () -> Unit = {},
     onWorkTaskClick: (String) -> Unit = {},
@@ -193,6 +194,7 @@ fun AgentConversationScreen(
                 onReadAssistant = onReadAssistant,
                 onShareAssistant = onShareAssistant,
                 onUndo = onUndo,
+                onOpenCalendar = onOpenCalendar,
                 feedbackEnabled = feedbackEnabled,
                 userAvatarBytes = userAvatarBytes,
                 userAvatarLabel = userAvatarLabel,

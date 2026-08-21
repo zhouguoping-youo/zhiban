@@ -30,6 +30,7 @@ class RelationshipInferenceParseTest {
         )
         assertEquals("CLASSMATE", inferred?.relationType)
     }
+
     @Test
     fun parsesCleanInferenceJson() {
         val inferred = parseInferredRelationship(

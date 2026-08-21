@@ -367,9 +367,6 @@ fun RelationTab(
         )
     }
     val contextNowEpochMs = remember(contacts, page.interactionIntensity) { System.currentTimeMillis() }
-    val selectedRelationshipGroup = remember(tag) {
-        RelationshipGroup.entries.firstOrNull { it.displayName == tag }
-    }
     val visible = remember(contacts, graphRelationships, query, tag) {
         contacts.filter { contact ->
             val matchesQuery = query.isBlank() || listOf(
@@ -424,13 +421,15 @@ fun RelationTab(
                 }
                 Spacer(Modifier.height(10.dp))
             }
-            item {
-                ZhiBanSearchField(
-                    value = query,
-                    onValueChange = { query = it },
-                    placeholder = "搜索姓名、电话、公司或备注",
-                )
-                Spacer(Modifier.height(10.dp))
+            if (mode == "list") {
+                item {
+                    ZhiBanSearchField(
+                        value = query,
+                        onValueChange = { query = it },
+                        placeholder = "搜索姓名、电话、公司或备注",
+                    )
+                    Spacer(Modifier.height(10.dp))
+                }
             }
             item {
                 RelationshipModeTabs(
@@ -459,6 +458,24 @@ fun RelationTab(
                             options = RelationFilters,
                             onSelected = { tag = it },
                         )
+                        Spacer(Modifier.height(12.dp))
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "联系人",
+                                modifier = Modifier.weight(1f),
+                                color = RelationInk,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                localizedQuantity(R.plurals.contact_count, visible.size),
+                                color = RelationMuted,
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                        }
                         Spacer(Modifier.height(8.dp))
                     }
                     if (shouldShowOwnerProfilePrompt(ownerProfile, tag, query)) {
@@ -535,27 +552,26 @@ fun RelationTab(
 
                 "graph" -> {
                     item {
-                        RelationshipCategoryFilter(
-                            selected = tag,
-                            options = RelationFilters,
-                            onSelected = { tag = it },
-                        )
-                        Spacer(Modifier.height(8.dp))
-                    }
-                    item {
                         RelationshipGraphState(
                             owner = ownerProfile,
-                            contacts = visible,
+                            contacts = contacts,
                             edges = graphRelationships,
                             historicalEdges = historyRelationships,
                             currentOwnerEmployment = currentOwnerEmployment,
                             ownerEmploymentHistoryCount = ownerEmploymentHistoryCount,
                             interactionIntensity = page.interactionIntensity,
+                            relationshipEvents = relationshipEvents,
                             canAddRelationship = contacts.isNotEmpty(),
-                            activeFilter = tag.takeUnless { it == "全部" } ?: query.takeIf(String::isNotBlank),
-                            activeGroup = selectedRelationshipGroup,
+                            activeFilter = null,
+                            activeGroup = null,
                             onAdd = { showRelationEditor = true },
                             onEditOwnerEmployment = { showOwnerEmploymentEditor = true },
+                            onOpenContact = { contactId ->
+                                contacts.firstOrNull { it.contactId == contactId }?.let {
+                                    selected = it
+                                    onContactClick(contactId)
+                                }
+                            },
                         )
                     }
                 }

@@ -199,7 +199,8 @@ class ContactEnrichmentConfirmTest {
                 "company":"知伴科技（上海）有限公司",
                 "canonicalName":"知伴科技（上海）有限公司",
                 "matchedCompanyHint":"知伴"
-            }""".trimIndent(),
+            }
+            """.trimIndent(),
         ).copy(
             providerId = "local-contact-intelligence",
             sourceRef = "通讯录中另一位联系人的已存公司资料",

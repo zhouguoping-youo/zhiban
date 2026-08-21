@@ -41,4 +41,27 @@ class AgentConversationUiStateTest {
             planConfirmLabel(AgentPlanUi(title = "发送邀请", platform = "WECHAT", message = "明晚见")),
         )
     }
+
+    @Test fun `successful calendar plan renders useful result actions`() {
+        val plan = AgentPlanUi(
+            title = "创建日程",
+            subject = "与丁波的视频会议",
+            schedule = "明晚 22:00–22:30",
+            reminder = "提前 10 分钟提醒",
+        )
+
+        assertTrue(operationResultShowsCalendar(plan))
+        assertEquals("日程已添加", operationResultTitle(plan))
+        assertEquals(
+            "与丁波的视频会议 · 明晚 22:00–22:30 · 提前 10 分钟提醒",
+            operationResultSummary(plan),
+        )
+    }
+
+    @Test fun `non calendar result does not claim a schedule was created`() {
+        val plan = AgentPlanUi(title = "完善联系人", details = "补充公司全称")
+
+        assertFalse(operationResultShowsCalendar(plan))
+        assertEquals("完善联系人已完成", operationResultTitle(plan))
+    }
 }

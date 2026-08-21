@@ -135,5 +135,4 @@ class ContactTagAutoWriteTest {
         )
         return RuntimeToolRouteContext("run-tag", "session-tag", "attempt-tag", "owner", lease.leaseEpoch, 1, 30)
     }
-
 }

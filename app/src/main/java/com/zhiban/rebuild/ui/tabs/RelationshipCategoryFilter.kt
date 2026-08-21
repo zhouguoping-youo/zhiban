@@ -62,7 +62,7 @@ internal fun RelationshipCategoryFilter(selected: String, options: List<String>,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = "联系人",
+                text = "关系分类",
                 modifier = Modifier.weight(1f).padding(start = ZhiBanSpacing.Sm),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,

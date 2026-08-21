@@ -19,12 +19,7 @@ class ContactIdentityPresentationTest {
         assertEquals("confirmed", visible.first().identityId)
     }
 
-    private fun identity(
-        id: String,
-        userConfirmed: Boolean,
-        updatedAt: Long,
-        handle: String,
-    ) = ContactPlatformIdentityEntity(
+    private fun identity(id: String, userConfirmed: Boolean, updatedAt: Long, handle: String) = ContactPlatformIdentityEntity(
         identityId = id,
         contactId = "contact",
         platform = "WECHAT",

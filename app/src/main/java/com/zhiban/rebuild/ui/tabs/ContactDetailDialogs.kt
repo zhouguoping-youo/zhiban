@@ -14,7 +14,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
@@ -191,6 +190,7 @@ internal fun ContactDetailDialog(
     onCall: () -> Unit,
     onAsk: () -> Unit,
 ) {
+    var showMoreDetails by rememberSaveable(contact.contactId) { mutableStateOf(false) }
     val openCrmOpportunities = crmOpportunities.filter { it.status == "OPEN" }
     val visiblePlatformIdentities = deduplicatePlatformIdentities(platformIdentities)
     val hasRelationshipContext = relatedEdges.isNotEmpty()
@@ -230,9 +230,7 @@ internal fun ContactDetailDialog(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    TextButton(onClick = onEdit, modifier = Modifier.height(ZhiBanSize.TouchTarget)) {
-                        Text("编辑", color = RelationAccent)
-                    }
+                    Spacer(Modifier.size(48.dp))
                 }
                 LazyColumn(
                     Modifier.fillMaxSize().testTag("contact-detail-content"),
@@ -296,6 +294,9 @@ internal fun ContactDetailDialog(
                                             modifier = Modifier.padding(top = 4.dp),
                                         )
                                     }
+                                }
+                                TextButton(onClick = onEdit, modifier = Modifier.height(ZhiBanSize.TouchTarget)) {
+                                    Text("编辑", color = RelationAccent)
                                 }
                             }
                             if (contact.phone?.isNotBlank() == true) {
@@ -423,116 +424,147 @@ internal fun ContactDetailDialog(
                     }
 
                     item {
-                        ContactDetailSection(
-                            title = "更多资料",
-                            action = "添加账号",
-                            onAction = onAddIdentity,
-                            modifier = Modifier.testTag("contact-detail-profile"),
+                        Button(
+                            onClick = onAsk,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp)
+                                .testTag("contact-detail-next-step"),
+                            shape = RoundedCornerShape(ZhiBanRadius.Medium),
+                            colors = ButtonDefaults.buttonColors(containerColor = RelationAccent),
                         ) {
-                            if (!hasProfileDetails && importantFacts.isEmpty() && mergedSources.isEmpty()) {
-                                ContactDetailEmptyAction("添加联系方式或公司", onEdit)
-                            } else {
-                                DetailValue("手机", contact.phone)
-                                aliases.forEach { alias ->
-                                    IdentityValueRow(
-                                        label = if (alias.aliasType == "NICKNAME") "昵称" else "常用称呼",
-                                        value = alias.alias,
-                                        onDelete = { onDeleteAlias(alias.aliasId) },
-                                    )
-                                }
-                                contact.wechatId?.takeIf(String::isNotBlank)
-                                    ?.takeUnless { wechat ->
-                                        visiblePlatformIdentities.any {
-                                            it.platform == "WECHAT" &&
-                                                it.normalizedHandle == wechat.trim().trimStart('@').lowercase()
-                                        }
-                                    }?.let { IdentityValueRow("微信", it, null) }
-                                visiblePlatformIdentities.forEach { identity ->
-                                    IdentityValueRow(
-                                        platformLabel(identity.platform),
-                                        identity.handle,
-                                        onDelete = { onDeletePlatformIdentity(identity.identityId) },
-                                    )
-                                }
-                                DetailValue(
-                                    "任职",
-                                    listOfNotNull(contact.company, contact.title).joinToString(" · ").takeIf(String::isNotBlank),
-                                )
-                                DetailValue("备注", contact.note)
-                                importantFacts.forEach { fact ->
-                                    Row(
-                                        Modifier.fillMaxWidth().padding(vertical = 7.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        Column(Modifier.weight(1f)) {
-                                            Text(fact.textContent, color = RelationInk, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                            Text(
-                                                "${factTypeLabel(fact.factType)} · ${sourceLabel(fact.sourceType)}",
-                                                color = RelationMuted,
-                                                style = MaterialTheme.typography.labelSmall,
-                                            )
-                                        }
-                                        IconButton(onClick = { onDeleteFact(fact.factId) }, modifier = Modifier.size(48.dp)) {
-                                            Icon(Icons.Rounded.DeleteOutline, "删除这条记忆", tint = RelationMuted)
-                                        }
-                                    }
-                                }
-                                mergedSources.forEach { (link, source) ->
-                                    Row(
-                                        Modifier.fillMaxWidth().padding(vertical = 7.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        Column(Modifier.weight(1f)) {
-                                            Text(source.displayName, color = RelationInk)
-                                            Text("${link.reason} · 原资料已保留", color = RelationMuted, style = MaterialTheme.typography.bodySmall)
-                                        }
-                                        TextButton(onClick = { onUndoMerge(source.contactId) }) { Text("恢复", color = RelationInk) }
-                                    }
-                                }
-                            }
+                            Text("让知伴准备下一步", fontWeight = FontWeight.SemiBold)
                         }
                     }
 
                     item {
                         Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .zhiBanCardSurface(RelationSurface)
-                                .defaultMinSize(minHeight = 64.dp)
-                                .clickable(onClick = onSaveToPhone)
-                                .padding(horizontal = 16.dp, vertical = 10.dp)
-                                .testTag("contact-detail-sync"),
+                            Modifier.fillMaxWidth().zhiBanCardSurface(RelationSurface)
+                                .clickable { showMoreDetails = !showMoreDetails }
+                                .padding(horizontal = 16.dp, vertical = 14.dp)
+                                .testTag("contact-detail-more-toggle"),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Box(
-                                Modifier.size(40.dp).clip(CircleShape).background(RelationSoft),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    Icons.Outlined.PhoneAndroid,
-                                    contentDescription = null,
-                                    tint = RelationInk,
-                                    modifier = Modifier.size(ZhiBanIconSize.Inline),
-                                )
-                            }
-                            Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                                Text("同步到手机通讯录", color = RelationInk, style = MaterialTheme.typography.bodyMedium)
-                                Text("写入前可预览", color = RelationMuted, style = MaterialTheme.typography.labelSmall)
-                            }
+                            Text("更多资料", modifier = Modifier.weight(1f), color = RelationInk, style = MaterialTheme.typography.titleMedium)
                             Icon(
                                 Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                                contentDescription = null,
+                                contentDescription = if (showMoreDetails) "收起更多资料" else "展开更多资料",
                                 tint = RelationMuted,
-                                modifier = Modifier.size(ZhiBanIconSize.Inline),
+                                modifier = Modifier.size(ZhiBanIconSize.Inline).graphicsLayer {
+                                    rotationZ = if (showMoreDetails) 90f else 0f
+                                },
                             )
                         }
                     }
-                    item {
-                        TextButton(
-                            onClick = onDelete,
-                            modifier = Modifier.fillMaxWidth().height(ZhiBanSize.TouchTarget),
-                        ) {
-                            Text("删除联系人", color = DangerRed)
+
+                    if (showMoreDetails) {
+                        item {
+                            ContactDetailSection(
+                                title = "资料与来源",
+                                action = "添加账号",
+                                onAction = onAddIdentity,
+                                modifier = Modifier.testTag("contact-detail-profile"),
+                            ) {
+                                if (!hasProfileDetails && importantFacts.isEmpty() && mergedSources.isEmpty()) {
+                                    ContactDetailEmptyAction("添加联系方式或公司", onEdit)
+                                } else {
+                                    DetailValue("手机", contact.phone)
+                                    aliases.forEach { alias ->
+                                        IdentityValueRow(
+                                            label = if (alias.aliasType == "NICKNAME") "昵称" else "常用称呼",
+                                            value = alias.alias,
+                                            onDelete = { onDeleteAlias(alias.aliasId) },
+                                        )
+                                    }
+                                    contact.wechatId?.takeIf(String::isNotBlank)
+                                        ?.takeUnless { wechat ->
+                                            visiblePlatformIdentities.any {
+                                                it.platform == "WECHAT" &&
+                                                    it.normalizedHandle == wechat.trim().trimStart('@').lowercase()
+                                            }
+                                        }?.let { IdentityValueRow("微信", it, null) }
+                                    visiblePlatformIdentities.forEach { identity ->
+                                        IdentityValueRow(
+                                            platformLabel(identity.platform),
+                                            identity.handle,
+                                            onDelete = { onDeletePlatformIdentity(identity.identityId) },
+                                        )
+                                    }
+                                    DetailValue(
+                                        "任职",
+                                        listOfNotNull(contact.company, contact.title).joinToString(" · ").takeIf(String::isNotBlank),
+                                    )
+                                    DetailValue("备注", contact.note)
+                                    importantFacts.forEach { fact ->
+                                        Row(
+                                            Modifier.fillMaxWidth().padding(vertical = 7.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            Column(Modifier.weight(1f)) {
+                                                Text(fact.textContent, color = RelationInk, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                                Text(
+                                                    "${factTypeLabel(fact.factType)} · ${sourceLabel(fact.sourceType)}",
+                                                    color = RelationMuted,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                )
+                                            }
+                                            IconButton(onClick = { onDeleteFact(fact.factId) }, modifier = Modifier.size(48.dp)) {
+                                                Icon(Icons.Rounded.DeleteOutline, "删除这条记忆", tint = RelationMuted)
+                                            }
+                                        }
+                                    }
+                                    mergedSources.forEach { (link, source) ->
+                                        Row(
+                                            Modifier.fillMaxWidth().padding(vertical = 7.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            Column(Modifier.weight(1f)) {
+                                                Text(source.displayName, color = RelationInk)
+                                                Text("${link.reason} · 原资料已保留", color = RelationMuted, style = MaterialTheme.typography.bodySmall)
+                                            }
+                                            TextButton(onClick = { onUndoMerge(source.contactId) }) { Text("恢复", color = RelationInk) }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        item {
+                            Row(
+                                Modifier.fillMaxWidth().zhiBanCardSurface(RelationSurface)
+                                    .defaultMinSize(minHeight = 64.dp).clickable(onClick = onSaveToPhone)
+                                    .padding(horizontal = 16.dp, vertical = 10.dp).testTag("contact-detail-sync"),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Box(
+                                    Modifier.size(40.dp).clip(CircleShape).background(RelationSoft),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.PhoneAndroid,
+                                        contentDescription = null,
+                                        tint = RelationInk,
+                                        modifier = Modifier.size(ZhiBanIconSize.Inline),
+                                    )
+                                }
+                                Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                                    Text("同步到手机通讯录", color = RelationInk, style = MaterialTheme.typography.bodyMedium)
+                                    Text("写入前可预览", color = RelationMuted, style = MaterialTheme.typography.labelSmall)
+                                }
+                                Icon(
+                                    Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = RelationMuted,
+                                    modifier = Modifier.size(ZhiBanIconSize.Inline),
+                                )
+                            }
+                        }
+                        item {
+                            TextButton(
+                                onClick = onDelete,
+                                modifier = Modifier.fillMaxWidth().height(ZhiBanSize.TouchTarget),
+                            ) {
+                                Text("删除联系人", color = DangerRed)
+                            }
                         }
                     }
                 }

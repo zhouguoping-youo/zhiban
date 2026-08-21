@@ -5,9 +5,9 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
-import com.zhiban.rebuild.data.config.AgentControlStore
 import com.zhiban.rebuild.data.communication.SmartForwardHandoff
 import com.zhiban.rebuild.data.communication.SmartForwardOutcome
+import com.zhiban.rebuild.data.config.AgentControlStore
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.ContactPlatformIdentityEntity
 import com.zhiban.rebuild.data.contact.ContactProfileField

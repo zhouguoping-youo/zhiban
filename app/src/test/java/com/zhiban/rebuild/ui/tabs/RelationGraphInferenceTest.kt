@@ -1,11 +1,11 @@
 package com.zhiban.rebuild.ui.tabs
 
 import com.zhiban.rebuild.data.contact.ContactEntity
-import com.zhiban.rebuild.data.contact.RelationshipPersonIds
+import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventParticipantEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventWithParticipants
-import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
+import com.zhiban.rebuild.data.contact.RelationshipPersonIds
 import com.zhiban.rebuild.data.facts.FactEntity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

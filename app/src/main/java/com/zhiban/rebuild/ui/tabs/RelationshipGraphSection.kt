@@ -166,11 +166,13 @@ internal fun RelationshipGraphState(
     currentOwnerEmployment: PersonEmploymentEpisodeEntity? = null,
     ownerEmploymentHistoryCount: Int = 0,
     interactionIntensity: List<ContactInteractionIntensity> = emptyList(),
+    relationshipEvents: List<RelationshipEventWithParticipants> = emptyList(),
     canAddRelationship: Boolean,
     activeFilter: String?,
     activeGroup: RelationshipGroup? = null,
     onAdd: () -> Unit,
     onEditOwnerEmployment: () -> Unit = {},
+    onOpenContact: (String) -> Unit = {},
 ) {
     val peopleById = remember(owner, contacts) {
         buildMap {
@@ -199,6 +201,8 @@ internal fun RelationshipGraphState(
     val viewPathState = rememberSaveable(owner.name) {
         mutableStateOf(listOf(RelationshipPersonIds.SELF))
     }
+    var selectedSection by rememberSaveable { mutableStateOf("graph") }
+    var selectedPersonId by rememberSaveable { mutableStateOf<String?>(null) }
     val storedViewPath = viewPathState.value
     val viewPath = storedViewPath.takeIf { it.lastOrNull() in peopleById }
         ?: listOf(RelationshipPersonIds.SELF)
@@ -241,6 +245,7 @@ internal fun RelationshipGraphState(
     }
     fun switchEgo(nextId: String) {
         if (nextId !in peopleById || nextId == rootId) return
+        selectedPersonId = nextId
         val existingIndex = viewPath.indexOf(nextId)
         viewPathState.value = if (existingIndex >= 0) {
             viewPath.take(existingIndex + 1)
@@ -249,7 +254,7 @@ internal fun RelationshipGraphState(
         }
     }
     Column(
-        Modifier.fillMaxWidth().zhiBanCardSurface(RelationSurface).padding(18.dp),
+        Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -293,6 +298,10 @@ internal fun RelationshipGraphState(
                 }
             }
         }
+        RelationshipGraphContentTabs(
+            selected = selectedSection,
+            onSelected = { selectedSection = it },
+        )
         if (root.isOwner && activeGroup == RelationshipGroup.WORK &&
             shouldShowOwnerEmploymentAnchor(owner.company, currentOwnerEmployment)
         ) {
@@ -303,7 +312,13 @@ internal fun RelationshipGraphState(
                 onEdit = onEditOwnerEmployment,
             )
         }
-        if (contacts.isEmpty()) {
+        if (selectedSection == "timeline") {
+            RelationshipTimeline(
+                events = relationshipEvents,
+                peopleById = peopleById,
+                rootId = rootId,
+            )
+        } else if (contacts.isEmpty()) {
             Spacer(Modifier.height(16.dp))
             Text(
                 relationshipGraphEmptyMessage(activeFilter, activeGroup),
@@ -329,11 +344,152 @@ internal fun RelationshipGraphState(
                     peopleById = peopleById,
                     edges = visibleEdgesForGraph,
                     presentationById = relationshipGraphPresentation(graphProjection),
-                    onSelectContact = {},
+                    onSelectContact = { selectedPersonId = it },
                     onSwitchEgo = ::switchEgo,
+                    showDetailSheet = false,
+                    onSelectionChanged = { selectedPersonId = it },
+                )
+                selectedPersonId?.takeIf { it != RelationshipPersonIds.SELF }?.let { selectedId ->
+                    val selectedPerson = peopleById[selectedId]
+                    if (selectedPerson != null) {
+                        Spacer(Modifier.height(ZhiBanSpacing.Md))
+                        RelationshipGraphPersonCard(
+                            person = selectedPerson,
+                            relationship = visibleEdgesForGraph.firstOrNull {
+                                (it.fromContactId == graphRootId && it.toContactId == selectedId) ||
+                                    (it.toContactId == graphRootId && it.fromContactId == selectedId)
+                            },
+                            interaction = interactionIntensity.firstOrNull { it.contactId == selectedId },
+                            onOpen = { onOpenContact(selectedId) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RelationshipGraphContentTabs(selected: String, onSelected: (String) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = ZhiBanSpacing.Md, bottom = ZhiBanSpacing.Sm)
+            .height(48.dp)
+            .clip(RoundedCornerShape(ZhiBanRadius.Medium))
+            .background(RelationSoft)
+            .padding(3.dp),
+    ) {
+        listOf("graph" to "关系图", "timeline" to "时间线").forEach { (value, label) ->
+            val active = selected == value
+            Box(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(ZhiBanRadius.Small))
+                    .background(if (active) RelationSurface else Color.Transparent)
+                    .clickable { onSelected(value) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    label,
+                    color = if (active) RelationAccent else RelationMuted,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                )
+                if (active) {
+                    Box(
+                        Modifier.align(Alignment.BottomCenter).width(38.dp).height(2.dp)
+                            .background(RelationAccent, RoundedCornerShape(ZhiBanRadius.Full)),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RelationshipTimeline(events: List<RelationshipEventWithParticipants>, peopleById: Map<String, RelationshipPersonUi>, rootId: String) {
+    val visibleEvents = remember(events, rootId) {
+        events.filter { event ->
+            rootId == RelationshipPersonIds.SELF || event.participants.any { it.contactId == rootId }
+        }.sortedByDescending { it.event.occurredAtEpochMs ?: it.event.updatedAtEpochMs }
+    }
+    if (visibleEvents.isEmpty()) {
+        Text(
+            "还没有可追溯的共同经历",
+            modifier = Modifier.fillMaxWidth().padding(vertical = 28.dp),
+            color = RelationMuted,
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        return
+    }
+    Column(
+        Modifier.fillMaxWidth().zhiBanCardSurface(RelationSurface).padding(horizontal = 16.dp),
+    ) {
+        visibleEvents.take(20).forEachIndexed { index, value ->
+            if (index > 0) HorizontalDivider(color = RelationLine)
+            Column(Modifier.fillMaxWidth().padding(vertical = 13.dp)) {
+                Text(
+                    value.event.title.ifBlank { relationshipEventTypeLabel(value.event.eventType) },
+                    color = RelationInk,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+                val participantNames = value.participants.mapNotNull { participant ->
+                    participant.contactId?.let { peopleById[it]?.displayName } ?: participant.displayNameSnapshot
+                }.filter(String::isNotBlank).distinct().joinToString(" · ")
+                val occurredAt = value.event.occurredAtEpochMs ?: value.event.updatedAtEpochMs
+                Text(
+                    listOf(
+                        DateTimeFormatter.ofPattern("yyyy年M月d日").format(
+                            Instant.ofEpochMilli(occurredAt).atZone(ZoneId.systemDefault()),
+                        ),
+                        participantNames,
+                    ).filter(String::isNotBlank).joinToString(" · "),
+                    color = RelationMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun RelationshipGraphPersonCard(
+    person: RelationshipPersonUi,
+    relationship: RelationshipEdgeEntity?,
+    interaction: ContactInteractionIntensity?,
+    onOpen: () -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().zhiBanCardSurface(RelationSurface).clickable(onClick = onOpen)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(52.dp).clip(CircleShape).background(RelationSoft),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(person.displayName.take(1), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        }
+        Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
+            Text(person.displayName, color = RelationInk, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            val lastInteraction = interaction?.lastInteractionAtEpochMs?.let {
+                relationshipInteractionRecency(it, System.currentTimeMillis())
+            }
+            Text(
+                listOfNotNull(relationship?.displayRelationLabel(), lastInteraction, person.company)
+                    .distinct().take(2).joinToString(" · ").ifBlank { "查看关系档案" },
+                color = RelationMuted,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Text("查看档案", color = RelationAccent, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
     }
 }
 

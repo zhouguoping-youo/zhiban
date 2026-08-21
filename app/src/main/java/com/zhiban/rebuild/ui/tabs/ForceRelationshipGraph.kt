@@ -6,7 +6,6 @@ import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -337,6 +336,8 @@ internal fun ForceRelationshipGraphCanvas(
     onSelectContact: (String) -> Unit,
     presentationById: Map<String, ForceGraphNodePresentation> = emptyMap(),
     onSwitchEgo: ((String) -> Unit)? = null,
+    showDetailSheet: Boolean = true,
+    onSelectionChanged: (String?) -> Unit = {},
 ) {
     val model = remember(rootId, peopleById, edges, presentationById) {
         buildForceGraphModel(rootId, peopleById, edges, presentationById)
@@ -413,6 +414,7 @@ internal fun ForceRelationshipGraphCanvas(
             },
         )
         selectedNodeId = null
+        onSelectionChanged(null)
         simulationPulse += 1
     }
 
@@ -460,9 +462,9 @@ internal fun ForceRelationshipGraphCanvas(
 
     BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         val graphHeight = when {
-            maxWidth < 340.dp -> 408.dp
-            maxWidth < 480.dp -> 448.dp
-            else -> 520.dp
+            maxWidth < 340.dp -> 340.dp
+            maxWidth < 480.dp -> 360.dp
+            else -> 460.dp
         }
         Column(
             Modifier.fillMaxWidth().widthIn(max = 720.dp),
@@ -473,8 +475,7 @@ internal fun ForceRelationshipGraphCanvas(
                     .fillMaxWidth()
                     .height(graphHeight)
                     .clip(RoundedCornerShape(ZhiBanRadius.Card))
-                    .background(canvasSurface)
-                    .border(1.dp, outlineColor, RoundedCornerShape(ZhiBanRadius.Card)),
+                    .background(canvasSurface),
             ) {
                 Canvas(
                     Modifier
@@ -545,6 +546,7 @@ internal fun ForceRelationshipGraphCanvas(
                                 activeNodeId?.let { bodies[it]?.dragged = false }
                                 if (!pinching && !nodeDragging && !longPressed && activeNodeId != null) {
                                     selectedNodeId = activeNodeId
+                                    onSelectionChanged(activeNodeId)
                                     focusNode(activeNodeId)
                                     val now = SystemClock.uptimeMillis()
                                     if (isRelationshipGraphDoubleTap(lastTapNodeId, activeNodeId, lastTapAtEpochMs, now)) {
@@ -554,7 +556,7 @@ internal fun ForceRelationshipGraphCanvas(
                                     } else {
                                         lastTapNodeId = activeNodeId
                                         lastTapAtEpochMs = now
-                                        onSwitchEgo?.invoke(activeNodeId)
+                                        onSelectContact(activeNodeId)
                                     }
                                 } else if (nodeDragging && model.nodes.size <= FORCE_PAIRWISE_NODE_LIMIT) {
                                     simulationPulse += 1
@@ -783,19 +785,25 @@ internal fun ForceRelationshipGraphCanvas(
         }
     }
 
-    selectedNodeId?.let { nodeId ->
-        val selected = model.nodes.firstOrNull { it.id == nodeId }
-        if (selected != null) {
-            ForceNodeDetailSheet(
-                node = selected,
-                model = model,
-                onDismiss = { selectedNodeId = null },
-                onRelatedClick = { relatedId ->
-                    selectedNodeId = relatedId
-                    focusNode(relatedId)
-                    (onSwitchEgo ?: onSelectContact).invoke(relatedId)
-                },
-            )
+    if (showDetailSheet) {
+        selectedNodeId?.let { nodeId ->
+            val selected = model.nodes.firstOrNull { it.id == nodeId }
+            if (selected != null) {
+                ForceNodeDetailSheet(
+                    node = selected,
+                    model = model,
+                    onDismiss = {
+                        selectedNodeId = null
+                        onSelectionChanged(null)
+                    },
+                    onRelatedClick = { relatedId ->
+                        selectedNodeId = relatedId
+                        onSelectionChanged(relatedId)
+                        focusNode(relatedId)
+                        (onSwitchEgo ?: onSelectContact).invoke(relatedId)
+                    },
+                )
+            }
         }
     }
 }

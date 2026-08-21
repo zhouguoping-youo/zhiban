@@ -164,6 +164,7 @@ private fun ZhiBanNavContent(
         composable<Home> {
             AgentConversationRoute(
                 initialDraft = "",
+                onOpenCalendar = { navController.navigate(Calendar()) { launchSingleTop = true } },
                 onBackToHome = {
                     navController.navigate(Calendar()) {
                         popUpTo(navController.graph.findStartDestination().id) { saveState = false }
@@ -221,6 +222,7 @@ private fun ZhiBanNavContent(
             val route = entry.toRoute<AssistantChat>()
             AgentConversationRoute(
                 initialDraft = route.draft,
+                onOpenCalendar = { navController.navigate(Calendar()) { launchSingleTop = true } },
                 onManagePlugins = { navController.navigate(Skill) { launchSingleTop = true } },
                 onNavigateToSettings = { navController.navigate(ModelConfig) { launchSingleTop = true } },
                 onBackToHome = {

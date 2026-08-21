@@ -53,6 +53,7 @@ import kotlinx.coroutines.launch
 fun AgentConversationRoute(
     initialDraft: String = "",
     onBackToHome: () -> Unit = {},
+    onOpenCalendar: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     onManagePlugins: () -> Unit = {},
     viewModel: AgentConversationViewModel = hiltViewModel(),
@@ -495,6 +496,7 @@ fun AgentConversationRoute(
         onDeleteConversation = viewModel::deleteConversation,
         onNewConversation = viewModel::newConversation,
         onBackToHome = onBackToHome,
+        onOpenCalendar = onOpenCalendar,
         onNavigateToSettings = onNavigateToSettings,
         onManagePlugins = onManagePlugins,
         inputText = input,

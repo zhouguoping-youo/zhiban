@@ -195,6 +195,7 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
     onReadAssistant: () -> Unit = {},
     onShareAssistant: () -> Unit = {},
     onUndo: () -> Unit = {},
+    onOpenCalendar: () -> Unit = {},
     feedbackEnabled: Boolean = true,
     userAvatarBytes: ByteArray? = null,
     userAvatarLabel: String = "我",
@@ -328,6 +329,16 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
                 }
             }
             if (state.stage == AgentConversationStage.SUCCEEDED) {
+                state.plan?.let { plan ->
+                    item {
+                        AgentOperationResultCard(
+                            plan = plan,
+                            canUndo = state.canUndo,
+                            onOpenCalendar = onOpenCalendar,
+                            onUndo = onUndo,
+                        )
+                    }
+                }
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -404,6 +415,77 @@ fun AgentTopBar(onBack: () -> Unit = {}, onMenu: () -> Unit = {}, onHistory: () 
         )
     }
 }
+
+@Composable
+private fun AgentOperationResultCard(plan: AgentPlanUi, canUndo: Boolean, onOpenCalendar: () -> Unit, onUndo: () -> Unit) {
+    val isCalendarResult = operationResultShowsCalendar(plan)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(ZhiBanRadius.Card),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = CardDefaults.outlinedCardBorder(),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(ZhiBanSpacing.Lg)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(34.dp).clip(CircleShape).background(SuccessSurface),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("✓", color = SuccessText, fontWeight = FontWeight.Bold)
+                }
+                Column(Modifier.weight(1f).padding(start = ZhiBanSpacing.Md)) {
+                    Text(
+                        operationResultTitle(plan),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    operationResultSummary(plan)?.let { summary ->
+                        Text(
+                            summary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
+                        )
+                    }
+                }
+            }
+            if (isCalendarResult || canUndo) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(top = ZhiBanSpacing.Md),
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    if (isCalendarResult) {
+                        TextButton(onClick = onOpenCalendar) { Text("查看日程", color = AgentAccent) }
+                    }
+                    if (canUndo) {
+                        TextButton(onClick = onUndo) { Text("撤销", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+internal fun operationResultShowsCalendar(plan: AgentPlanUi): Boolean =
+    plan.schedule.isNotBlank() || listOf(plan.title, plan.subject, plan.details).any { text ->
+        listOf("日程", "会议", "提醒", "安排").any(text::contains)
+    }
+
+internal fun operationResultTitle(plan: AgentPlanUi): String = when {
+    operationResultShowsCalendar(plan) -> "日程已添加"
+    plan.title.isNotBlank() -> "${plan.title.removeSuffix("。")}已完成"
+    else -> "已完成"
+}
+
+internal fun operationResultSummary(plan: AgentPlanUi): String? = listOf(plan.subject, plan.schedule, plan.reminder)
+    .map(String::trim)
+    .filter(String::isNotBlank)
+    .distinct()
+    .take(3)
+    .joinToString(" · ")
+    .ifBlank { null }
 
 private fun AgentConversationUiState.hasPersistedCurrentTurn(role: String): Boolean {
     val runId = runtimeRunId ?: return false
