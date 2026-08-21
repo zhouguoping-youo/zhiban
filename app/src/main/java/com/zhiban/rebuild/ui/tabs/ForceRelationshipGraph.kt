@@ -31,7 +31,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.MyLocation
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -755,42 +754,6 @@ internal fun ForceRelationshipGraphCanvas(
                     ) {
                         Icon(Icons.Rounded.RestartAlt, contentDescription = "重置关系图视图")
                     }
-                }
-
-                RelationshipGraphMinimap(
-                    positions = bodies,
-                    links = model.links,
-                    rootId = rootId,
-                    graphScale = graphScale,
-                    graphOffset = graphOffset,
-                    graphSize = Size(canvasSize.width.toFloat(), canvasSize.height.toFloat()),
-                    graphColors = graphColors,
-                    onClick = {
-                        onSwitchEgo?.invoke(RelationshipPersonIds.SELF)
-                        resetViewport()
-                    },
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = ZhiBanSpacing.Sm, bottom = 44.dp),
-                )
-
-                Row(
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = ZhiBanSpacing.Sm)
-                        .clip(RoundedCornerShape(ZhiBanRadius.Full))
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
-                        .padding(horizontal = ZhiBanSpacing.Md, vertical = ZhiBanSpacing.Xs),
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        Icons.Rounded.MyLocation,
-                        null,
-                        modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                    Text("单击详情 · 双击切换视角 · 长按拖动 · 双指缩放", style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
