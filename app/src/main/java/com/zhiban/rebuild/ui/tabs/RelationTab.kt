@@ -130,7 +130,6 @@ import com.zhiban.rebuild.ui.components.ZhiBanHeaderIconAction
 import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
 import com.zhiban.rebuild.ui.components.ZhiBanPrimaryTabHeader
 import com.zhiban.rebuild.ui.components.ZhiBanSearchField
-import com.zhiban.rebuild.ui.components.ZhiBanSegmentedControl
 import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
 import com.zhiban.rebuild.ui.components.ZhiBanTabHorizontalPadding
 import com.zhiban.rebuild.ui.components.ZhiBanTabTopPadding
@@ -423,7 +422,7 @@ fun RelationTab(
                         tint = RelationInk,
                     )
                 }
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(10.dp))
             }
             item {
                 ZhiBanSearchField(
@@ -431,24 +430,14 @@ fun RelationTab(
                     onValueChange = { query = it },
                     placeholder = "搜索姓名、电话、公司或备注",
                 )
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(10.dp))
             }
             item {
-                ZhiBanSegmentedControl(
-                    options = listOf("联系人", "关系图"),
-                    selectedIndex = if (mode == "graph") 1 else 0,
-                    onSelected = { mode = if (it == 1) "graph" else "list" },
-                    modifier = Modifier.fillMaxWidth(),
+                RelationshipModeTabs(
+                    selectedMode = mode,
+                    onSelected = { mode = it },
                 )
-                Spacer(Modifier.height(14.dp))
-            }
-            item {
-                RelationshipCategoryFilter(
-                    selected = tag,
-                    options = RelationFilters,
-                    onSelected = { tag = it },
-                )
-                Spacer(Modifier.height(18.dp))
+                Spacer(Modifier.height(12.dp))
             }
             if (mode == "list" && query.isBlank() && tag == "全部" && attentionItems.isNotEmpty()) {
                 item {
@@ -459,11 +448,19 @@ fun RelationTab(
                             RelationshipAttentionKind.MAINTENANCE -> onOpenContactMaintenance()
                         }
                     }
-                    Spacer(Modifier.height(18.dp))
+                    Spacer(Modifier.height(12.dp))
                 }
             }
             when (mode) {
                 "list" -> {
+                    item {
+                        RelationshipCategoryFilter(
+                            selected = tag,
+                            options = RelationFilters,
+                            onSelected = { tag = it },
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
                     if (shouldShowOwnerProfilePrompt(ownerProfile, tag, query)) {
                         item {
                             OwnerProfilePrompt(ownerProfile, onOwnerClick)
@@ -530,13 +527,21 @@ fun RelationTab(
                                 onContactClick(visible[index].contactId)
                             }
                             if (index != visible.lastIndex) {
-                                Box(Modifier.fillMaxWidth().padding(start = 58.dp).height(1.dp).background(RelationLine))
+                                Spacer(Modifier.height(8.dp))
                             }
                         }
                     }
                 }
 
                 "graph" -> {
+                    item {
+                        RelationshipCategoryFilter(
+                            selected = tag,
+                            options = RelationFilters,
+                            onSelected = { tag = it },
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
                     item {
                         RelationshipGraphState(
                             owner = ownerProfile,
@@ -919,6 +924,47 @@ fun RelationTab(
             setSelectedEvent = { selectedEvent = it },
         ),
     )
+}
+
+@Composable
+private fun RelationshipModeTabs(selectedMode: String, onSelected: (String) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(50.dp)
+            .clip(RoundedCornerShape(ZhiBanRadius.Medium))
+            .background(RelationSoft)
+            .padding(3.dp),
+    ) {
+        listOf("list" to "联系人", "graph" to "关系图").forEach { (mode, label) ->
+            val selected = selectedMode == mode
+            Box(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(ZhiBanRadius.Small))
+                    .background(if (selected) RelationSurface else Color.Transparent)
+                    .clickable { onSelected(mode) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (selected) RelationInk else RelationMuted,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                )
+                if (selected) {
+                    Box(
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .width(42.dp)
+                            .height(2.dp)
+                            .background(RelationAccent, RoundedCornerShape(ZhiBanRadius.Full)),
+                    )
+                }
+            }
+        }
+    }
 }
 
 internal const val CONTACT_IMPORT_PERMISSION_INTRO =

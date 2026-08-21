@@ -5,7 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -44,9 +44,7 @@ internal fun RelationshipCategoryFilter(selected: String, options: List<String>,
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = ZhiBanSize.TouchTarget)
-                .clip(MaterialTheme.shapes.large)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .height(ZhiBanSize.TouchTarget)
                 .clickable(role = Role.Button) { expanded = true }
                 .semantics(mergeDescendants = true) {
                     contentDescription = "关系分类"
@@ -54,21 +52,21 @@ internal fun RelationshipCategoryFilter(selected: String, options: List<String>,
                     role = Role.Button
                 }
                 .testTag("relation-category-filter")
-                .padding(horizontal = ZhiBanSpacing.Lg),
+                .padding(horizontal = ZhiBanSpacing.Xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 imageVector = Icons.Outlined.FilterList,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(18.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = "关系分类",
-                modifier = Modifier.weight(1f).padding(start = ZhiBanSpacing.Md),
-                style = MaterialTheme.typography.bodyMedium,
+                text = "联系人",
+                modifier = Modifier.weight(1f).padding(start = ZhiBanSpacing.Sm),
+                style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Medium,
+                fontWeight = FontWeight.SemiBold,
             )
             Text(
                 text = selected,
@@ -79,7 +77,7 @@ internal fun RelationshipCategoryFilter(selected: String, options: List<String>,
             Icon(
                 imageVector = Icons.Outlined.KeyboardArrowDown,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(18.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

@@ -23,6 +23,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
@@ -32,6 +33,8 @@ import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -561,82 +564,63 @@ private fun ConversationAvatar(label: String, background: Color, foreground: Col
 
 @Composable fun AgentPlanCard(plan: AgentPlanUi, stage: AgentConversationStage, onConfirm: () -> Unit, onReject: () -> Unit, onCancel: () -> Unit) {
     Surface(
-        Modifier.fillMaxWidth().semantics {
+        Modifier.fillMaxWidth().shadow(2.dp, RoundedCornerShape(ZhiBanRadius.Card)).semantics {
             liveRegion = LiveRegionMode.Polite
         },
         color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(ZhiBanRadius.Card),
-        tonalElevation = 1.dp,
+        tonalElevation = 0.dp,
     ) {
-        Column(Modifier.padding(18.dp)) {
+        Column(Modifier.padding(16.dp)) {
             Text(
                 planCardStatusLabel(stage),
-                style = MaterialTheme.typography.labelMedium,
-                color = if (stage == AgentConversationStage.EXECUTING) ZhiBanTerracotta else ZhiBanTextSecondary,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (stage == AgentConversationStage.EXECUTING) ZhiBanTerracotta else ZhiBanTerracotta,
             )
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(6.dp))
             Text(
                 plan.title.ifBlank { "待确认操作" },
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 color = ZhiBanTextPrimary,
             )
             if (plan.subject.isNotBlank() &&
                 plan.subject != plan.title
             ) {
-                Spacer(Modifier.height(12.dp))
-                Text(plan.subject, fontWeight = FontWeight.SemiBold, color = ZhiBanTextPrimary)
-            }
-            if (plan.schedule.isNotBlank()) Text(plan.schedule, color = ZhiBanTextSecondary)
-            if (plan.reminder.isNotBlank()) Text(plan.reminder, color = ZhiBanTextSecondary)
-            if (plan.details.isNotBlank()) {
                 Spacer(Modifier.height(10.dp))
-                Text(
-                    plan.details,
-                    Modifier.fillMaxWidth().background(
-                        MaterialTheme.colorScheme.surfaceVariant,
-                        RoundedCornerShape(ZhiBanRadius.Medium),
-                    ).padding(ZhiBanSpacing.Md),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = ZhiBanTextPrimary,
-                )
+                AgentPlanSummaryRow(Icons.Outlined.ChatBubbleOutline, plan.subject)
+            }
+            if (plan.schedule.isNotBlank()) AgentPlanSummaryRow(Icons.Outlined.Schedule, plan.schedule)
+            if (plan.reminder.isNotBlank()) AgentPlanSummaryRow(Icons.Outlined.NotificationsNone, plan.reminder)
+            if (plan.details.isNotBlank()) {
+                AgentPlanSummaryRow(Icons.Outlined.ChatBubbleOutline, plan.details)
             }
             if (plan.recipient.isNotBlank()) {
-                Spacer(Modifier.height(12.dp))
-                Text("收件人", style = MaterialTheme.typography.labelMedium, color = ZhiBanTextSecondary)
-                Text(plan.recipient, style = MaterialTheme.typography.bodyLarge, color = ZhiBanTextPrimary)
+                AgentPlanSummaryRow(Icons.Outlined.ChatBubbleOutline, plan.recipient)
             }
             if (plan.message.isNotBlank()) {
-                Spacer(Modifier.height(10.dp))
-                Text("消息预览", style = MaterialTheme.typography.labelMedium, color = ZhiBanTextSecondary)
-                Text(
-                    plan.message,
-                    Modifier.fillMaxWidth().background(
-                        MaterialTheme.colorScheme.surfaceVariant,
-                        RoundedCornerShape(ZhiBanRadius.Medium),
-                    ).padding(ZhiBanSpacing.Md),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = ZhiBanTextPrimary,
-                )
-                Spacer(Modifier.height(8.dp))
+                AgentPlanSummaryRow(Icons.Outlined.ChatBubbleOutline, "${plan.platform.userFacingPlatformLabel()}文案已准备")
                 Text(
                     "确认后会打开目标应用，仍需由你完成最后发送。",
+                    modifier = Modifier.padding(start = 28.dp, top = 2.dp),
                     style = MaterialTheme.typography.bodySmall,
                     color = ZhiBanTextSecondary,
                 )
             }
             Spacer(Modifier.height(16.dp))
             when (stage) {
-                AgentConversationStage.AWAITING_CONFIRMATION -> Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
+                AgentConversationStage.AWAITING_CONFIRMATION -> Column {
                     Button(
                         onClick = onConfirm,
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = ZhiBanTerracotta),
+                        shape = RoundedCornerShape(ZhiBanRadius.Medium),
                     ) {
                         Text(planConfirmLabel(plan))
                     }
-                    TextButton(onClick = onReject) { Text("取消") }
+                    TextButton(onClick = onReject, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                        Text("取消")
+                    }
                 }
 
                 AgentConversationStage.EXECUTING -> Row(verticalAlignment = Alignment.CenterVertically) {
@@ -649,6 +633,24 @@ private fun ConversationAvatar(label: String, background: Color, foreground: Col
                 else -> Unit
             }
         }
+    }
+}
+
+@Composable
+private fun AgentPlanSummaryRow(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+    Row(
+        Modifier.fillMaxWidth().padding(top = 8.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(icon, null, tint = ZhiBanTextSecondary, modifier = Modifier.size(18.dp))
+        Text(
+            text,
+            modifier = Modifier.weight(1f).padding(start = 10.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = ZhiBanTextSecondary,
+            maxLines = 3,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        )
     }
 }
 

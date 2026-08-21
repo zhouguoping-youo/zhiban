@@ -97,7 +97,11 @@ private fun UserProfile.missingRequiredIdentityHint(): String {
 @Composable
 internal fun ContactRow(contact: ContactEntity, contextSummary: String? = null, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 13.dp),
+        Modifier
+            .fillMaxWidth()
+            .zhiBanCardSurface(RelationSurface)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(44.dp).clip(CircleShape).background(RelationSoft), contentAlignment = Alignment.Center) {
@@ -174,7 +178,7 @@ internal fun relationshipInteractionRecency(lastInteractionAtEpochMs: Long, nowE
 @Composable
 internal fun RelationEmpty(searching: Boolean, onImport: () -> Unit, onAdd: () -> Unit) {
     Column(
-        Modifier.fillMaxWidth().zhiBanCardSurface(RelationSurface).padding(vertical = 30.dp, horizontal = 22.dp),
+        Modifier.fillMaxWidth().zhiBanCardSurface(RelationSurface).padding(vertical = 24.dp, horizontal = 22.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(Modifier.size(48.dp).clip(CircleShape).background(RelationSoft), contentAlignment = Alignment.Center) {
