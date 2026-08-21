@@ -1,19 +1,33 @@
 package com.zhiban.rebuild.data.contact
 
-internal data class LocalOrganizationSuggestion(val contactId: String, val company: String, val evidenceContactId: String, val confidence: Double)
+internal data class LocalOrganizationSuggestion(
+    val contactId: String,
+    val company: String,
+    val matchedCompanyHint: String,
+    val evidenceContactId: String,
+    val confidence: Double,
+)
 
 /**
  * Finds explainable company-name candidates already present in the user's own relationship book.
  * A unique legal-name match may complete an abbreviation; conflicting matches produce nothing.
  */
-internal fun buildLocalOrganizationSuggestions(contacts: List<ContactEntity>): List<LocalOrganizationSuggestion> {
+internal fun buildLocalOrganizationSuggestions(
+    contacts: List<ContactEntity>,
+    knownCompanyNames: List<String> = emptyList(),
+): List<LocalOrganizationSuggestion> {
     val canonicalCompanies = contacts.mapNotNull { contact ->
         contact.company?.cleanCompanyName()?.takeIf(::looksLikeLegalCompanyName)?.let { company ->
             CanonicalCompany(contact.contactId, company, company.companyKey())
         }
+    } + knownCompanyNames.mapNotNull { company ->
+        company.cleanCompanyName().takeIf(::looksLikeLegalCompanyName)?.let { canonical ->
+            CanonicalCompany(RelationshipPersonIds.SELF, canonical, canonical.companyKey())
+        }
     }
     return contacts.mapNotNull { contact ->
-        val current = contact.company?.cleanCompanyName() ?: return@mapNotNull null
+        val rawHint = contact.company?.trim()?.takeIf(String::isNotBlank) ?: return@mapNotNull null
+        val current = rawHint.cleanCompanyName()
         if (looksLikeLegalCompanyName(current)) return@mapNotNull null
         val hint = current.companyKey()
         if (hint.length < 2) return@mapNotNull null
@@ -24,6 +38,7 @@ internal fun buildLocalOrganizationSuggestions(contacts: List<ContactEntity>): L
         LocalOrganizationSuggestion(
             contactId = contact.contactId,
             company = match.name,
+            matchedCompanyHint = rawHint,
             evidenceContactId = match.contactId,
             confidence = 0.78,
         )

@@ -370,7 +370,10 @@ internal suspend fun ContactAgentDataRepository.upsertSystemContactPlatformIdent
 
 internal suspend fun ContactAgentDataRepository.stageLocalOrganizationSuggestions(nowEpochMs: Long) {
     val contacts = database.contactDao().listActiveForIntelligence()
-    buildLocalOrganizationSuggestions(contacts).forEach { suggestion ->
+    val ownerCompanies = database.contactIntelligenceDao()
+        .listConfirmedOwnerEmployments(RelationshipPersonIds.SELF)
+        .map(PersonEmploymentEpisodeEntity::companyNameSnapshot)
+    buildLocalOrganizationSuggestions(contacts, ownerCompanies).forEach { suggestion ->
         val candidateId = "local-org-${sha256("${suggestion.contactId}|${suggestion.company}").take(24)}"
         database.contactKnowledgeDao().insertEnrichmentCandidateIfAbsent(
             ContactEnrichmentCandidateEntity(
@@ -378,8 +381,18 @@ internal suspend fun ContactAgentDataRepository.stageLocalOrganizationSuggestion
                 contactId = suggestion.contactId,
                 providerId = "local-contact-intelligence",
                 fieldKind = "ORGANIZATION",
-                proposedValueJson = buildJsonObject { put("company", JsonPrimitive(suggestion.company)) }.toString(),
-                sourceRef = "通讯录中另一位联系人的已存公司资料",
+                proposedValueJson = buildJsonObject {
+                    // Keep both the canonical value and the exact lookup hint. The writer uses the
+                    // hint as a compare-and-swap guard before replacing an existing abbreviation.
+                    put("company", JsonPrimitive(suggestion.company))
+                    put("canonicalName", JsonPrimitive(suggestion.company))
+                    put("matchedCompanyHint", JsonPrimitive(suggestion.matchedCompanyHint))
+                }.toString(),
+                sourceRef = if (suggestion.evidenceContactId == RelationshipPersonIds.SELF) {
+                    "用户资料中已确认的当前公司"
+                } else {
+                    "通讯录中另一位联系人的已存公司资料"
+                },
                 confidence = suggestion.confidence,
                 status = "PENDING",
                 observedAtEpochMs = nowEpochMs,

@@ -15,6 +15,7 @@ class ContactIntelligenceTest {
         assertEquals(1, suggestions.size)
         assertEquals("a", suggestions.single().contactId)
         assertEquals("知伴科技（上海）有限公司", suggestions.single().company)
+        assertEquals("知伴", suggestions.single().matchedCompanyHint)
         assertTrue(suggestions.single().confidence < 1.0)
     }
 
@@ -29,6 +30,19 @@ class ContactIntelligenceTest {
         )
 
         assertTrue(suggestions.isEmpty())
+    }
+
+    @Test
+    fun confirmedOwnerCompanyCanCompleteContactAbbreviation() {
+        val suggestions = buildLocalOrganizationSuggestions(
+            contacts = listOf(contact("a", "王能能", "平凯星辰")),
+            knownCompanyNames = listOf("平凯星辰（北京）科技有限公司"),
+        )
+
+        assertEquals(1, suggestions.size)
+        assertEquals("平凯星辰（北京）科技有限公司", suggestions.single().company)
+        assertEquals("平凯星辰", suggestions.single().matchedCompanyHint)
+        assertEquals(RelationshipPersonIds.SELF, suggestions.single().evidenceContactId)
     }
 
     @Test

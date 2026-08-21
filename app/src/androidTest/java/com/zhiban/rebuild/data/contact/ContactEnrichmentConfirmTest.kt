@@ -5,8 +5,12 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zhiban.rebuild.data.agent.AgentDatabase
 import com.zhiban.rebuild.data.agent.ContactAgentDataRepository
+import com.zhiban.rebuild.data.agent.refreshLocalContactIntelligence
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -185,6 +189,41 @@ class ContactEnrichmentConfirmTest {
         val temporalEmployment = db.contactIntelligenceDao().listAllEmployments().single()
         assertEquals(organization.organizationId, temporalEmployment.organizationId)
         assertEquals("UNKNOWN", temporalEmployment.currentState)
+    }
+
+    @Test fun confirmLocalCompanyEvidenceReplacesExistingAbbreviation() = runBlocking {
+        db.contactDao().insert(contact(company = "知伴", title = null))
+        val local = candidate(
+            id = "local-company",
+            value = """{
+                "company":"知伴科技（上海）有限公司",
+                "canonicalName":"知伴科技（上海）有限公司",
+                "matchedCompanyHint":"知伴"
+            }""".trimIndent(),
+        ).copy(
+            providerId = "local-contact-intelligence",
+            sourceRef = "通讯录中另一位联系人的已存公司资料",
+            confidence = 0.78,
+        )
+        repository.stageContactEnrichmentCandidate(local)
+
+        assertTrue(repository.applyContactEnrichmentCandidate(local, nowEpochMs = 100))
+        assertEquals("知伴科技（上海）有限公司", db.contactDao().findRawById("c1")!!.company)
+        assertEquals("APPROVED", db.contactKnowledgeDao().findEnrichmentCandidate(local.candidateId)!!.status)
+    }
+
+    @Test fun localCompanyRefreshStagesCompareAndSwapHintAndCanBeApplied() = runBlocking {
+        db.contactDao().insert(contact(company = "知伴", title = null))
+        db.contactDao().insert(contact(company = "知伴科技（上海）有限公司", title = null).copy(contactId = "c2", displayName = "李四"))
+
+        repository.refreshLocalContactIntelligence(nowEpochMs = 100)
+
+        val candidate = db.contactKnowledgeDao().observePendingEnrichment("c1").first().single()
+        val value = Json.parseToJsonElement(candidate.proposedValueJson).jsonObject
+        assertEquals("知伴科技（上海）有限公司", value["canonicalName"]?.jsonPrimitive?.content)
+        assertEquals("知伴", value["matchedCompanyHint"]?.jsonPrimitive?.content)
+        assertTrue(repository.applyContactEnrichmentCandidate(candidate, nowEpochMs = 101))
+        assertEquals("知伴科技（上海）有限公司", db.contactDao().findRawById("c1")!!.company)
     }
 
     @Test fun registryConfirmationDoesNotOverwriteCompanyChangedAfterLookup() = runBlocking {

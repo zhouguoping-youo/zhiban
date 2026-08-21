@@ -52,9 +52,13 @@ internal class WebSearchCompanyRegistryGateway(private val webSearch: WebSearchG
         hits.forEach { hit ->
             extractFullNames("${hit.title} ${hit.snippet}")
                 .map { it.filterNot(Char::isWhitespace) }
-                .filter { it.length in hint.length..MAX_FULL_NAME_CHARS }
-                .filter { it.contains(hint, ignoreCase = true) }
-                .forEach { fullName -> aggregates.getOrPut(fullName) { CandidateAggregate(fullName) }.addHit(hit) }
+                .filter { it.length in MIN_HINT_CHARS..MAX_FULL_NAME_CHARS }
+                .mapNotNull { fullName ->
+                    companyHintMatch(hint, fullName)?.let { fullName to it }
+                }
+                .forEach { (fullName, hintMatch) ->
+                    aggregates.getOrPut(fullName) { CandidateAggregate(fullName, hintMatch.exact) }.addHit(hit)
+                }
         }
         return aggregates.values
             .map { it.toMatch(hint) }
@@ -80,7 +84,38 @@ internal class WebSearchCompanyRegistryGateway(private val webSearch: WebSearchG
 
     private fun normalize(value: String): String = value.trim().lowercase().filterNot(Char::isWhitespace)
 
-    private class CandidateAggregate(private val fullName: String) {
+    private fun companyHintMatch(hint: String, fullName: String): CompanyHintMatch? {
+        val normalizedHint = normalizeCompanyText(hint)
+        val normalizedName = normalizeCompanyText(fullName)
+        if (normalizedHint.length < MIN_HINT_CHARS || normalizedName.length < MIN_HINT_CHARS) return null
+        if (normalizedName.contains(normalizedHint)) return CompanyHintMatch(exact = true)
+        val similarity = longestCommonSubsequence(normalizedHint, normalizedName).toDouble() / normalizedHint.length
+        val threshold = if (normalizedHint.length >= LONG_HINT_CHARS) LONG_HINT_SIMILARITY else MIN_HINT_SIMILARITY
+        return CompanyHintMatch(exact = false).takeIf { similarity >= threshold }
+    }
+
+    private fun normalizeCompanyText(value: String): String = value
+        .trim()
+        .lowercase()
+        .filter { it.isLetterOrDigit() || it in '\u4e00'..'\u9fa5' }
+
+    private fun longestCommonSubsequence(first: String, second: String): Int {
+        var previous = IntArray(second.length + 1)
+        first.forEach { firstChar ->
+            val current = IntArray(second.length + 1)
+            second.forEachIndexed { index, secondChar ->
+                current[index + 1] = if (firstChar == secondChar) {
+                    previous[index] + 1
+                } else {
+                    maxOf(current[index], previous[index + 1])
+                }
+            }
+            previous = current
+        }
+        return previous.last()
+    }
+
+    private class CandidateAggregate(private val fullName: String, private val exactHintMatch: Boolean) {
         private val hosts = linkedSetOf<String>()
         private var sourceUrl: String? = null
         private var sourceName: String? = null
@@ -100,10 +135,12 @@ internal class WebSearchCompanyRegistryGateway(private val webSearch: WebSearchG
         }
 
         fun toMatch(hint: String): CompanyRegistryMatch {
-            var confidence = CONTAINS_BASE_CONFIDENCE
+            var confidence = if (exactHintMatch) CONTAINS_BASE_CONFIDENCE else FUZZY_BASE_CONFIDENCE
             if (authoritative) confidence += AUTHORITATIVE_BONUS
             if (hosts.size >= MIN_SOURCES_FOR_CORROBORATION) confidence += CROSS_DOMAIN_BONUS
-            val reasons = mutableListOf("全称包含简称「$hint」")
+            val reasons = mutableListOf(
+                if (exactHintMatch) "全称包含简称「$hint」" else "全称与简称高度相似「$hint」",
+            )
             sourceName?.let { reasons += "来源：$it" }
             if (hosts.size >= MIN_SOURCES_FOR_CORROBORATION) reasons += "多来源一致"
             return CompanyRegistryMatch(
@@ -131,16 +168,21 @@ internal class WebSearchCompanyRegistryGateway(private val webSearch: WebSearchG
         const val MAX_CACHE_ENTRIES = 200
         const val MIN_SOURCES_FOR_CORROBORATION = 2
         const val CONTAINS_BASE_CONFIDENCE = 0.65
+        const val FUZZY_BASE_CONFIDENCE = 0.60
         const val AUTHORITATIVE_BONUS = 0.15
         const val CROSS_DOMAIN_BONUS = 0.15
         const val MAX_CONFIDENCE = 0.80
         const val CACHE_TTL_MS = 30L * 24 * 60 * 60 * 1_000
+        const val MIN_HINT_CHARS = 2
+        const val LONG_HINT_CHARS = 6
+        const val MIN_HINT_SIMILARITY = 0.75
+        const val LONG_HINT_SIMILARITY = 0.80
 
         /** Anchored at a name boundary so a sentence ending in a suffix does not swallow its lead-in. */
         val ORG_NAME = Regex(
             """(?:^|[\s，。、；：:""'【】《》〈〉!?,.\-—…·/\\|<>])""" +
                 """([一-龥][一-龥A-Za-z0-9（）()]{1,28}?""" +
-                """(?:有限责任公司|股份有限公司|集团有限公司|有限公司|股份公司|有限合伙|事务所|研究院|研究所))""",
+                """(?:有限责任公司|股份有限公司|集团有限公司|有限公司|股份公司|有限合伙|事务所|研究院|研究所|医院|学校|大学|学院|银行|中心|协会|基金会))""",
         )
 
         val AUTHORITATIVE_SOURCES = listOf(
@@ -165,4 +207,6 @@ internal class WebSearchCompanyRegistryGateway(private val webSearch: WebSearchG
     }
 
     private data class CacheEntry(val storedAtEpochMs: Long, val matches: List<CompanyRegistryMatch>)
+
+    private data class CompanyHintMatch(val exact: Boolean)
 }

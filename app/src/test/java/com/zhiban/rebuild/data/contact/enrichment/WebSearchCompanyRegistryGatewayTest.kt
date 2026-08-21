@@ -32,6 +32,30 @@ class WebSearchCompanyRegistryGatewayTest {
     }
 
     @Test
+    fun `accepts a close public name match when web spelling differs slightly`() = runBlocking {
+        val webSearch = WebSearchGateway { _, _ ->
+            listOf(WebSearchHit("长沙宏网通讯有限公司", "https://site-a.example/about", "长沙宏网通讯有限公司"))
+        }
+
+        val match = gateway(webSearch).search("长沙宏网通信").single()
+
+        assertEquals("长沙宏网通讯有限公司", match.canonicalName)
+        assertEquals(0.60, match.confidence, 1e-9)
+        assertTrue(match.matchReasons.any { it.contains("高度相似") })
+    }
+
+    @Test
+    fun `extracts public institution names such as hospitals`() = runBlocking {
+        val webSearch = WebSearchGateway { _, _ ->
+            listOf(WebSearchHit("武汉市人民医院", "https://hospital.example/about", "武汉市人民医院"))
+        }
+
+        val match = gateway(webSearch).search("武汉市省人民医院").single()
+
+        assertEquals("武汉市人民医院", match.canonicalName)
+    }
+
+    @Test
     fun `an authoritative source lifts confidence to the cap`() = runBlocking {
         val webSearch = WebSearchGateway { _, _ ->
             listOf(WebSearchHit("北京星河科技有限公司 - 企查查", "https://www.qcc.com/firm/1", "北京星河科技有限公司"))
