@@ -226,12 +226,12 @@ class CrmContactLinkTest {
                     onRejectEnrichment = {},
                     onSaveToPhone = {},
                     onCall = {},
-                    onMessage = {},
+                    onAsk = {},
                 )
             }
         }
 
-        compose.onNodeWithText("进行中的商机").assertIsDisplayed()
+        compose.onNodeWithText("还没完成").assertIsDisplayed()
         compose.onNodeWithTag("contact-crm-opp-o1").assertIsDisplayed()
         compose.onNodeWithText("甲公司年度合作").assertIsDisplayed()
     }
@@ -272,16 +272,17 @@ class CrmContactLinkTest {
                     onRejectEnrichment = {},
                     onSaveToPhone = {},
                     onCall = {},
-                    onMessage = {},
+                    onAsk = {},
                 )
             }
         }
 
         compose.onNodeWithText("编辑").performClick()
         assertTrue(edited)
-        compose.onNodeWithText("电话").assertIsDisplayed()
-        compose.onNodeWithText("短信").assertIsDisplayed()
-        compose.onNodeWithText("资料").assertIsDisplayed()
+        compose.onNodeWithText("联系").assertIsDisplayed()
+        compose.onNodeWithText("记一条").assertIsDisplayed()
+        compose.onNodeWithText("问问").assertIsDisplayed()
+        compose.onNodeWithText("更多资料").assertIsDisplayed()
         compose.onNodeWithText("身份与称呼").assertDoesNotExist()
         compose.onNodeWithText("你确认的信息").assertDoesNotExist()
         compose.onNodeWithText("暂无已关联的通话记录").assertDoesNotExist()

@@ -34,6 +34,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.zhiban.rebuild.data.contact.ContactEntity
+import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
+import com.zhiban.rebuild.data.contact.RelationshipPersonIds
+import com.zhiban.rebuild.data.interaction.ContactInteractionIntensity
 import com.zhiban.rebuild.runtime.personalization.UserProfile
 import com.zhiban.rebuild.runtime.personalization.hasCompleteRequiredIdentity
 import com.zhiban.rebuild.runtime.personalization.isValidMainlandMobileNumber
@@ -92,7 +95,7 @@ private fun UserProfile.missingRequiredIdentityHint(): String {
 }
 
 @Composable
-internal fun ContactRow(contact: ContactEntity, onClick: () -> Unit) {
+internal fun ContactRow(contact: ContactEntity, contextSummary: String? = null, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -113,7 +116,9 @@ internal fun ContactRow(contact: ContactEntity, onClick: () -> Unit) {
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium,
             )
-            val subtitle = listOfNotNull(contact.company, contact.title, contact.phone).take(2).joinToString(" · ")
+            val subtitle = contextSummary.orEmpty().ifBlank {
+                listOfNotNull(contact.company, contact.title, contact.phone).take(2).joinToString(" · ")
+            }
             if (subtitle.isNotBlank()) {
                 Text(
                     subtitle,
@@ -135,6 +140,34 @@ internal fun ContactRow(contact: ContactEntity, onClick: () -> Unit) {
                 ).padding(horizontal = 8.dp, vertical = 4.dp),
             )
         }
+    }
+}
+
+internal fun contactContextSummary(
+    contact: ContactEntity,
+    relationships: List<RelationshipEdgeEntity>,
+    interaction: ContactInteractionIntensity?,
+    nowEpochMs: Long,
+): String {
+    val directRelationship = relationships.firstOrNull { edge ->
+        (edge.fromContactId == RelationshipPersonIds.SELF && edge.toContactId == contact.contactId) ||
+            (edge.toContactId == RelationshipPersonIds.SELF && edge.fromContactId == contact.contactId)
+    }?.displayRelationLabel()
+    val company = contact.company?.trim()?.takeIf(String::isNotBlank)
+    val recency = interaction?.lastInteractionAtEpochMs?.let { relationshipInteractionRecency(it, nowEpochMs) }
+    return listOfNotNull(directRelationship, company, recency).distinct().take(3).joinToString(" · ")
+}
+
+internal fun relationshipInteractionRecency(lastInteractionAtEpochMs: Long, nowEpochMs: Long): String? {
+    if (lastInteractionAtEpochMs <= 0L || lastInteractionAtEpochMs > nowEpochMs) return null
+    val days = (nowEpochMs - lastInteractionAtEpochMs) / 86_400_000L
+    return when {
+        days == 0L -> "今天联系过"
+        days == 1L -> "昨天联系过"
+        days < 7L -> "${days}天前联系"
+        days < 30L -> "${days / 7L}周前联系"
+        days < 365L -> "${days / 30L}个月前联系"
+        else -> "${days / 365L}年前联系"
     }
 }
 

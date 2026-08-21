@@ -44,12 +44,9 @@ class RelationshipGraphInteractionTest {
                     owner = UserProfile(name = "周国平"),
                     contacts = listOf(contact("a", "联系人甲"), contact("b", "联系人乙")),
                     edges = listOf(edge("a", "b")),
-                    events = emptyList(),
                     canAddRelationship = true,
                     activeFilter = null,
                     onAdd = {},
-                    onInspect = {},
-                    onInspectEvent = {},
                 )
             }
         }
@@ -71,13 +68,10 @@ class RelationshipGraphInteractionTest {
                     owner = UserProfile(name = "周国平"),
                     contacts = emptyList(),
                     edges = emptyList(),
-                    events = emptyList(),
                     canAddRelationship = false,
                     activeFilter = group.value.displayName,
                     activeGroup = group.value,
                     onAdd = {},
-                    onInspect = {},
-                    onInspectEvent = {},
                 )
             }
         }

@@ -166,13 +166,10 @@ internal fun RelationshipGraphState(
     currentOwnerEmployment: PersonEmploymentEpisodeEntity? = null,
     ownerEmploymentHistoryCount: Int = 0,
     interactionIntensity: List<ContactInteractionIntensity> = emptyList(),
-    events: List<RelationshipEventWithParticipants>,
     canAddRelationship: Boolean,
     activeFilter: String?,
     activeGroup: RelationshipGroup? = null,
     onAdd: () -> Unit,
-    onInspect: (RelationshipEdgeEntity) -> Unit,
-    onInspectEvent: (RelationshipEventWithParticipants) -> Unit,
     onEditOwnerEmployment: () -> Unit = {},
 ) {
     val peopleById = remember(owner, contacts) {
@@ -211,9 +208,6 @@ internal fun RelationshipGraphState(
         mergeCurrentAndHistoricalRelationships(edges, historicalEdges)
             .filter { it.fromContactId in peopleById && it.toContactId in peopleById }
     }
-    val inferredEdgesCount = remember(allValidEdges) {
-        allValidEdges.count(RelationshipEdgeEntity::isInferredEvidenceRelationship)
-    }
     val visibleEdges = remember(allValidEdges, rootId) {
         allValidEdges.filter { it.fromContactId == rootId || it.toContactId == rootId }
     }
@@ -229,16 +223,6 @@ internal fun RelationshipGraphState(
     val root = peopleById.getValue(rootId)
     val graphEdges = displayedEdges
     val graphRootId = rootId
-    val relatedContactIds = remember(displayedEdges, rootId) {
-        displayedEdges.flatMap { edge -> listOf(edge.fromContactId, edge.toContactId) }
-            .filter { it != rootId }
-            .toSet()
-    }
-    val graphRelatedIds = remember(graphEdges, graphRootId) {
-        graphEdges.flatMap { listOf(it.fromContactId, it.toContactId) }
-            .filter { it != graphRootId }
-            .toSet()
-    }
     val graphNeighborIds = remember(graphEdges, graphRootId, peopleById) {
         graphEdges
             .flatMap { listOf(it.fromContactId, it.toContactId) }
@@ -255,11 +239,6 @@ internal fun RelationshipGraphState(
                 "${ordered[0]}::${ordered[1]}::${edge.relationType}"
             }
     }
-    val hiddenGraphNodesCount = if (graphProjection.isEgoView) {
-        (graphRelatedIds.size - graphNeighborIds.size).coerceAtLeast(0)
-    } else {
-        0
-    }
     fun switchEgo(nextId: String) {
         if (nextId !in peopleById || nextId == rootId) return
         val existingIndex = viewPath.indexOf(nextId)
@@ -267,19 +246,6 @@ internal fun RelationshipGraphState(
             viewPath.take(existingIndex + 1)
         } else {
             viewPath + nextId
-        }
-    }
-    val relatedEvents = remember(root, events, relatedContactIds, rootId) {
-        if (root.isOwner) {
-            events.filter { event ->
-                event.participants.any { participant -> participant.contactId in relatedContactIds }
-            }
-        } else {
-            events.filter { event ->
-                event.participants.any {
-                    it.contactId == null || it.contactId == rootId || it.contactId in relatedContactIds
-                }
-            }
         }
     }
     Column(
@@ -357,14 +323,6 @@ internal fun RelationshipGraphState(
             )
         } else {
             Spacer(Modifier.height(12.dp))
-            Text(
-                "关系图谱",
-                Modifier.fillMaxWidth(),
-                color = RelationInk,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.height(16.dp))
             if (graphEdges.isNotEmpty()) {
                 ForceRelationshipGraphCanvas(
                     rootId = graphRootId,
@@ -374,55 +332,6 @@ internal fun RelationshipGraphState(
                     onSelectContact = {},
                     onSwitchEgo = ::switchEgo,
                 )
-                Spacer(Modifier.height(14.dp))
-                if (hiddenGraphNodesCount > 0) {
-                    Text(
-                        "当前焦点还有 $hiddenGraphNodesCount 位联系人未铺开；点任意节点继续探索",
-                        color = RelationMuted,
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                }
-                Text(
-                    if (root.isOwner) "与我相关" else "与 ${root.displayName} 相关",
-                    Modifier.fillMaxWidth(),
-                    color = RelationInk,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Medium,
-                )
-                Spacer(Modifier.height(6.dp))
-                RelationshipRows(graphEdges.take(12), peopleById, onInspect, onSelectContact = ::switchEgo)
-                Spacer(Modifier.height(12.dp))
-            }
-            if (allValidEdges.size > 12) {
-                Text("仅展示 12 条关系，可在联系人页打开更多", color = RelationMuted, style = MaterialTheme.typography.labelSmall)
-            }
-        }
-        if (displayedEdges.isNotEmpty()) {
-            Spacer(Modifier.height(14.dp))
-            Text(
-                if (inferredEdgesCount > 0) {
-                    "实线为已确认关系；虚线为资料证据推测"
-                } else {
-                    "只展示已保存、可追溯来源的关系"
-                },
-                color = RelationMuted,
-                style = MaterialTheme.typography.labelSmall,
-            )
-        }
-        if (relatedEvents.isNotEmpty()) {
-            Spacer(Modifier.height(18.dp))
-            Box(Modifier.fillMaxWidth().height(1.dp).background(RelationLine))
-            Spacer(Modifier.height(14.dp))
-            Text(
-                "共同经历",
-                Modifier.fillMaxWidth(),
-                color = RelationInk,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-            relatedEvents.take(5).forEach { event ->
-                RelationshipEventRow(event, onInspectEvent)
             }
         }
     }

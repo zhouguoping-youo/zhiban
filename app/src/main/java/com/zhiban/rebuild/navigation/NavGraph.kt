@@ -189,6 +189,7 @@ private fun ZhiBanNavContent(
                 onOwnerClick = { navController.navigate(ProfileEdit) },
                 onOpenAutoWrites = { navController.navigate(AutoWrites) },
                 onOpenContactMaintenance = { navController.navigate(ContactMaintenance) },
+                onAsk = { draft -> navController.navigate(AssistantChat(draft = draft, returnTarget = "RELATION")) },
             )
         }
         composable<Skill> {

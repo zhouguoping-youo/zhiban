@@ -129,7 +129,7 @@ class ForceRelationshipGraphTest {
     }
 
     @Test
-    fun `root projection retains every connected edge`() {
+    fun `root projection stays quiet and keeps only direct relationships`() {
         val edges = listOf(
             edge("self-a", RelationshipPersonIds.SELF, "a", "COLLEAGUE", 1.0, true),
             edge("a-b", "a", "b", "COLLEAGUE", 1.0, true),
@@ -143,8 +143,8 @@ class ForceRelationshipGraphTest {
             edges = edges,
         )
 
-        assertEquals(edges.take(3), projection.edges)
-        assertEquals(setOf("a", "b", "c"), projection.hopByNode.keys - RelationshipPersonIds.SELF)
+        assertEquals(listOf(edges.first()), projection.edges)
+        assertEquals(setOf("a"), projection.hopByNode.keys - RelationshipPersonIds.SELF)
         assertTrue(projection.isEgoView.not())
     }
 

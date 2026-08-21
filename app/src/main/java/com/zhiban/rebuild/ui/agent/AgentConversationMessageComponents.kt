@@ -570,13 +570,13 @@ private fun ConversationAvatar(label: String, background: Color, foreground: Col
     ) {
         Column(Modifier.padding(18.dp)) {
             Text(
-                if (stage ==
-                    AgentConversationStage.EXECUTING
-                ) {
-                    "正在执行计划"
-                } else {
-                    "计划：${plan.title}"
-                },
+                planCardStatusLabel(stage),
+                style = MaterialTheme.typography.labelMedium,
+                color = if (stage == AgentConversationStage.EXECUTING) ZhiBanTerracotta else ZhiBanTextSecondary,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                plan.title.ifBlank { "待确认操作" },
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = ZhiBanTextPrimary,
@@ -608,7 +608,7 @@ private fun ConversationAvatar(label: String, background: Color, foreground: Col
             }
             if (plan.message.isNotBlank()) {
                 Spacer(Modifier.height(10.dp))
-                Text("将发送", style = MaterialTheme.typography.labelMedium, color = ZhiBanTextSecondary)
+                Text("消息预览", style = MaterialTheme.typography.labelMedium, color = ZhiBanTextSecondary)
                 Text(
                     plan.message,
                     Modifier.fillMaxWidth().background(
@@ -634,15 +634,15 @@ private fun ConversationAvatar(label: String, background: Color, foreground: Col
                         onClick = onConfirm,
                         colors = ButtonDefaults.buttonColors(containerColor = ZhiBanTerracotta),
                     ) {
-                        Text("确认执行")
+                        Text(planConfirmLabel(plan))
                     }
-                    TextButton(onClick = onReject) { Text("拒绝") }
+                    TextButton(onClick = onReject) { Text("取消") }
                 }
 
                 AgentConversationStage.EXECUTING -> Row(verticalAlignment = Alignment.CenterVertically) {
                     CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = ZhiBanTerracotta)
                     Spacer(Modifier.width(10.dp))
-                    Text("正在安全写入，请稍候…", Modifier.weight(1f), color = ZhiBanTextSecondary)
+                    Text("正在完成…", Modifier.weight(1f), color = ZhiBanTextSecondary)
                     TextButton(onClick = onCancel) { Text("取消") }
                 }
 
@@ -650,6 +650,25 @@ private fun ConversationAvatar(label: String, background: Color, foreground: Col
             }
         }
     }
+}
+
+internal fun planCardStatusLabel(stage: AgentConversationStage): String = if (stage == AgentConversationStage.EXECUTING) {
+    "正在处理"
+} else {
+    "需要你确认"
+}
+
+internal fun planConfirmLabel(plan: AgentPlanUi): String =
+    if (plan.message.isNotBlank() && plan.platform.isNotBlank()) "确认并打开${plan.platform.userFacingPlatformLabel()}" else "确认"
+
+private fun String.userFacingPlatformLabel(): String = when (uppercase()) {
+    "WECHAT" -> "微信"
+    "QQ" -> "QQ"
+    "DINGTALK" -> "钉钉"
+    "FEISHU" -> "飞书"
+    "WEWORK" -> "企业微信"
+    "SMS" -> "短信"
+    else -> "目标应用"
 }
 
 @Composable fun ToolResultCard(

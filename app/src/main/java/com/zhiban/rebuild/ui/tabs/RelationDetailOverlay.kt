@@ -35,6 +35,7 @@ internal data class RelationDetailActions(
     val onAddIdentity: (ContactEntity) -> Unit,
     val onInspectEvent: (RelationshipEventWithParticipants) -> Unit,
     val onRequestPhoneSync: (ContactEntity) -> Unit,
+    val onAsk: (ContactEntity) -> Unit,
 )
 
 @Composable
@@ -90,7 +91,7 @@ internal fun RelationDetailOverlay(state: RelationDetailState, actions: Relation
         onRejectEnrichment = viewModel::rejectContactEnrichment,
         onSaveToPhone = { actions.onRequestPhoneSync(contact) },
         onCall = { launchContactIntent(context, Intent.ACTION_DIAL, "tel", contact.phone) },
-        onMessage = { launchContactIntent(context, Intent.ACTION_SENDTO, "smsto", contact.phone) },
+        onAsk = { actions.onAsk(contact) },
     )
 }
 

@@ -346,7 +346,7 @@ internal fun ForceRelationshipGraphCanvas(
 
     val density = LocalDensity.current
     val densityValue = density.density
-    val canvasSurface = MaterialTheme.colorScheme.surfaceVariant
+    val canvasSurface = MaterialTheme.colorScheme.surface
     val lineColor = MaterialTheme.colorScheme.onSurfaceVariant
     val labelColor = MaterialTheme.colorScheme.onSurface
     val outlineColor = MaterialTheme.colorScheme.outlineVariant
@@ -468,7 +468,6 @@ internal fun ForceRelationshipGraphCanvas(
             Modifier.fillMaxWidth().widthIn(max = 720.dp),
             verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm),
         ) {
-            ForceGraphLegend(graphColors)
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -555,6 +554,7 @@ internal fun ForceRelationshipGraphCanvas(
                                     } else {
                                         lastTapNodeId = activeNodeId
                                         lastTapAtEpochMs = now
+                                        onSwitchEgo?.invoke(activeNodeId)
                                     }
                                 } else if (nodeDragging && model.nodes.size <= FORCE_PAIRWISE_NODE_LIMIT) {
                                     simulationPulse += 1
@@ -567,6 +567,16 @@ internal fun ForceRelationshipGraphCanvas(
                     val viewportPadding = 72.dp.toPx()
                     fun visible(point: Offset): Boolean = point.x in -viewportPadding..(size.width + viewportPadding) &&
                         point.y in -viewportPadding..(size.height + viewportPadding)
+                    val rootCenter = bodies[rootId]?.position?.let(::screenPosition)
+                        ?: Offset(size.width / 2f, size.height / 2f)
+                    listOf(0.19f, 0.31f, 0.42f).forEach { ratio ->
+                        drawCircle(
+                            color = outlineColor.copy(alpha = 0.15f),
+                            radius = min(size.width, size.height) * ratio * graphScale,
+                            center = rootCenter,
+                            style = Stroke(width = 0.8f * densityValue),
+                        )
+                    }
                     model.links.forEach { link ->
                         val from = bodies[link.fromId]?.position?.let(::screenPosition) ?: return@forEach
                         val to = bodies[link.toId]?.position?.let(::screenPosition) ?: return@forEach
@@ -575,9 +585,19 @@ internal fun ForceRelationshipGraphCanvas(
                             nodeById[link.fromId]?.presentation?.opacity ?: 1f,
                             nodeById[link.toId]?.presentation?.opacity ?: 1f,
                         )
+                        val touchesSelectedNode = selectedNodeId == link.fromId || selectedNodeId == link.toId
+                        val touchesRoot = rootId == link.fromId || rootId == link.toId
                         drawLine(
                             color = if (link.evidenceLabel != null) {
                                 graphColors.sharedCompany.copy(alpha = 0.58f * edgeOpacity)
+                            } else if (touchesSelectedNode || touchesRoot) {
+                                graphColors.focusNode.copy(
+                                    alpha = when {
+                                        link.isInferred -> 0.42f
+                                        link.isHistorical -> 0.48f
+                                        else -> 0.72f
+                                    } * edgeOpacity,
+                                )
                             } else {
                                 lineColor.copy(
                                     alpha = when {
@@ -597,7 +617,6 @@ internal fun ForceRelationshipGraphCanvas(
                                 else -> null
                             },
                         )
-                        val touchesSelectedNode = selectedNodeId == link.fromId || selectedNodeId == link.toId
                         val showEdgeLabel = shouldShowRelationshipEdgeLabel(
                             scale = graphScale,
                             selected = selectedNodeId != null && touchesSelectedNode,
@@ -655,6 +674,11 @@ internal fun ForceRelationshipGraphCanvas(
                         } * graphScale.coerceIn(0.85f, 1.35f)
                         val color = nodeColor(node.kind, graphColors)
                         val nodeOpacity = node.presentation.opacity
+                        drawCircle(
+                            Color.Black.copy(alpha = 0.08f * nodeOpacity),
+                            visualRadius * 1.06f,
+                            center + Offset(0f, 4.dp.toPx()),
+                        )
                         if (node.kind == ForceGraphNodeKind.FOCUS || selected) {
                             drawCircle(color.copy(alpha = 0.13f * nodeOpacity), visualRadius * 1.48f, center)
                         }
@@ -773,33 +797,6 @@ internal fun ForceRelationshipGraphCanvas(
                 },
             )
         }
-    }
-}
-
-@Composable
-private fun ForceGraphLegend(colors: RelationshipGraphColors) {
-    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md)) {
-            ForceLegendItem("当前焦点", colors.focusNode, Modifier.weight(1f))
-            ForceLegendItem("联系人", colors.contactNode, Modifier.weight(1f))
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md)) {
-            ForceLegendItem("工作关系", colors.workNode, Modifier.weight(1f))
-            ForceLegendItem("资料推测", colors.sharedCompany, Modifier.weight(1f), line = true)
-        }
-    }
-}
-
-@Composable
-private fun ForceLegendItem(label: String, color: Color, modifier: Modifier = Modifier, line: Boolean = false) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-        Box(
-            Modifier
-                .then(if (line) Modifier.width(16.dp).height(3.dp) else Modifier.size(10.dp))
-                .clip(CircleShape)
-                .background(color),
-        )
-        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

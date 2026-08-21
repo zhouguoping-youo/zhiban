@@ -335,8 +335,8 @@ class AgentConversationScreenE2ETest {
                 )
             }
         }
-        compose.onNodeWithText("确认执行").assertIsDisplayed().performClick()
-        compose.onNodeWithText("拒绝").performClick()
+        compose.onNodeWithText("确认").assertIsDisplayed().performClick()
+        compose.onNodeWithText("取消").performClick()
         compose.onNodeWithText("我").assertIsDisplayed()
         compose.onNodeWithContentDescription("返回").performClick()
         assertEquals(1, confirm.get())

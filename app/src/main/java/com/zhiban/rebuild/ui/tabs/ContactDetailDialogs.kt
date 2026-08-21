@@ -51,11 +51,11 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.QuestionAnswer
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Groups
-import androidx.compose.material.icons.rounded.Sms
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -187,14 +187,13 @@ internal fun ContactDetailDialog(
     onRejectEnrichment: (ContactEnrichmentCandidateEntity) -> Unit,
     onSaveToPhone: () -> Unit,
     onCall: () -> Unit,
-    onMessage: () -> Unit,
+    onAsk: () -> Unit,
 ) {
     val openCrmOpportunities = crmOpportunities.filter { it.status == "OPEN" }
     val visiblePlatformIdentities = deduplicatePlatformIdentities(platformIdentities)
-    val hasRelationshipContext = relatedEdges.isNotEmpty() || relatedEvents.isNotEmpty()
-    // 微信等消息观察自动投影的互动摘录(INTERACTION_SUMMARY)属于「活动流」而非「资料」,
-    // 不在详情资料区展示,这里只保留用户主动记录的重要信息,保证资料区干净。
-    // 互动活动流数据保留在消息/通话底座,供后续「关系温度/沉默预警」消费。
+    val hasRelationshipContext = relatedEdges.isNotEmpty()
+    val recentInteractionFacts = facts.filter { it.factType == "INTERACTION_SUMMARY" }
+        .sortedByDescending(FactEntity::updatedAtEpochMs)
     val importantFacts = facts.filterNot { it.factType == "INTERACTION_SUMMARY" }
     val hasProfileDetails = listOf(
         contact.phone,
@@ -262,13 +261,16 @@ internal fun ContactDetailDialog(
                 if (contact.phone?.isNotBlank() == true) {
                     Spacer(Modifier.height(18.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ContactActionButton(Icons.Rounded.Call, "电话", onCall, Modifier.weight(1f))
-                        ContactActionButton(Icons.Rounded.Sms, "短信", onMessage, Modifier.weight(1f))
+                        ContactActionButton(Icons.Rounded.Call, "联系", onCall, Modifier.weight(1f))
                         ContactActionButton(Icons.Outlined.Add, "记一条", onAddFact, Modifier.weight(1f))
+                        ContactActionButton(Icons.Outlined.QuestionAnswer, "问问", onAsk, Modifier.weight(1f))
                     }
                 } else {
                     Spacer(Modifier.height(14.dp))
-                    ContactActionButton(Icons.Outlined.Add, "记录重要信息", onAddFact, Modifier.fillMaxWidth())
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ContactActionButton(Icons.Outlined.Add, "记一条", onAddFact, Modifier.weight(1f))
+                        ContactActionButton(Icons.Outlined.QuestionAnswer, "问问", onAsk, Modifier.weight(1f))
+                    }
                 }
                 if (showMarkAsOwner) {
                     TextButton(onClick = onMarkAsOwner, modifier = Modifier.fillMaxWidth().height(48.dp)) {
@@ -280,12 +282,114 @@ internal fun ContactDetailDialog(
 
             item {
                 ContactDetailSection(
-                    title = "资料",
+                    title = "我们的关系",
+                    action = "添加",
+                    onAction = onAddEvent,
+                    modifier = Modifier.testTag("contact-detail-relationships"),
+                ) {
+                    if (!hasRelationshipContext) {
+                        ContactDetailEmptyAction("添加关系或共同经历", onAddEvent)
+                    } else {
+                        if (relatedEdges.isNotEmpty()) {
+                            relatedEdges.forEach { edge ->
+                                val otherId = if (edge.fromContactId == contact.contactId) {
+                                    edge.toContactId
+                                } else {
+                                    edge.fromContactId
+                                }
+                                Row(
+                                    Modifier.fillMaxWidth().padding(vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        contactNames[otherId].orEmpty().ifBlank {
+                                            if (otherId == RelationshipPersonIds.SELF) "我" else "关联联系人"
+                                        },
+                                        color = RelationInk,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Text(
+                                        if (edge.isInferredEvidenceRelationship()) {
+                                            "${edge.displayRelationLabel()} · ${edge.inferredEvidenceLabel().orEmpty()}"
+                                        } else {
+                                            relationLabel(edge.relationType)
+                                        },
+                                        color = RelationMuted,
+                                        style = MaterialTheme.typography.labelMedium,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (recentInteractionFacts.isNotEmpty() || relatedEvents.isNotEmpty()) {
+                item {
+                    ContactDetailSection("最近发生") {
+                        recentInteractionFacts.take(3).forEach { fact ->
+                            Text(
+                                fact.textContent,
+                                color = RelationInk,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(vertical = 7.dp),
+                            )
+                        }
+                        relatedEvents.sortedByDescending { it.event.occurredAtEpochMs ?: it.event.updatedAtEpochMs }
+                            .take(3)
+                            .forEach { event -> RelationshipEventRow(event, onInspectEvent) }
+                    }
+                }
+            }
+
+            if (enrichmentSuggestions.isNotEmpty() || openCrmOpportunities.isNotEmpty()) {
+                item {
+                    ContactDetailSection("还没完成") {
+                        enrichmentSuggestions.forEach { candidate ->
+                            ContactEnrichmentRow(
+                                candidate = candidate,
+                                onConfirm = { onConfirmEnrichment(candidate) },
+                                onReject = { onRejectEnrichment(candidate) },
+                            )
+                        }
+                        openCrmOpportunities.forEach { opportunity ->
+                            Row(
+                                Modifier.fillMaxWidth().padding(vertical = 7.dp)
+                                    .testTag("contact-crm-opp-${opportunity.opportunityId}"),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        opportunity.title,
+                                        color = RelationInk,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        "${crmStageLabel(opportunity.stage)} · ${formatCrmMoney(opportunity.valueMinor, opportunity.currencyCode)}",
+                                        color = RelationMuted,
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                }
+                                Text("${opportunity.probabilityPercent}%", color = RelationInk)
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
+                ContactDetailSection(
+                    title = "更多资料",
                     action = "添加账号",
                     onAction = onAddIdentity,
                     modifier = Modifier.testTag("contact-detail-profile"),
                 ) {
-                    if (!hasProfileDetails) {
+                    if (!hasProfileDetails && importantFacts.isEmpty() && mergedSources.isEmpty()) {
                         ContactDetailEmptyAction("添加联系方式或公司", onEdit)
                     } else {
                         DetailValue("手机", contact.phone)
@@ -311,174 +415,39 @@ internal fun ContactDetailDialog(
                             )
                         }
                         DetailValue(
-                            "公司全称",
-                            listOfNotNull(contact.company, contact.title)
-                                .joinToString(" · ")
-                                .takeIf(String::isNotBlank),
+                            "任职",
+                            listOfNotNull(contact.company, contact.title).joinToString(" · ").takeIf(String::isNotBlank),
                         )
                         DetailValue("备注", contact.note)
-                    }
-                }
-            }
-
-            if (mergedSources.isNotEmpty()) {
-                item {
-                    ContactDetailSection("已合并资料") {
-                        mergedSources.forEach { (link, source) ->
-                            Row(
-                                Modifier.fillMaxWidth().padding(vertical = 7.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(source.displayName, color = RelationInk, style = MaterialTheme.typography.bodyMedium)
-                                    Text(
-                                        "${link.reason} · 原资料已保留",
-                                        color = RelationMuted,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                                TextButton(onClick = { onUndoMerge(source.contactId) }) {
-                                    Text("恢复", color = RelationInk)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (importantFacts.isNotEmpty()) {
-                item {
-                    ContactDetailSection("重要信息", "添加", onAddFact) {
                         importantFacts.forEach { fact ->
                             Row(
                                 Modifier.fillMaxWidth().padding(vertical = 7.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Column(Modifier.weight(1f)) {
-                                    Text(
-                                        fact.textContent,
-                                        color = RelationInk,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
+                                    Text(fact.textContent, color = RelationInk, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                     Text(
                                         "${factTypeLabel(fact.factType)} · ${sourceLabel(fact.sourceType)}",
                                         color = RelationMuted,
                                         style = MaterialTheme.typography.labelSmall,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
                                     )
                                 }
                                 IconButton(onClick = { onDeleteFact(fact.factId) }, modifier = Modifier.size(48.dp)) {
-                                    Icon(
-                                        Icons.Rounded.DeleteOutline,
-                                        "删除这条记忆",
-                                        tint = RelationMuted,
-                                        modifier = Modifier.size(ZhiBanIconSize.Inline),
-                                    )
+                                    Icon(Icons.Rounded.DeleteOutline, "删除这条记忆", tint = RelationMuted)
                                 }
                             }
                         }
-                    }
-                }
-            }
-
-            if (enrichmentSuggestions.isNotEmpty()) {
-                item {
-                    ContactDetailSection("知伴建议") {
-                        enrichmentSuggestions.forEach { candidate ->
-                            ContactEnrichmentRow(
-                                candidate = candidate,
-                                onConfirm = { onConfirmEnrichment(candidate) },
-                                onReject = { onRejectEnrichment(candidate) },
-                            )
-                        }
-                    }
-                }
-            }
-
-            if (openCrmOpportunities.isNotEmpty()) {
-                item {
-                    ContactDetailSection("进行中的商机") {
-                        openCrmOpportunities.forEach { opportunity ->
+                        mergedSources.forEach { (link, source) ->
                             Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 7.dp)
-                                    .testTag("contact-crm-opp-${opportunity.opportunityId}"),
+                                Modifier.fillMaxWidth().padding(vertical = 7.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Column(Modifier.weight(1f)) {
-                                    Text(
-                                        opportunity.title,
-                                        color = RelationInk,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Text(
-                                        "${crmStageLabel(opportunity.stage)} · ${formatCrmMoney(opportunity.valueMinor, opportunity.currencyCode)}",
-                                        color = RelationMuted,
-                                        style = MaterialTheme.typography.labelSmall,
-                                    )
+                                    Text(source.displayName, color = RelationInk)
+                                    Text("${link.reason} · 原资料已保留", color = RelationMuted, style = MaterialTheme.typography.bodySmall)
                                 }
-                                Text(
-                                    "${opportunity.probabilityPercent}%",
-                                    color = RelationInk,
-                                    style = MaterialTheme.typography.labelMedium,
-                                )
+                                TextButton(onClick = { onUndoMerge(source.contactId) }) { Text("恢复", color = RelationInk) }
                             }
-                        }
-                    }
-                }
-            }
-
-            item {
-                ContactDetailSection(
-                    title = "关系与经历",
-                    action = "添加".takeIf { hasRelationshipContext },
-                    onAction = onAddEvent.takeIf { hasRelationshipContext },
-                    modifier = Modifier.testTag("contact-detail-relationships"),
-                ) {
-                    if (!hasRelationshipContext) {
-                        ContactDetailEmptyAction("添加一段共同经历", onAddEvent)
-                    } else {
-                        if (relatedEdges.isNotEmpty()) {
-                            ContactDetailSubheading("关联的人")
-                            relatedEdges.forEach { edge ->
-                                val otherId = if (edge.fromContactId == contact.contactId) {
-                                    edge.toContactId
-                                } else {
-                                    edge.fromContactId
-                                }
-                                Row(
-                                    Modifier.fillMaxWidth().padding(vertical = 7.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text(
-                                        contactNames[otherId].orEmpty(),
-                                        color = RelationInk,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                    Text(
-                                        if (edge.isInferredEvidenceRelationship()) {
-                                            "${edge.displayRelationLabel()} · ${edge.inferredEvidenceLabel().orEmpty()}"
-                                        } else {
-                                            relationLabel(edge.relationType)
-                                        },
-                                        color = RelationMuted,
-                                        style = MaterialTheme.typography.labelMedium,
-                                    )
-                                }
-                            }
-                        }
-                        if (relatedEvents.isNotEmpty()) {
-                            ContactDetailSubheading("共同经历")
-                            relatedEvents.forEach { event -> RelationshipEventRow(event, onInspectEvent) }
                         }
                     }
                 }

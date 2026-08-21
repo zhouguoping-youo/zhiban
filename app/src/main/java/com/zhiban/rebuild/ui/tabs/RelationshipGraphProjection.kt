@@ -7,9 +7,9 @@ import com.zhiban.rebuild.data.interaction.ContactInteractionIntensity
 /**
  * A small, UI-independent projection of the relationship graph.
  *
- * The persisted graph is intentionally kept separate from what is drawn.  Root view shows the
- * complete connected graph, while a contact ego view is limited to two hops so that expanding a
- * node never silently turns the canvas into an unreadable all-contact list.
+ * The persisted graph is intentionally kept separate from what is drawn. Root view keeps the most
+ * relevant direct relationships, while a contact ego view is limited to two hops so that expanding
+ * a node never silently turns the canvas into an unreadable all-contact list.
  */
 internal data class RelationshipGraphProjection(
     val rootId: String,
@@ -35,6 +35,7 @@ internal fun projectRelationshipGraph(
     edges: List<RelationshipEdgeEntity>,
     ownerId: String = RelationshipPersonIds.SELF,
     maxEgoHops: Int = 2,
+    maxRootNeighbors: Int = 18,
     interactionIntensity: List<ContactInteractionIntensity> = emptyList(),
 ): RelationshipGraphProjection {
     val validEdges = edges.filter { it.fromContactId in peopleIds && it.toContactId in peopleIds }
@@ -49,25 +50,7 @@ internal fun projectRelationshipGraph(
         }
     }
     if (rootId == ownerId) {
-        val hopByNode = linkedMapOf(rootId to 0)
-        var frontier = setOf(rootId)
-        var distance = 0
-        while (frontier.isNotEmpty()) {
-            val next = frontier.flatMap { adjacency[it].orEmpty() }
-                .filter { it !in hopByNode }
-                .toSet()
-            distance += 1
-            next.forEach { hopByNode[it] = distance }
-            frontier = next
-        }
-        val connectedNodes = hopByNode.keys
-        return RelationshipGraphProjection(
-            rootId = rootId,
-            isEgoView = false,
-            hopByNode = hopByNode,
-            ringByNode = ringByNode,
-            edges = validEdges.filter { it.fromContactId in connectedNodes && it.toContactId in connectedNodes },
-        )
+        return projectOwnerRelationshipGraph(rootId, validEdges, intensityById, ringByNode, maxRootNeighbors)
     }
 
     val hopByNode = linkedMapOf(rootId to 0)
@@ -84,6 +67,41 @@ internal fun projectRelationshipGraph(
     return RelationshipGraphProjection(
         rootId = rootId,
         isEgoView = true,
+        hopByNode = hopByNode,
+        ringByNode = ringByNode,
+        edges = validEdges.filter { it.fromContactId in visibleNodes && it.toContactId in visibleNodes },
+    )
+}
+
+private fun projectOwnerRelationshipGraph(
+    rootId: String,
+    validEdges: List<RelationshipEdgeEntity>,
+    intensityById: Map<String, ContactInteractionIntensity>,
+    ringByNode: Map<String, RelationshipGraphRing>,
+    maxRootNeighbors: Int,
+): RelationshipGraphProjection {
+    val strongestEdgeByNeighbor = validEdges
+        .filter { it.fromContactId == rootId || it.toContactId == rootId }
+        .groupBy { edge -> if (edge.fromContactId == rootId) edge.toContactId else edge.fromContactId }
+        .mapValues { (_, values) ->
+            values.maxWithOrNull(
+                compareBy<RelationshipEdgeEntity> { it.userConfirmed }
+                    .thenBy { it.confidence }
+                    .thenBy { it.updatedAtEpochMs },
+            )
+        }
+    val directNeighbors = strongestEdgeByNeighbor.keys.sortedWith(
+        compareByDescending<String> { intensityById[it]?.interactionCount ?: 0 }
+            .thenByDescending { strongestEdgeByNeighbor[it]?.userConfirmed == true }
+            .thenByDescending { strongestEdgeByNeighbor[it]?.confidence ?: 0.0 }
+            .thenByDescending { strongestEdgeByNeighbor[it]?.updatedAtEpochMs ?: 0L }
+            .thenBy { it },
+    ).take(maxRootNeighbors.coerceAtLeast(1))
+    val hopByNode = linkedMapOf(rootId to 0).apply { directNeighbors.forEach { put(it, 1) } }
+    val visibleNodes = hopByNode.keys
+    return RelationshipGraphProjection(
+        rootId = rootId,
+        isEgoView = false,
         hopByNode = hopByNode,
         ringByNode = ringByNode,
         edges = validEdges.filter { it.fromContactId in visibleNodes && it.toContactId in visibleNodes },

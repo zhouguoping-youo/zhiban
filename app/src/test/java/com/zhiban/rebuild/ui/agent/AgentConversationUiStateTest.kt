@@ -31,4 +31,14 @@ class AgentConversationUiStateTest {
         assertFalse(TAB_ROUTES.contains(Home::class))
         assertFalse(TAB_ROUTES.contains(AssistantChat::class))
     }
+
+    @Test fun `confirmation copy describes user action instead of runtime internals`() {
+        assertEquals("需要你确认", planCardStatusLabel(AgentConversationStage.AWAITING_CONFIRMATION))
+        assertEquals("正在处理", planCardStatusLabel(AgentConversationStage.EXECUTING))
+        assertEquals("确认", planConfirmLabel(AgentPlanUi("创建日程")))
+        assertEquals(
+            "确认并打开微信",
+            planConfirmLabel(AgentPlanUi(title = "发送邀请", platform = "WECHAT", message = "明晚见")),
+        )
+    }
 }

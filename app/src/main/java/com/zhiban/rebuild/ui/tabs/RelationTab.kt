@@ -185,6 +185,7 @@ fun RelationTab(
     onDiscoverClick: () -> Unit = {},
     onOpenAutoWrites: () -> Unit = {},
     onOpenContactMaintenance: () -> Unit = {},
+    onAsk: (String) -> Unit = {},
     isDataEmpty: Boolean = false,
     viewModel: RelationViewModel = hiltViewModel(),
     autoWriteViewModel: AutoWriteViewModel = hiltViewModel(),
@@ -354,6 +355,19 @@ fun RelationTab(
         historicalRelationshipEdges(temporalRelationships)
     }
     val maintenanceCount = maintenanceOverview.needsAttentionCount + unresolvedSourceIdentities.size
+    val interactionByContactId = remember(page.interactionIntensity) {
+        page.interactionIntensity.associateBy { it.contactId }
+    }
+    val attentionItems = remember(pendingCallNotes, replySuggestions, maintenanceCount, contacts) {
+        buildRelationshipAttentionItems(
+            pendingCallContactNames = pendingCallNotes.map { call ->
+                call.linkedContactId?.let { id -> contacts.firstOrNull { it.contactId == id }?.displayName }.orEmpty()
+            },
+            replySuggestions = replySuggestions,
+            maintenanceCount = maintenanceCount,
+        )
+    }
+    val contextNowEpochMs = remember(contacts, page.interactionIntensity) { System.currentTimeMillis() }
     val selectedRelationshipGroup = remember(tag) {
         RelationshipGroup.entries.firstOrNull { it.displayName == tag }
     }
@@ -411,38 +425,6 @@ fun RelationTab(
                 }
                 Spacer(Modifier.height(16.dp))
             }
-            if (pendingCallNotes.isNotEmpty()) {
-                item {
-                    val call = pendingCallNotes.first()
-                    val contactName = call.linkedContactId?.let { id ->
-                        contacts.firstOrNull { it.contactId == id }?.displayName
-                    }
-                    Row(
-                        Modifier.fillMaxWidth().zhiBanCardSurface(RelationSurface)
-                            .clickable { selectedCallNote = call }
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(Icons.Rounded.Call, contentDescription = null, tint = RelationAccent)
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                "补充刚才的通话要点",
-                                color = RelationInk,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
-                            )
-                            Text(
-                                contactName ?: "未匹配联系人 · 可直接记录",
-                                color = RelationMuted,
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                        Text("记录", color = RelationAccent, style = MaterialTheme.typography.labelLarge)
-                    }
-                    Spacer(Modifier.height(12.dp))
-                }
-            }
             item {
                 ZhiBanSearchField(
                     value = query,
@@ -468,34 +450,16 @@ fun RelationTab(
                 )
                 Spacer(Modifier.height(18.dp))
             }
-            if (maintenanceCount > 0) {
+            if (mode == "list" && query.isBlank() && tag == "全部" && attentionItems.isNotEmpty()) {
                 item {
-                    Row(
-                        Modifier.fillMaxWidth().zhiBanCardSurface().clickable(onClick = onOpenContactMaintenance)
-                            .padding(ZhiBanSpacing.Lg),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
-                    ) {
-                        ZhiBanLeadingIcon(Icons.Outlined.AutoAwesome, contentDescription = null)
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(
-                                "联系人维护",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                            Text(
-                                "$maintenanceCount 项待核实",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                    RelationshipAttentionSection(attentionItems) { item ->
+                        when (item.kind) {
+                            RelationshipAttentionKind.CALL_NOTE -> pendingCallNotes.firstOrNull()?.let { selectedCallNote = it }
+                            RelationshipAttentionKind.REPLY -> showNotificationCandidates = true
+                            RelationshipAttentionKind.MAINTENANCE -> onOpenContactMaintenance()
                         }
-                        Icon(
-                            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
                     }
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(18.dp))
                 }
             }
             when (mode) {
@@ -553,7 +517,15 @@ fun RelationTab(
                         }
                     } else {
                         items(visible.size, key = { visible[it].contactId }) { index ->
-                            ContactRow(visible[index]) {
+                            ContactRow(
+                                contact = visible[index],
+                                contextSummary = contactContextSummary(
+                                    contact = visible[index],
+                                    relationships = graphRelationships,
+                                    interaction = interactionByContactId[visible[index].contactId],
+                                    nowEpochMs = contextNowEpochMs,
+                                ),
+                            ) {
                                 selected = visible[index]
                                 onContactClick(visible[index].contactId)
                             }
@@ -574,13 +546,10 @@ fun RelationTab(
                             currentOwnerEmployment = currentOwnerEmployment,
                             ownerEmploymentHistoryCount = ownerEmploymentHistoryCount,
                             interactionIntensity = page.interactionIntensity,
-                            events = relationshipEvents,
                             canAddRelationship = contacts.isNotEmpty(),
                             activeFilter = tag.takeUnless { it == "全部" } ?: query.takeIf(String::isNotBlank),
                             activeGroup = selectedRelationshipGroup,
                             onAdd = { showRelationEditor = true },
-                            onInspect = { selectedEdge = it },
-                            onInspectEvent = { selectedEvent = it },
                             onEditOwnerEmployment = { showOwnerEmploymentEditor = true },
                         )
                     }
@@ -634,6 +603,9 @@ fun RelationTab(
                     phoneSyncPermissionContact = contact
                     writeContactPermissionLauncher.launch(Manifest.permission.WRITE_CONTACTS)
                 }
+            },
+            onAsk = { contact ->
+                onAsk("结合我和${contact.displayName}的关系、最近互动和未完成事项，告诉我现在最值得做什么。")
             },
         ),
         viewModel = viewModel,
