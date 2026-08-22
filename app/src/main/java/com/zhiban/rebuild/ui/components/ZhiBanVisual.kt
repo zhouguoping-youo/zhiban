@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -39,7 +40,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -48,7 +48,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -61,7 +60,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.zhiban.rebuild.ui.theme.Gray200
 import com.zhiban.rebuild.ui.theme.Gray500
 import com.zhiban.rebuild.ui.theme.ZhiBanCard
@@ -72,7 +70,6 @@ import com.zhiban.rebuild.ui.theme.ZhiBanSize
 import com.zhiban.rebuild.ui.theme.ZhiBanSpacing
 import com.zhiban.rebuild.ui.theme.ZhiBanTerracotta
 import com.zhiban.rebuild.ui.theme.ZhiBanTerracottaSoft
-import com.zhiban.rebuild.ui.theme.ZhiBanTextPrimary
 import com.zhiban.rebuild.ui.theme.ZhiBanWarmBackground
 
 val ZhiBanTabHorizontalPadding = ZhiBanSpacing.PageHorizontal
@@ -158,33 +155,26 @@ fun ZhiBanHeaderIconAction(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     tint: Color = MaterialTheme.colorScheme.onBackground,
+    badgeCount: Int = 0,
 ) {
     IconButton(
         onClick = onClick,
         modifier = modifier.size(ZhiBanIconContainer.TouchTarget),
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            tint = tint,
-            modifier = Modifier.size(ZhiBanIconSize.Action),
-        )
-    }
-}
-
-/** Text actions share the same 48 dp row and typography as adjacent icon actions. */
-@Composable
-fun ZhiBanHeaderTextAction(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, tint: Color = MaterialTheme.colorScheme.onBackground) {
-    TextButton(
-        onClick = onClick,
-        modifier = modifier.defaultMinSize(minHeight = ZhiBanIconContainer.TouchTarget),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = ZhiBanSpacing.Sm),
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            color = tint,
-        )
+        Box {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = tint,
+                modifier = Modifier.size(ZhiBanIconSize.Action),
+            )
+            if (badgeCount > 0) {
+                ZhiBanBadge(
+                    count = badgeCount,
+                    modifier = Modifier.align(Alignment.TopEnd).offset(x = 10.dp, y = (-8).dp),
+                )
+            }
+        }
     }
 }
 
@@ -356,49 +346,6 @@ fun ZhiBanSingleChoiceRow(title: String, subtitle: String = "", selected: Boolea
 }
 
 @Composable
-fun ZhiBanGradientIcon(
-    text: String,
-    modifier: Modifier = Modifier,
-    size: Dp = 52.dp,
-    brush: Brush = SolidColor(ZhiBanTerracotta),
-    textColor: Color = Color.White,
-) {
-    Box(
-        modifier = modifier.size(size).clip(RoundedCornerShape(size / 3)).background(brush),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text = text, fontSize = (size.value * 0.38f).sp, color = textColor, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-fun ZhiBanHeader(title: String, subtitle: String, modifier: Modifier = Modifier, iconText: String? = null, trailing: (@Composable () -> Unit)? = null) {
-    Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        if (iconText !=
-            null
-        ) {
-            ZhiBanGradientIcon(text = iconText, size = ZhiBanSize.TouchTarget)
-            Spacer(modifier = Modifier.width(ZhiBanSpacing.Md))
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                title,
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onBackground,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        trailing?.invoke()
-    }
-}
-
-@Composable
 fun ZhiBanSectionTitle(title: String, modifier: Modifier = Modifier, action: String? = null, onActionClick: (() -> Unit)? = null) {
     Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(
@@ -466,7 +413,7 @@ fun ZhiBanSegmentedControl(options: List<String>, selectedIndex: Int, onSelected
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .defaultMinSize(minHeight = 44.dp)
+                    .defaultMinSize(minHeight = ZhiBanSize.Control)
                     .clip(RoundedCornerShape(ZhiBanRadius.Full))
                     .background(if (sel) MaterialTheme.colorScheme.surface else Color.Transparent)
                     .semantics { selected = sel }
@@ -485,44 +432,6 @@ fun ZhiBanSegmentedControl(options: List<String>, selectedIndex: Int, onSelected
 }
 
 @Composable
-fun RowScope.ZhiBanStatTile(value: String, label: String, iconText: String, accent: Color = ZhiBanTerracotta) {
-    ZhiBanGlassCard(modifier = Modifier.weight(1f), cornerRadius = ZhiBanRadius.Card) {
-        Column(modifier = Modifier.padding(ZhiBanSpacing.Lg)) {
-            ZhiBanGradientIcon(
-                text = iconText,
-                size = 34.dp,
-                brush = Brush.linearGradient(listOf(accent, accent.copy(alpha = 0.72f))),
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(value, style = MaterialTheme.typography.headlineSmall, color = ZhiBanTextPrimary)
-            Text(label, style = MaterialTheme.typography.labelMedium, color = Gray500)
-        }
-    }
-}
-
-@Composable
-fun RowScope.ZhiBanCompactMetric(value: String, label: String, iconText: String, accent: Color = ZhiBanTerracotta) {
-    Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier.size(30.dp).clip(RoundedCornerShape(ZhiBanRadius.Small)).background(accent.copy(alpha = 0.14f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(iconText, style = MaterialTheme.typography.labelMedium, color = accent, fontWeight = FontWeight.Bold)
-        }
-        Spacer(modifier = Modifier.width(6.dp))
-        Column {
-            Text(
-                value,
-                style = MaterialTheme.typography.titleMedium,
-                color = ZhiBanTextPrimary,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(label, style = MaterialTheme.typography.labelSmall, color = Gray500)
-        }
-    }
-}
-
-@Composable
 fun ZhiBanEmptyState(title: String, subtitle: String, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.fillMaxWidth().padding(vertical = 36.dp),
@@ -536,30 +445,6 @@ fun ZhiBanEmptyState(title: String, subtitle: String, modifier: Modifier = Modif
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-fun ZhiBanMiniButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
-    Box(
-        modifier = modifier.defaultMinSize(
-            minHeight = ZhiBanSize.TouchTarget,
-        ).clip(
-            RoundedCornerShape(ZhiBanRadius.Full),
-        ).background(
-            if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-        ).clickable(
-            enabled = enabled,
-            onClick = onClick,
-        ).padding(horizontal = ZhiBanSpacing.Lg, vertical = ZhiBanSpacing.Sm),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = text,
-            color = Color.White,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
     }
 }
 
@@ -648,22 +533,5 @@ fun ZhiBanTextInput(
             Box(modifier = Modifier.width(10.dp))
             trailing()
         }
-    }
-}
-
-@Composable
-fun ZhiBanProgressBar(progress: Float, modifier: Modifier = Modifier, height: Dp = 8.dp, color: Color = ZhiBanTerracotta) {
-    Box(
-        modifier = modifier.fillMaxWidth().height(
-            height,
-        ).clip(RoundedCornerShape(ZhiBanRadius.Full)).background(com.zhiban.rebuild.ui.theme.Gray100),
-    ) {
-        Box(
-            modifier = Modifier.fillMaxWidth(
-                progress.coerceIn(0f, 1f),
-            ).height(
-                height,
-            ).clip(RoundedCornerShape(ZhiBanRadius.Full)).background(Brush.horizontalGradient(listOf(color, ZhiBanTerracotta))),
-        )
     }
 }
