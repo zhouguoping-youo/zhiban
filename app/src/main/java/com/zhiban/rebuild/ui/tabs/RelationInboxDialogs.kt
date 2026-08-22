@@ -1,14 +1,11 @@
 package com.zhiban.rebuild.ui.tabs
 
 import android.Manifest
-import android.app.Activity
 import android.content.ComponentName
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.MediaRecorder
 import android.net.Uri
 import android.provider.Settings
-import android.speech.RecognizerIntent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -209,17 +206,6 @@ internal fun CallNoteDialog(
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) beginCloudRecording() else error = "需要麦克风权限才能录入语音"
         }
-    val systemSpeech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val recognized = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
-            if (!recognized.isNullOrBlank()) {
-                text = recognized
-                source = "SYSTEM_SPEECH"
-                error = null
-            }
-        }
-    }
-
     fun transcribe(file: File) {
         transcribing = true
         onTranscribe(file) { result, failure ->
@@ -256,15 +242,10 @@ internal fun CallNoteDialog(
 
             CloudAsrAvailability.UNSUPPORTED_PROVIDER,
             CloudAsrAvailability.PROVIDER_NOT_CONFIGURED,
-            -> runCatching {
-                systemSpeech.launch(
-                    Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, "zh-CN")
-                        putExtra(RecognizerIntent.EXTRA_PROMPT, "说出这次通话的关键要点")
-                    },
-                )
-            }.onFailure { error = "当前设备没有可用的语音识别，请手动输入" }
+            -> {
+                // 不回落到系统语音识别弹窗：只用知伴自己的语音链路，不可用时给出可执行的引导。
+                error = scheduleOutcomeVoiceUnavailableMessage(cloudAsrAvailability) ?: "语音识别暂不可用，请手动输入"
+            }
         }
     }
 
