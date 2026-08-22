@@ -562,7 +562,7 @@ class AgentConversationScreenE2ETest {
         val screenState = mutableStateOf(
             AgentConversationUiState(
                 stage = AgentConversationStage.FAILED_FINAL,
-                safeMessage = "尚未配置大模型服务，请先完成连接设置。",
+                safeMessage = "尚未配置 AI 服务，请先完成连接设置。",
                 safeFailureCode = "PROVIDER_NOT_CONFIGURED",
                 isCredentialMissing = true,
             ),
@@ -710,7 +710,7 @@ class AgentConversationScreenE2ETest {
                         transcription = TranscriptionUiState(
                             phase = TranscriptionPhase.FAILED,
                             safeCode = "ASR_PROVIDER_NOT_CONFIGURED",
-                            safeMessage = "前往 我的 → 智能体设置 → 大模型连接 完成配置",
+                            safeMessage = "前往 我的 → 模型连接 完成配置",
                         ),
                     ),
                     onNavigateToSettings = { settings.incrementAndGet() },

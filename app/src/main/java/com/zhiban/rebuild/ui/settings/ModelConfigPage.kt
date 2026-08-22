@@ -68,17 +68,14 @@ import com.zhiban.rebuild.ui.theme.ZhiBanRadius
 import com.zhiban.rebuild.ui.theme.ZhiBanSize
 import com.zhiban.rebuild.ui.theme.ZhiBanSpacing
 import com.zhiban.rebuild.ui.theme.ZhiBanTerracotta
-import com.zhiban.rebuild.ui.theme.ZhiBanTerracottaSoft
 import com.zhiban.rebuild.ui.theme.ZhiBanTextPrimary
 import com.zhiban.rebuild.ui.theme.ZhiBanTextSecondary
 import com.zhiban.rebuild.ui.theme.ZhiBanWarmBackground
 
-private data class ModelOption(val id: String, val description: String, val recommended: Boolean)
 private val ModelSettingsCanvas = ZhiBanWarmBackground
 private val ModelSettingsSurface = ZhiBanCard
 private val ModelSettingsPrimary = ZhiBanTextPrimary
 private val ModelSettingsSecondary = ZhiBanTextSecondary
-private val ModelSettingsIconSurface = ZhiBanTerracottaSoft
 
 @Composable
 fun ModelConfigPage(onBack: () -> Unit = {}, viewModel: ModelConfigViewModel = hiltViewModel()) {
@@ -96,7 +93,7 @@ fun ModelConfigPage(onBack: () -> Unit = {}, viewModel: ModelConfigViewModel = h
 
     ZhiBanPage {
         Column(modifier = Modifier.fillMaxSize().background(ModelSettingsCanvas)) {
-            ZhiBanTopBar(title = "大模型连接", onBack = onBack)
+            ZhiBanTopBar(title = "模型连接", onBack = onBack)
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(horizontal = ZhiBanSpacing.PageHorizontal),
@@ -247,11 +244,17 @@ private fun EmbeddingConfigDialog(
                         PasswordVisualTransformation()
                     },
                     trailingIcon = {
-                        Icon(
-                            imageVector = if (state.embeddingApiKeyVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                            contentDescription = if (state.embeddingApiKeyVisible) "隐藏" else "显示",
-                            modifier = Modifier.size(ZhiBanIconSize.Field).clickable(onClick = onToggleVisibility),
-                        )
+                        Box(
+                            modifier = Modifier.size(ZhiBanSize.TouchTarget).clip(CircleShape).clickable(onClick = onToggleVisibility),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = if (state.embeddingApiKeyVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                contentDescription = if (state.embeddingApiKeyVisible) "隐藏" else "显示",
+                                tint = Gray500,
+                                modifier = Modifier.size(ZhiBanIconSize.Field),
+                            )
+                        }
                     },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -307,54 +310,6 @@ private fun StatusBadge(configured: Boolean) {
 }
 
 @Composable
-private fun HeroBlock(providerName: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(ZhiBanRadius.Input))
-            .background(CloudBlue.copy(alpha = 0.10f))
-            .border(1.dp, CloudBlue.copy(alpha = 0.20f), RoundedCornerShape(ZhiBanRadius.Input))
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier.size(44.dp).clip(RoundedCornerShape(ZhiBanRadius.Medium)).background(CloudBlue.copy(alpha = 0.20f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.Outlined.CloudQueue,
-                contentDescription = null,
-                tint = CloudBlue,
-                modifier = Modifier.size(ZhiBanIconSize.Leading),
-            )
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Column {
-            Text(
-                "$providerName · 官方兼容协议",
-                style = MaterialTheme.typography.titleSmall,
-                color = ZhiBanTextPrimary,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text("仅连接内置官方地址，API Key 只保存在本机", style = MaterialTheme.typography.bodySmall, color = ZhiBanTextSecondary)
-        }
-    }
-}
-
-@Composable
-private fun SectionLabel(title: String, subtitle: String) {
-    Column {
-        Text(
-            title,
-            style = MaterialTheme.typography.titleSmall,
-            color = ZhiBanTextPrimary,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = ZhiBanTextSecondary)
-    }
-}
-
-@Composable
 private fun ErrorBanner(message: String) {
     Row(
         modifier = Modifier
@@ -368,58 +323,6 @@ private fun ErrorBanner(message: String) {
         Text("⚠", color = ErrorRed, style = MaterialTheme.typography.titleMedium)
         Spacer(modifier = Modifier.width(8.dp))
         Text(message, color = ErrorRed, style = MaterialTheme.typography.bodySmall)
-    }
-}
-
-@Composable
-private fun ModelRow(option: ModelOption, selected: Boolean, onClick: () -> Unit) {
-    val borderColor = if (selected) ZhiBanTerracotta else MaterialTheme.colorScheme.outlineVariant
-    val bgColor = if (selected) ZhiBanTerracottaSoft else ZhiBanCard.copy(alpha = 0.6f)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .clip(RoundedCornerShape(ZhiBanRadius.Medium))
-            .background(bgColor)
-            .border(if (selected) 1.5.dp else 1.dp, borderColor, RoundedCornerShape(ZhiBanRadius.Medium))
-            .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // radio dot
-        Box(
-            modifier = Modifier
-                .size(18.dp)
-                .clip(CircleShape)
-                .background(if (selected) ZhiBanTerracotta else Color.Transparent)
-                .border(1.5.dp, if (selected) ZhiBanTerracotta else Gray500, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (selected) Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onPrimary))
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    option.id,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = ZhiBanTextPrimary,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                if (option.recommended) {
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(ZhiBanRadius.Full))
-                            .background(ZhiBanTerracotta)
-                            .padding(horizontal = 6.dp, vertical = 1.dp),
-                    ) {
-                        Text("推荐", color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-            }
-            Text(option.description, style = MaterialTheme.typography.bodySmall, color = ZhiBanTextSecondary)
-        }
     }
 }
 

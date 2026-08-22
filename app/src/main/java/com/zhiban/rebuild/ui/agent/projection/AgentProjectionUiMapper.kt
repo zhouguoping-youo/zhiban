@@ -75,8 +75,8 @@ object AgentProjectionUiMapper {
 
     private fun safeMessageFor(cancelling: Boolean, safeFailureCode: String?): String? = when {
         cancelling -> "正在取消，请稍候…"
-        safeFailureCode == "PROVIDER_NOT_CONFIGURED" -> "尚未配置大模型服务，请先完成连接设置。"
-        safeFailureCode == "AUTHENTICATION_FAILED" -> "大模型连接验证失败，请检查设置后重试。"
+        safeFailureCode == "PROVIDER_NOT_CONFIGURED" -> "尚未配置 AI 服务，请先完成连接设置。"
+        safeFailureCode == "AUTHENTICATION_FAILED" -> "模型连接验证失败，请检查设置后重试。"
         safeFailureCode == "TLS_VERIFICATION_FAILED" -> "安全连接验证失败，请检查网络环境或更新知伴后重试。"
         safeFailureCode == "RATE_LIMITED" -> "请求较多，请稍后重试。"
         safeFailureCode == "INSUFFICIENT_QUOTA" -> "阶跃星辰账户余额或套餐额度不足，请检查服务商账户。"
@@ -86,13 +86,13 @@ object AgentProjectionUiMapper {
         safeFailureCode == "NETWORK_OFFLINE" -> "当前没有网络，仍可查看本地日程、联系人和记忆。连接网络后可重试对话。"
         safeFailureCode == "NETWORK_TOO_SLOW" -> "当前网络较差，AI 对话暂不可用。"
         safeFailureCode == "WEAK_NETWORK_MULTIMODAL_DISABLED" -> "网络较慢，图片和文件分析已暂停，请恢复网络后重试。"
-        safeFailureCode in setOf("TIMEOUT", "PROVIDER_UNAVAILABLE") -> "暂时无法连接大模型，请检查网络后重试。"
+        safeFailureCode in setOf("TIMEOUT", "PROVIDER_UNAVAILABLE") -> "暂时无法连接 AI 服务，请检查网络后重试。"
         safeFailureCode == "EMPTY_RESPONSE" -> "AI 没有返回内容，请重新发送。"
         safeFailureCode == "INVALID_TOOL_CALL" -> "AI 没有生成可安全执行的操作，请换一种说法重新发送。"
         safeFailureCode == "TARGET_APP_UNAVAILABLE" -> "没有找到目标消息应用，或该应用暂时无法打开。请确认已安装并登录后重试。"
         safeFailureCode == "LOCATION_CONSENT_REQUIRED" -> "定位读取还没开启，请到“设置 → 隐私与安全 → 定位”打开开关后再试。"
         safeFailureCode == "MEMORY_CONSENT_REQUIRED" -> "长期记忆尚未开启，请到“我的 → 智能体设置 → 记忆”开启后重试。"
-        safeFailureCode != null -> "大模型暂时无法完成请求，请稍后重试。"
+        safeFailureCode != null -> "AI 服务暂时无法完成请求，请稍后重试。"
         else -> null
     }
 

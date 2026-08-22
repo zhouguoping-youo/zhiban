@@ -784,7 +784,7 @@ private fun String.userFacingPlatformLabel(): String = when (uppercase()) {
     val credentialHint = if (isCredentialMissing &&
         stage == AgentConversationStage.FAILED_FINAL
     ) {
-        "前往 我的 → 智能体设置 → 大模型连接 完成配置"
+        "前往 我的 → 模型连接 完成配置"
     } else {
         null
     }

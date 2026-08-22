@@ -140,65 +140,67 @@ internal fun AgentSuggestionContent(
 
     Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { innerPadding ->
         ZhiBanPage {
-            LazyColumn(
-                Modifier.fillMaxSize().padding(innerPadding),
-                contentPadding = PaddingValues(bottom = ZhiBanSpacing.Xxxl),
-                verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
-            ) {
-                item { ZhiBanTopBar(title = "智能建议", onBack = onBack) }
-                if (state.suggestions.isEmpty()) {
-                    item {
-                        Column(
-                            Modifier.fillMaxWidth().padding(
-                                horizontal = ZhiBanSpacing.PageHorizontal,
-                                vertical = ZhiBanSpacing.Xl,
-                            ),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            Text(
-                                "暂无智能建议",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                textAlign = TextAlign.Center,
-                            )
-                            Text(
-                                "知伴在感知到值得注意的消息或事件时会主动给出判断",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center,
-                            )
-                        }
-                    }
-                } else {
-                    val acceptAction: (String, String?) -> Unit = { suggestionId, chosen ->
-                        onAccept(suggestionId, chosen) { success ->
-                            showSnackbar(if (success) "已完成" else "未能完成，请检查后重试")
-                        }
-                    }
-                    val dismissAction: (String) -> Unit = { suggestionId -> onDismiss(suggestionId) {} }
-                    agentSuggestionSection(
-                        title = "待处理",
-                        suggestions = state.suggestions.filter { it.status == AgentSuggestionStatus.PENDING },
-                        onAccept = acceptAction,
-                        onDismiss = dismissAction,
-                        onLoadCompletionDraft = onLoadCompletionDraft,
-                        onCompleteAndHandoff = onCompleteAndHandoff,
-                    )
-                    agentSuggestionSection(
-                        title = "已处理",
-                        suggestions = state.suggestions.filter { it.status != AgentSuggestionStatus.PENDING },
-                        onAccept = acceptAction,
-                        onDismiss = dismissAction,
-                        onLoadCompletionDraft = onLoadCompletionDraft,
-                        onCompleteAndHandoff = onCompleteAndHandoff,
-                    )
-                    if (state.hasMore) {
-                        item(key = "load-more") {
-                            TextButton(
-                                onClick = onLoadMore,
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = ZhiBanSpacing.PageHorizontal),
+            Column(Modifier.fillMaxSize().padding(innerPadding)) {
+                ZhiBanTopBar(title = "智能建议", onBack = onBack)
+                LazyColumn(
+                    Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = ZhiBanSpacing.Xxxl),
+                    verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
+                ) {
+                    if (state.suggestions.isEmpty()) {
+                        item {
+                            Column(
+                                Modifier.fillMaxWidth().padding(
+                                    horizontal = ZhiBanSpacing.PageHorizontal,
+                                    vertical = ZhiBanSpacing.Xl,
+                                ),
+                                horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
-                                Text("查看更多")
+                                Text(
+                                    "暂无智能建议",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    textAlign = TextAlign.Center,
+                                )
+                                Text(
+                                    "知伴在感知到值得注意的消息或事件时会主动给出判断",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center,
+                                )
+                            }
+                        }
+                    } else {
+                        val acceptAction: (String, String?) -> Unit = { suggestionId, chosen ->
+                            onAccept(suggestionId, chosen) { success ->
+                                showSnackbar(if (success) "已完成" else "未能完成，请检查后重试")
+                            }
+                        }
+                        val dismissAction: (String) -> Unit = { suggestionId -> onDismiss(suggestionId) {} }
+                        agentSuggestionSection(
+                            title = "待处理",
+                            suggestions = state.suggestions.filter { it.status == AgentSuggestionStatus.PENDING },
+                            onAccept = acceptAction,
+                            onDismiss = dismissAction,
+                            onLoadCompletionDraft = onLoadCompletionDraft,
+                            onCompleteAndHandoff = onCompleteAndHandoff,
+                        )
+                        agentSuggestionSection(
+                            title = "已处理",
+                            suggestions = state.suggestions.filter { it.status != AgentSuggestionStatus.PENDING },
+                            onAccept = acceptAction,
+                            onDismiss = dismissAction,
+                            onLoadCompletionDraft = onLoadCompletionDraft,
+                            onCompleteAndHandoff = onCompleteAndHandoff,
+                        )
+                        if (state.hasMore) {
+                            item(key = "load-more") {
+                                TextButton(
+                                    onClick = onLoadMore,
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                                ) {
+                                    Text("查看更多")
+                                }
                             }
                         }
                     }

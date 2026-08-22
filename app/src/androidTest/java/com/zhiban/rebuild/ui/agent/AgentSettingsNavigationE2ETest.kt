@@ -40,7 +40,7 @@ class AgentSettingsNavigationE2ETest {
         compose.onNodeWithText("智能体设置").assertIsDisplayed()
 
         listOf(
-            "大模型连接" to "大模型连接",
+            "模型连接" to "模型连接",
             "记忆" to "记忆",
             "回答偏好" to "回答偏好",
             "工具" to "工具",
@@ -79,14 +79,14 @@ class AgentSettingsNavigationE2ETest {
 
         compose.onNodeWithText("语言").assertDoesNotExist()
         compose.onNodeWithText("重置知伴").assertDoesNotExist()
-        compose.onNodeWithText("数据管理").assertExists()
+        compose.onNodeWithText("存储和数据").assertExists()
     }
 
     @Test fun dataManagementExposesPortableBackupAndExplainsCredentialBoundary() {
         compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
         compose.waitForIdle()
         compose.onNodeWithContentDescription("我的").performClick()
-        compose.onNodeWithText("数据管理").performScrollTo().performClick()
+        compose.onNodeWithText("存储和数据").performScrollTo().performClick()
 
         compose.onNodeWithText("创建加密备份").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("从加密备份恢复").assertIsDisplayed()
@@ -99,17 +99,18 @@ class AgentSettingsNavigationE2ETest {
         compose.onNodeWithContentDescription("我的").performClick()
 
         listOf(
-            "智能体设置",
-            "自动整理",
-            "外观",
-            "通知",
-            "隐私与权限",
-            "存储",
-            "数据管理",
-            "报告问题",
-            "关于知伴",
-        ).forEach { title ->
-            compose.onNodeWithText(title).performScrollTo().performClick()
+            "模型连接" to "模型连接",
+            "智能建议" to "智能建议",
+            "自动整理记录" to "自动整理",
+            "智能体设置" to "智能体设置",
+            "手机权限" to "隐私与权限",
+            "外观" to "外观",
+            "通知" to "通知",
+            "存储和数据" to "存储和数据",
+            "帮助与问题反馈" to "帮助与问题反馈",
+            "关于知伴" to "关于知伴",
+        ).forEach { (entry, title) ->
+            compose.onNodeWithText(entry).performScrollTo().performClick()
             compose.onNodeWithText(title).assertIsDisplayed()
             compose.onNodeWithContentDescription("返回").performClick()
             compose.onNodeWithContentDescription("我的").assertExists()
@@ -152,8 +153,10 @@ class AgentSettingsNavigationE2ETest {
         compose.onNodeWithText("打开系统通知设置").assertDoesNotExist()
         compose.onNodeWithContentDescription("返回").performClick()
 
-        compose.onNodeWithText("隐私与权限").performScrollTo().performClick()
-        compose.onNodeWithText("让知伴更好用").assertIsDisplayed()
+        compose.onNodeWithText("手机权限").performScrollTo().performClick()
+        compose.onNodeWithText("手机权限").assertIsDisplayed()
+        compose.onNodeWithText("知伴能做什么").assertIsDisplayed()
+        compose.onNodeWithText("数据与隐私详情").assertIsDisplayed()
         compose.onNodeWithText("联系人").assertIsDisplayed()
         compose.onNodeWithText("日历").assertIsDisplayed()
         compose.onNodeWithText("数据发送范围").assertDoesNotExist()
@@ -161,7 +164,8 @@ class AgentSettingsNavigationE2ETest {
         compose.onNodeWithText("允许远程语义检索").assertDoesNotExist()
         compose.onNodeWithContentDescription("返回").performClick()
 
-        compose.onNodeWithText("存储").performScrollTo().performClick()
+        compose.onNodeWithText("存储和数据").performScrollTo().performClick()
+        compose.onNodeWithText("存储占用与清理").performClick()
         compose.onNodeWithText("保存位置").assertIsDisplayed()
         compose.onNodeWithText("应用专属目录").assertIsDisplayed()
         compose.onNodeWithText("共计").assertIsDisplayed()

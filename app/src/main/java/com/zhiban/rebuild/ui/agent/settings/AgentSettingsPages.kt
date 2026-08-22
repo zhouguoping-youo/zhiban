@@ -108,7 +108,7 @@ fun AgentSettingsPage(
                         listOf(
                             AgentSettingsEntry(
                                 Icons.Outlined.CloudQueue,
-                                "大模型连接",
+                                "模型连接",
                                 if (state.providerConfigured) "阶跃星辰 · 已连接" else "输入 API Key",
                                 onModel,
                             ),
@@ -555,12 +555,15 @@ class AgentFeedbackViewModel @Inject constructor(private val controls: AgentCont
     ZhiBanPage {
         Column(Modifier.fillMaxSize()) {
             AgentHeader("回答反馈", onBack)
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.ContentGap),
+            ) {
                 ToggleRow("显示点赞和点踩", "出现在知伴回答下方", s.policy.useHumanFeedback, vm::human)
                 ToggleRow("根据反馈提出改进", "修改前仍会询问你", s.policy.allowPreferenceImprovement, vm::improve)
                 s.suggestion?.let { suggestion ->
                     ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Column(Modifier.padding(ZhiBanSpacing.Lg), verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm)) {
                             Text("待审核建议", color = ZhiBanTerracotta, fontWeight = FontWeight.SemiBold)
                             Text(suggestion.title, fontWeight = FontWeight.SemiBold)
                             Text(
@@ -568,7 +571,7 @@ class AgentFeedbackViewModel @Inject constructor(private val controls: AgentCont
                                 color = ZhiBanTextSecondary,
                                 style = MaterialTheme.typography.bodySmall,
                             )
-                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm)) {
                                 OutlinedButton(vm::reject, Modifier.weight(1f)) { Text("不采用") }
                                 Button(vm::accept, Modifier.weight(1f)) { Text("接受建议") }
                             }
@@ -638,11 +641,14 @@ data class AgentRunHistoryState(
     ZhiBanPage {
         Column(Modifier.fillMaxSize()) {
             AgentHeader("运行记录", onBack)
-            LazyColumn(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            LazyColumn(
+                Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
+            ) {
                 item {
                     OutlinedButton(vm::export, Modifier.fillMaxWidth(), enabled = !s.exporting) {
                         Icon(Icons.Outlined.IosShare, null)
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(ZhiBanSpacing.Sm))
                         Text(if (s.exporting) "正在生成…" else "导出脱敏诊断包")
                     }
                 }
@@ -657,8 +663,8 @@ data class AgentRunHistoryState(
                 }
                 s.metrics?.takeIf { it.sampledRuns > 0 }?.let { metrics ->
                     item {
-                        ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = 18.dp) {
-                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ZhiBanGlassCard(Modifier.fillMaxWidth(), cornerRadius = ZhiBanRadius.Card) {
+                            Column(Modifier.padding(ZhiBanSpacing.Lg), verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm)) {
                                 Text("本机运行概览", fontWeight = FontWeight.SemiBold)
                                 Text(
                                     "最近 ${metrics.sampledRuns} 次 · 成功率 ${metrics.successRatePercent}% · 平均 ${metrics.averageDurationMs}ms",
@@ -695,14 +701,14 @@ data class AgentRunHistoryState(
                     s.isLoading -> item { CircularProgressIndicator() }
 
                     s.items.isEmpty() -> item {
-                        Text("暂无运行记录", color = ZhiBanTextSecondary, modifier = Modifier.padding(16.dp))
+                        Text("暂无运行记录", color = ZhiBanTextSecondary, modifier = Modifier.padding(ZhiBanSpacing.Lg))
                     }
 
                     else -> {
                         item {
                             Row(
                                 Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm),
                             ) {
                                 RunHistoryFilter.entries.forEach { filter ->
                                     ZhiBanChip(
@@ -717,7 +723,7 @@ data class AgentRunHistoryState(
                         val visible = s.items.filter { s.filter.matches(it) }
                         if (visible.isEmpty()) {
                             item {
-                                Text("没有「${s.filter.label}」的记录", color = ZhiBanTextSecondary, modifier = Modifier.padding(16.dp))
+                                Text("没有「${s.filter.label}」的记录", color = ZhiBanTextSecondary, modifier = Modifier.padding(ZhiBanSpacing.Lg))
                             }
                         }
                         items(visible, key = { it.runId }) { trace ->
@@ -794,8 +800,8 @@ private fun relativeTime(epochMs: Long): String {
 private fun RunTraceCard(trace: com.zhiban.rebuild.runtime.observability.AgentRunTrace) {
     var expanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     val status = runStatusStyle(trace.status)
-    ZhiBanGlassCard(Modifier.fillMaxWidth().clickable { expanded = !expanded }, cornerRadius = 18.dp) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    ZhiBanGlassCard(Modifier.fillMaxWidth().clickable { expanded = !expanded }, cornerRadius = ZhiBanRadius.Card) {
+        Column(Modifier.padding(ZhiBanSpacing.Lg), verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     color = status.color.copy(alpha = .12f),
@@ -808,7 +814,7 @@ private fun RunTraceCard(trace: com.zhiban.rebuild.runtime.observability.AgentRu
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                     )
                 }
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(ZhiBanSpacing.Md))
                 Column(Modifier.weight(1f)) {
                     Text(
                         "${trace.durationMs}ms · ${trace.attemptCount} 次尝试",
@@ -864,7 +870,7 @@ private fun RunTraceExpandedContent(trace: com.zhiban.rebuild.runtime.observabil
                     style = MaterialTheme.typography.labelSmall,
                 )
             }
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(ZhiBanSpacing.Sm))
             Text(
                 auditStatusLabel(step.status),
                 color = ZhiBanTextSecondary,

@@ -100,6 +100,7 @@ internal fun NavGraphBuilder.agentSettingsRoutes(navController: NavHostControlle
     composable<DataSettings> {
         DataSettingsPage(
             onBack = { navController.popBackStack() },
+            onStorage = { navController.navigate(StorageSettings) },
             onMemory = { navController.navigate(MemoryConfig) },
             onRunHistory = { navController.navigate(AgentRunHistory) },
         )

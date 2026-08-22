@@ -203,13 +203,13 @@ private fun ZhiBanNavContent(
         composable<Profile> {
             ProfileTab(
                 onNavigateToAgentSettings = { navController.navigate(AgentSettings) },
+                onNavigateToModelConfig = { navController.navigate(ModelConfig) },
                 onNavigateToAutoWrites = { navController.navigate(AutoWrites) },
                 onNavigateToAgentSuggestions = { navController.navigate(AgentSuggestions) },
                 onNavigateToProfileEdit = { navController.navigate(ProfileEdit) },
                 onNavigateToPrivacySecurity = { navController.navigate(PrivacySecurity) },
                 onNavigateToAppearance = { navController.navigate(Appearance) },
                 onNavigateToNotificationSettings = { navController.navigate(NotificationSettings) },
-                onNavigateToStorage = { navController.navigate(StorageSettings) },
                 onNavigateToData = { navController.navigate(DataSettings) },
                 onNavigateToReportError = { navController.navigate(ReportErrorSettings) },
                 onNavigateToAbout = { navController.navigate(AboutZhiBan) },

@@ -111,53 +111,55 @@ internal fun AutoWriteContent(
 
     Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { innerPadding ->
         ZhiBanPage {
-            LazyColumn(
-                Modifier.fillMaxSize().padding(innerPadding),
-                contentPadding = PaddingValues(bottom = ZhiBanSpacing.Xxxl),
-                verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
-            ) {
-                item { ZhiBanTopBar(title = "自动整理", onBack = onBack) }
-                if (state.receipts.isEmpty()) {
-                    item {
-                        Column(
-                            Modifier.fillMaxWidth().padding(
-                                horizontal = ZhiBanSpacing.PageHorizontal,
-                                vertical = ZhiBanSpacing.Xl,
-                            ),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            Text(
-                                "暂无自动整理",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                textAlign = TextAlign.Center,
-                            )
+            Column(Modifier.fillMaxSize().padding(innerPadding)) {
+                ZhiBanTopBar(title = "自动整理", onBack = onBack)
+                LazyColumn(
+                    Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = ZhiBanSpacing.Xxxl),
+                    verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
+                ) {
+                    if (state.receipts.isEmpty()) {
+                        item {
+                            Column(
+                                Modifier.fillMaxWidth().padding(
+                                    horizontal = ZhiBanSpacing.PageHorizontal,
+                                    vertical = ZhiBanSpacing.Xl,
+                                ),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                Text(
+                                    "暂无自动整理",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    textAlign = TextAlign.Center,
+                                )
+                            }
                         }
-                    }
-                } else {
-                    val onUndoReceipt: (AutoWriteReceiptRow) -> Unit = { receipt ->
-                        onUndo(receipt.changeId) { success ->
-                            showSnackbar(if (success) "已撤销" else "内容已被修改，请用纠正处理")
+                    } else {
+                        val onUndoReceipt: (AutoWriteReceiptRow) -> Unit = { receipt ->
+                            onUndo(receipt.changeId) { success ->
+                                showSnackbar(if (success) "已撤销" else "内容已被修改，请用纠正处理")
+                            }
                         }
+                        autoWriteSection(
+                            title = "待查看",
+                            receipts = state.receipts.filter { it.reviewState == "UNREVIEWED" },
+                            onUndo = onUndoReceipt,
+                            onCorrect = { correcting = it },
+                        )
+                        autoWriteSection(
+                            title = "已查看",
+                            receipts = state.receipts.filter { it.reviewState != "UNREVIEWED" && it.undoState == "AVAILABLE" },
+                            onUndo = onUndoReceipt,
+                            onCorrect = { correcting = it },
+                        )
+                        autoWriteSection(
+                            title = "已撤销",
+                            receipts = state.receipts.filter { it.undoState == "UNDONE" },
+                            onUndo = onUndoReceipt,
+                            onCorrect = { correcting = it },
+                        )
                     }
-                    autoWriteSection(
-                        title = "待查看",
-                        receipts = state.receipts.filter { it.reviewState == "UNREVIEWED" },
-                        onUndo = onUndoReceipt,
-                        onCorrect = { correcting = it },
-                    )
-                    autoWriteSection(
-                        title = "已查看",
-                        receipts = state.receipts.filter { it.reviewState != "UNREVIEWED" && it.undoState == "AVAILABLE" },
-                        onUndo = onUndoReceipt,
-                        onCorrect = { correcting = it },
-                    )
-                    autoWriteSection(
-                        title = "已撤销",
-                        receipts = state.receipts.filter { it.undoState == "UNDONE" },
-                        onUndo = onUndoReceipt,
-                        onCorrect = { correcting = it },
-                    )
                 }
             }
         }

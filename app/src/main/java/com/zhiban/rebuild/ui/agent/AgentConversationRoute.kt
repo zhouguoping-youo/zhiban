@@ -703,7 +703,7 @@ private fun cloudAsrFailureMessage(code: String): String = when (code) {
     "ASR_PROVIDER_UNAVAILABLE" -> "语音服务暂时不可用，请稍后重试"
     "ASR_CLOUD_CONSENT_REQUIRED" -> "请先到“我的－隐私与权限”允许语音识别上云"
     "ASR_NETWORK_FAILURE" -> "网络连接失败，录音已保留"
-    "ASR_PROVIDER_NOT_CONFIGURED" -> "前往 我的 → 智能体设置 → 大模型连接 完成配置"
+    "ASR_PROVIDER_NOT_CONFIGURED" -> "前往 我的 → 模型连接 完成配置"
     "ASR_PROVIDER_UNSUPPORTED" -> "当前 AI 服务暂不支持语音转文字"
     else -> "没有完成转写，录音已保留"
 }

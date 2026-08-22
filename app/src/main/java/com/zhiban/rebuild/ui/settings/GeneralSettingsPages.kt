@@ -183,7 +183,7 @@ fun PrivacySecurityPage(
         ) {
             item {
                 Text(
-                    "让知伴更好用",
+                    "手机权限",
                     style = MaterialTheme.typography.labelMedium,
                     color = ZhiBanTextSecondary,
                     modifier = Modifier.padding(horizontal = ZhiBanSpacing.Xs),
@@ -241,7 +241,7 @@ fun PrivacySecurityPage(
             }
             item {
                 Text(
-                    "通话感知",
+                    "知伴能做什么",
                     style = MaterialTheme.typography.labelMedium,
                     color = ZhiBanTextSecondary,
                     modifier = Modifier.padding(horizontal = ZhiBanSpacing.Xs, vertical = ZhiBanSpacing.Sm),
@@ -293,14 +293,6 @@ fun PrivacySecurityPage(
                 }
             }
             item {
-                Text(
-                    "回复建议",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = ZhiBanTextSecondary,
-                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.Xs, vertical = ZhiBanSpacing.Sm),
-                )
-            }
-            item {
                 SettingsCard {
                     SettingsToggleRow(
                         title = "为待回复的消息起草回复",
@@ -318,14 +310,6 @@ fun PrivacySecurityPage(
                 }
             }
             item {
-                Text(
-                    "联系人资料补全",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = ZhiBanTextSecondary,
-                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.Xs, vertical = ZhiBanSpacing.Sm),
-                )
-            }
-            item {
                 SettingsCard {
                     SettingsToggleRow(
                         title = "向联系人询问缺失资料",
@@ -334,14 +318,6 @@ fun PrivacySecurityPage(
                         onCheckedChange = completionViewModel::setEnabled,
                     )
                 }
-            }
-            item {
-                Text(
-                    "实验功能",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = ZhiBanTextSecondary,
-                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.Xs, vertical = ZhiBanSpacing.Sm),
-                )
             }
             item {
                 SettingsCard {
@@ -367,18 +343,10 @@ fun PrivacySecurityPage(
                 }
             }
             item {
-                Text(
-                    "定位",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = ZhiBanTextSecondary,
-                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.Xs, vertical = ZhiBanSpacing.Sm),
-                )
-            }
-            item {
                 SettingsCard {
                     SettingsToggleRow(
                         title = "允许知伴读取当前位置",
-                        subtitle = "开启后，在需要位置的问题中知伴可读取一次性坐标并发给大模型；不记录轨迹，默认关闭",
+                        subtitle = "开启后，在需要位置的问题中知伴可读取一次性坐标并发给云端 AI；不记录轨迹，默认关闭",
                         checked = locationAccessEnabled,
                         onCheckedChange = locationConsentViewModel::setEnabled,
                     )
@@ -386,7 +354,7 @@ fun PrivacySecurityPage(
             }
             item {
                 Text(
-                    "AI 服务",
+                    "数据与隐私详情",
                     style = MaterialTheme.typography.labelMedium,
                     color = ZhiBanTextSecondary,
                     modifier = Modifier.padding(horizontal = ZhiBanSpacing.Xs, vertical = ZhiBanSpacing.Sm),
@@ -395,14 +363,14 @@ fun PrivacySecurityPage(
             item {
                 SettingsCard {
                     SettingsToggleRow(
-                        title = "AI 对话与检索",
-                        subtitle = if (outboundState.allowCloudLlm) "已开启 · 大模型请求可出云" else "已关闭 · 停止所有云端大模型请求",
+                        title = "联网 AI 问答",
+                        subtitle = if (outboundState.allowCloudLlm) "已开启 · 问答和整理会连接云端 AI" else "已关闭 · 停止所有云端 AI 请求",
                         checked = outboundState.allowCloudLlm,
                         onCheckedChange = outboundViewModel::setAllowCloudLlm,
                     )
                     Divider()
                     SettingsToggleRow(
-                        title = "把真实号码交给大模型",
+                        title = "知伴可看到真实手机号",
                         subtitle = if (outboundState.allowUnmaskedPhoneNumbers) {
                             "已开启 · 知伴能看到真实手机号，才能替你发短信、拨号"
                         } else {
@@ -631,7 +599,13 @@ class DataExportViewModel @Inject constructor(private val exportService: AgentDa
 }
 
 @Composable
-fun DataSettingsPage(onBack: () -> Unit, onMemory: () -> Unit, onRunHistory: () -> Unit, exportViewModel: DataExportViewModel = hiltViewModel()) {
+fun DataSettingsPage(
+    onBack: () -> Unit,
+    onStorage: () -> Unit,
+    onMemory: () -> Unit,
+    onRunHistory: () -> Unit,
+    exportViewModel: DataExportViewModel = hiltViewModel(),
+) {
     val context = LocalContext.current
     var confirmReset by remember { mutableStateOf(false) }
     val exportState by exportViewModel.state.collectAsStateWithLifecycle()
@@ -651,11 +625,16 @@ fun DataSettingsPage(onBack: () -> Unit, onMemory: () -> Unit, onRunHistory: () 
             exportViewModel.exportConsumed()
         }
     }
-    SettingsPageFrame("数据管理", onBack) {
+    SettingsPageFrame("存储和数据", onBack) {
         LazyColumn(
             Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
             verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
         ) {
+            item {
+                SettingsCard {
+                    SettingsActionRow("存储占用与清理", onClick = onStorage)
+                }
+            }
             item {
                 Text(
                     "保存在这台手机上",
@@ -711,7 +690,7 @@ fun DataSettingsPage(onBack: () -> Unit, onMemory: () -> Unit, onRunHistory: () 
 @Composable
 fun ReportErrorSettingsPage(onBack: () -> Unit, onDiagnostics: () -> Unit) {
     val context = LocalContext.current
-    SettingsPageFrame("报告问题", onBack) {
+    SettingsPageFrame("帮助与问题反馈", onBack) {
         Column(
             Modifier
                 .fillMaxSize()

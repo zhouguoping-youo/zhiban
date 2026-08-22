@@ -22,8 +22,8 @@ import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.CloudQueue
 import androidx.compose.material.icons.outlined.DarkMode
-import androidx.compose.material.icons.outlined.DataUsage
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.Lock
@@ -105,13 +105,13 @@ internal data class ProfileSettingItem(
 @Composable
 fun ProfileTab(
     onNavigateToAgentSettings: () -> Unit = {},
+    onNavigateToModelConfig: () -> Unit = {},
     onNavigateToAutoWrites: () -> Unit = {},
     onNavigateToAgentSuggestions: () -> Unit = {},
     onNavigateToProfileEdit: () -> Unit = {},
     onNavigateToPrivacySecurity: () -> Unit = {},
     onNavigateToAppearance: () -> Unit = {},
     onNavigateToNotificationSettings: () -> Unit = {},
-    onNavigateToStorage: () -> Unit = {},
     onNavigateToData: () -> Unit = {},
     onNavigateToReportError: () -> Unit = {},
     onNavigateToAbout: () -> Unit = {},
@@ -142,26 +142,20 @@ fun ProfileTab(
         else -> "告诉知伴你的称呼和联系方式"
     }
 
+    // §九：L1 只留日常入口（资料/权限/模型连接/通知/外观/存储和数据/自动整理/帮助），
+    // 记忆、工具、运行记录等高级与诊断项统一收进「智能体设置」。
     val agentItems = listOf(
         ProfileSettingItem(
-            icon = Icons.Outlined.Psychology,
-            title = "智能体设置",
-            accessibilityDescription = "大模型、记忆、回答偏好和工具",
+            icon = Icons.Outlined.CloudQueue,
+            title = "模型连接",
+            accessibilityDescription = "查看或更换知伴使用的 AI 服务",
             statusText = when (providerConfigured) {
                 true -> "已连接"
                 false -> "未连接"
                 null -> null
             },
             statusNeedsAttention = providerConfigured == false,
-            onClick = onNavigateToAgentSettings,
-        ),
-        ProfileSettingItem(
-            icon = Icons.Outlined.AutoAwesome,
-            title = "自动整理",
-            accessibilityDescription = "查看、撤销或纠正知伴自动记录的内容",
-            statusText = pendingAutoWriteCount.takeIf { it > 0 }?.let { "$it 条待查看" },
-            statusNeedsAttention = pendingAutoWriteCount > 0,
-            onClick = onNavigateToAutoWrites,
+            onClick = onNavigateToModelConfig,
         ),
         ProfileSettingItem(
             icon = Icons.Outlined.Lightbulb,
@@ -171,21 +165,36 @@ fun ProfileTab(
             statusNeedsAttention = pendingSuggestionCount > 0,
             onClick = onNavigateToAgentSuggestions,
         ),
+        ProfileSettingItem(
+            icon = Icons.Outlined.AutoAwesome,
+            title = "自动整理记录",
+            accessibilityDescription = "查看、撤销或纠正知伴自动记录的内容",
+            statusText = pendingAutoWriteCount.takeIf { it > 0 }?.let { "$it 条待查看" },
+            statusNeedsAttention = pendingAutoWriteCount > 0,
+            onClick = onNavigateToAutoWrites,
+        ),
     )
     val appItems = listOf(
-        ProfileSettingItem(Icons.Outlined.DarkMode, "外观", "跟随手机显示设置", onClick = onNavigateToAppearance),
+        ProfileSettingItem(Icons.Outlined.Lock, "手机权限", "知伴可使用的权限与数据范围", onClick = onNavigateToPrivacySecurity),
         ProfileSettingItem(
             Icons.Outlined.NotificationsNone,
             "通知",
             "提醒和消息权限",
             onClick = onNavigateToNotificationSettings,
         ),
-        ProfileSettingItem(Icons.Outlined.Lock, "隐私与权限", "查看知伴当前可使用的权限", onClick = onNavigateToPrivacySecurity),
-        ProfileSettingItem(Icons.Outlined.Storage, "存储", "查看和清理临时文件", onClick = onNavigateToStorage),
-        ProfileSettingItem(Icons.Outlined.DataUsage, "数据管理", "对话、记忆、联系人、日程与诊断", onClick = onNavigateToData),
+        ProfileSettingItem(Icons.Outlined.DarkMode, "外观", "跟随手机显示设置", onClick = onNavigateToAppearance),
+        ProfileSettingItem(Icons.Outlined.Storage, "存储和数据", "占用空间、导出与重置", onClick = onNavigateToData),
+    )
+    val advancedItems = listOf(
+        ProfileSettingItem(
+            Icons.Outlined.Psychology,
+            "智能体设置",
+            "记忆、回答偏好与工具",
+            onClick = onNavigateToAgentSettings,
+        ),
     )
     val supportItems = listOf(
-        ProfileSettingItem(Icons.Outlined.BugReport, "报告问题", "发送问题描述或导出诊断", onClick = onNavigateToReportError),
+        ProfileSettingItem(Icons.Outlined.BugReport, "帮助与问题反馈", "发送问题描述或导出诊断", onClick = onNavigateToReportError),
         ProfileSettingItem(Icons.Outlined.Info, "关于知伴", "版本、隐私与产品信息", onClick = onNavigateToAbout),
     )
 
@@ -264,6 +273,7 @@ fun ProfileTab(
 
             item { ProfileSettingsGroup("知伴", agentItems) }
             item { ProfileSettingsGroup("设置", appItems) }
+            item { ProfileSettingsGroup("高级", advancedItems) }
             item { ProfileSettingsGroup("支持", supportItems) }
             // Debug 构建才渲染的验收入口；Release 变体为 no-op。
             item { DebugAcceptanceEntry(onClick = onNavigateToDebugAcceptance) }
