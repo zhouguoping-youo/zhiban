@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -32,15 +31,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.RestartAlt
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -68,7 +63,6 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -336,7 +330,6 @@ internal fun ForceRelationshipGraphCanvas(
     onSelectContact: (String) -> Unit,
     presentationById: Map<String, ForceGraphNodePresentation> = emptyMap(),
     onSwitchEgo: ((String) -> Unit)? = null,
-    showDetailSheet: Boolean = true,
     onSelectionChanged: (String?) -> Unit = {},
 ) {
     val model = remember(rootId, peopleById, edges, presentationById) {
@@ -784,78 +777,6 @@ internal fun ForceRelationshipGraphCanvas(
             }
         }
     }
-
-    if (showDetailSheet) {
-        selectedNodeId?.let { nodeId ->
-            val selected = model.nodes.firstOrNull { it.id == nodeId }
-            if (selected != null) {
-                ForceNodeDetailSheet(
-                    node = selected,
-                    model = model,
-                    onDismiss = {
-                        selectedNodeId = null
-                        onSelectionChanged(null)
-                    },
-                    onRelatedClick = { relatedId ->
-                        selectedNodeId = relatedId
-                        onSelectionChanged(relatedId)
-                        focusNode(relatedId)
-                        (onSwitchEgo ?: onSelectContact).invoke(relatedId)
-                    },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-@OptIn(ExperimentalMaterial3Api::class)
-private fun ForceNodeDetailSheet(node: ForceGraphNode, model: ForceGraphModel, onDismiss: () -> Unit, onRelatedClick: (String) -> Unit) {
-    val graphColors = LocalRelationshipGraphColors.current
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val maxSheetHeight = LocalConfiguration.current.screenHeightDp.dp * 0.70f
-    val relatedLinks = model.links.filter { it.fromId == node.id || it.toId == node.id }
-    val strength = relatedLinks.filter { it.relationType != "WORKS_AT" }
-        .map(ForceGraphLink::confidence)
-        .average()
-        .takeUnless(Double::isNaN)
-    com.zhiban.rebuild.ui.components.ZhiBanBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-    ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(max = maxSheetHeight)
-                .padding(horizontal = ZhiBanSpacing.PageHorizontal)
-                .padding(bottom = ZhiBanSpacing.Xl),
-        ) {
-            ForceNodeHeader(node = node, graphColors = graphColors, onDismiss = onDismiss)
-            if (strength != null) {
-                Spacer(Modifier.height(ZhiBanSpacing.Md))
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(ZhiBanRadius.Medium),
-                ) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(ZhiBanSpacing.Md),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text("关系强度", style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            "${(strength * 100).toInt()}%",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.height(ZhiBanSpacing.Lg))
-            Text("关联对象", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(ZhiBanSpacing.Xs))
-            ForceNodeRelatedList(node = node, model = model, graphColors = graphColors, onRelatedClick = onRelatedClick)
-        }
-    }
 }
 
 private fun nodeColor(kind: ForceGraphNodeKind, colors: RelationshipGraphColors): Color = when (kind) {
@@ -868,94 +789,4 @@ private fun nodeContentColor(kind: ForceGraphNodeKind, colors: RelationshipGraph
     ForceGraphNodeKind.FOCUS -> colors.onFocusNode
     ForceGraphNodeKind.CONTACT -> colors.onContactNode
     ForceGraphNodeKind.WORK -> colors.onWorkNode
-}
-
-private fun nodeKindLabel(kind: ForceGraphNodeKind): String = when (kind) {
-    ForceGraphNodeKind.FOCUS -> "当前焦点"
-    ForceGraphNodeKind.CONTACT -> "联系人"
-    ForceGraphNodeKind.WORK -> "工作关系"
-}
-
-@Composable
-private fun ForceNodeHeader(node: ForceGraphNode, graphColors: RelationshipGraphColors, onDismiss: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier
-                .size(52.dp)
-                .clip(CircleShape)
-                .background(nodeColor(node.kind, graphColors)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.Rounded.Person,
-                contentDescription = null,
-                tint = nodeContentColor(node.kind, graphColors),
-            )
-        }
-        Spacer(Modifier.width(ZhiBanSpacing.Md))
-        Column(Modifier.weight(1f)) {
-            Text(node.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-            val subtitle = listOfNotNull(node.title, node.company).distinct().joinToString(" · ")
-            Text(
-                subtitle.ifBlank { nodeKindLabel(node.kind) },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        IconButton(onClick = onDismiss, modifier = Modifier.size(ZhiBanSize.TouchTarget)) {
-            Icon(Icons.Rounded.Close, contentDescription = "关闭详情")
-        }
-    }
-}
-
-@Composable
-private fun ForceNodeRelatedList(node: ForceGraphNode, model: ForceGraphModel, graphColors: RelationshipGraphColors, onRelatedClick: (String) -> Unit) {
-    val relatedLinks = model.links.filter { it.fromId == node.id || it.toId == node.id }
-    if (relatedLinks.isEmpty()) {
-        Text(
-            "暂无可展示的关联",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    } else {
-        relatedLinks.take(12).forEachIndexed { index, link ->
-            val relatedId = if (link.fromId == node.id) link.toId else link.fromId
-            val related = model.nodes.firstOrNull { it.id == relatedId } ?: return@forEachIndexed
-            if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .defaultMinSize(minHeight = 56.dp)
-                    .clickable { onRelatedClick(relatedId) }
-                    .padding(vertical = ZhiBanSpacing.Sm),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(Modifier.size(10.dp).clip(CircleShape).background(nodeColor(related.kind, graphColors)))
-                Spacer(Modifier.width(ZhiBanSpacing.Md))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        related.name,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium,
-                    )
-                    Text(
-                        buildString {
-                            append(graphRelationLabel(link.relationType, link.isHistorical))
-                            link.evidenceLabel?.let { append(" · 依据：").append(it) }
-                            if (link.isInferred) append(" · 智能推测")
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Text(
-                    "查看",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
-    }
 }

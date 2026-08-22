@@ -124,6 +124,7 @@ import com.zhiban.rebuild.relationship.RelationshipGroup
 import com.zhiban.rebuild.relationship.RelationshipTaxonomy
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.personalization.UserProfile
+import com.zhiban.rebuild.ui.components.ZhiBanCompactEmptyState
 import com.zhiban.rebuild.ui.components.ZhiBanPrimaryTabHeader
 import com.zhiban.rebuild.ui.components.ZhiBanSearchField
 import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
@@ -319,22 +320,20 @@ internal fun RelationshipGraphState(
                 rootId = rootId,
             )
         } else if (contacts.isEmpty()) {
-            Spacer(Modifier.height(16.dp))
-            Text(
-                relationshipGraphEmptyMessage(activeFilter, activeGroup),
-                color = RelationMuted,
-                style = MaterialTheme.typography.bodySmall,
+            ZhiBanCompactEmptyState(
+                title = relationshipGraphEmptyMessage(activeFilter, activeGroup),
+                icon = Icons.Rounded.Groups,
             )
         } else if (displayedEdges.isEmpty()) {
-            Spacer(Modifier.height(14.dp))
-            Text(
-                if (root.isOwner) {
+            ZhiBanCompactEmptyState(
+                title = if (root.isOwner) {
                     "还没有与我相关的可靠关系"
                 } else {
                     "这个人还没有已确认的关联联系人"
                 },
-                color = RelationMuted,
-                style = MaterialTheme.typography.bodySmall,
+                icon = Icons.Rounded.Groups,
+                primaryLabel = if (root.isOwner && canAddRelationship) "添加关系" else null,
+                onPrimary = if (root.isOwner && canAddRelationship) onAdd else null,
             )
         } else {
             Spacer(Modifier.height(12.dp))
@@ -346,7 +345,6 @@ internal fun RelationshipGraphState(
                     presentationById = relationshipGraphPresentation(graphProjection),
                     onSelectContact = { selectedPersonId = it },
                     onSwitchEgo = ::switchEgo,
-                    showDetailSheet = false,
                     onSelectionChanged = { selectedPersonId = it },
                 )
                 selectedPersonId?.takeIf { it != RelationshipPersonIds.SELF }?.let { selectedId ->
@@ -507,146 +505,6 @@ private fun relationshipGraphEmptyMessage(activeFilter: String?, group: Relation
     else -> "还没有与我相关的可靠关系"
 }
 
-@Composable
-internal fun RelationshipRows(
-    edges: List<RelationshipEdgeEntity>,
-    peopleById: Map<String, RelationshipPersonUi>,
-    onInspect: (RelationshipEdgeEntity) -> Unit,
-    onSelectContact: (String) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm)) {
-        edges.forEach { edge ->
-            val from = peopleById.getValue(edge.fromContactId)
-            val to = peopleById.getValue(edge.toContactId)
-            RelationshipGraphCard(
-                edge = edge,
-                from = from,
-                to = to,
-                onInspect = onInspect,
-                onSelectContact = onSelectContact,
-            )
-        }
-    }
-}
-
-@Composable
-internal fun RelationshipGraphCard(
-    edge: RelationshipEdgeEntity,
-    from: RelationshipPersonUi,
-    to: RelationshipPersonUi,
-    onInspect: (RelationshipEdgeEntity) -> Unit,
-    onSelectContact: (String) -> Unit,
-) {
-    val inferredFromEvidence = edge.isInferredEvidenceRelationship()
-    val historical = edge.isHistoricalRelationship()
-    val relation = edge.displayRelationLabel()
-    val other = when {
-        from.isOwner -> to
-        to.isOwner -> from
-        else -> null
-    }
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(ZhiBanRadius.Medium))
-            .background(RelationSoft)
-            .clickable(enabled = !inferredFromEvidence) { onInspect(edge) }
-            .padding(horizontal = ZhiBanSpacing.Md, vertical = ZhiBanSpacing.Sm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RelationshipPairAvatar(from, to, onSelectContact)
-        Spacer(Modifier.width(ZhiBanSpacing.Md))
-        Column(Modifier.weight(1f)) {
-            Text(
-                other?.displayName ?: "${from.displayName} 与 ${to.displayName}",
-                color = RelationInk,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                when {
-                    inferredFromEvidence -> edge.evidenceDigest.ifBlank { edge.inferredEvidenceLabel().orEmpty() }
-                    historical -> "历史关系 · 已保留在时间线"
-                    edge.userConfirmed -> "已确认 · 点击查看依据"
-                    else -> "待确认 · 点击查看依据"
-                },
-                color = RelationMuted,
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Spacer(Modifier.width(ZhiBanSpacing.Sm))
-        Box(
-            Modifier.clip(RoundedCornerShape(ZhiBanRadius.Full))
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(horizontal = ZhiBanSpacing.Md, vertical = ZhiBanSpacing.Xs),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                relation,
-                color = if (historical) RelationMuted else RelationInk,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-            )
-        }
-    }
-}
-
-@Composable
-private fun RelationshipPairAvatar(from: RelationshipPersonUi, to: RelationshipPersonUi, onSelectContact: (String) -> Unit) {
-    Box(Modifier.width(56.dp).height(40.dp)) {
-        RelationshipMiniAvatar(from, Modifier.align(Alignment.CenterStart)) { onSelectContact(from.personId) }
-        RelationshipMiniAvatar(to, Modifier.align(Alignment.CenterEnd)) { onSelectContact(to.personId) }
-    }
-}
-
-@Composable
-private fun RelationshipMiniAvatar(person: RelationshipPersonUi, modifier: Modifier, onClick: () -> Unit) {
-    Box(
-        modifier
-            .size(34.dp)
-            .clip(CircleShape)
-            .background(if (person.isOwner) RelationAccent else MaterialTheme.colorScheme.surface)
-            .clickable(onClick = onClick)
-            .semantics { contentDescription = "查看${person.displayName}" },
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            person.displayName.take(1),
-            color = if (person.isOwner) Color.White else RelationInk,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-    }
-}
-
-@Composable
-internal fun GraphPersonAvatar(person: RelationshipPersonUi, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .size(ZhiBanSize.TouchTarget)
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            Modifier.size(38.dp).clip(CircleShape)
-                .background(if (person.isOwner) RelationAccent else RelationSoft),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                person.displayName.take(1),
-                color = if (person.isOwner) MaterialTheme.colorScheme.onPrimary else RelationInk,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Medium,
-            )
-        }
-    }
-}
-
 internal data class RelationshipPersonUi(
     val personId: String,
     val displayName: String,
@@ -654,29 +512,6 @@ internal data class RelationshipPersonUi(
     val company: String? = null,
     val title: String? = null,
 )
-
-@Composable
-internal fun GraphCenterNode(person: RelationshipPersonUi) {
-    Box(
-        Modifier
-            .size(56.dp)
-            .clip(CircleShape)
-            .background(if (person.isOwner) RelationAccent else RelationSurface)
-            .border(
-                width = if (person.isOwner) 0.dp else 1.dp,
-                color = if (person.isOwner) Color.Transparent else RelationLine,
-                shape = CircleShape,
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            if (person.isOwner) "我" else person.displayName.take(1),
-            color = if (person.isOwner) MaterialTheme.colorScheme.onPrimary else RelationInk,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold,
-        )
-    }
-}
 
 @Composable
 internal fun GraphPersonNode(person: RelationshipPersonUi, labelAbove: Boolean = false, onClick: (() -> Unit)? = null) {

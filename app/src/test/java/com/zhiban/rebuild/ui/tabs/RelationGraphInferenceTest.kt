@@ -141,7 +141,7 @@ class RelationGraphInferenceTest {
     }
 
     @Test
-    fun `introduction event projects owner subject and introducer edges`() {
+    fun `introduction event projects a path through the introducer instead of a direct edge`() {
         val subject = contact("huang", "黄勇")
         val introducer = contact("ding", "丁波")
         val event = RelationshipEventWithParticipants(
@@ -167,12 +167,12 @@ class RelationGraphInferenceTest {
 
         val edges = relationshipEventEdges(listOf(event), listOf(subject, introducer))
 
-        assertEquals(3, edges.size)
-        assertEquals("介绍认识", edges.first { it.toContactId == "huang" }.displayRelationLabel())
-        assertEquals("介绍人", edges.first { it.toContactId == "ding" }.displayRelationLabel())
+        assertEquals(2, edges.size)
+        assertEquals("介绍人", edges.first { it.fromContactId == RelationshipPersonIds.SELF }.displayRelationLabel())
         assertTrue(edges.all { it.status == INTRODUCTION_EVENT_STATUS })
         assertTrue(edges.all(RelationshipEdgeEntity::isInferredEvidenceRelationship))
         assertTrue(edges.any { it.fromContactId == "huang" && it.toContactId == "ding" })
+        assertTrue(edges.none { it.fromContactId == RelationshipPersonIds.SELF && it.toContactId == "huang" })
     }
 
     @Test

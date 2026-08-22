@@ -60,9 +60,10 @@ internal fun RelationshipEdgeEntity.inferredEvidenceLabel(): String? = when (sta
 }
 
 /**
- * Projects a confirmed introduction event into the graph without pretending that the event is a
- * manually confirmed relationship edge.  The three incident edges make the chain visible from
- * either side: owner—introduced person, owner—introducer, and introduced person—introducer.
+ * Projects a confirmed introduction event into the graph as a path through the introducer
+ * (owner —[介绍人]— introducer —[介绍人]— subject), not as a fabricated direct owner—subject edge.
+ * The two incident edges make the chain readable from either side without pretending the
+ * owner and the introduced person hold an independently confirmed relationship.
  */
 internal fun relationshipEventEdges(
     events: List<RelationshipEventWithParticipants>,
@@ -86,14 +87,6 @@ internal fun relationshipEventEdges(
             val confidence = if (eventWithParticipants.event.userConfirmed) 1.0 else 0.85
             val evidence = "共同经历：$title"
             listOf(
-                introductionEventEdge(
-                    edgeId = "event:${eventWithParticipants.event.eventId}:owner-subject",
-                    from = ownerId,
-                    to = subject,
-                    relationType = "ACQUAINTANCE",
-                    evidence = evidence,
-                    confidence = confidence,
-                ),
                 introductionEventEdge(
                     edgeId = "event:${eventWithParticipants.event.eventId}:owner-introducer",
                     from = ownerId,
