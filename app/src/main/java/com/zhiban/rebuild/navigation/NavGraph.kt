@@ -226,10 +226,19 @@ private fun ZhiBanNavContent(
                 onManagePlugins = { navController.navigate(Skill) { launchSingleTop = true } },
                 onNavigateToSettings = { navController.navigate(ModelConfig) { launchSingleTop = true } },
                 onBackToHome = {
-                    if (route.returnTarget == "BACK" && navController.popBackStack()) {
-                        Unit
-                    } else {
-                        navController.navigate(Calendar()) {
+                    when {
+                        route.returnTarget == "BACK" && navController.popBackStack() -> Unit
+
+                        // 从关系区（联系人详情/联系人维护）进入的问问，返回时必须回到关系上下文，
+                        // 而不是笼统落到日历；弹出失败时兜底到关系 TAB。
+                        route.returnTarget == "RELATION" -> {
+                            if (!navController.popBackStack()) {
+                                navController.navigate(Relation) { launchSingleTop = true }
+                            }
+                            Unit
+                        }
+
+                        else -> navController.navigate(Calendar()) {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = false }
                             launchSingleTop = true
                         }
