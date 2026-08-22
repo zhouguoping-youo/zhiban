@@ -75,6 +75,7 @@ DropdownMenu 1：CategoryDropdownMenu（关系分类）
 2. **AssistantChat returnTarget="RELATION" 不生效**（NavGraph.kt:228-237 只特判 "BACK"）——联系人详情"问问"执行完无法回到联系人 → 包 E 修
 3. **CallNoteDialog 云 ASR 不可用时弹 Google 系统语音识别**（RelationInboxDialogs.kt:261-267）——违反 §七.5 → 包 F 修
 4. **CRM 场景无结果回执**（生活助理/一起安排有回执条，CRM 没有）→ 包 G 修
+5. **联系人详情关系行不可点**（ContactDetailDialogs.kt 关系行无 click 链路，selectedEdge 无任何 UI 入口，关系详情/删除为断头路）→ 验收轮修（506e63a，真机走完删除全流程）
 
 ## 三、验收矩阵（逐包填写）
 
@@ -84,8 +85,40 @@ DropdownMenu 1：CategoryDropdownMenu（关系分类）
 | B | 关系首页 | 维护常驻大卡/行第二行露手机号/空态大白卡 | RelationshipAttention.kt、RelationContactRows.kt、RelationTab.kt | after/B-02 | ✅ 角标27、无手机号、关注区按需出现（653d958） |
 | C | 联系人详情 | 手写顶行/空态正文号/私有52dp主按钮 | ContactDetailDialogs.kt | after/C-08（对 before/08） | ✅ 统一TopBar+小字空态+共享按钮（229a6b0）；灰带为存量系统窗背景非回归 |
 | D | 关系图 | 介绍链伪造直达边/禁用sheet死代码/空态无操作 | ForceRelationshipGraph.kt、RelationshipGraphSection.kt、RelationGraphInference.kt | after/D-09 | ✅ 空态一状态一主操作；介绍链=路径（3a7b33e）；真机 0 边为真实空态 |
-| E | 问问 | 确认条笼统/长文无折叠/表格扭曲/返回断点 | AgentConversationScreen.kt、AgentResponseFormatting.kt、NavGraph.kt(e95c6eb 单独修) | after/E-02、E-03-long-* | ✅ 长文折叠+表格真机验证；returnTarget 真机验证；感知条无候选未截图（e173b16） |
-| F | 日历 | 点行进编辑器/行内多入口/空态大白卡/完成无撤销/来源缺失 | CalendarTab.kt、ScheduleCompletionDialog.kt、AgentEntities.kt、AgentDaos.kt | after/F-01~F-10 | ✅ 真机全生命周期：建→行→统一状态框→编辑→完成→撤销→查看结果→取消（13c0e8e）；「知伴记录」来源标注仅代码级验证（真机无工具链日程）；断点③系统语音弹窗已删（5579c6d，启动器代码移除） |
-| G | 三能力场景 | 依据/来源占详情首屏/按钮体系不一/CRM 无回执/安排详情无顶栏/参与人行内多按钮 | CrmIntelligenceComponents.kt、CrmCapabilityPage.kt、CrmLeadListPage.kt、CrmOpportunityDetailPage.kt、CrmUiModels.kt、LifeAssistantPages.kt、EventPlanningPages.kt、EventPlanningDialogs.kt、SceneCapabilityComponents.kt、ZhiBanControls.kt | after/G-01~G-13 | ✅ 能力首页2列卡/三场景紧凑空态/CRM工作台+详情回执/查看依据收起展开/阶段Sheet勾选/参与人Sheet(状态+移除)/动作栈主-次-危险全真机验证（46db193+6777aee）；断点①安排详情TopBar（8c3a11d）与断点④CRM回执（9fdc8e0）真机确认；生活助理详情「查看依据」真机无真实数据未验（与CRM同款组件已验+JVM测试覆盖）；测试计划已删除清理 |
-| H | 我的/设置 | L1 入口杂（智能体设置直出+存储数据两行）/隐私页7段无结构/行话(大模型请求可出云等)/TopBar 随内容滚走/20dp 硬编码/密钥眼睛 44dp/死代码 | ProfileTab.kt、NavGraph.kt、NavGraphRoutes.kt、GeneralSettingsPages.kt、AgentSettingsPages.kt、ModelConfigPage.kt、AutoWritePage.kt、AgentSuggestionPage.kt、AgentProjectionUiMapper.kt、AgentConversationRoute.kt、AgentConversationMessageComponents.kt | after/H-01~H-08 | ✅ L1 新IA真机核验（模型连接状态/手机权限/存储和数据/高级组）；隐私三段+行话清零真机核验；模型连接直达页/存储二级进入/智能体设置/运行记录真机核验（3ef99f6）；自动整理与智能建议真机均为真实空态，TopBar 常驻为结构改动（与已验页面同构）；E2E 断言同步未回退数量 |
-| I | 缩放/键盘/形态/可达性 | —（验证包，无预登记缺陷） | 无代码改动 | after/I-01~I-16 | ✅ 字体 100/130/150/200% 四档三张 L1 无裁切（TABBAR 纯图标不变）；搜狗全高键盘下问问输入条+发送+最新消息可见、日程编辑器字段+保存可见；横屏自动改左侧导航轨、空态主操作滚动可达；可达性用语义树审计（可点父节点的命名子节点齐全：回到今天/选择日期/我的等），TalkBack 本体未在日用机开启（侵入式）；分屏与折叠态外屏需实体操作，adb 无法驱动，登记未验证。字体已还原 0.9、输入法已还原 ADB、误触的号码开关已还原开启 |
+| E | 问问 | 确认条笼统/长文无折叠/表格扭曲/返回断点 | AgentConversationScreen.kt、AgentResponseFormatting.kt、NavGraph.kt(e95c6eb 单独修) | after/E-02、E-03-long-* | ✅ 长文折叠+表格真机验证；returnTarget 真机验证；感知确认条经受控种子实测（§四.4，61455e8） |
+| F | 日历 | 点行进编辑器/行内多入口/空态大白卡/完成无撤销/来源缺失 | CalendarTab.kt、ScheduleCompletionDialog.kt、AgentEntities.kt、AgentDaos.kt | after/F-01~F-10 | ✅ 真机全生命周期：建→行→统一状态框→编辑→完成→撤销→查看结果→取消（13c0e8e）；「知伴记录」来源标注受控种子实测（§四.4，61455e8）；断点③系统语音弹窗已删（5579c6d，启动器代码移除） |
+| G | 三能力场景 | 依据/来源占详情首屏/按钮体系不一/CRM 无回执/安排详情无顶栏/参与人行内多按钮 | CrmIntelligenceComponents.kt、CrmCapabilityPage.kt、CrmLeadListPage.kt、CrmOpportunityDetailPage.kt、CrmUiModels.kt、LifeAssistantPages.kt、EventPlanningPages.kt、EventPlanningDialogs.kt、SceneCapabilityComponents.kt、ZhiBanControls.kt | after/G-01~G-13 | ✅ 能力首页2列卡/三场景紧凑空态/CRM工作台+详情回执/查看依据收起展开/阶段Sheet勾选/参与人Sheet(状态+移除)/动作栈主-次-危险全真机验证（46db193+6777aee）；断点①安排详情TopBar（8c3a11d）与断点④CRM回执（9fdc8e0）真机确认；生活助理详情「查看依据」受控种子实测（§四.4，61455e8）；测试计划已删除清理 |
+| H | 我的/设置 | L1 入口杂（智能体设置直出+存储数据两行）/隐私页7段无结构/行话(大模型请求可出云等)/TopBar 随内容滚走/20dp 硬编码/密钥眼睛 44dp/死代码 | ProfileTab.kt、NavGraph.kt、NavGraphRoutes.kt、GeneralSettingsPages.kt、AgentSettingsPages.kt、ModelConfigPage.kt、AutoWritePage.kt、AgentSuggestionPage.kt、AgentProjectionUiMapper.kt、AgentConversationRoute.kt、AgentConversationMessageComponents.kt | after/H-01~H-08 | ✅ L1 新IA真机核验（模型连接状态/手机权限/存储和数据/高级组）；隐私三段+行话清零真机核验；模型连接直达页/存储二级进入/智能体设置/运行记录真机核验（3ef99f6）；自动整理与智能建议真机均为真实空态；两页 TopBar 常驻为结构改动，仅按同构推断、未单独实测，保持未验证；E2E 断言同步未回退数量 |
+| I | 缩放/键盘/形态/可达性 | —（验证包，无预登记缺陷） | 无代码改动 | after/I-01~I-16 | ✅ 字体 100/130/150/200% 四档三张 L1 无裁切（TABBAR 纯图标不变）；搜狗全高键盘下问问输入条+发送+最新消息可见、日程编辑器字段+保存可见；横屏自动改左侧导航轨、空态主操作滚动可达；可达性已实测开启 TalkBack 验证（§四.2：TAB/快捷操作/Sheet/Dialog 焦点/设置开关全过，关系图节点缺陷已修 e609254）；分屏实测通过（§四.3）；折叠外屏未验证（折叠后 adb tap 不落外屏，登记人工项）。字体已还原 0.9、输入法已还原 ADB、误触的号码开关已还原开启 |
+
+## 四、最终验收闭环（2026-08-22，HEAD `cafc415`）
+
+> 规则：只有实际验证通过才标 ✅；未验证保持「未验证」，不用同构组件推断为通过。
+
+### 1. 全套件重跑
+- 命令：`ANDROID_SERIAL=R5CT20QKT9D ./gradlew :app:connectedDebugAndroidTest`（设备 SM-W7023 / Android 13）
+- **结果：tests=696 / failures=0 / errors=0 / skipped=1**；XML 生成时间 **2026-08-22 17:11:32**（非旧报告）
+- 同日首轮（16:35:50）曾 3 失败，定性均为 E/H 收口包改了产品行为但 E2E 断言未同步（感知确认条文案、长文折叠、隐私页 LazyColumn 虚拟化），非产品回归；`cafc415` 同步断言后复跑全绿，JVM `check` 绿
+- 执行前已说明设备测试重置 App 沙箱；执行后 `installDebug` 恢复 Debug APK 并冷启动确认
+
+### 2. TalkBack 实测
+真机实际开启 TalkBack 验证：五个 TAB 名称与选中态 ✅（问问为全屏对话、无 TAB 栏属设计）；联系人详情三个快捷操作命名 ✅；关系图节点与返回 ✅（见修复①）；问问输入/发送/错误结果卡 ✅；日程状态 Sheet 全生命周期 ✅；Dialog 打开后焦点锁定（a11y 树仅含 Dialog）✅；关闭后焦点恢复至「返回」✅；设置开关名称/状态/点击结果 ✅。
+- 修复①：关系图 Canvas 节点对 TalkBack 不可见 → 语义锚点 overlay（`e609254`，真机复验「我/Angel Wu」可朗读可激活，不拦截画布拖动/双击）
+- 修复②：联系人详情关系行不可点（断点⑤）→ 接通详情/删除链路（`506e63a`）
+- **未验证**：问问「确认卡/结果卡/撤销」的 TalkBack 路径——需真实 LLM 配置才会产生确认卡，真机为无 key 真实状态，不以假数据推断为通过
+- 未观察到重复朗读、焦点跳失；发现的两处缺陷已修复并补测试
+
+### 3. 实体形态
+- 分屏（与第二应用各半屏）：五个主 TAB 无裁切、主操作可达、导航无异常 ✅
+- 折叠展开态（内屏 1080×2640）：本轮全部真机验收即在展开态完成 ✅
+- 折叠外屏：**未验证**（折叠后 adb tap 不落外屏，无法驱动；登记为人工项）
+
+### 4. 受控种子验收（`61455e8`，随全套件自检自清理）
+受控测试数据经第二连接直写真实加密库、全程走真实 UI，验证后清理（UI「忽略」路径 + 硬删兜底），不污染用户数据：
+- 生活助理详情「查看依据」✅（来源/微信/原消息正文/90% 可信全渲染）
+- 知伴工具创建日程的「知伴记录」来源标识 ✅
+- 感知候选确认卡 ✅（渲染 + 真实「忽略」清卡 + 状态落库）
+
+### 5. 登记问题（待用户定夺，不阻塞验收）
+- 删除关系后关系图留存「前X」虚线历史边：时序模型设计如此（episode 关闭 → 历史投影，测试锁定），但删除确认文案「将被移除」与留存表现存在表述差异——改文案还是改行为，待用户决定。
+
