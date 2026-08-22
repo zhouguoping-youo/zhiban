@@ -180,6 +180,7 @@ internal fun ContactDetailDialog(
     onAddEvent: () -> Unit,
     onAddIdentity: () -> Unit,
     onInspectEvent: (RelationshipEventWithParticipants) -> Unit,
+    onInspectEdge: (RelationshipEdgeEntity) -> Unit,
     onDeleteFact: (String) -> Unit,
     onDeleteAlias: (String) -> Unit,
     onDeletePlatformIdentity: (String) -> Unit,
@@ -329,7 +330,10 @@ internal fun ContactDetailDialog(
                                             edge.fromContactId
                                         }
                                         Row(
-                                            Modifier.fillMaxWidth().padding(vertical = 7.dp),
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .clickable { onInspectEdge(edge) }
+                                                .padding(vertical = 7.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                         ) {
                                             Text(

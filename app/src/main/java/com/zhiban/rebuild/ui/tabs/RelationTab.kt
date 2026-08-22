@@ -627,6 +627,10 @@ fun RelationTab(
             onAddEvent = { addEventFor = it },
             onAddIdentity = { identityEditorForId = it.contactId },
             onInspectEvent = { selectedEvent = it },
+            onInspectEdge = { edge ->
+                selected = null
+                selectedEdge = edge
+            },
             onRequestPhoneSync = { contact ->
                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) ==
                     PackageManager.PERMISSION_GRANTED

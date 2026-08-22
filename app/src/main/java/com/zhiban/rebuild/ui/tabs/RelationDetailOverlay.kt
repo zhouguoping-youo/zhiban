@@ -35,6 +35,7 @@ internal data class RelationDetailActions(
     val onAddEvent: (ContactEntity) -> Unit,
     val onAddIdentity: (ContactEntity) -> Unit,
     val onInspectEvent: (RelationshipEventWithParticipants) -> Unit,
+    val onInspectEdge: (RelationshipEdgeEntity) -> Unit,
     val onRequestPhoneSync: (ContactEntity) -> Unit,
     val onAsk: (ContactEntity) -> Unit,
 )
@@ -82,6 +83,7 @@ internal fun RelationDetailOverlay(state: RelationDetailState, actions: Relation
         onAddEvent = { actions.onAddEvent(contact) },
         onAddIdentity = { actions.onAddIdentity(contact) },
         onInspectEvent = actions.onInspectEvent,
+        onInspectEdge = actions.onInspectEdge,
         onDeleteFact = viewModel::deleteContactFact,
         onDeleteAlias = viewModel::deleteAlias,
         onDeletePlatformIdentity = viewModel::deletePlatformIdentity,
