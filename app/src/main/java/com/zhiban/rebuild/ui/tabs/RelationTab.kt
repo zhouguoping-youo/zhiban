@@ -48,6 +48,7 @@ import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.PersonSearch
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.Close
@@ -358,13 +359,12 @@ fun RelationTab(
     val interactionByContactId = remember(page.interactionIntensity) {
         page.interactionIntensity.associateBy { it.contactId }
     }
-    val attentionItems = remember(pendingCallNotes, replySuggestions, maintenanceCount, contacts) {
+    val attentionItems = remember(pendingCallNotes, replySuggestions) {
         buildRelationshipAttentionItems(
             pendingCallContactNames = pendingCallNotes.map { call ->
                 call.linkedContactId?.let { id -> contacts.firstOrNull { it.contactId == id }?.displayName }.orEmpty()
             },
             replySuggestions = replySuggestions,
-            maintenanceCount = maintenanceCount,
         )
     }
     val contextNowEpochMs = remember(contacts, page.interactionIntensity) { System.currentTimeMillis() }
@@ -398,6 +398,13 @@ fun RelationTab(
                     title = "关系",
                     subtitle = localizedQuantity(R.plurals.contact_count, contacts.size),
                 ) {
+                    ZhiBanHeaderIconAction(
+                        icon = Icons.Outlined.PersonSearch,
+                        contentDescription = if (maintenanceCount > 0) "联系人维护，$maintenanceCount 项待核实" else "联系人维护",
+                        onClick = onOpenContactMaintenance,
+                        tint = RelationInk,
+                        badgeCount = maintenanceCount,
+                    )
                     ZhiBanHeaderIconAction(
                         icon = Icons.Outlined.NotificationsNone,
                         contentDescription = "待确认内容",
@@ -445,7 +452,6 @@ fun RelationTab(
                         when (item.kind) {
                             RelationshipAttentionKind.CALL_NOTE -> pendingCallNotes.firstOrNull()?.let { selectedCallNote = it }
                             RelationshipAttentionKind.REPLY -> showNotificationCandidates = true
-                            RelationshipAttentionKind.MAINTENANCE -> onOpenContactMaintenance()
                         }
                     }
                     Spacer(Modifier.height(12.dp))

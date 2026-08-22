@@ -24,14 +24,18 @@ import com.zhiban.rebuild.ui.components.zhiBanCardSurface
 import com.zhiban.rebuild.ui.theme.ZhiBanIconSize
 import com.zhiban.rebuild.ui.theme.ZhiBanSpacing
 
-internal enum class RelationshipAttentionKind { CALL_NOTE, REPLY, MAINTENANCE }
+internal enum class RelationshipAttentionKind { CALL_NOTE, REPLY }
 
 internal data class RelationshipAttentionItem(val kind: RelationshipAttentionKind, val title: String, val detail: String)
 
+/**
+ * Attention rows list only concrete, actionable items. Contact maintenance is
+ * intentionally absent: it lives as a permanent header entry with a count
+ * badge instead of occupying a recurring card here.
+ */
 internal fun buildRelationshipAttentionItems(
     pendingCallContactNames: List<String>,
     replySuggestions: List<ReplySuggestionCardModel>,
-    maintenanceCount: Int,
 ): List<RelationshipAttentionItem> = buildList {
     pendingCallContactNames.firstOrNull()?.let { name ->
         add(
@@ -48,15 +52,6 @@ internal fun buildRelationshipAttentionItems(
                 kind = RelationshipAttentionKind.REPLY,
                 title = "${suggestion.contactName} · 有一条消息待回复",
                 detail = suggestion.incomingExcerpt.ifBlank { "知伴已准备回复建议" },
-            ),
-        )
-    }
-    if (maintenanceCount > 0) {
-        add(
-            RelationshipAttentionItem(
-                kind = RelationshipAttentionKind.MAINTENANCE,
-                title = "$maintenanceCount 项联系人资料待核实",
-                detail = "只处理无法确定的内容",
             ),
         )
     }
