@@ -138,6 +138,7 @@ fun EventPlanningDetailPage(planId: String, onBack: () -> Unit, onAskAgent: (Str
             contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = ZhiBanSpacing.Xxl),
             verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Lg),
         ) {
+            item { ZhiBanTopBar("安排详情", onBack) }
             eventPlanDetailContent(
                 item = item,
                 state = state,
