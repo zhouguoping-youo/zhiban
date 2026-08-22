@@ -224,6 +224,7 @@ fun RelationTab(
     var deleting by remember { mutableStateOf<ContactEntity?>(null) }
     var markingAsOwner by remember { mutableStateOf<ContactEntity?>(null) }
     var showRelationEditor by rememberSaveable { mutableStateOf(false) }
+    var relationshipEditorTargetId by rememberSaveable { mutableStateOf<String?>(null) }
     var showOwnerEmploymentEditor by remember { mutableStateOf(false) }
     var deletingEdge by remember { mutableStateOf<RelationshipEdgeEntity?>(null) }
     var selectedEdge by remember { mutableStateOf<RelationshipEdgeEntity?>(null) }
@@ -564,7 +565,10 @@ fun RelationTab(
                             canAddRelationship = contacts.isNotEmpty(),
                             activeFilter = null,
                             activeGroup = null,
-                            onAdd = { showRelationEditor = true },
+                            onAdd = {
+                                relationshipEditorTargetId = null
+                                showRelationEditor = true
+                            },
                             onEditOwnerEmployment = { showOwnerEmploymentEditor = true },
                             onOpenContact = { contactId ->
                                 contacts.firstOrNull { it.contactId == contactId }?.let {
@@ -609,6 +613,11 @@ fun RelationTab(
                 deleting = contact
             },
             onAddFact = { addFactForId = it.contactId },
+            onAddRelationship = { contact ->
+                relationshipEditorTargetId = contact.contactId
+                selected = null
+                showRelationEditor = true
+            },
             onAddEvent = { addEventFor = it },
             onAddIdentity = { identityEditorForId = it.contactId },
             onInspectEvent = { selectedEvent = it },
@@ -873,11 +882,16 @@ fun RelationTab(
         RelationshipEditorDialog(
             owner = ownerProfile,
             contacts = contacts,
-            onDismiss = { showRelationEditor = false },
+            initialTargetId = relationshipEditorTargetId,
+            onDismiss = {
+                relationshipEditorTargetId = null
+                showRelationEditor = false
+            },
             onSave = { from, to, type, temporalState, result ->
                 viewModel.saveRelationship(from, to, type, temporalState) { error ->
                     result(error)
                     if (error == null) {
+                        relationshipEditorTargetId = null
                         showRelationEditor = false
                         showFeedback("关系已保存")
                     }

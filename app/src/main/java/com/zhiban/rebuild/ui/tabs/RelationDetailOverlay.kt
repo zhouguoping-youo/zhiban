@@ -31,6 +31,7 @@ internal data class RelationDetailActions(
     val onMarkAsOwner: (ContactEntity) -> Unit,
     val onDelete: (ContactEntity) -> Unit,
     val onAddFact: (ContactEntity) -> Unit,
+    val onAddRelationship: (ContactEntity) -> Unit,
     val onAddEvent: (ContactEntity) -> Unit,
     val onAddIdentity: (ContactEntity) -> Unit,
     val onInspectEvent: (RelationshipEventWithParticipants) -> Unit,
@@ -57,7 +58,8 @@ internal fun RelationDetailOverlay(state: RelationDetailState, actions: Relation
             state.ownerContactLinks.none { it.contactId == contact.contactId },
         facts = facts,
         relatedEdges = state.graphRelationships.filter {
-            it.fromContactId == contact.contactId || it.toContactId == contact.contactId
+            (it.fromContactId == RelationshipPersonIds.SELF && it.toContactId == contact.contactId) ||
+                (it.toContactId == RelationshipPersonIds.SELF && it.fromContactId == contact.contactId)
         },
         relatedEvents = state.relationshipEvents.filter { event ->
             event.participants.any { it.contactId == contact.contactId }
@@ -76,6 +78,7 @@ internal fun RelationDetailOverlay(state: RelationDetailState, actions: Relation
         onMarkAsOwner = { actions.onMarkAsOwner(contact) },
         onDelete = { actions.onDelete(contact) },
         onAddFact = { actions.onAddFact(contact) },
+        onAddRelationship = { actions.onAddRelationship(contact) },
         onAddEvent = { actions.onAddEvent(contact) },
         onAddIdentity = { actions.onAddIdentity(contact) },
         onInspectEvent = actions.onInspectEvent,

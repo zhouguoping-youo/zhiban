@@ -177,6 +177,7 @@ internal fun ContactDetailDialog(
     onMarkAsOwner: () -> Unit,
     onDelete: () -> Unit,
     onAddFact: () -> Unit,
+    onAddRelationship: () -> Unit,
     onAddEvent: () -> Unit,
     onAddIdentity: () -> Unit,
     onInspectEvent: (RelationshipEventWithParticipants) -> Unit,
@@ -324,12 +325,17 @@ internal fun ContactDetailDialog(
                     item {
                         ContactDetailSection(
                             title = "我们的关系",
-                            action = "添加",
-                            onAction = onAddEvent,
+                            action = "添加关系",
+                            onAction = onAddRelationship,
                             modifier = Modifier.testTag("contact-detail-relationships"),
                         ) {
                             if (!hasRelationshipContext) {
-                                ContactDetailEmptyAction("添加关系或共同经历", onAddEvent)
+                                Text(
+                                    "还没有记录你们是什么关系",
+                                    color = RelationMuted,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.padding(vertical = 7.dp),
+                                )
                             } else {
                                 if (relatedEdges.isNotEmpty()) {
                                     relatedEdges.forEach { edge ->
@@ -366,9 +372,21 @@ internal fun ContactDetailDialog(
                         }
                     }
 
-                    if (recentInteractionFacts.isNotEmpty() || relatedEvents.isNotEmpty()) {
-                        item {
-                            ContactDetailSection("最近发生") {
+                    item {
+                        ContactDetailSection(
+                            title = "最近发生",
+                            action = "添加经历",
+                            onAction = onAddEvent,
+                            modifier = Modifier.testTag("contact-detail-recent"),
+                        ) {
+                            if (recentInteractionFacts.isEmpty() && relatedEvents.isEmpty()) {
+                                Text(
+                                    "还没有最近动态",
+                                    color = RelationMuted,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.padding(vertical = 7.dp),
+                                )
+                            } else {
                                 recentInteractionFacts.take(3).forEach { fact ->
                                     Text(
                                         fact.textContent,
@@ -379,7 +397,8 @@ internal fun ContactDetailDialog(
                                         modifier = Modifier.padding(vertical = 7.dp),
                                     )
                                 }
-                                relatedEvents.sortedByDescending { it.event.occurredAtEpochMs ?: it.event.updatedAtEpochMs }
+                                relatedEvents
+                                    .sortedByDescending { it.event.occurredAtEpochMs ?: it.event.updatedAtEpochMs }
                                     .take(3)
                                     .forEach { event -> RelationshipEventRow(event, onInspectEvent) }
                             }

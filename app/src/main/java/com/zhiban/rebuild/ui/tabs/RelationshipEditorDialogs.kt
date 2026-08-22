@@ -156,6 +156,7 @@ import kotlin.math.sin
 internal fun RelationshipEditorDialog(
     owner: UserProfile,
     contacts: List<ContactEntity>,
+    initialTargetId: String? = null,
     onDismiss: () -> Unit,
     onSave: (String, String, String, String, (String?) -> Unit) -> Unit,
 ) {
@@ -164,9 +165,10 @@ internal fun RelationshipEditorDialog(
         contacts.forEach { add(RelationshipPersonUi(it.contactId, it.displayName, false)) }
     }
     var fromId by rememberSaveable(contacts, owner.name) { mutableStateOf(RelationshipPersonIds.SELF) }
-    var toId by rememberSaveable(contacts) { mutableStateOf("") }
+    val initialTarget = contacts.firstOrNull { it.contactId == initialTargetId }
+    var toId by rememberSaveable(contacts, initialTargetId) { mutableStateOf(initialTarget?.contactId.orEmpty()) }
     var fromQuery by rememberSaveable { mutableStateOf("") }
-    var toQuery by rememberSaveable { mutableStateOf("") }
+    var toQuery by rememberSaveable(initialTargetId) { mutableStateOf(initialTarget?.displayName.orEmpty()) }
     var chooseContactAsSource by rememberSaveable { mutableStateOf(false) }
     var type by rememberSaveable { mutableStateOf("") }
     var temporalState by rememberSaveable { mutableStateOf("CURRENT") }

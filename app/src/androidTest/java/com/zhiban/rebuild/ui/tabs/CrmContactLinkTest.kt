@@ -215,6 +215,7 @@ class CrmContactLinkTest {
                     onMarkAsOwner = {},
                     onDelete = {},
                     onAddFact = {},
+                    onAddRelationship = {},
                     onAddEvent = {},
                     onAddIdentity = {},
                     onInspectEvent = {},
@@ -239,6 +240,8 @@ class CrmContactLinkTest {
     @Test fun contactDetailUsesCompactHierarchyAndKeepsActionsReachable() {
         var edited = false
         var asked = false
+        var relationshipAdded = false
+        var eventAdded = false
         val contact = ContactEntity(
             "c1", "丁波", "丁波", "13800000000", null, "wx-dingbo", "甲公司", "售前", "[]", "[]", null,
             null, "USER", null, 1, 1,
@@ -262,7 +265,8 @@ class CrmContactLinkTest {
                     onMarkAsOwner = {},
                     onDelete = {},
                     onAddFact = {},
-                    onAddEvent = {},
+                    onAddRelationship = { relationshipAdded = true },
+                    onAddEvent = { eventAdded = true },
                     onAddIdentity = {},
                     onInspectEvent = {},
                     onDeleteFact = {},
@@ -287,6 +291,17 @@ class CrmContactLinkTest {
         compose.onNodeWithText("身份与称呼").assertDoesNotExist()
         compose.onNodeWithText("你确认的信息").assertDoesNotExist()
         compose.onNodeWithText("暂无已关联的通话记录").assertDoesNotExist()
+
+        compose.onNodeWithTag("contact-detail-content")
+            .performScrollToNode(hasTestTag("contact-detail-relationships"))
+        compose.onNodeWithText("添加关系").performClick()
+        assertTrue(relationshipAdded)
+        assertTrue(!eventAdded)
+        compose.onNodeWithTag("contact-detail-content")
+            .performScrollToNode(hasTestTag("contact-detail-recent"))
+        compose.onNodeWithText("添加经历").performClick()
+        assertTrue(eventAdded)
+        compose.onNodeWithText("添加关系或共同经历").assertDoesNotExist()
 
         compose.onNodeWithTag("contact-detail-content")
             .performScrollToNode(hasTestTag("contact-detail-next-step"))
