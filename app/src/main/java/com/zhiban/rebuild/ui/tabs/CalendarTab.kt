@@ -50,6 +50,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -85,6 +86,7 @@ import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.NotificationInsightAnalyzer
 import com.zhiban.rebuild.data.notification.ScheduleInsight
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
+import com.zhiban.rebuild.ui.components.ZhiBanCompactEmptyState
 import com.zhiban.rebuild.ui.components.ZhiBanHeaderIconAction
 import com.zhiban.rebuild.ui.components.ZhiBanPrimaryTabHeader
 import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
@@ -312,10 +314,8 @@ fun CalendarTab(
                 items(schedules.size, key = { schedules[it].id }) { index ->
                     ScheduleRow(
                         schedule = schedules[index],
-                        onClick = {
-                            editingId = schedules[index].id
-                            showEditor = true
-                        },
+                        // 点日程统一进入状态处理（完成/改期/取消/编辑），不再直接弹编辑器。
+                        onClick = { completing = schedules[index] },
                         onProgress = { completing = schedules[index] },
                     )
                     if (index != schedules.lastIndex) {
@@ -340,7 +340,18 @@ fun CalendarTab(
                 onComplete = { feedback ->
                     viewModel.complete(schedule.id, feedback) { completed ->
                         completing = null
-                        showFeedback(if (completed) "已标记完成" else "日程已不存在")
+                        if (completed) {
+                            scope.launch {
+                                val outcome = snackbarHostState.showSnackbar("已标记完成", actionLabel = "撤销")
+                                if (outcome == SnackbarResult.ActionPerformed) {
+                                    viewModel.reopen(schedule.id) { reopened ->
+                                        if (reopened) showFeedback("已恢复为待办")
+                                    }
+                                }
+                            }
+                        } else {
+                            showFeedback("日程已不存在")
+                        }
                     }
                 },
                 onPostpone = {
@@ -349,6 +360,11 @@ fun CalendarTab(
                         editingId = schedule.id
                         showEditor = true
                     }
+                },
+                onEdit = {
+                    completing = null
+                    editingId = schedule.id
+                    showEditor = true
                 },
                 onCancelSchedule = {
                     completing = null
@@ -798,6 +814,8 @@ internal fun ScheduleRow(schedule: ScheduleProjection, onClick: () -> Unit, onPr
                             },
                         )
                     }
+                    // 轻量来源：知伴（问问/CRM 工具链）记录的日程在元信息里标出；消息来源已写在备注里。
+                    if (schedule.createdByRuntimeRunId != null) append(" · 知伴记录")
                 },
                 color = CalendarMuted,
                 style = MaterialTheme.typography.labelSmall,
@@ -829,38 +847,13 @@ internal fun scheduleLifecycleLabel(schedule: ScheduleProjection, nowEpochMs: Lo
 
 @Composable
 internal fun EmptyDay(onAdd: () -> Unit) {
-    Column(
-        Modifier.fillMaxWidth().zhiBanCardSurface(CalendarSurface).padding(horizontal = 22.dp, vertical = 30.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(Modifier.size(48.dp).clip(CircleShape).background(CalendarSoft), contentAlignment = Alignment.Center) {
-            Icon(
-                Icons.Outlined.CalendarMonth,
-                null,
-                tint = CalendarInk,
-                modifier = Modifier.size(ZhiBanIconSize.Leading),
-            )
-        }
-        Spacer(Modifier.height(12.dp))
-        Text(
-            "这一天还没有安排",
-            color = CalendarInk,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Medium,
-        )
-        Spacer(Modifier.height(4.dp))
-        Text("添加日程，到时提醒你", color = CalendarMuted, style = MaterialTheme.typography.bodySmall)
-        Spacer(Modifier.height(16.dp))
-        Button(
-            onClick = onAdd,
-            colors = ButtonDefaults.buttonColors(containerColor = CalendarAccent),
-            shape = CircleShape,
-        ) {
-            Icon(Icons.Outlined.Add, null, modifier = Modifier.size(ZhiBanIconSize.Inline))
-            Spacer(Modifier.width(6.dp))
-            Text("添加日程")
-        }
-    }
+    ZhiBanCompactEmptyState(
+        title = "这一天还没有安排",
+        subtitle = "添加日程，到时提醒你",
+        icon = Icons.Outlined.CalendarMonth,
+        primaryLabel = "添加日程",
+        onPrimary = onAdd,
+    )
 }
 
 internal fun weekdayNarrow(date: LocalDate, locale: Locale = Locale.getDefault()): String = date.dayOfWeek.getDisplayName(TextStyle.NARROW, locale)

@@ -3,12 +3,7 @@ package com.zhiban.rebuild.ui.tabs
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,11 +12,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.zhiban.rebuild.data.agent.ScheduleProjection
+import com.zhiban.rebuild.data.agent.ScheduleStatus
 import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.ui.components.ZhiBanDialogHeader
+import com.zhiban.rebuild.ui.components.ZhiBanPrimaryButton
+import com.zhiban.rebuild.ui.components.ZhiBanSecondaryButton
 import com.zhiban.rebuild.ui.components.ZhiBanTaskDialog
-import com.zhiban.rebuild.ui.theme.ZhiBanRadius
-import com.zhiban.rebuild.ui.theme.ZhiBanSize
+import com.zhiban.rebuild.ui.components.ZhiBanTextActionButton
 import java.io.File
 
 @Composable
@@ -30,6 +27,7 @@ internal fun ScheduleCompletionDialog(
     actions: ScheduleCompletionActions,
     voice: ScheduleOutcomeVoiceConfig = ScheduleOutcomeVoiceConfig(),
 ) {
+    val completed = schedule.status == ScheduleStatus.COMPLETED
     var feedback by remember(schedule.id) { mutableStateOf(schedule.outcomeNote.orEmpty()) }
     val voiceController = rememberScheduleOutcomeVoiceController(
         scheduleId = schedule.id,
@@ -41,7 +39,7 @@ internal fun ScheduleCompletionDialog(
         actions.onDismiss()
     }
     ZhiBanTaskDialog(onDismissRequest = dismissDialog, maxWidth = 480.dp, maxHeight = 520.dp) {
-        ZhiBanDialogHeader("更新进展", dismissDialog, subtitle = schedule.title)
+        ZhiBanDialogHeader(if (completed) "查看结果" else "更新进展", dismissDialog, subtitle = schedule.title)
         ScheduleOutcomeVoiceField(
             value = feedback,
             onValueChange = { feedback = it.take(MAX_OUTCOME_LENGTH) },
@@ -53,32 +51,34 @@ internal fun ScheduleCompletionDialog(
             Modifier.fillMaxWidth().padding(top = 18.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Button(
+            ZhiBanSecondaryButton(
+                text = "改期",
                 onClick = actions.onPostpone,
+                modifier = Modifier.weight(1f),
                 enabled = !voiceController.isBusy,
-                modifier = Modifier.weight(1f).height(ZhiBanSize.Control),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = CalendarSoft,
-                    contentColor = CalendarInk,
-                ),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(ZhiBanRadius.Card),
-            ) {
-                Text("延期")
-            }
-            Button(
+            )
+            ZhiBanPrimaryButton(
+                text = if (completed) "保存结果" else "标记完成",
                 onClick = { actions.onComplete(feedback.trim().takeIf(String::isNotEmpty)) },
+                modifier = Modifier.weight(1f),
                 enabled = !voiceController.isBusy,
-                modifier = Modifier.weight(1f).height(ZhiBanSize.Control),
-                colors = ButtonDefaults.buttonColors(containerColor = CalendarAccent),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(ZhiBanRadius.Card),
-            ) { Text("标记完成") }
+            )
         }
-        TextButton(
-            onClick = actions.onCancelSchedule,
-            enabled = !voiceController.isBusy,
-            modifier = Modifier.fillMaxWidth().height(ZhiBanSize.Control),
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text("取消日程", color = CalendarDanger)
+            ZhiBanTextActionButton(
+                text = "编辑详情",
+                onClick = actions.onEdit,
+                enabled = !voiceController.isBusy,
+            )
+            ZhiBanTextActionButton(
+                text = "取消日程",
+                onClick = actions.onCancelSchedule,
+                enabled = !voiceController.isBusy,
+                danger = true,
+            )
         }
     }
 }
@@ -87,6 +87,7 @@ internal data class ScheduleCompletionActions(
     val onDismiss: () -> Unit,
     val onComplete: (String?) -> Unit,
     val onPostpone: () -> Unit,
+    val onEdit: () -> Unit,
     val onCancelSchedule: () -> Unit,
 )
 

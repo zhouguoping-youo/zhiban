@@ -38,6 +38,7 @@ class ScheduleOutcomeVoiceRecordingTest {
                         onDismiss = {},
                         onComplete = {},
                         onPostpone = {},
+                        onEdit = {},
                         onCancelSchedule = {},
                     ),
                     voice = ScheduleOutcomeVoiceConfig(

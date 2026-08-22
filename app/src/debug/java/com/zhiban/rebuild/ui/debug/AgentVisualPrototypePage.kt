@@ -179,7 +179,8 @@ private val LONG_ANSWER_SAMPLE = """
 综合来看，没有绝对的优劣，关键是按场景分配：运动选香蕉，加餐选苹果。
 """.trim()
 
-@Composable private fun EmptyContent() {    Column(
+@Composable private fun EmptyContent() {
+    Column(
         Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,

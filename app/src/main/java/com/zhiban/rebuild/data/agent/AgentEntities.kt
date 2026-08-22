@@ -48,6 +48,8 @@ data class ScheduleProjection(
     val status: String = ScheduleStatus.PENDING,
     val outcomeNote: String? = null,
     val completedAtEpochMs: Long? = null,
+    // 非空表示这条日程由知伴（问问/CRM 等运行时工具链）记录，日历用它做轻量来源展示。
+    val createdByRuntimeRunId: String? = null,
 )
 
 object ScheduleStatus {

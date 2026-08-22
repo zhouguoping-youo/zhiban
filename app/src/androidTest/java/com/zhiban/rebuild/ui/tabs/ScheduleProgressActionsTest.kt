@@ -59,14 +59,16 @@ class ScheduleProgressActionsTest {
                         onDismiss = {},
                         onComplete = { selectedAction = "complete" },
                         onPostpone = { selectedAction = "postpone" },
+                        onEdit = { selectedAction = "edit" },
                         onCancelSchedule = { selectedAction = "cancel" },
                     ),
                 )
             }
         }
 
-        compose.onNodeWithText("延期").assertIsDisplayed()
+        compose.onNodeWithText("改期").assertIsDisplayed()
         compose.onNodeWithText("标记完成").assertIsDisplayed()
+        compose.onNodeWithText("编辑详情").assertIsDisplayed()
         compose.onNodeWithText("取消日程").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals("cancel", selectedAction) }
     }
@@ -81,6 +83,7 @@ class ScheduleProgressActionsTest {
                         onDismiss = {},
                         onComplete = {},
                         onPostpone = {},
+                        onEdit = {},
                         onCancelSchedule = {},
                     ),
                     voice = ScheduleOutcomeVoiceConfig(
