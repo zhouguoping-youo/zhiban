@@ -45,7 +45,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AutoAwesome
@@ -56,8 +55,6 @@ import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Groups
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -122,6 +119,7 @@ import com.zhiban.rebuild.runtime.input.asr.CloudAsrAvailability
 import com.zhiban.rebuild.runtime.personalization.UserProfile
 import com.zhiban.rebuild.ui.components.ZhiBanChip
 import com.zhiban.rebuild.ui.components.ZhiBanDialogHost
+import com.zhiban.rebuild.ui.components.ZhiBanPrimaryButton
 import com.zhiban.rebuild.ui.components.ZhiBanPrimaryTabHeader
 import com.zhiban.rebuild.ui.components.ZhiBanSearchField
 import com.zhiban.rebuild.ui.components.ZhiBanSegmentedControl
@@ -129,9 +127,10 @@ import com.zhiban.rebuild.ui.components.ZhiBanTabBottomSpacer
 import com.zhiban.rebuild.ui.components.ZhiBanTabHorizontalPadding
 import com.zhiban.rebuild.ui.components.ZhiBanTabTopPadding
 import com.zhiban.rebuild.ui.components.ZhiBanTaskDialog
+import com.zhiban.rebuild.ui.components.ZhiBanTextActionButton
+import com.zhiban.rebuild.ui.components.ZhiBanTopBar
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
 import com.zhiban.rebuild.ui.settings.AutoWriteViewModel
-import com.zhiban.rebuild.ui.theme.DangerRed
 import com.zhiban.rebuild.ui.theme.DateFormats
 import com.zhiban.rebuild.ui.theme.ZhiBanCard
 import com.zhiban.rebuild.ui.theme.ZhiBanDivider
@@ -215,24 +214,7 @@ internal fun ContactDetailDialog(
             color = RelationBackground,
         ) {
             Column(Modifier.fillMaxSize()) {
-                Row(
-                    Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回")
-                    }
-                    Text(
-                        contact.displayName,
-                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-                        color = RelationInk,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Spacer(Modifier.size(48.dp))
-                }
+                ZhiBanTopBar(title = contact.displayName, onBack = onDismiss)
                 LazyColumn(
                     Modifier.fillMaxSize().testTag("contact-detail-content"),
                     contentPadding = PaddingValues(
@@ -315,9 +297,11 @@ internal fun ContactDetailDialog(
                                 }
                             }
                             if (showMarkAsOwner) {
-                                TextButton(onClick = onMarkAsOwner, modifier = Modifier.fillMaxWidth().height(48.dp)) {
-                                    Text("与我的资料合并", color = RelationInk)
-                                }
+                                ZhiBanTextActionButton(
+                                    text = "与我的资料合并",
+                                    onClick = onMarkAsOwner,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
                             }
                         }
                     }
@@ -333,7 +317,7 @@ internal fun ContactDetailDialog(
                                 Text(
                                     "还没有记录你们是什么关系",
                                     color = RelationMuted,
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = MaterialTheme.typography.bodySmall,
                                     modifier = Modifier.padding(vertical = 7.dp),
                                 )
                             } else {
@@ -383,7 +367,7 @@ internal fun ContactDetailDialog(
                                 Text(
                                     "还没有最近动态",
                                     color = RelationMuted,
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = MaterialTheme.typography.bodySmall,
                                     modifier = Modifier.padding(vertical = 7.dp),
                                 )
                             } else {
@@ -443,17 +427,13 @@ internal fun ContactDetailDialog(
                     }
 
                     item {
-                        Button(
+                        ZhiBanPrimaryButton(
+                            text = "让知伴准备下一步",
                             onClick = onAsk,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(52.dp)
                                 .testTag("contact-detail-next-step"),
-                            shape = RoundedCornerShape(ZhiBanRadius.Medium),
-                            colors = ButtonDefaults.buttonColors(containerColor = RelationAccent),
-                        ) {
-                            Text("让知伴准备下一步", fontWeight = FontWeight.SemiBold)
-                        }
+                        )
                     }
 
                     item {
@@ -578,12 +558,12 @@ internal fun ContactDetailDialog(
                             }
                         }
                         item {
-                            TextButton(
+                            ZhiBanTextActionButton(
+                                text = "删除联系人",
                                 onClick = onDelete,
-                                modifier = Modifier.fillMaxWidth().height(ZhiBanSize.TouchTarget),
-                            ) {
-                                Text("删除联系人", color = DangerRed)
-                            }
+                                danger = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
                         }
                     }
                 }
