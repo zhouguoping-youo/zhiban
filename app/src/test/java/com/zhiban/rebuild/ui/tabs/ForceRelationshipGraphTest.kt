@@ -203,6 +203,46 @@ class ForceRelationshipGraphTest {
         assertTrue(bodies.values.all { it.position.x.isFinite() && it.position.y.isFinite() })
     }
 
+    @Test
+    fun `a11y anchors expose every node name at its screen position`() {
+        val people = mapOf(
+            RelationshipPersonIds.SELF to RelationshipPersonUi(RelationshipPersonIds.SELF, "我", true),
+            "li" to RelationshipPersonUi("li", "李应啸", false),
+            "ding" to RelationshipPersonUi("ding", "丁波", false),
+        )
+        val edges = listOf(
+            edge("self-li", RelationshipPersonIds.SELF, "li", "COLLEAGUE", 1.0, true),
+            edge("li-ding", "li", "ding", "COLLEAGUE", 0.86, false),
+        )
+        val model = buildForceGraphModel(RelationshipPersonIds.SELF, people, edges)
+        val bodies = seedForceBodies(model.nodes.map(ForceGraphNode::id), RelationshipPersonIds.SELF, 800f, 600f)
+
+        val anchors = buildGraphA11yAnchors(model.nodes, bodies, scale = 1.5f, offset = Offset(10f, 20f))
+
+        assertEquals(model.nodes.map(ForceGraphNode::name).toSet(), anchors.map(GraphA11yAnchor::name).toSet())
+        anchors.forEach { anchor ->
+            val body = bodies.getValue(anchor.nodeId)
+            assertEquals(body.position.x * 1.5f + 10f, anchor.center.x, 0.001f)
+            assertEquals(body.position.y * 1.5f + 20f, anchor.center.y, 0.001f)
+        }
+    }
+
+    @Test
+    fun `a11y anchors skip nodes without a simulated body`() {
+        val anchors = buildGraphA11yAnchors(
+            nodes = listOf(
+                ForceGraphNode("a", "联系人甲", ForceGraphNodeKind.CONTACT),
+                ForceGraphNode("missing", "缺身体节点", ForceGraphNodeKind.CONTACT),
+            ),
+            bodies = mapOf("a" to ForceBody(Offset(40f, 60f))),
+            scale = 1f,
+            offset = Offset.Zero,
+        )
+
+        assertEquals(listOf("a"), anchors.map(GraphA11yAnchor::nodeId))
+        assertEquals(Offset(40f, 60f), anchors.single().center)
+    }
+
     private fun edge(id: String, from: String, to: String, type: String, confidence: Double, confirmed: Boolean) = RelationshipEdgeEntity(
         edgeId = id,
         fromContactId = from,

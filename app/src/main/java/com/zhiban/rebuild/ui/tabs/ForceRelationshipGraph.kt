@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -64,8 +65,12 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -83,6 +88,7 @@ import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
@@ -126,6 +132,18 @@ internal data class ForceBody(
     var dragged: Boolean = false,
     val ring: RelationshipGraphRing = RelationshipGraphRing.UNKNOWN,
 )
+
+internal data class GraphA11yAnchor(val nodeId: String, val name: String, val center: Offset)
+
+internal fun graphNodeA11yCenter(body: ForceBody, scale: Float, offset: Offset): Offset =
+    Offset(body.position.x * scale + offset.x, body.position.y * scale + offset.y)
+
+/** Canvas 绘制的节点 TalkBack 看不见;为每个节点生成带姓名的语义锚点供 overlay 使用。 */
+internal fun buildGraphA11yAnchors(nodes: List<ForceGraphNode>, bodies: Map<String, ForceBody>, scale: Float, offset: Offset): List<GraphA11yAnchor> =
+    nodes.mapNotNull { node ->
+        val body = bodies[node.id] ?: return@mapNotNull null
+        GraphA11yAnchor(node.id, node.name, graphNodeA11yCenter(body, scale, offset))
+    }
 
 internal fun buildForceGraphModel(
     rootId: String,
@@ -757,6 +775,36 @@ internal fun ForceRelationshipGraphCanvas(
                             }
                         }
                     }
+                }
+
+                // 可达性:Canvas 节点对 TalkBack 不可见,叠加与节点同位的语义锚点。
+                // 纯 semantics 不拦截触摸,拖动/双击手势仍由下方 Canvas 处理。
+                model.nodes.forEach { node ->
+                    if (node.id !in bodies) return@forEach
+                    Box(
+                        Modifier
+                            .offset {
+                                frameTick // 位置随模拟逐帧变化;读 frameTick 只触发 layout 不触发重组
+                                val center = bodies[node.id]
+                                    ?.let { graphNodeA11yCenter(it, graphScale, graphOffset) }
+                                    ?: Offset.Zero
+                                IntOffset(
+                                    (center.x - hitRadius).roundToInt(),
+                                    (center.y - hitRadius).roundToInt(),
+                                )
+                            }
+                            .size(with(density) { (hitRadius * 2).toDp() })
+                            .semantics(mergeDescendants = true) {
+                                contentDescription = node.name
+                                onClick(label = "查看联系人") {
+                                    selectedNodeId = node.id
+                                    onSelectionChanged(node.id)
+                                    focusNode(node.id)
+                                    onSelectContact(node.id)
+                                    true
+                                }
+                            },
+                    )
                 }
 
                 Surface(
