@@ -80,4 +80,12 @@ DropdownMenu 1：CategoryDropdownMenu（关系分类）
 
 | 包 | 页面/状态项 | 问题 | 改动文件 | 截图 | 真机结果 |
 |---|---|---|---|---|---|
-| A | 全局组件 | 缺统一按钮/角标/选项Sheet/紧凑空态 | （待填） | | |
+| A | 全局组件 | 缺统一按钮/角标/选项Sheet/紧凑空态；SegmentedControl 44dp | ZhiBanControls.kt(新)、ZhiBanVisual.kt | after/A-01~05 | ✅ 5 L1 无回归（b7a8338） |
+| B | 关系首页 | 维护常驻大卡/行第二行露手机号/空态大白卡 | RelationshipAttention.kt、RelationContactRows.kt、RelationTab.kt | after/B-02 | ✅ 角标27、无手机号、关注区按需出现（653d958） |
+| C | 联系人详情 | 手写顶行/空态正文号/私有52dp主按钮 | ContactDetailDialogs.kt | after/C-08（对 before/08） | ✅ 统一TopBar+小字空态+共享按钮（229a6b0）；灰带为存量系统窗背景非回归 |
+| D | 关系图 | 介绍链伪造直达边/禁用sheet死代码/空态无操作 | ForceRelationshipGraph.kt、RelationshipGraphSection.kt、RelationGraphInference.kt | after/D-09 | ✅ 空态一状态一主操作；介绍链=路径（3a7b33e）；真机 0 边为真实空态 |
+| E | 问问 | 确认条笼统/长文无折叠/表格扭曲/返回断点 | AgentConversationScreen.kt、AgentResponseFormatting.kt、NavGraph.kt(e95c6eb 单独修) | after/E-02、E-03-long-* | ✅ 长文折叠+表格真机验证；returnTarget 真机验证；感知条无候选未截图（e173b16） |
+| F | 日历 | 点行进编辑器/行内多入口/空态大白卡/完成无撤销/来源缺失 | CalendarTab.kt、ScheduleCompletionDialog.kt、AgentEntities.kt、AgentDaos.kt | after/F-01~F-10 | ✅ 真机全生命周期：建→行→统一状态框→编辑→完成→撤销→查看结果→取消（13c0e8e）；「知伴记录」来源标注仅代码级验证（真机无工具链日程）；断点③系统语音弹窗已删（5579c6d，启动器代码移除） |
+| G | 三能力场景 | 依据/来源占详情首屏/按钮体系不一/CRM 无回执/安排详情无顶栏/参与人行内多按钮 | CrmIntelligenceComponents.kt、CrmCapabilityPage.kt、CrmLeadListPage.kt、CrmOpportunityDetailPage.kt、CrmUiModels.kt、LifeAssistantPages.kt、EventPlanningPages.kt、EventPlanningDialogs.kt、SceneCapabilityComponents.kt、ZhiBanControls.kt | after/G-01~G-13 | ✅ 能力首页2列卡/三场景紧凑空态/CRM工作台+详情回执/查看依据收起展开/阶段Sheet勾选/参与人Sheet(状态+移除)/动作栈主-次-危险全真机验证（46db193+6777aee）；断点①安排详情TopBar（8c3a11d）与断点④CRM回执（9fdc8e0）真机确认；生活助理详情「查看依据」真机无真实数据未验（与CRM同款组件已验+JVM测试覆盖）；测试计划已删除清理 |
+| H | 我的/设置 | L1 入口杂（智能体设置直出+存储数据两行）/隐私页7段无结构/行话(大模型请求可出云等)/TopBar 随内容滚走/20dp 硬编码/密钥眼睛 44dp/死代码 | ProfileTab.kt、NavGraph.kt、NavGraphRoutes.kt、GeneralSettingsPages.kt、AgentSettingsPages.kt、ModelConfigPage.kt、AutoWritePage.kt、AgentSuggestionPage.kt、AgentProjectionUiMapper.kt、AgentConversationRoute.kt、AgentConversationMessageComponents.kt | after/H-01~H-08 | ✅ L1 新IA真机核验（模型连接状态/手机权限/存储和数据/高级组）；隐私三段+行话清零真机核验；模型连接直达页/存储二级进入/智能体设置/运行记录真机核验（3ef99f6）；自动整理与智能建议真机均为真实空态，TopBar 常驻为结构改动（与已验页面同构）；E2E 断言同步未回退数量 |
+| I | 缩放/键盘/形态/可达性 | —（验证包，无预登记缺陷） | 无代码改动 | after/I-01~I-16 | ✅ 字体 100/130/150/200% 四档三张 L1 无裁切（TABBAR 纯图标不变）；搜狗全高键盘下问问输入条+发送+最新消息可见、日程编辑器字段+保存可见；横屏自动改左侧导航轨、空态主操作滚动可达；可达性用语义树审计（可点父节点的命名子节点齐全：回到今天/选择日期/我的等），TalkBack 本体未在日用机开启（侵入式）；分屏与折叠态外屏需实体操作，adb 无法驱动，登记未验证。字体已还原 0.9、输入法已还原 ADB、误触的号码开关已还原开启 |
