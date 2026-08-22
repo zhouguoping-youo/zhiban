@@ -70,8 +70,13 @@ import com.zhiban.rebuild.R
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
 import com.zhiban.rebuild.data.notification.ScheduleInsight
 import com.zhiban.rebuild.data.store.ConversationSummary
+import com.zhiban.rebuild.ui.components.ZhiBanDialogDismissButton
+import com.zhiban.rebuild.ui.components.ZhiBanTextActionButton
 import com.zhiban.rebuild.ui.components.localizedQuantity
 import com.zhiban.rebuild.ui.theme.*
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 import kotlin.math.sin
 import kotlinx.coroutines.launch
@@ -283,9 +288,31 @@ fun AgentConversationScreen(
     }
 }
 
+/**
+ * §六感知确认条：先说识别结论（具体安排/具体人），再说为什么还需要用户决定，
+ * 按钮按结果命名（加入日历/不记录、关联联系人/不关联），不用笼统的「确认/忽略」。
+ * 高置信低风险的内部整理不走这里——那类已由可撤销自动写收据机制直接执行。
+ */
 @Composable
 private fun PerceptionConfirmationBar(candidate: NotificationCandidateEntity, remainingCount: Int, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     val schedule = ScheduleInsight.from(candidate)
+    val conclusion = if (schedule != null) {
+        "识别到安排：${schedule.title}"
+    } else {
+        "识别到联系人线索：${candidate.senderName ?: candidate.appLabel}"
+    }
+    val reason = if (schedule != null) "写进日历前需要你确认" else "关联到关系前需要你确认"
+    val metaLine = buildList {
+        candidate.senderName?.takeIf(String::isNotBlank)?.let { add(it) }
+        if (schedule != null) {
+            add(
+                DateTimeFormatter.ofPattern("M月d日 HH:mm").format(
+                    Instant.ofEpochMilli(schedule.startAtEpochMs).atZone(ZoneId.systemDefault()),
+                ),
+            )
+        }
+        if (remainingCount > 0) add(localizedQuantity(R.plurals.remaining_item_count, remainingCount))
+    }.joinToString(" · ")
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = ZhiBanSpacing.Lg, vertical = ZhiBanSpacing.Xs),
         shape = RoundedCornerShape(ZhiBanRadius.Card),
@@ -298,27 +325,35 @@ private fun PerceptionConfirmationBar(candidate: NotificationCandidateEntity, re
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Xs)) {
                 Text(
-                    if (schedule != null) "识别到一项安排" else "识别到一位联系人",
+                    conclusion,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    listOfNotNull(candidate.senderName, schedule?.title ?: candidate.body)
-                        .joinToString(" · ") + if (remainingCount > 0) {
-                        " · ${localizedQuantity(R.plurals.remaining_item_count, remainingCount)}"
-                    } else {
-                        ""
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 )
+                if (metaLine.isNotBlank()) {
+                    Text(
+                        metaLine,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
+                }
+                Text(
+                    reason,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            TextButton(onClick = onDismiss) { Text("忽略") }
-            TextButton(onClick = onConfirm) {
-                Text(if (schedule != null) "确认安排" else "确认")
-            }
+            ZhiBanDialogDismissButton(
+                text = if (schedule != null) "不记录" else "不关联",
+                onClick = onDismiss,
+            )
+            ZhiBanTextActionButton(
+                text = if (schedule != null) "加入日历" else "关联联系人",
+                onClick = onConfirm,
+            )
         }
     }
 }

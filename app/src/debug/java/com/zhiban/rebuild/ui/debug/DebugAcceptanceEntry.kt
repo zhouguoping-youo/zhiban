@@ -99,6 +99,7 @@ private fun DebugAcceptancePage(onOpenChat: (String) -> Unit, onOpenAgentPrototy
                     "executing" to "执行",
                     "success" to "成功",
                     "error" to "错误",
+                    "long" to "长文",
                 ).forEach { (state, label) ->
                     Text(
                         label,

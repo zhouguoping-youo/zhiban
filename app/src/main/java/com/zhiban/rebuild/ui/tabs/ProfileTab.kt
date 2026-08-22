@@ -57,6 +57,7 @@ import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.components.ZhiBanPrimaryTabHeader
 import com.zhiban.rebuild.ui.components.ZhiBanTabHorizontalPadding
 import com.zhiban.rebuild.ui.components.ZhiBanTabTopPadding
+import com.zhiban.rebuild.ui.debug.DebugAcceptanceEntry
 import com.zhiban.rebuild.ui.theme.ZhiBanRadius
 import com.zhiban.rebuild.ui.theme.ZhiBanSize
 import com.zhiban.rebuild.ui.theme.ZhiBanSpacing
@@ -114,6 +115,7 @@ fun ProfileTab(
     onNavigateToData: () -> Unit = {},
     onNavigateToReportError: () -> Unit = {},
     onNavigateToAbout: () -> Unit = {},
+    onNavigateToDebugAcceptance: () -> Unit = {},
     modifier: Modifier = Modifier,
     isDataEmpty: Boolean = false,
     viewModel: ProfileTabViewModel = hiltViewModel(),
@@ -263,6 +265,8 @@ fun ProfileTab(
             item { ProfileSettingsGroup("知伴", agentItems) }
             item { ProfileSettingsGroup("设置", appItems) }
             item { ProfileSettingsGroup("支持", supportItems) }
+            // Debug 构建才渲染的验收入口；Release 变体为 no-op。
+            item { DebugAcceptanceEntry(onClick = onNavigateToDebugAcceptance) }
         }
     }
 }

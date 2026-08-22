@@ -213,6 +213,7 @@ private fun ZhiBanNavContent(
                 onNavigateToData = { navController.navigate(DataSettings) },
                 onNavigateToReportError = { navController.navigate(ReportErrorSettings) },
                 onNavigateToAbout = { navController.navigate(AboutZhiBan) },
+                onNavigateToDebugAcceptance = { navController.navigate(DebugAcceptance) },
             )
         }
 

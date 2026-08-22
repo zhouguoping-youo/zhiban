@@ -2,9 +2,12 @@ package com.zhiban.rebuild.ui.debug
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
@@ -30,6 +33,10 @@ fun AgentVisualPrototypePage(state: String, onBack: () -> Unit) {
             state = AgentConversationUiState(),
             multimodalState = multimodalFixture(state.removePrefix("mm_")),
         )
+        return
+    }
+    if (state == "long") {
+        LongAnswerPrototypePage(onBack)
         return
     }
     val fixture = runCatching { PrototypeState.valueOf(state.uppercase()) }.getOrDefault(PrototypeState.EMPTY)
@@ -120,8 +127,59 @@ private fun multimodalFixture(key: String): MultimodalUiState {
     )
 }
 
-@Composable private fun EmptyContent() {
-    Column(
+/**
+ * 长回复验收态：渲染生产 AssistantMessageBubble，验证 §六 长文约束
+ * （结论先行、超阈值折叠为「展开全文」、表格可读）。
+ */
+@Composable
+private fun LongAnswerPrototypePage(onBack: () -> Unit) {
+    Column(Modifier.fillMaxSize().background(ZhiBanWarmBackground).statusBarsPadding()) {
+        Row(Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "长回复渲染验收",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = ZhiBanTextPrimary,
+            )
+            Spacer(Modifier.weight(1f))
+            Text("返回", color = ZhiBanTerracotta, modifier = Modifier.clickable(onClick = onBack).padding(12.dp))
+        }
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+            AssistantMessageBubble(LONG_ANSWER_SAMPLE)
+        }
+    }
+}
+
+private val LONG_ANSWER_SAMPLE = """
+结论：苹果和香蕉各有优势，日常补充能量选香蕉更方便，控制糖分摄入选苹果更稳妥。
+
+## 核心差异
+
+| 维度 | 苹果 | 香蕉 |
+| --- | --- | --- |
+| 热量 | 约 52 千卡/100 克 | 约 89 千卡/100 克 |
+| 糖分 | 较低，升糖慢 | 较高，升糖快 |
+| 便携性 | 需要清洗 | 剥皮即食 |
+| 饱腹感 | 中等 | 较强 |
+
+## 详细分析
+
+1. 苹果富含果胶和多酚，适合作为日常加餐，咀嚼感也能带来更好的饱腹信号。
+2. 香蕉富含钾元素和快速碳水，运动前后补充能量更合适，但血糖敏感人群需要控制分量。
+3. 两者都不含脂肪和钠，属于可以长期搭配的基础水果。
+
+> 注意：以上数据为常见品种的公开营养参考值，个体差异和成熟度会影响实际数值。
+
+此外从储存角度看，苹果冷藏可以保存一到两个月，香蕉常温下三到五天就会成熟过度，需要按家庭消耗速度安排采购顺序。如果家里有老人和孩子，建议两种都备一些，早上吃香蕉补充能量，下午吃苹果作为低负担加餐。
+
+```text
+采购建议：苹果 4 个 + 香蕉 1 把，每周补货一次
+```
+
+综合来看，没有绝对的优劣，关键是按场景分配：运动选香蕉，加餐选苹果。
+""".trim()
+
+@Composable private fun EmptyContent() {    Column(
         Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
