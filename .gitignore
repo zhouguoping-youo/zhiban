@@ -30,6 +30,10 @@ signing.properties
 /.impeccable/
 /prototype.html
 /docs/*mockup*.html
+# 真机验收截图含真实联系人/日程数据，永不提交
+/docs/visual-acceptance/before/
+/docs/visual-acceptance/after/
+/docs/visual-acceptance/journey/
 
 # Empty local orchestration scratch file
 /orkmode.py
