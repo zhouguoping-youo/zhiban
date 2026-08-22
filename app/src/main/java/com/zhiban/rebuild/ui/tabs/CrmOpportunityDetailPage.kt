@@ -72,6 +72,7 @@ fun CrmOpportunityDetailPage(
     viewModel: CrmCapabilityViewModel = hiltViewModel(),
 ) {
     val state by viewModel.detailState.collectAsStateWithLifecycle()
+    val actionNotice by viewModel.notice.collectAsStateWithLifecycle()
     val opportunity = state.opportunity
     var showStageDialog by remember { mutableStateOf(false) }
 
@@ -129,6 +130,15 @@ fun CrmOpportunityDetailPage(
                 }
 
                 else -> {
+                    actionNotice?.let { notice ->
+                        item {
+                            CrmActionNoticeCard(
+                                notice = notice,
+                                onDismiss = viewModel::clearActionNotice,
+                                modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                            )
+                        }
+                    }
                     val guidance = buildCrmOpportunityGuidance(state, System.currentTimeMillis())
                     guidance?.let { recommendation ->
                         item {

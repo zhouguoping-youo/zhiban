@@ -100,21 +100,13 @@ fun CrmCapabilityPage(
                 )
             }
 
-            state.demoNotice?.let { notice ->
+            state.actionNotice?.let { notice ->
                 item {
-                    Row(
-                        Modifier.padding(
-                            horizontal = ZhiBanSpacing.PageHorizontal,
-                        ).fillMaxWidth().zhiBanCardSurface(ZhiBanTerracottaSoft)
-                            .clickable(onClick = viewModel::clearDemoNotice).padding(ZhiBanSpacing.Lg),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            notice,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
+                    CrmActionNoticeCard(
+                        notice = notice,
+                        onDismiss = viewModel::clearActionNotice,
+                        modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                    )
                 }
             }
 
@@ -222,6 +214,22 @@ fun CrmCapabilityPage(
                 )
             }
         }
+    }
+}
+
+/** 操作结果回执条：工作区/线索池/机会详情三处共用，点按关闭。 */
+@Composable
+internal fun CrmActionNoticeCard(notice: String, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier.fillMaxWidth().zhiBanCardSurface(ZhiBanTerracottaSoft)
+            .clickable(onClick = onDismiss).padding(ZhiBanSpacing.Lg),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            notice,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 

@@ -62,6 +62,16 @@ fun CrmLeadListPage(onBack: () -> Unit, onOpenOpportunity: (String) -> Unit, vie
                 )
             }
 
+            state.actionNotice?.let { notice ->
+                item {
+                    CrmActionNoticeCard(
+                        notice = notice,
+                        onDismiss = viewModel::clearActionNotice,
+                        modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+                    )
+                }
+            }
+
             if (state.candidateLeads.isNotEmpty()) {
                 item {
                     CrmSectionHeader(

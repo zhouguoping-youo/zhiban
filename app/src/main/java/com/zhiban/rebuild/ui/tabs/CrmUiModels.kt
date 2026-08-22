@@ -26,6 +26,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
@@ -109,7 +110,7 @@ internal data class CrmWorkbenchUiState(
     val followUps: CrmFollowUpGroups = CrmFollowUpGroups(),
     val dashboard: CrmDashboardUi = CrmDashboardUi(),
     val isDemo: Boolean = false,
-    val demoNotice: String? = null,
+    val actionNotice: String? = null,
 )
 
 internal data class CrmOpportunityDetailUiState(
@@ -145,7 +146,8 @@ class CrmCapabilityViewModel @Inject constructor(
 ) : ViewModel() {
     private val contacts = repository.observeContacts()
     private val selectedOpportunityId = MutableStateFlow<String?>(null)
-    private val demoNotice = MutableStateFlow<String?>(null)
+    private val actionNotice = MutableStateFlow<String?>(null)
+    internal val notice: StateFlow<String?> = actionNotice.asStateFlow()
     private val zone: ZoneId = ZoneId.systemDefault()
 
     private val realCore = combine(
@@ -204,9 +206,9 @@ class CrmCapabilityViewModel @Inject constructor(
     internal val state: StateFlow<CrmWorkbenchUiState> = combine(
         realState,
         demoStore.dataset,
-        demoNotice,
+        actionNotice,
     ) { real, demo, notice ->
-        (demo?.toWorkbenchState() ?: real).copy(demoNotice = notice)
+        (demo?.toWorkbenchState() ?: real).copy(actionNotice = notice)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CrmWorkbenchUiState())
 
     internal val detailState: StateFlow<CrmOpportunityDetailUiState> = selectedOpportunityId
@@ -264,7 +266,7 @@ class CrmCapabilityViewModel @Inject constructor(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CrmOpportunityDetailUiState())
 
     fun enterDemo() {
-        demoNotice.value = null
+        actionNotice.value = null
         demoStore.enter()
     }
 
@@ -272,7 +274,7 @@ class CrmCapabilityViewModel @Inject constructor(
         demoStore.exit()
         viewModelScope.launch {
             val summary = repository.clearLegacyCrmDemoData()
-            demoNotice.value = if (summary.totalDeleted == 0) {
+            actionNotice.value = if (summary.totalDeleted == 0) {
                 "已退出演示；真实联系人和日程未改动"
             } else {
                 "已退出演示，并清除 ${summary.totalDeleted} 条旧演示记录"
@@ -280,22 +282,26 @@ class CrmCapabilityViewModel @Inject constructor(
         }
     }
 
-    fun clearDemoNotice() {
-        demoNotice.value = null
+    fun clearActionNotice() {
+        actionNotice.value = null
     }
 
     fun promoteCandidateLead(leadId: String) {
         viewModelScope.launch {
-            if (!autoWriteRepository.promoteCandidateLead(leadId)) {
-                demoNotice.value = "候选线索已变化，请刷新后重试"
+            actionNotice.value = if (autoWriteRepository.promoteCandidateLead(leadId)) {
+                "已转为正式线索"
+            } else {
+                "候选线索已变化，请刷新后重试"
             }
         }
     }
 
     fun ignoreCandidateLead(leadId: String) {
         viewModelScope.launch {
-            if (!autoWriteRepository.ignoreCandidateLead(leadId)) {
-                demoNotice.value = "候选线索已变化，请到自动整理中纠正"
+            actionNotice.value = if (autoWriteRepository.ignoreCandidateLead(leadId)) {
+                "已忽略这条候选线索"
+            } else {
+                "候选线索已变化，请到自动整理中纠正"
             }
         }
     }
@@ -306,16 +312,20 @@ class CrmCapabilityViewModel @Inject constructor(
 
     fun qualifyLead(leadId: String) {
         viewModelScope.launch {
-            if (!repository.qualifyCrmLead(leadId)) {
-                demoNotice.value = "该线索当前状态无法标记为已确认需求"
+            actionNotice.value = if (repository.qualifyCrmLead(leadId)) {
+                "已标记为已确认需求"
+            } else {
+                "该线索当前状态无法标记为已确认需求"
             }
         }
     }
 
     fun disqualifyLead(leadId: String) {
         viewModelScope.launch {
-            if (!repository.disqualifyCrmLead(leadId)) {
-                demoNotice.value = "该线索当前状态无法放弃"
+            actionNotice.value = if (repository.disqualifyCrmLead(leadId)) {
+                "已放弃这条线索"
+            } else {
+                "该线索当前状态无法放弃"
             }
         }
     }
@@ -324,8 +334,9 @@ class CrmCapabilityViewModel @Inject constructor(
         viewModelScope.launch {
             val opportunityId = repository.convertLeadToOpportunity(leadId, input)
             if (opportunityId == null) {
-                demoNotice.value = "该线索当前状态无法转化为商机"
+                actionNotice.value = "该线索当前状态无法转化为商机"
             } else {
+                actionNotice.value = "已创建商机"
                 onConverted(opportunityId)
             }
         }
@@ -335,6 +346,7 @@ class CrmCapabilityViewModel @Inject constructor(
         if (!demoStore.setActionCompleted(actionId, completed)) {
             viewModelScope.launch { repository.setCrmActionCompleted(actionId, completed) }
         }
+        actionNotice.value = if (completed) "跟进已标记完成" else "已恢复待跟进"
     }
 
     fun dismissSuggestion(suggestionId: String) {
@@ -345,16 +357,20 @@ class CrmCapabilityViewModel @Inject constructor(
 
     fun acceptCallFollowUpSuggestion(suggestionId: String) {
         viewModelScope.launch {
-            if (!repository.acceptCallFollowUpSuggestion(suggestionId)) {
-                demoNotice.value = "这条建议已处理或已失效"
+            actionNotice.value = if (repository.acceptCallFollowUpSuggestion(suggestionId)) {
+                "已采纳建议"
+            } else {
+                "这条建议已处理或已失效"
             }
         }
     }
 
     fun acceptNewLeadSuggestion(suggestionId: String) {
         viewModelScope.launch {
-            if (!repository.acceptNewLeadSuggestion(suggestionId)) {
-                demoNotice.value = "这条建议已处理或已失效"
+            actionNotice.value = if (repository.acceptNewLeadSuggestion(suggestionId)) {
+                "已采纳建议"
+            } else {
+                "这条建议已处理或已失效"
             }
         }
     }
@@ -365,6 +381,7 @@ class CrmCapabilityViewModel @Inject constructor(
                 repository.updateCrmOpportunityStage(opportunityId, stage, "用户在机会详情页确认调整")
             }
         }
+        actionNotice.value = "推进阶段已更新"
     }
 
     private companion object {
