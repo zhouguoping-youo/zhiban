@@ -204,6 +204,9 @@ interface NotificationCandidateDao {
     )
     suspend fun reopen(candidateId: String): Int
 
+    @Query("DELETE FROM notification_candidates WHERE candidateId = :candidateId")
+    suspend fun deleteById(candidateId: String): Int
+
     @Query("DELETE FROM notification_candidates WHERE postedAtEpochMs < :cutoffEpochMs OR status = 'DISMISSED'")
     suspend fun clearExpiredOrDismissed(cutoffEpochMs: Long): Int
 
