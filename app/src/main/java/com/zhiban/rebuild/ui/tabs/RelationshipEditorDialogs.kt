@@ -959,7 +959,7 @@ internal fun RelationshipEvidenceDialog(
                     shape = RoundedCornerShape(ZhiBanRadius.Card),
                 ) { Text("保存修改") }
                 TextButton(onClick = onDelete, modifier = Modifier.fillMaxWidth().height(48.dp)) {
-                    Text("删除这条关系", color = RelationDanger)
+                    Text("结束当前关系", color = RelationDanger)
                 }
             }
         }

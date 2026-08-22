@@ -29,33 +29,50 @@ internal data class RelationDialogSlots(
     val setSelectedEvent: (RelationshipEventWithParticipants?) -> Unit,
 )
 
+/** 结束关系成功后的反馈文案:行为是关闭 episode,历史关系保留,文案必须与之相符。 */
+internal const val END_RELATIONSHIP_SUCCESS_FEEDBACK = "当前关系已结束，历史记录已保留"
+
+/**
+ * 「结束当前关系」确认弹窗。底层行为是删除当前 active 边并关闭 temporal episode,
+ * 历史关系保留为「前X」虚线投影,所以文案只说结束、不说删除。
+ */
+@Composable
+internal fun EndRelationshipConfirmDialog(fromName: String, toName: String, relationType: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    ZhiBanAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("结束这段关系？") },
+        text = {
+            Text(
+                "结束后，$fromName 与 $toName 的“${relationLabel(relationType)}”关系将不再作为当前关系显示，" +
+                    "但会保留在关系历史中，并在关系图中以历史关系的虚线呈现。",
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("结束关系", color = RelationDanger)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("暂不", color = RelationInk) } },
+        containerColor = RelationSurface,
+    )
+}
+
 @Composable
 internal fun RelationEdgeDialogs(slots: RelationDialogSlots) {
     slots.deletingEdge?.let { edge ->
         val names = slots.contacts.associate { it.contactId to it.displayName } +
             (RelationshipPersonIds.SELF to slots.ownerLabel)
-        ZhiBanAlertDialog(
-            onDismissRequest = { slots.setDeletingEdge(null) },
-            title = { Text("删除这条关系？") },
-            text = {
-                Text(
-                    "${names[edge.fromContactId].orEmpty()} 与 ${names[edge.toContactId].orEmpty()} 的“${relationLabel(
-                        edge.relationType,
-                    )}”关系将被移除。",
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    slots.viewModel.deleteRelationship(edge.edgeId) {
-                        slots.setDeletingEdge(null)
-                        slots.showFeedback("关系已删除")
-                    }
-                }) {
-                    Text("删除", color = RelationDanger)
+        EndRelationshipConfirmDialog(
+            fromName = names[edge.fromContactId].orEmpty(),
+            toName = names[edge.toContactId].orEmpty(),
+            relationType = edge.relationType,
+            onConfirm = {
+                slots.viewModel.deleteRelationship(edge.edgeId) {
+                    slots.setDeletingEdge(null)
+                    slots.showFeedback(END_RELATIONSHIP_SUCCESS_FEEDBACK)
                 }
             },
-            dismissButton = { TextButton(onClick = { slots.setDeletingEdge(null) }) { Text("取消", color = RelationInk) } },
-            containerColor = RelationSurface,
+            onDismiss = { slots.setDeletingEdge(null) },
         )
     }
     slots.selectedEdge?.let { edge ->

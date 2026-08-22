@@ -2,6 +2,7 @@ package com.zhiban.rebuild.ui.tabs
 
 import com.zhiban.rebuild.data.contact.ContactEntity
 import com.zhiban.rebuild.data.contact.RelationshipEdgeEntity
+import com.zhiban.rebuild.data.contact.RelationshipEpisodeEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventParticipantEntity
 import com.zhiban.rebuild.data.contact.RelationshipEventWithParticipants
@@ -48,6 +49,37 @@ class RelationGraphInferenceTest {
         createdAtEpochMs = createdAtEpochMs,
         updatedAtEpochMs = createdAtEpochMs,
     )
+
+    @Test
+    fun `closed episode stays in graph data as historical edge after current edge is gone`() {
+        val closed = RelationshipEpisodeEntity(
+            episodeId = "ep-1",
+            fromPersonId = RelationshipPersonIds.SELF,
+            toPersonId = "c1",
+            relationshipType = "CUSTOMER",
+            direction = "UNDIRECTED",
+            validFromEpochMs = 1_000L,
+            validToEpochMs = 2_000L,
+            temporalPrecision = "DAY",
+            evidenceRefsJson = "[\"USER_PROFILE\"]",
+            confidence = 1.0,
+            verificationState = "USER_CONFIRMED",
+            status = "ACTIVE",
+            recordedAtEpochMs = 1_000L,
+            updatedAtEpochMs = 2_000L,
+        )
+        val historical = historicalRelationshipEdges(listOf(closed))
+
+        assertEquals(1, historical.size)
+        assertEquals("HISTORICAL", historical.single().status)
+        assertEquals("history:ep-1", historical.single().edgeId)
+        assertEquals("CUSTOMER", historical.single().relationType)
+
+        // 结束关系后当前 active 边已删除,历史投影仍留在图数据里 → 「前客户」虚线边可见。
+        val merged = mergeCurrentAndHistoricalRelationships(emptyList(), historical)
+        assertEquals(1, merged.size)
+        assertEquals("HISTORICAL", merged.single().status)
+    }
 
     @Test
     fun `interactions project one evidence edge per contacted person`() {

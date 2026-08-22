@@ -138,7 +138,7 @@ class ContactTemporalWriteTest {
                 "CURRENT",
                 100,
             )
-            relationships.saveConfirmedRelationship(
+            val colleagueEdge = relationships.saveConfirmedRelationship(
                 com.zhiban.rebuild.data.contact.RelationshipPersonIds.SELF,
                 contactId,
                 "COLLEAGUE",
@@ -148,6 +148,9 @@ class ContactTemporalWriteTest {
 
             relationships.deleteConfirmedRelationship(friendEdge, 300)
 
+            // 结束语义:当前 active 边删除,对应 episode 关闭,其余关系不受影响。
+            assertNull(database.relationshipEdgeDao().find(friendEdge))
+            assertNotNull(database.relationshipEdgeDao().find(colleagueEdge))
             val episodes = database.contactIntelligenceDao().listRelationships(
                 com.zhiban.rebuild.data.contact.RelationshipPersonIds.SELF,
                 20,
