@@ -214,6 +214,7 @@ fun ZhiBanCompactEmptyState(
     icon: ImageVector? = null,
     primaryLabel: String? = null,
     onPrimary: (() -> Unit)? = null,
+    primaryModifier: Modifier = Modifier,
     secondaryLabel: String? = null,
     onSecondary: (() -> Unit)? = null,
 ) {
@@ -256,7 +257,7 @@ fun ZhiBanCompactEmptyState(
         }
         if (primaryLabel != null && onPrimary != null) {
             Spacer(Modifier.height(ZhiBanSpacing.Lg))
-            ZhiBanPrimaryButton(text = primaryLabel, onClick = onPrimary)
+            ZhiBanPrimaryButton(text = primaryLabel, onClick = onPrimary, modifier = primaryModifier)
         }
         if (secondaryLabel != null && onSecondary != null) {
             ZhiBanTextActionButton(text = secondaryLabel, onClick = onSecondary)
@@ -324,6 +325,8 @@ fun <T> ZhiBanOptionSheet(
     onSelect: (T) -> Unit,
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
+    dangerLabel: String? = null,
+    onDanger: (() -> Unit)? = null,
 ) {
     ZhiBanBottomSheet(onDismissRequest = onDismissRequest, modifier = modifier) {
         Text(
@@ -371,6 +374,25 @@ fun <T> ZhiBanOptionSheet(
                         modifier = Modifier.size(ZhiBanIconSize.Field),
                     )
                 }
+            }
+        }
+        if (dangerLabel != null && onDanger != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .defaultMinSize(minHeight = ZhiBanSize.ListRow)
+                    .clickable(role = Role.Button) {
+                        onDanger()
+                        onDismissRequest()
+                    }
+                    .padding(horizontal = ZhiBanSpacing.Xl, vertical = ZhiBanSpacing.Md),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    dangerLabel,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
         }
         Spacer(Modifier.height(ZhiBanSpacing.Lg))

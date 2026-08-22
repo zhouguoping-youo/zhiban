@@ -65,6 +65,9 @@ class CrmDetailPageStateTest {
         }
 
         compose.onNodeWithTag("crm-opportunity-guidance").assertIsDisplayed()
+        // 依据默认收起，先展开再断言（§八：证据不进详情首屏）。
+        compose.onNodeWithText("依据：原定昨天，目前仍未完成").assertDoesNotExist()
+        compose.onNodeWithText("查看依据").performClick()
         compose.onNodeWithText("依据：原定昨天，目前仍未完成").assertIsDisplayed()
         compose.onNodeWithTag("crm-opportunity-guidance-prepare").performClick()
         compose.onNodeWithText("查看日历").performClick()

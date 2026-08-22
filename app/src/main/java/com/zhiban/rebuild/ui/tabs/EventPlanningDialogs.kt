@@ -19,9 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.zhiban.rebuild.data.contact.ContactEntity
-import com.zhiban.rebuild.data.event.EventResponseStatus
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
-import com.zhiban.rebuild.ui.components.ZhiBanChip
 import com.zhiban.rebuild.ui.theme.ZhiBanSpacing
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -106,32 +104,6 @@ internal fun EventContactPicker(contacts: List<ContactEntity>, onDismiss: () -> 
                             }
                         }
                     }
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
-    )
-}
-
-@Composable
-internal fun ResponseStatusDialog(contactName: String, onDismiss: () -> Unit, onSelect: (String) -> Unit) {
-    ZhiBanAlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(contactName) },
-        text = {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm)) {
-                listOf(
-                    EventResponseStatus.GOING to "参加",
-                    EventResponseStatus.MAYBE to "待定",
-                    EventResponseStatus.DECLINED to "不参加",
-                ).forEach { (status, label) ->
-                    ZhiBanChip(
-                        text = label,
-                        selected = false,
-                        modifier = Modifier.weight(1f),
-                        onClick = { onSelect(status) },
-                    )
                 }
             }
         },

@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -31,10 +30,11 @@ import com.zhiban.rebuild.data.crm.CrmLeadEntity
 import com.zhiban.rebuild.data.crm.CrmLeadStatus
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanPage
+import com.zhiban.rebuild.ui.components.ZhiBanPrimaryButton
+import com.zhiban.rebuild.ui.components.ZhiBanTextActionButton
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
 import com.zhiban.rebuild.ui.components.localizedQuantity
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
-import com.zhiban.rebuild.ui.theme.ZhiBanSize
 import com.zhiban.rebuild.ui.theme.ZhiBanSpacing
 import com.zhiban.rebuild.ui.theme.ZhiBanTerracotta
 import java.time.LocalDate
@@ -203,21 +203,25 @@ internal fun CrmLeadPoolCard(lead: CrmLeadEntity, onQualify: () -> Unit, onConve
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            TextButton(
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+            ZhiBanTextActionButton(
+                text = "放弃",
                 onClick = onDisqualify,
-                modifier = Modifier.testTag("crm-lead-disqualify-${lead.leadId}").defaultMinSize(minHeight = ZhiBanSize.TouchTarget),
-            ) { Text("放弃") }
+                danger = true,
+                modifier = Modifier.testTag("crm-lead-disqualify-${lead.leadId}"),
+            )
             if (lead.status != CrmLeadStatus.QUALIFIED) {
-                TextButton(
+                ZhiBanTextActionButton(
+                    text = "标记需求",
                     onClick = onQualify,
-                    modifier = Modifier.testTag("crm-lead-qualify-${lead.leadId}").defaultMinSize(minHeight = ZhiBanSize.TouchTarget),
-                ) { Text("标记需求") }
+                    modifier = Modifier.testTag("crm-lead-qualify-${lead.leadId}"),
+                )
             }
-            TextButton(
+            ZhiBanPrimaryButton(
+                text = "转化为商机",
                 onClick = onConvert,
-                modifier = Modifier.testTag("crm-lead-convert-${lead.leadId}").defaultMinSize(minHeight = ZhiBanSize.TouchTarget),
-            ) { Text("转化为商机", color = ZhiBanTerracotta) }
+                modifier = Modifier.testTag("crm-lead-convert-${lead.leadId}"),
+            )
         }
     }
 }

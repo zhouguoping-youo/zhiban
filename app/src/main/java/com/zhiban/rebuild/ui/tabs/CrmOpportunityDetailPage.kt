@@ -53,6 +53,7 @@ import com.zhiban.rebuild.data.crm.CrmOpportunityStage
 import com.zhiban.rebuild.data.crm.CrmStageHistoryEntity
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanPage
+import com.zhiban.rebuild.ui.components.ZhiBanTextActionButton
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
 import com.zhiban.rebuild.ui.theme.ZhiBanIconSize
@@ -95,7 +96,7 @@ fun CrmOpportunityDetailPage(
                                 {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         CrmDemoBadge()
-                                        TextButton(onClick = viewModel::exitDemo) { Text("退出演示") }
+                                        ZhiBanTextActionButton(text = "退出演示", onClick = viewModel::exitDemo)
                                     }
                                 }
                                 )

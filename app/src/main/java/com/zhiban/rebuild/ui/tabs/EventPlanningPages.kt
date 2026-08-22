@@ -5,9 +5,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -22,11 +22,9 @@ import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.PersonAddAlt
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -48,8 +46,13 @@ import com.zhiban.rebuild.data.event.EventPlanStatus
 import com.zhiban.rebuild.data.event.EventResponseStatus
 import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
 import com.zhiban.rebuild.ui.components.ZhiBanLeadingIcon
+import com.zhiban.rebuild.ui.components.ZhiBanOption
+import com.zhiban.rebuild.ui.components.ZhiBanOptionSheet
 import com.zhiban.rebuild.ui.components.ZhiBanPage
+import com.zhiban.rebuild.ui.components.ZhiBanPrimaryButton
+import com.zhiban.rebuild.ui.components.ZhiBanSecondaryButton
 import com.zhiban.rebuild.ui.components.ZhiBanSectionTitle
+import com.zhiban.rebuild.ui.components.ZhiBanTextActionButton
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
 import com.zhiban.rebuild.ui.components.localizedQuantity
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
@@ -130,7 +133,7 @@ fun EventPlanningDetailPage(planId: String, onBack: () -> Unit, onAskAgent: (Str
     val state by viewModel.state.collectAsStateWithLifecycle()
     val item = state.plans.firstOrNull { it.plan.planId == planId }
     var contactPickerOpen by rememberSaveable { mutableStateOf(false) }
-    var responseContact by remember { mutableStateOf<ContactEntity?>(null) }
+    var responseParticipant by remember { mutableStateOf<EventParticipantUi?>(null) }
     var deleteConfirmOpen by remember { mutableStateOf(false) }
     ZhiBanPage {
         LazyColumn(
@@ -143,8 +146,7 @@ fun EventPlanningDetailPage(planId: String, onBack: () -> Unit, onAskAgent: (Str
                 item = item,
                 state = state,
                 onAddClick = { contactPickerOpen = true },
-                onParticipantClick = { contact -> responseContact = contact },
-                onRemoveParticipant = { contactId -> viewModel.removeParticipant(planId, contactId) },
+                onParticipantClick = { participant -> responseParticipant = participant },
                 onPrepareInvite = { item?.let { onAskAgent(eventInvitePrompt(it)) } },
                 onConfirm = { item?.let { viewModel.confirmToCalendar(it) } },
                 onDelete = { deleteConfirmOpen = true },
@@ -156,8 +158,8 @@ fun EventPlanningDetailPage(planId: String, onBack: () -> Unit, onAskAgent: (Str
         EventPlanningDetailDialogSlots(
             contactPickerOpen = contactPickerOpen,
             setContactPickerOpen = { contactPickerOpen = it },
-            responseContact = responseContact,
-            setResponseContact = { responseContact = it },
+            responseParticipant = responseParticipant,
+            setResponseParticipant = { responseParticipant = it },
             deleteConfirmOpen = deleteConfirmOpen,
             setDeleteConfirmOpen = { deleteConfirmOpen = it },
             item = item,
@@ -268,7 +270,7 @@ private fun EventPlanSpotlight(item: EventPlanUi, onClick: () -> Unit, modifier:
             }
         }
         Text(eventProgressLabel(item), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Button(onClick = onClick, modifier = Modifier.fillMaxWidth().height(48.dp)) { Text("继续安排") }
+        ZhiBanPrimaryButton(text = "继续安排", onClick = onClick, modifier = Modifier.fillMaxWidth())
     }
 }
 
@@ -320,14 +322,21 @@ private fun EventPlanRow(item: EventPlanUi, onClick: () -> Unit, modifier: Modif
 }
 
 @Composable
-private fun ParticipantRow(participant: EventParticipantUi, onClick: () -> Unit, onRemove: () -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+private fun ParticipantRow(participant: EventParticipantUi, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.fillMaxWidth().defaultMinSize(minHeight = ZhiBanSize.ListRow).clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Column(Modifier.weight(1f)) {
             Text(participant.contact.displayName, style = MaterialTheme.typography.titleMedium)
             Text(responseLabel(participant.responseStatus), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        TextButton(onClick = onClick) { Text("更新") }
-        TextButton(onClick = onRemove) { Text("移除") }
+        Icon(
+            Icons.AutoMirrored.Outlined.ArrowForward,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(ZhiBanIconSize.Inline),
+        )
     }
 }
 
@@ -400,8 +409,8 @@ private val EVENT_DATE_FORMAT = DateTimeFormatter.ofPattern("M月d日 E HH:mm")
 private data class EventPlanningDetailDialogSlots(
     val contactPickerOpen: Boolean,
     val setContactPickerOpen: (Boolean) -> Unit,
-    val responseContact: ContactEntity?,
-    val setResponseContact: (ContactEntity?) -> Unit,
+    val responseParticipant: EventParticipantUi?,
+    val setResponseParticipant: (EventParticipantUi?) -> Unit,
     val deleteConfirmOpen: Boolean,
     val setDeleteConfirmOpen: (Boolean) -> Unit,
     val item: EventPlanUi?,
@@ -423,14 +432,22 @@ private fun EventPlanningDetailDialogs(slots: EventPlanningDetailDialogSlots) {
             },
         )
     }
-    slots.responseContact?.let { contact ->
-        ResponseStatusDialog(
-            contactName = contact.displayName,
-            onDismiss = { slots.setResponseContact(null) },
+    slots.responseParticipant?.let { participant ->
+        ZhiBanOptionSheet(
+            title = participant.contact.displayName,
+            options = listOf(
+                ZhiBanOption(EventResponseStatus.GOING, "会参加"),
+                ZhiBanOption(EventResponseStatus.MAYBE, "待确定"),
+                ZhiBanOption(EventResponseStatus.DECLINED, "不能参加"),
+                ZhiBanOption(EventResponseStatus.PENDING, "等待回复"),
+            ),
+            selected = participant.responseStatus,
             onSelect = { status ->
-                slots.viewModel.updateResponse(slots.planId, contact.contactId, status)
-                slots.setResponseContact(null)
+                slots.viewModel.updateResponse(slots.planId, participant.contact.contactId, status)
             },
+            onDismissRequest = { slots.setResponseParticipant(null) },
+            dangerLabel = "移除参与人",
+            onDanger = { slots.viewModel.removeParticipant(slots.planId, participant.contact.contactId) },
         )
     }
     if (slots.deleteConfirmOpen && slots.item != null) {
@@ -461,8 +478,7 @@ private fun LazyListScope.eventPlanDetailContent(
     item: EventPlanUi?,
     state: EventPlanningState,
     onAddClick: () -> Unit,
-    onParticipantClick: (ContactEntity) -> Unit,
-    onRemoveParticipant: (String) -> Unit,
+    onParticipantClick: (EventParticipantUi) -> Unit,
     onPrepareInvite: () -> Unit,
     onConfirm: () -> Unit,
     onDelete: () -> Unit,
@@ -482,21 +498,18 @@ private fun LazyListScope.eventPlanDetailContent(
         }
         if (item.participants.isEmpty()) {
             item {
-                OutlinedButton(
+                ZhiBanSecondaryButton(
+                    text = "选择联系人",
                     onClick = { onAddClick() },
-                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal).fillMaxWidth().height(48.dp),
-                ) {
-                    Icon(Icons.Outlined.PersonAddAlt, null, Modifier.size(ZhiBanIconSize.Inline))
-                    Spacer(Modifier.size(ZhiBanSpacing.Sm))
-                    Text("选择联系人")
-                }
+                    icon = Icons.Outlined.PersonAddAlt,
+                    modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal).fillMaxWidth(),
+                )
             }
         } else {
             items(item.participants, key = { it.contact.contactId }) { participant ->
                 ParticipantRow(
                     participant = participant,
-                    onClick = { onParticipantClick(participant.contact) },
-                    onRemove = { onRemoveParticipant(participant.contact.contactId) },
+                    onClick = { onParticipantClick(participant) },
                     modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
                 )
             }
@@ -506,24 +519,25 @@ private fun LazyListScope.eventPlanDetailContent(
                 modifier = Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
                 verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Sm),
             ) {
-                OutlinedButton(
+                if (item.plan.status != EventPlanStatus.CONFIRMED) {
+                    ZhiBanPrimaryButton(
+                        text = "确定并加入日历",
+                        onClick = { onConfirm() },
+                        enabled = item.participants.isNotEmpty(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                ZhiBanSecondaryButton(
+                    text = "准备邀请",
                     onClick = { onPrepareInvite() },
                     enabled = item.participants.isNotEmpty(),
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                ) { Text("准备邀请") }
-                Button(
-                    onClick = { onConfirm() },
-                    enabled = item.participants.isNotEmpty() && item.plan.status != EventPlanStatus.CONFIRMED,
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                ) {
-                    Text(if (item.plan.status == EventPlanStatus.CONFIRMED) "已加入日历" else "确定并加入日历")
-                }
-                TextButton(
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                ZhiBanTextActionButton(
+                    text = "删除这项安排",
                     onClick = { onDelete() },
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                ) {
-                    Text("删除这项安排", color = MaterialTheme.colorScheme.error)
-                }
+                    danger = true,
+                )
             }
         }
     }

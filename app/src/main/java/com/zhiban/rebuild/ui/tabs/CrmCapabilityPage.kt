@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,7 +19,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -35,6 +33,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zhiban.rebuild.data.crm.CrmLeadEntity
 import com.zhiban.rebuild.data.crm.CrmLeadStatus
 import com.zhiban.rebuild.ui.components.ZhiBanPage
+import com.zhiban.rebuild.ui.components.ZhiBanPrimaryButton
+import com.zhiban.rebuild.ui.components.ZhiBanTextActionButton
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
 import com.zhiban.rebuild.ui.theme.ZhiBanIconSize
@@ -79,9 +79,9 @@ fun CrmCapabilityPage(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             if (state.isDemo) {
                                 CrmDemoBadge()
-                                TextButton(onClick = viewModel::exitDemo) { Text("退出演示") }
+                                ZhiBanTextActionButton(text = "退出演示", onClick = viewModel::exitDemo)
                             } else {
-                                TextButton(onClick = viewModel::enterDemo) { Text("查看演示") }
+                                ZhiBanTextActionButton(text = "查看演示", onClick = viewModel::enterDemo)
                             }
                             if (!state.isDemo && !isWorkbenchEmpty) {
                                 IconButton(
@@ -284,23 +284,17 @@ internal fun CrmCandidateLeadCard(
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            TextButton(
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+            ZhiBanTextActionButton(
+                text = "忽略",
                 onClick = onIgnore,
-                modifier = Modifier.testTag(
-                    "crm-candidate-ignore-${lead.leadId}",
-                ).defaultMinSize(minHeight = ZhiBanSize.TouchTarget),
-            ) {
-                Text("忽略")
-            }
-            TextButton(
+                modifier = Modifier.testTag("crm-candidate-ignore-${lead.leadId}"),
+            )
+            ZhiBanPrimaryButton(
+                text = "转为正式线索",
                 onClick = onPromote,
-                modifier = Modifier.testTag(
-                    "crm-candidate-promote-${lead.leadId}",
-                ).defaultMinSize(minHeight = ZhiBanSize.TouchTarget),
-            ) {
-                Text("转为正式线索", color = ZhiBanTerracotta)
-            }
+                modifier = Modifier.testTag("crm-candidate-promote-${lead.leadId}"),
+            )
         }
     }
 }

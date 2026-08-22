@@ -17,19 +17,23 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import com.zhiban.rebuild.ui.components.ZhiBanPrimaryButton
+import com.zhiban.rebuild.ui.components.ZhiBanTextActionButton
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
 import com.zhiban.rebuild.ui.theme.ZhiBanIconSize
 import com.zhiban.rebuild.ui.theme.ZhiBanSize
@@ -114,25 +118,19 @@ internal fun CrmPriorityCard(priority: CrmPriorityUi, primary: Boolean, onOpen: 
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (primary && onPrepare != null) {
-            FilledTonalButton(
+            ZhiBanPrimaryButton(
+                text = "让知伴准备",
                 onClick = onPrepare,
-                modifier = Modifier.defaultMinSize(minHeight = ZhiBanSize.TouchTarget)
-                    .testTag("crm-priority-prepare"),
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = ZhiBanTerracotta,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-            ) {
-                Icon(Icons.Outlined.AutoAwesome, contentDescription = null, modifier = Modifier.size(ZhiBanIconSize.Inline))
-                Spacer(Modifier.width(ZhiBanSpacing.Sm))
-                Text("让知伴准备")
-            }
+                icon = Icons.Outlined.AutoAwesome,
+                modifier = Modifier.testTag("crm-priority-prepare"),
+            )
         }
     }
 }
 
 @Composable
 internal fun CrmOpportunityGuidanceCard(guidance: CrmOpportunityGuidanceUi, onPrepare: () -> Unit, onCalendar: (() -> Unit)?, modifier: Modifier = Modifier) {
+    var evidenceExpanded by rememberSaveable { mutableStateOf(false) }
     Column(
         modifier.fillMaxWidth().testTag("crm-opportunity-guidance")
             .zhiBanCardSurface(ZhiBanTerracottaSoft).padding(ZhiBanSpacing.Lg),
@@ -141,28 +139,27 @@ internal fun CrmOpportunityGuidanceCard(guidance: CrmOpportunityGuidanceUi, onPr
         Text("知伴建议", style = MaterialTheme.typography.labelLarge, color = ZhiBanTerracotta)
         Text(guidance.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Text(guidance.summary, style = MaterialTheme.typography.bodyMedium)
-        Text(
-            "依据：${guidance.evidence}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        // 依据不进首屏，统一收进「查看依据」（§八）。
+        ZhiBanTextActionButton(
+            text = if (evidenceExpanded) "收起依据" else "查看依据",
+            onClick = { evidenceExpanded = !evidenceExpanded },
         )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        if (evidenceExpanded) {
+            Text(
+                "依据：${guidance.evidence}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
             if (onCalendar != null) {
-                TextButton(onClick = onCalendar, modifier = Modifier.defaultMinSize(minHeight = ZhiBanSize.TouchTarget)) {
-                    Text("查看日历")
-                }
+                ZhiBanTextActionButton(text = "查看日历", onClick = onCalendar)
             }
-            FilledTonalButton(
+            ZhiBanPrimaryButton(
+                text = "让知伴准备",
                 onClick = onPrepare,
-                modifier = Modifier.defaultMinSize(minHeight = ZhiBanSize.TouchTarget)
-                    .testTag("crm-opportunity-guidance-prepare"),
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = ZhiBanTerracotta,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-            ) {
-                Text("让知伴准备")
-            }
+                modifier = Modifier.testTag("crm-opportunity-guidance-prepare"),
+            )
         }
     }
 }
