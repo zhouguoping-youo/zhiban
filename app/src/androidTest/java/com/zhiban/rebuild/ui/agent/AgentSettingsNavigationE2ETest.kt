@@ -154,11 +154,14 @@ class AgentSettingsNavigationE2ETest {
         compose.onNodeWithContentDescription("返回").performClick()
 
         compose.onNodeWithText("手机权限").performScrollTo().performClick()
+        // 首屏先验手机权限卡(在页顶);再让列表滚到「数据与隐私详情」——LazyColumn 虚拟化,
+        // 屏外段落不在语义树里,必须先滚动列表再断言。
         compose.onNodeWithText("手机权限").assertIsDisplayed()
-        compose.onNodeWithText("知伴能做什么").assertIsDisplayed()
-        compose.onNodeWithText("数据与隐私详情").assertIsDisplayed()
         compose.onNodeWithText("联系人").assertIsDisplayed()
         compose.onNodeWithText("日历").assertIsDisplayed()
+        compose.onNodeWithText("知伴能做什么").assertIsDisplayed()
+        compose.onNodeWithTag("privacy_permission_list").performScrollToNode(hasText("数据与隐私详情"))
+        compose.onNodeWithText("数据与隐私详情").assertIsDisplayed()
         compose.onNodeWithText("数据发送范围").assertDoesNotExist()
         compose.onNodeWithText("模型数据发送").assertDoesNotExist()
         compose.onNodeWithText("允许远程语义检索").assertDoesNotExist()

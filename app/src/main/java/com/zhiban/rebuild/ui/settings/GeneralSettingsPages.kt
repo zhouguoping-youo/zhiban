@@ -59,6 +59,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
@@ -178,7 +179,9 @@ fun PrivacySecurityPage(
 
     SettingsPageFrame("隐私与权限", onBack) {
         LazyColumn(
-            Modifier.padding(horizontal = ZhiBanSpacing.PageHorizontal),
+            Modifier
+                .padding(horizontal = ZhiBanSpacing.PageHorizontal)
+                .testTag("privacy_permission_list"),
             verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Md),
         ) {
             item {

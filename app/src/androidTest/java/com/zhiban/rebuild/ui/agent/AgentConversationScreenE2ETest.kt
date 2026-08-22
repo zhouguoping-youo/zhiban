@@ -15,6 +15,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import com.zhiban.rebuild.data.notification.NotificationCandidateEntity
@@ -280,11 +281,13 @@ class AgentConversationScreenE2ETest {
             }
         }
 
-        compose.onNodeWithText("识别到一项安排").assertIsDisplayed()
-        compose.onNodeWithText("王敏 · 项目会议").assertIsDisplayed()
-        compose.onNodeWithText("确认安排").assertIsDisplayed().performClick()
+        // §六:感知条先给识别结论和理由,按钮按结果命名(加入日历/不记录)。
+        compose.onNodeWithText("识别到安排：项目会议").assertIsDisplayed()
+        compose.onNodeWithText("王敏", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("写进日历前需要你确认").assertIsDisplayed()
+        compose.onNodeWithText("加入日历").assertIsDisplayed().performClick()
         assertEquals("candidate-1", confirmed.get())
-        compose.onNodeWithText("忽略").performClick()
+        compose.onNodeWithText("不记录").performClick()
         assertEquals("candidate-1", dismissed.get())
     }
 
@@ -725,7 +728,7 @@ class AgentConversationScreenE2ETest {
         assertEquals(0, retry.get())
     }
 
-    @Test fun structuredLongReplyRendersHeadingsListsCodeAndAutomaticallyShowsLatestContent() {
+    @Test fun structuredLongReplyCollapsesToConclusionHeadAndExpandsOnDemand() {
         val longTail = (1..60).joinToString("\n") { "- 第 $it 条可核对结果" }
         compose.setContent {
             ZhiBanTheme {
@@ -738,9 +741,12 @@ class AgentConversationScreenE2ETest {
             }
         }
         compose.waitForIdle()
+        // §六长文约束:超过阈值的回复默认只渲染结论头部,其余收进「展开全文」。
         compose.onNodeWithText("执行结果").assertExists()
         compose.onNodeWithText("{\"status\":\"ok\"}").assertExists()
-        compose.onNodeWithText("第 60 条可核对结果").assertIsDisplayed()
-        compose.onNodeWithContentDescription("滚动到最新").assertDoesNotExist()
+        compose.onNodeWithText("第 60 条可核对结果").assertDoesNotExist()
+        compose.onNodeWithText("展开全文").assertIsDisplayed().performClick()
+        compose.onNodeWithText("收起").assertExists()
+        compose.onNodeWithText("第 60 条可核对结果").performScrollTo().assertIsDisplayed()
     }
 }
