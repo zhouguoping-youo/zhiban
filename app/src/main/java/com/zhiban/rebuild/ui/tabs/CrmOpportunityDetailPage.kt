@@ -51,13 +51,13 @@ import com.zhiban.rebuild.data.crm.CrmActionStatus
 import com.zhiban.rebuild.data.crm.CrmActivityEntity
 import com.zhiban.rebuild.data.crm.CrmOpportunityStage
 import com.zhiban.rebuild.data.crm.CrmStageHistoryEntity
-import com.zhiban.rebuild.ui.components.ZhiBanAlertDialog
+import com.zhiban.rebuild.ui.components.ZhiBanOption
+import com.zhiban.rebuild.ui.components.ZhiBanOptionSheet
 import com.zhiban.rebuild.ui.components.ZhiBanPage
 import com.zhiban.rebuild.ui.components.ZhiBanTextActionButton
 import com.zhiban.rebuild.ui.components.ZhiBanTopBar
 import com.zhiban.rebuild.ui.components.zhiBanCardSurface
 import com.zhiban.rebuild.ui.theme.ZhiBanIconSize
-import com.zhiban.rebuild.ui.theme.ZhiBanRadius
 import com.zhiban.rebuild.ui.theme.ZhiBanSize
 import com.zhiban.rebuild.ui.theme.ZhiBanSpacing
 import com.zhiban.rebuild.ui.theme.ZhiBanTerracotta
@@ -309,13 +309,14 @@ fun CrmOpportunityDetailPage(
     }
 
     if (showStageDialog && opportunity != null) {
-        CrmStageDialog(
-            currentStage = opportunity.entity.stage,
-            onDismiss = { showStageDialog = false },
-            onConfirm = { stage ->
-                showStageDialog = false
-                viewModel.changeStage(opportunity.entity.opportunityId, stage)
+        ZhiBanOptionSheet(
+            title = "调整推进阶段",
+            options = (crmVisibleStages + CrmOpportunityStage.LOST).map { stage ->
+                ZhiBanOption(stage, crmStageLabel(stage))
             },
+            selected = opportunity.entity.stage,
+            onSelect = { stage -> viewModel.changeStage(opportunity.entity.opportunityId, stage) },
+            onDismissRequest = { showStageDialog = false },
         )
     }
 }
@@ -520,64 +521,4 @@ private fun CrmHistoryRow(history: CrmStageHistoryEntity, modifier: Modifier = M
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-}
-
-@Composable
-private fun CrmStageDialog(currentStage: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
-    var pendingStage by remember(currentStage) { mutableStateOf(currentStage) }
-    ZhiBanAlertDialog(
-        onDismissRequest = onDismiss,
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(ZhiBanRadius.Dialog),
-        title = { Text("调整推进阶段") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(ZhiBanSpacing.Xs)) {
-                (crmVisibleStages + CrmOpportunityStage.LOST).forEach { stage ->
-                    Row(
-                        Modifier.fillMaxWidth().defaultMinSize(
-                            minHeight = ZhiBanSize.TouchTarget,
-                        ).clip(androidx.compose.foundation.shape.RoundedCornerShape(ZhiBanRadius.Small))
-                            .background(
-                                if (pendingStage ==
-                                    stage
-                                ) {
-                                    ZhiBanTerracottaSoft
-                                } else {
-                                    MaterialTheme.colorScheme.surface
-                                },
-                            )
-                            .clickable { pendingStage = stage }.padding(horizontal = ZhiBanSpacing.Md),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            crmStageLabel(stage),
-                            Modifier.weight(1f),
-                            color = if (pendingStage ==
-                                stage
-                            ) {
-                                ZhiBanTerracotta
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            },
-                        )
-                        if (pendingStage ==
-                            stage
-                        ) {
-                            Icon(
-                                Icons.Outlined.CheckCircleOutline,
-                                contentDescription = null,
-                                tint = ZhiBanTerracotta,
-                                modifier = Modifier.size(ZhiBanIconSize.Inline),
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
-        confirmButton = {
-            TextButton(onClick = {
-                onConfirm(pendingStage)
-            }, enabled = pendingStage != currentStage) { Text("确认调整", color = ZhiBanTerracotta) }
-        },
-    )
 }
